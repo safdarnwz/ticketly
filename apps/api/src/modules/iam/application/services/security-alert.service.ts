@@ -4,7 +4,10 @@ import { DatabaseService } from '@database';
 import type { TenantId, UserId } from '@kernel';
 import { Logger } from '@observability';
 
-import { shouldAlertOnFailures, shouldAlertOnNewIp } from '../../../platform-settings/domain/suspicious-login';
+import {
+  shouldAlertOnFailures,
+  shouldAlertOnNewIp,
+} from '../../../platform-settings/domain/suspicious-login';
 import { PlatformPoliciesService } from '../../../platform-settings/platform-policies.service';
 import { Mailer } from '../../infrastructure/mail/mailer';
 import { SessionRepository } from '../../infrastructure/persistence/session.repository';
@@ -31,9 +34,19 @@ export class SecurityAlertService {
   }
 
   /** Record a failed password attempt and alert when the account crosses the threshold. */
-  async onLoginFailed(user: { id: UserId; tenantId: TenantId | null; email: string | null }, ip: string | undefined): Promise<void> {
+  async onLoginFailed(
+    user: { id: UserId; tenantId: TenantId | null; email: string | null },
+    ip: string | undefined,
+  ): Promise<void> {
     try {
-      await this.audit.record({ action: 'user.login_failed', resourceType: 'user', resourceId: user.id, tenantId: user.tenantId, actorId: user.id, actorType: 'user' });
+      await this.audit.record({
+        action: 'user.login_failed',
+        resourceType: 'user',
+        resourceId: user.id,
+        tenantId: user.tenantId,
+        actorId: user.id,
+        actorType: 'user',
+      });
       const policy = await this.policies.suspiciousLoginPolicy();
       if (!policy.enabled) return;
       const row = await this.db.queryOne<{ n: string }>(
@@ -45,7 +58,13 @@ export class SecurityAlertService {
       );
       const failures = Number(row?.n ?? 0);
       if (shouldAlertOnFailures(policy, failures)) {
-        await this.raise('repeated_failures', user, ip, policy.alertEmails, `${failures} failed sign-in attempts in ${policy.windowMinutes} minutes`);
+        await this.raise(
+          'repeated_failures',
+          user,
+          ip,
+          policy.alertEmails,
+          `${failures} failed sign-in attempts in ${policy.windowMinutes} minutes`,
+        );
       }
     } catch (err) {
       this.log.error({ err, userId: user.id }, 'failed-login alert check failed');
@@ -53,13 +72,22 @@ export class SecurityAlertService {
   }
 
   /** Alert when a platform admin signs in from an IP not seen in their recent sessions. Call BEFORE the new session is created. */
-  async onPlatformAdminLogin(user: { id: UserId; tenantId: TenantId | null; email: string | null }, ip: string | undefined): Promise<void> {
+  async onPlatformAdminLogin(
+    user: { id: UserId; tenantId: TenantId | null; email: string | null },
+    ip: string | undefined,
+  ): Promise<void> {
     try {
       const policy = await this.policies.suspiciousLoginPolicy();
       if (!policy.enabled || !policy.alertOnNewAdminIp) return;
       const recent = await this.sessions.recentIps(user.id, user.tenantId);
       if (shouldAlertOnNewIp(policy, ip, recent)) {
-        await this.raise('new_admin_ip', user, ip, policy.alertEmails, `Platform admin signed in from a new IP address (${ip})`);
+        await this.raise(
+          'new_admin_ip',
+          user,
+          ip,
+          policy.alertEmails,
+          `Platform admin signed in from a new IP address (${ip})`,
+        );
       }
     } catch (err) {
       this.log.error({ err, userId: user.id }, 'new-IP alert check failed');
@@ -74,20 +102,33 @@ export class SecurityAlertService {
     summary: string,
   ): Promise<void> {
     await this.audit.record({
-      action: 'security.suspicious_login', resourceType: 'user', resourceId: user.id, tenantId: user.tenantId,
-      actorType: 'system', changes: { kind, ip: ip ?? null, summary },
+      action: 'security.suspicious_login',
+      resourceType: 'user',
+      resourceId: user.id,
+      tenantId: user.tenantId,
+      actorType: 'system',
+      changes: { kind, ip: ip ?? null, summary },
     });
     const subject = `[Ticketly security] ${summary}`;
     const html = `<p>${escapeHtml(summary)}.</p>
       <p>Account: ${escapeHtml(user.email ?? user.id)}<br/>IP: ${escapeHtml(ip ?? 'unknown')}<br/>Time: ${new Date().toISOString()}</p>
       <p>If this was not expected, lock the account and review the audit log.</p>`;
     for (const to of recipients) {
-      await this.mailer.send({ to, subject, html, text: `${summary}. Account: ${user.email ?? user.id}. IP: ${ip ?? 'unknown'}.` })
+      await this.mailer
+        .send({
+          to,
+          subject,
+          html,
+          text: `${summary}. Account: ${user.email ?? user.id}. IP: ${ip ?? 'unknown'}.`,
+        })
         .catch((err: unknown) => this.log.error({ err, to }, 'security alert email failed'));
     }
   }
 }
 
 function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+  return value.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
 }

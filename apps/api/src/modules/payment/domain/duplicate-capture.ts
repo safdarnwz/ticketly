@@ -8,9 +8,13 @@
  */
 export type CaptureDecision = 'record' | 'already_recorded' | 'duplicate';
 
-export function classifyCapture(locked: { status: string; gatewayPaymentId: string | null } | null, incomingPaymentId: string): CaptureDecision | null {
+export function classifyCapture(
+  locked: { status: string; gatewayPaymentId: string | null } | null,
+  incomingPaymentId: string,
+): CaptureDecision | null {
   if (!locked) return null;
   if (locked.status !== 'captured') return 'record';
-  if (!locked.gatewayPaymentId || locked.gatewayPaymentId === incomingPaymentId) return 'already_recorded';
+  if (!locked.gatewayPaymentId || locked.gatewayPaymentId === incomingPaymentId)
+    return 'already_recorded';
   return 'duplicate';
 }

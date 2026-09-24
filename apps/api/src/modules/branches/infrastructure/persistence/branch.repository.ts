@@ -17,24 +17,46 @@ export interface Branch {
 export class BranchRepository {
   constructor(private readonly db: DatabaseService) {}
 
-  async create(input: { name: string; address?: string; phone?: string; managerUserId?: string }): Promise<BranchId> {
+  async create(input: {
+    name: string;
+    address?: string;
+    phone?: string;
+    managerUserId?: string;
+  }): Promise<BranchId> {
     const id = newId() as BranchId;
     await this.db.execute_(
       `INSERT INTO branches (id, tenant_id, name, address, phone, manager_user_id)
        VALUES ($1,$2,$3,$4,$5,$6)`,
-      [id, requireTenantId(), input.name, input.address ?? null, input.phone ?? null, input.managerUserId ?? null],
+      [
+        id,
+        requireTenantId(),
+        input.name,
+        input.address ?? null,
+        input.phone ?? null,
+        input.managerUserId ?? null,
+      ],
       { name: 'branch.create', primary: true },
     );
     return id;
   }
 
-  async update(id: BranchId, input: { name?: string; address?: string; phone?: string; managerUserId?: string }): Promise<void> {
+  async update(
+    id: BranchId,
+    input: { name?: string; address?: string; phone?: string; managerUserId?: string },
+  ): Promise<void> {
     await this.db.execute_(
       `UPDATE branches SET
          name = coalesce($3, name), address = coalesce($4, address),
          phone = coalesce($5, phone), manager_user_id = coalesce($6, manager_user_id)
        WHERE tenant_id = $1 AND id = $2`,
-      [requireTenantId(), id, input.name ?? null, input.address ?? null, input.phone ?? null, input.managerUserId ?? null],
+      [
+        requireTenantId(),
+        id,
+        input.name ?? null,
+        input.address ?? null,
+        input.phone ?? null,
+        input.managerUserId ?? null,
+      ],
       { name: 'branch.update', primary: true },
     );
   }
@@ -69,9 +91,22 @@ export class BranchRepository {
 }
 
 interface BranchRow {
-  id: BranchId; name: string; address: string | null; phone: string | null;
-  manager_user_id: string | null; status: Branch['status']; created_at: Date;
+  id: BranchId;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  manager_user_id: string | null;
+  status: Branch['status'];
+  created_at: Date;
 }
 function map(r: BranchRow): Branch {
-  return { id: r.id, name: r.name, address: r.address, phone: r.phone, managerUserId: r.manager_user_id, status: r.status, createdAt: r.created_at };
+  return {
+    id: r.id,
+    name: r.name,
+    address: r.address,
+    phone: r.phone,
+    managerUserId: r.manager_user_id,
+    status: r.status,
+    createdAt: r.created_at,
+  };
 }

@@ -1,9 +1,4 @@
-import {
-  Catch,
-  HttpException,
-  type ArgumentsHost,
-  type ExceptionFilter,
-} from '@nestjs/common';
+import { Catch, HttpException, type ArgumentsHost, type ExceptionFilter } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { AppConfig } from '@config';
@@ -61,13 +56,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
       type: `${this.config.app.publicBaseUrl}/errors/${appError.code}`,
       title: appError.message,
       status: appError.status,
-      detail: appError.status >= 500 && this.config.isProduction ? 'An unexpected error occurred' : appError.message,
+      detail:
+        appError.status >= 500 && this.config.isProduction
+          ? 'An unexpected error occurred'
+          : appError.message,
       instance: request.url,
       code: appError.code,
       retryable: appError.retryable,
       ...(ctx ? { requestId: ctx.requestId } : {}),
       ...(traceId ? { traceId } : {}),
-      ...(appError.details !== undefined && appError.status < 500 ? { errors: appError.details } : {}),
+      ...(appError.details !== undefined && appError.status < 500
+        ? { errors: appError.details }
+        : {}),
       timestamp: appError.timestamp,
     };
 
@@ -85,10 +85,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       void reply.header('WWW-Authenticate', `Bearer realm="${this.config.security.issuer}"`);
     }
 
-    void reply
-      .status(appError.status)
-      .type('application/problem+json')
-      .send(body);
+    void reply.status(appError.status).type('application/problem+json').send(body);
   }
 
   private normalise(exception: unknown): AppError {

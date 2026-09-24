@@ -17,8 +17,8 @@
 export interface FarePlanCandidate {
   id: string;
   effectiveFrom: string | null; // YYYY-MM-DD inclusive
-  effectiveTo: string | null;   // YYYY-MM-DD inclusive
-  weekdays: number[] | null;    // ISO 1=Mon … 7=Sun; null/empty = every day
+  effectiveTo: string | null; // YYYY-MM-DD inclusive
+  weekdays: number[] | null; // ISO 1=Mon … 7=Sun; null/empty = every day
 }
 
 export function isoWeekday(dateYmd: string): number {
@@ -35,17 +35,22 @@ function windowDays(p: FarePlanCandidate): number {
 export function appliesOn(p: FarePlanCandidate, dateYmd: string): boolean {
   if (p.effectiveFrom && dateYmd < p.effectiveFrom) return false;
   if (p.effectiveTo && dateYmd > p.effectiveTo) return false;
-  if (p.weekdays && p.weekdays.length > 0 && !p.weekdays.includes(isoWeekday(dateYmd))) return false;
+  if (p.weekdays && p.weekdays.length > 0 && !p.weekdays.includes(isoWeekday(dateYmd)))
+    return false;
   return true;
 }
 
-export function selectFarePlan(plans: FarePlanCandidate[], dateYmd: string): FarePlanCandidate | null {
+export function selectFarePlan(
+  plans: FarePlanCandidate[],
+  dateYmd: string,
+): FarePlanCandidate | null {
   const eligible = plans.filter((p) => appliesOn(p, dateYmd));
   if (eligible.length === 0) return null;
   return [...eligible].sort((a, b) => {
     const w = windowDays(a) - windowDays(b);
     if (w !== 0 && Number.isFinite(w)) return w;
-    if (Number.isFinite(windowDays(a)) !== Number.isFinite(windowDays(b))) return Number.isFinite(windowDays(a)) ? -1 : 1;
+    if (Number.isFinite(windowDays(a)) !== Number.isFinite(windowDays(b)))
+      return Number.isFinite(windowDays(a)) ? -1 : 1;
     const wa = a.weekdays?.length ? 1 : 0;
     const wb = b.weekdays?.length ? 1 : 0;
     if (wa !== wb) return wb - wa;
@@ -54,10 +59,16 @@ export function selectFarePlan(plans: FarePlanCandidate[], dateYmd: string): Far
 }
 
 /** Validate a plan's date range / weekday filter before saving. Returns an error or null. */
-export function validatePlanWindow(p: { effectiveFrom?: string | null; effectiveTo?: string | null; weekdays?: number[] | null }): string | null {
-  if (p.effectiveFrom && p.effectiveTo && p.effectiveTo < p.effectiveFrom) return 'The end date cannot be before the start date';
+export function validatePlanWindow(p: {
+  effectiveFrom?: string | null;
+  effectiveTo?: string | null;
+  weekdays?: number[] | null;
+}): string | null {
+  if (p.effectiveFrom && p.effectiveTo && p.effectiveTo < p.effectiveFrom)
+    return 'The end date cannot be before the start date';
   if (p.weekdays) {
-    if (p.weekdays.some((d) => !Number.isInteger(d) || d < 1 || d > 7)) return 'Weekdays must be 1 (Mon) to 7 (Sun)';
+    if (p.weekdays.some((d) => !Number.isInteger(d) || d < 1 || d > 7))
+      return 'Weekdays must be 1 (Mon) to 7 (Sun)';
     if (new Set(p.weekdays).size !== p.weekdays.length) return 'A weekday is listed twice';
   }
   return null;

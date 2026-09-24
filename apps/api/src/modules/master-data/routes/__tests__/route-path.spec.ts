@@ -66,7 +66,11 @@ describe('RoutePath — happy path', () => {
 
 describe('RoutePath — negative & edge cases', () => {
   it('rejects a route with fewer than 2 stops', () => {
-    expect(() => RoutePath.create(minuteOfDay('06:00'), [{ stopId: A, sequence: 0, distanceFromOriginM: 0, departOffsetMin: 0 }])).toThrow(/at least 2 stops/);
+    expect(() =>
+      RoutePath.create(minuteOfDay('06:00'), [
+        { stopId: A, sequence: 0, distanceFromOriginM: 0, departOffsetMin: 0 },
+      ]),
+    ).toThrow(/at least 2 stops/);
   });
 
   it('rejects gapped or non-zero-based sequences', () => {
@@ -78,7 +82,9 @@ describe('RoutePath — negative & edge cases', () => {
   it('rejects a non-zero origin departure offset', () => {
     const stops = fourStopRoute();
     stops[0].departOffsetMin = 15;
-    expect(() => RoutePath.create(minuteOfDay('06:00'), stops)).toThrow(/origin stop must depart at offset 0/);
+    expect(() => RoutePath.create(minuteOfDay('06:00'), stops)).toThrow(
+      /origin stop must depart at offset 0/,
+    );
   });
 
   it('rejects distance going backwards', () => {

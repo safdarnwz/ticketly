@@ -46,7 +46,14 @@ import { Pool, type PoolClient } from 'pg';
 
 import { buildAppConfig, loadEnv } from '@config';
 import { FieldEncryptor, PasswordHasher } from '@security';
-import { runInNewContext, localDate, addDays, todayIn, type TenantId, type TimeZone } from '@kernel';
+import {
+  runInNewContext,
+  localDate,
+  addDays,
+  todayIn,
+  type TenantId,
+  type TimeZone,
+} from '@kernel';
 import { UnitOfWork } from '@database';
 
 import { AppModule } from '../apps/api/src/app.module';
@@ -71,8 +78,12 @@ const TOTAL_CUSTOMERS = 1000;
 const TARGET_BOOKINGS = 1000;
 const START_DATE = '2026-09-01';
 
-function rand(n: number): number { return Math.floor(Math.random() * n); }
-function pick<T>(arr: T[]): T { return arr[rand(arr.length)]; }
+function rand(n: number): number {
+  return Math.floor(Math.random() * n);
+}
+function pick<T>(arr: T[]): T {
+  return arr[rand(arr.length)];
+}
 
 const REVIEW_TITLES: [number, string, string][] = [
   [5, 'Great journey!', 'Comfortable seats, driver was careful, reached on time.'],
@@ -84,7 +95,14 @@ const REVIEW_TITLES: [number, string, string][] = [
 ];
 
 /** ~40% of successfully-completed bookings get a review — a real passenger base never reviews every single trip. */
-async function maybeAddReview(client: PoolClient, tenantId: string, bookingId: string, customerId: string, routeId: string, tripId: string): Promise<void> {
+async function maybeAddReview(
+  client: PoolClient,
+  tenantId: string,
+  bookingId: string,
+  customerId: string,
+  routeId: string,
+  tripId: string,
+): Promise<void> {
   if (Math.random() >= 0.4) return;
   const [rating, title, body] = pick(REVIEW_TITLES);
   try {
@@ -94,14 +112,23 @@ async function maybeAddReview(client: PoolClient, tenantId: string, bookingId: s
        ON CONFLICT (tenant_id, booking_id) DO NOTHING`,
       [tenantId, bookingId, customerId, routeId, tripId, rating, title, body],
     );
-  } catch { /* best-effort — a review must never abort the booking flow */ }
+  } catch {
+    /* best-effort — a review must never abort the booking flow */
+  }
 }
 
 async function main(): Promise<void> {
   const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error', 'warn'] });
   const env = loadEnv();
   const config = buildAppConfig(env);
-  const pool = new Pool({ host: env.DB_HOST, port: env.DB_PORT, database: env.DB_NAME, user: env.DB_USER, password: env.DB_PASSWORD, max: 4 });
+  const pool = new Pool({
+    host: env.DB_HOST,
+    port: env.DB_PORT,
+    database: env.DB_NAME,
+    user: env.DB_USER,
+    password: env.DB_PASSWORD,
+    max: 4,
+  });
   const client = await pool.connect();
   const encryptor = new FieldEncryptor(config);
   const hasher = new PasswordHasher(config);
@@ -125,7 +152,11 @@ async function main(): Promise<void> {
   const today = todayIn(tz);
 
   // ---- 1) Tenants -----------------------------------------------------
-  const tenantRows = (await client.query<{ id: string; slug: string }>(`SELECT id, slug FROM tenants ORDER BY created_at`)).rows;
+  const tenantRows = (
+    await client.query<{ id: string; slug: string }>(
+      `SELECT id, slug FROM tenants ORDER BY created_at`,
+    )
+  ).rows;
   process.stdout.write(`Found ${tenantRows.length} tenants.\n`);
 
   // ---- 2) Historical trip materialisation, per tenant ------------------
@@ -137,9 +168,16 @@ async function main(): Promise<void> {
         const vType = await vehicleTypes.getById(svc.vehicleTypeId);
         if (!vType.seatLayoutId) continue;
         const layout = await layouts.getById(vType.seatLayoutId);
-        const seatInit = layout.seatMap.toJSON().seats.map((s: { number: string; type: string; bookable?: boolean; ladiesOnly?: boolean }) => ({
-          seatNumber: s.number, seatType: s.type, isBookable: s.bookable !== false, ladiesOnly: s.ladiesOnly === true,
-        }));
+        const seatInit = layout.seatMap
+          .toJSON()
+          .seats.map(
+            (s: { number: string; type: string; bookable?: boolean; ladiesOnly?: boolean }) => ({
+              seatNumber: s.number,
+              seatType: s.type,
+              isBookable: s.bookable !== false,
+              ladiesOnly: s.ladiesOnly === true,
+            }),
+          );
 
         let d = localDate(START_DATE);
         let created = 0;
@@ -151,17 +189,26 @@ async function main(): Promise<void> {
               const departOffsetMin = s.departDayOffset * 1440 + s.departMinute;
               const arrivalOffsetMin = s.arrivalDayOffset * 1440 + s.arrivalMinute;
               return {
-                sequence: s.sequence, stopId: s.stopId,
+                sequence: s.sequence,
+                stopId: s.stopId,
                 arrivesAt: new Date(originInstant.getTime() + arrivalOffsetMin * 60_000),
                 departsAt: new Date(originInstant.getTime() + departOffsetMin * 60_000),
-                canBoard: s.canBoard, canAlight: s.canAlight,
+                canBoard: s.canBoard,
+                canAlight: s.canAlight,
               };
             });
             await uow.run({ name: 'demo.materialise', tenantId: t.id as TenantId }, async () =>
               trips.insertTrip({
-                serviceId: svc.id, routeId: svc.routeId, vehicleId: svc.defaultVehicleId ?? null, seatLayoutId: layout.id,
-                journeyDate: d, departsAt: stopRows[0].departsAt, arrivesAt: stopRows[stopRows.length - 1].arrivesAt,
-                stopCount: stopRows.length, stops: stopRows, seats: seatInit,
+                serviceId: svc.id,
+                routeId: svc.routeId,
+                vehicleId: svc.defaultVehicleId ?? null,
+                seatLayoutId: layout.id,
+                journeyDate: d,
+                departsAt: stopRows[0].departsAt,
+                arrivesAt: stopRows[stopRows.length - 1].arrivesAt,
+                stopCount: stopRows.length,
+                stops: stopRows,
+                seats: seatInit,
               }),
             );
             created += 1;
@@ -172,7 +219,9 @@ async function main(): Promise<void> {
           }
           d = addDays(d, 1);
         }
-        process.stdout.write(`  [${t.slug}] service ${svc.code}: ${created} trip-days materialised\n`);
+        process.stdout.write(
+          `  [${t.slug}] service ${svc.code}: ${created} trip-days materialised\n`,
+        );
       }
     });
   }
@@ -191,7 +240,8 @@ async function main(): Promise<void> {
     const phoneBlind = encryptor.blindIndex(phoneRaw);
     try {
       const existing = await client.query<{ id: string }>(
-        `SELECT id FROM users WHERE tenant_id = $1 AND email_blind = $2 AND deleted_at IS NULL LIMIT 1`, [tenant.id, emailBlind],
+        `SELECT id FROM users WHERE tenant_id = $1 AND email_blind = $2 AND deleted_at IS NULL LIMIT 1`,
+        [tenant.id, emailBlind],
       );
       let userId: string;
       if (existing.rows[0]) {
@@ -214,7 +264,13 @@ async function main(): Promise<void> {
   }
 
   // ---- 4) Bookings --------------------------------------------------------
-  const outcomes = { confirmed: 0, cancelledSettled: 0, cancelledPending: 0, upgraded: 0, failed: 0 };
+  const outcomes = {
+    confirmed: 0,
+    cancelledSettled: 0,
+    cancelledPending: 0,
+    upgraded: 0,
+    failed: 0,
+  };
   const perTenantTarget = Math.ceil(TARGET_BOOKINGS / tenantRows.length);
 
   for (const t of tenantRows) {
@@ -223,12 +279,25 @@ async function main(): Promise<void> {
 
     await runInNewContext({ tenantId: t.id as TenantId, actorType: 'system' }, async () => {
       // Only trips that ALREADY have real seat inventory (materialised above).
-      const tripRows = (await client.query<{ id: string; route_id: string; total_seats: number; departs_at: Date; arrives_at: Date }>(
-        `SELECT id, route_id, total_seats, departs_at, arrives_at FROM trips WHERE tenant_id = $1 AND status = 'open' ORDER BY journey_date`, [t.id],
-      )).rows;
+      const tripRows = (
+        await client.query<{
+          id: string;
+          route_id: string;
+          total_seats: number;
+          departs_at: Date;
+          arrives_at: Date;
+        }>(
+          `SELECT id, route_id, total_seats, departs_at, arrives_at FROM trips WHERE tenant_id = $1 AND status = 'open' ORDER BY journey_date`,
+          [t.id],
+        )
+      ).rows;
       if (tripRows.length === 0) return;
 
-      const tenantRow = (await client.query<{ gstin: string | null }>(`SELECT gstin FROM tenants WHERE id = $1`, [t.id])).rows[0];
+      const tenantRow = (
+        await client.query<{ gstin: string | null }>(`SELECT gstin FROM tenants WHERE id = $1`, [
+          t.id,
+        ])
+      ).rows[0];
 
       // ---- Crew duty assignment: which driver + conductor is on which trip ----
       // Round-robins through ACTIVE (not on_leave) crew. crew_duties has a
@@ -238,11 +307,23 @@ async function main(): Promise<void> {
       // so this tries a few different crew members before giving up on a
       // given trip; an unassigned trip is a realistic, non-blocking outcome
       // (real rosters do have unfilled slots), not a script bug.
-      const drivers = (await client.query<{ id: string }>(`SELECT id FROM crew WHERE tenant_id = $1 AND role = 'driver' AND status = 'active'`, [t.id])).rows;
-      const conductors = (await client.query<{ id: string }>(`SELECT id FROM crew WHERE tenant_id = $1 AND role = 'conductor' AND status = 'active'`, [t.id])).rows;
+      const drivers = (
+        await client.query<{ id: string }>(
+          `SELECT id FROM crew WHERE tenant_id = $1 AND role = 'driver' AND status = 'active'`,
+          [t.id],
+        )
+      ).rows;
+      const conductors = (
+        await client.query<{ id: string }>(
+          `SELECT id FROM crew WHERE tenant_id = $1 AND role = 'conductor' AND status = 'active'`,
+          [t.id],
+        )
+      ).rows;
       let dutiesAssigned = 0;
       for (const trip of tripRows) {
-        const durationMin = Math.round((trip.arrives_at.getTime() - trip.departs_at.getTime()) / 60000);
+        const durationMin = Math.round(
+          (trip.arrives_at.getTime() - trip.departs_at.getTime()) / 60000,
+        );
         // A single driver legally/practically can't run an entire long-haul
         // trip alone — real overnight services split the route into shifts
         // across 2-3 drivers. ~8h is a reasonable continuous-driving
@@ -256,8 +337,12 @@ async function main(): Promise<void> {
           if (pool.length === 0) continue;
           const usedThisTrip = new Set<string>();
           for (let shift = 0; shift < shiftsNeeded; shift++) {
-            const shiftStart = new Date(trip.departs_at.getTime() + (durationMin * shift * 60_000) / shiftsNeeded);
-            const shiftEnd = new Date(trip.departs_at.getTime() + (durationMin * (shift + 1) * 60_000) / shiftsNeeded);
+            const shiftStart = new Date(
+              trip.departs_at.getTime() + (durationMin * shift * 60_000) / shiftsNeeded,
+            );
+            const shiftEnd = new Date(
+              trip.departs_at.getTime() + (durationMin * (shift + 1) * 60_000) / shiftsNeeded,
+            );
             const shiftMinutes = Math.round((shiftEnd.getTime() - shiftStart.getTime()) / 60_000);
 
             for (let attempt = 0; attempt < Math.min(4, pool.length); attempt++) {
@@ -282,20 +367,25 @@ async function main(): Promise<void> {
       }
       process.stdout.write(`  [${t.slug}] crew duties assigned: ${dutiesAssigned}\n`);
 
-      const stopRows = (await client.query<{ stop_id: string; sequence: number }>(
-        `SELECT rs.stop_id, rs.sequence FROM route_stops rs WHERE rs.tenant_id = $1 ORDER BY rs.sequence`, [t.id],
-      )).rows;
+      const stopRows = (
+        await client.query<{ stop_id: string; sequence: number }>(
+          `SELECT rs.stop_id, rs.sequence FROM route_stops rs WHERE rs.tenant_id = $1 ORDER BY rs.sequence`,
+          [t.id],
+        )
+      ).rows;
 
       // ---- Ancillary services (insurance/meal/luggage) — once per tenant ----
-      const ancillaryRows = (await client.query<{ id: string; price_minor: number }>(
-        `INSERT INTO ancillary_services (id, tenant_id, code, name, kind, price_minor, per_passenger) VALUES
+      const ancillaryRows = (
+        await client.query<{ id: string; price_minor: number }>(
+          `INSERT INTO ancillary_services (id, tenant_id, code, name, kind, price_minor, per_passenger) VALUES
            (uuid_generate_v7(), $1, 'travel_insurance', 'Travel Insurance', 'insurance', 4900, true),
            (uuid_generate_v7(), $1, 'meal', 'Meal Voucher', 'meal', 15000, true),
            (uuid_generate_v7(), $1, 'extra_luggage', 'Extra Luggage', 'luggage', 20000, false)
          ON CONFLICT (tenant_id, code) DO NOTHING
          RETURNING id, price_minor`,
-        [t.id],
-      )).rows;
+          [t.id],
+        )
+      ).rows;
 
       // ---- Support tickets — a handful per tenant, not tied to any one booking ----
       const supportSubjects: [string, string, string][] = [
@@ -340,7 +430,8 @@ async function main(): Promise<void> {
           // for a sleeper/semi-sleeper trip, and could even fail outright
           // if that trip has no seater seats at all).
           const typeRow = await client.query<{ seat_type: string }>(
-            `SELECT DISTINCT seat_type FROM trip_seats WHERE trip_id = $1 AND is_bookable = true`, [trip.id],
+            `SELECT DISTINCT seat_type FROM trip_seats WHERE trip_id = $1 AND is_bookable = true`,
+            [trip.id],
           );
           if (typeRow.rows.length === 0) continue;
           const seatType = pick(typeRow.rows).seat_type;
@@ -353,17 +444,29 @@ async function main(): Promise<void> {
           const seatNumbers = avail.rows.map((r) => r.seat_number);
 
           const quote = await pricing.quote({
-            tripId: trip.id as never, fromStopId: fromStop.stop_id as never, toStopId: toStop.stop_id as never,
-            seatType, seatNumbers,
+            tripId: trip.id as never,
+            fromStopId: fromStop.stop_id as never,
+            toStopId: toStop.stop_id as never,
+            seatType,
+            seatNumbers,
           });
 
           const hold = await bookings.hold({
-            quoteId: quote.quoteId, seatNumbers,
-            passengers: seatNumbers.map((sn, idx) => ({ seatNumber: sn, fullName: `Customer ${b}-${idx}`, age: 25 + rand(40), gender: pick(['male', 'female']) })),
+            quoteId: quote.quoteId,
+            seatNumbers,
+            passengers: seatNumbers.map((sn, idx) => ({
+              seatNumber: sn,
+              fullName: `Customer ${b}-${idx}`,
+              age: 25 + rand(40),
+              gender: pick(['male', 'female']),
+            })),
             contactPhone: `9${(700000000 + b).toString().padStart(9, '0')}`,
           });
 
-          await payments.chargeTest(hold.bookingId, { method: 'upi', vpa: config.payment.test.upiSuccessVpa } as never);
+          await payments.chargeTest(hold.bookingId, {
+            method: 'upi',
+            vpa: config.payment.test.upiSuccessVpa,
+          } as never);
 
           // GST tax invoice — normally raised by InvoiceConsumer listening
           // for booking.confirmed via the WORKER's outbox dispatcher, which
@@ -374,7 +477,9 @@ async function main(): Promise<void> {
           // ever triggered it for seeded data.
           try {
             await invoices.issueForBooking(hold.bookingId, tenantRow?.gstin ?? undefined);
-          } catch { /* best-effort — a missing invoice must never abort the booking itself */ }
+          } catch {
+            /* best-effort — a missing invoice must never abort the booking itself */
+          }
 
           // Fraud assessment — every booking gets one (mirrors the real
           // FraudService running inline at checkout); a low score for
@@ -384,9 +489,15 @@ async function main(): Promise<void> {
           await client.query(
             `INSERT INTO fraud_assessments (id, tenant_id, booking_id, customer_id, score, band, decision, reasons, signals)
              VALUES (uuid_generate_v7(), $1, $2, $3, $4, $5, $6, $7, '{}'::jsonb)`,
-            [t.id, hold.bookingId, customerId, isOutlier ? 65 + rand(20) : rand(15),
-             isOutlier ? 'medium' : 'low', isOutlier ? 'review' : 'allow',
-             JSON.stringify(isOutlier ? ['velocity: 3 bookings in 10 minutes'] : [])],
+            [
+              t.id,
+              hold.bookingId,
+              customerId,
+              isOutlier ? 65 + rand(20) : rand(15),
+              isOutlier ? 'medium' : 'low',
+              isOutlier ? 'review' : 'allow',
+              JSON.stringify(isOutlier ? ['velocity: 3 bookings in 10 minutes'] : []),
+            ],
           );
 
           // Ancillary — ~20% of bookings add travel insurance.
@@ -407,12 +518,19 @@ async function main(): Promise<void> {
             // context, not the worker, so nothing would ever consume that
             // event on its own). destination 'source' resolves synchronously
             // against the same mock gateway that captured the payment.
-            const cancelled = await bookings.cancel(hold.bookingId, 'demo-data: customer cancelled');
+            const cancelled = await bookings.cancel(
+              hold.bookingId,
+              'demo-data: customer cancelled',
+            );
             if (cancelled.refundMinor > 0) {
-              await refunds.initiate({ bookingId: hold.bookingId, amountMinor: cancelled.refundMinor, destination: 'source' });
+              await refunds.initiate({
+                bookingId: hold.bookingId,
+                amountMinor: cancelled.refundMinor,
+                destination: 'source',
+              });
             }
             outcomes.cancelledSettled += 1;
-          } else if (roll < 0.20) {
+          } else if (roll < 0.2) {
             // Cancel and deliberately stop there — no refund record at all.
             // This IS the realistic "still being worked on" state: the
             // booking.cancelled event sits in the outbox exactly as it would
@@ -425,7 +543,10 @@ async function main(): Promise<void> {
             // that hasn't passed; best-effort, failure here just falls
             // through to "confirmed", which is a fine outcome too.
             try {
-              const ticketRow = await client.query<{ id: string }>(`SELECT id FROM tickets WHERE booking_id = $1 LIMIT 1`, [hold.bookingId]);
+              const ticketRow = await client.query<{ id: string }>(
+                `SELECT id FROM tickets WHERE booking_id = $1 LIMIT 1`,
+                [hold.bookingId],
+              );
               const altSeat = await client.query<{ seat_number: string }>(
                 `SELECT seat_number FROM trip_seats WHERE trip_id = $1 AND is_bookable = true AND occupied_legs = 0 AND seat_number <> ANY($2) LIMIT 1`,
                 [trip.id, seatNumbers],
@@ -433,12 +554,28 @@ async function main(): Promise<void> {
               if (ticketRow.rows[0] && altSeat.rows[0]) {
                 await payments.upgradeSeat(ticketRow.rows[0].id, altSeat.rows[0].seat_number);
                 outcomes.upgraded += 1;
-                await maybeAddReview(client, t.id, hold.bookingId, customerId, trip.route_id, trip.id);
+                await maybeAddReview(
+                  client,
+                  t.id,
+                  hold.bookingId,
+                  customerId,
+                  trip.route_id,
+                  trip.id,
+                );
               } else {
                 outcomes.confirmed += 1;
-                await maybeAddReview(client, t.id, hold.bookingId, customerId, trip.route_id, trip.id);
+                await maybeAddReview(
+                  client,
+                  t.id,
+                  hold.bookingId,
+                  customerId,
+                  trip.route_id,
+                  trip.id,
+                );
               }
-            } catch { outcomes.confirmed += 1; }
+            } catch {
+              outcomes.confirmed += 1;
+            }
           } else {
             outcomes.confirmed += 1;
             await maybeAddReview(client, t.id, hold.bookingId, customerId, trip.route_id, trip.id);
@@ -449,9 +586,12 @@ async function main(): Promise<void> {
       }
 
       // ---- Booking amendments — a few reschedule records on confirmed bookings ----
-      const confirmedForAmend = (await client.query<{ id: string }>(
-        `SELECT id FROM bookings WHERE tenant_id = $1 AND status = 'confirmed' ORDER BY random() LIMIT 5`, [t.id],
-      )).rows;
+      const confirmedForAmend = (
+        await client.query<{ id: string }>(
+          `SELECT id FROM bookings WHERE tenant_id = $1 AND status = 'confirmed' ORDER BY random() LIMIT 5`,
+          [t.id],
+        )
+      ).rows;
       for (const b of confirmedForAmend) {
         try {
           await client.query(
@@ -459,13 +599,18 @@ async function main(): Promise<void> {
              VALUES (uuid_generate_v7(), $1, $2, 'reschedule', $3, 5000, 0, 5000, 0)`,
             [t.id, b.id, JSON.stringify({ reason: 'customer requested date change' })],
           );
-        } catch { /* best-effort demo record */ }
+        } catch {
+          /* best-effort demo record */
+        }
       }
 
       // ---- Live-tracking snapshot — trips that have already "departed" (journey_date in the past) get a trip_live row + a few gps_pings, as if they were tracked in real time. Trips departing today/future stay 'not_started' (realistic — GPS only exists once a trip is actually running). ----
-      const departedTrips = (await client.query<{ id: string; departs_at: Date; arrives_at: Date }>(
-        `SELECT id, departs_at, arrives_at FROM trips WHERE tenant_id = $1 AND status = 'open' AND arrives_at < now() ORDER BY random() LIMIT 20`, [t.id],
-      )).rows;
+      const departedTrips = (
+        await client.query<{ id: string; departs_at: Date; arrives_at: Date }>(
+          `SELECT id, departs_at, arrives_at FROM trips WHERE tenant_id = $1 AND status = 'open' AND arrives_at < now() ORDER BY random() LIMIT 20`,
+          [t.id],
+        )
+      ).rows;
       for (const trip of departedTrips) {
         const totalMs = trip.arrives_at.getTime() - trip.departs_at.getTime();
         await client.query(
@@ -480,12 +625,22 @@ async function main(): Promise<void> {
           await client.query(
             `INSERT INTO gps_pings (tenant_id, trip_id, lat, lng, speed_kmph, distance_covered_m, recorded_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [t.id, trip.id, 26.9 + p * 0.3, 75.7 + p * 0.3, 55 + rand(20), Math.round((280000 * p) / 5), pingTime],
+            [
+              t.id,
+              trip.id,
+              26.9 + p * 0.3,
+              75.7 + p * 0.3,
+              55 + rand(20),
+              Math.round((280000 * p) / 5),
+              pingTime,
+            ],
           );
         }
       }
     });
-    process.stdout.write(`  [${t.slug}] bookings done — running totals: ${JSON.stringify(outcomes)}\n`);
+    process.stdout.write(
+      `  [${t.slug}] bookings done — running totals: ${JSON.stringify(outcomes)}\n`,
+    );
   }
 
   // ---- 4.5) A few REAL connecting-journey bookings (Delhi -> Jaipur -> Bangalore -> Mysuru) ----
@@ -496,9 +651,16 @@ async function main(): Promise<void> {
   // hand-crafted rows), so every ledger/invoice/ticket this produces is as
   // genuine as a real customer's connecting booking would be.
   try {
-    const cityRows = (await client.query<{ id: string; name: string }>(`SELECT id, name FROM cities WHERE name IN ('Delhi','Jaipur','Bangalore','Mysuru')`)).rows;
+    const cityRows = (
+      await client.query<{ id: string; name: string }>(
+        `SELECT id, name FROM cities WHERE name IN ('Delhi','Jaipur','Bangalore','Mysuru')`,
+      )
+    ).rows;
     const cityId = (name: string) => cityRows.find((c) => c.name === name)?.id;
-    const delhiId = cityId('Delhi'); const jaipurId = cityId('Jaipur'); const bangaloreId = cityId('Bangalore'); const mysuruId = cityId('Mysuru');
+    const delhiId = cityId('Delhi');
+    const jaipurId = cityId('Jaipur');
+    const bangaloreId = cityId('Bangalore');
+    const mysuruId = cityId('Mysuru');
 
     const connectingRuns: [string | undefined, string | undefined, string][] = [
       [delhiId, bangaloreId, 'Delhi -> Jaipur -> Bangalore'],
@@ -509,25 +671,66 @@ async function main(): Promise<void> {
       if (!fromCity || !toCity) continue;
       for (let d = 0; d < 5; d++) {
         const day = localDate(new Date(Date.now() - d * 86_400_000).toISOString().slice(0, 10));
-        const { options } = await connectingSearch.search(fromCity, toCity, day).then((options) => ({ options })).catch(() => ({ options: [] }));
+        const { options } = await connectingSearch
+          .search(fromCity, toCity, day)
+          .then((options) => ({ options }))
+          .catch(() => ({ options: [] }));
         if (options.length === 0) continue;
         const opt = options[0];
         const custId = pick(Array.from(customerIdsByTenant.values()).flat());
         try {
-          const q1 = await runInNewContext({ tenantId: opt.leg1.tenantId as TenantId, actorType: 'system' }, () =>
-            pricing.quote({ tripId: opt.leg1.tripId as never, fromStopId: opt.leg1.fromStopId as never, toStopId: opt.leg1.toStopId as never, seatType: 'seater', seatNumbers: ['1'] }));
-          const q2 = await runInNewContext({ tenantId: opt.leg2.tenantId as TenantId, actorType: 'system' }, () =>
-            pricing.quote({ tripId: opt.leg2.tripId as never, fromStopId: opt.leg2.fromStopId as never, toStopId: opt.leg2.toStopId as never, seatType: 'seater', seatNumbers: ['1'] }));
+          const q1 = await runInNewContext(
+            { tenantId: opt.leg1.tenantId as TenantId, actorType: 'system' },
+            () =>
+              pricing.quote({
+                tripId: opt.leg1.tripId as never,
+                fromStopId: opt.leg1.fromStopId as never,
+                toStopId: opt.leg1.toStopId as never,
+                seatType: 'seater',
+                seatNumbers: ['1'],
+              }),
+          );
+          const q2 = await runInNewContext(
+            { tenantId: opt.leg2.tenantId as TenantId, actorType: 'system' },
+            () =>
+              pricing.quote({
+                tripId: opt.leg2.tripId as never,
+                fromStopId: opt.leg2.fromStopId as never,
+                toStopId: opt.leg2.toStopId as never,
+                seatType: 'seater',
+                seatNumbers: ['1'],
+              }),
+          );
 
           const held = await connectingBooking.holdConnection({
-            leg1: { tenantId: opt.leg1.tenantId, quoteId: q1.quoteId, seatNumbers: ['1'], passengers: [{ seatNumber: '1', fullName: 'Connecting Passenger', age: 30, gender: 'male' }] },
-            leg2: { tenantId: opt.leg2.tenantId, quoteId: q2.quoteId, seatNumbers: ['1'], passengers: [{ seatNumber: '1', fullName: 'Connecting Passenger', age: 30, gender: 'male' }] },
-            contactPhone: '9800000001', customerId: custId,
+            leg1: {
+              tenantId: opt.leg1.tenantId,
+              quoteId: q1.quoteId,
+              seatNumbers: ['1'],
+              passengers: [
+                { seatNumber: '1', fullName: 'Connecting Passenger', age: 30, gender: 'male' },
+              ],
+            },
+            leg2: {
+              tenantId: opt.leg2.tenantId,
+              quoteId: q2.quoteId,
+              seatNumbers: ['1'],
+              passengers: [
+                { seatNumber: '1', fullName: 'Connecting Passenger', age: 30, gender: 'male' },
+              ],
+            },
+            contactPhone: '9800000001',
+            customerId: custId,
           });
-          await connectingBooking.confirmConnection(held.connectionId,
-            { method: 'upi', vpa: config.payment.test.upiSuccessVpa }, { method: 'upi', vpa: config.payment.test.upiSuccessVpa });
+          await connectingBooking.confirmConnection(
+            held.connectionId,
+            { method: 'upi', vpa: config.payment.test.upiSuccessVpa },
+            { method: 'upi', vpa: config.payment.test.upiSuccessVpa },
+          );
           connectingBooked += 1;
-        } catch { /* seat/timing collision on this day — try the next date */ }
+        } catch {
+          /* seat/timing collision on this day — try the next date */
+        }
         break; // one successful connecting booking per route-pair is enough demo data
       }
       void label;
@@ -543,7 +746,16 @@ async function main(): Promise<void> {
   // BEFORE settlements so agent commission is netted into operator payouts.
   const agentService = app.get(AgentService);
   const quotaService = app.get(SeatQuotaService);
-  const b2b = { agents: 0, agentBookings: 0, agentCancels: 0, quotas: 0, phoneHolds: 0, expenses: 0, waitlist: 0, failed: 0 };
+  const b2b = {
+    agents: 0,
+    agentBookings: 0,
+    agentCancels: 0,
+    quotas: 0,
+    phoneHolds: 0,
+    expenses: 0,
+    waitlist: 0,
+    failed: 0,
+  };
   for (const t of tenantRows) {
     const agentIds: { id: string; userId: string; mode: 'prepaid' | 'postpaid' }[] = [];
     await runInNewContext({ tenantId: t.id as TenantId, actorType: 'system' }, async () => {
@@ -554,27 +766,66 @@ async function main(): Promise<void> {
           { minMonthlySalesMinor: 2_00_000_00, commissionPct: 7.5 },
         ]);
         const specs = [
-          { key: 'prepaid', name: 'Shree Travels Agency', billingMode: 'prepaid' as const, activate: true },
-          { key: 'postpaid', name: 'City Link Tours', billingMode: 'postpaid' as const, activate: true, creditLimitMinor: 50_000_00 },
-          { key: 'pending', name: 'New Era Bookings', billingMode: 'prepaid' as const, activate: false },
-          { key: 'suspended', name: 'Quick Ticket Point', billingMode: 'prepaid' as const, activate: true },
+          {
+            key: 'prepaid',
+            name: 'Shree Travels Agency',
+            billingMode: 'prepaid' as const,
+            activate: true,
+          },
+          {
+            key: 'postpaid',
+            name: 'City Link Tours',
+            billingMode: 'postpaid' as const,
+            activate: true,
+            creditLimitMinor: 50_000_00,
+          },
+          {
+            key: 'pending',
+            name: 'New Era Bookings',
+            billingMode: 'prepaid' as const,
+            activate: false,
+          },
+          {
+            key: 'suspended',
+            name: 'Quick Ticket Point',
+            billingMode: 'prepaid' as const,
+            activate: true,
+          },
         ];
         for (const [i, sp] of specs.entries()) {
           const created = await agentService.create({
-            name: sp.name, contactPhone: `98${String(i).padStart(2, '0')}${t.id.replace(/\D/g, '').slice(0, 6).padEnd(6, '0')}`,
-            loginEmail: `agent${i + 1}@${t.slug}.example`, password: 'pass@123', billingMode: sp.billingMode, commissionPct: 5,
-            creditLimitMinor: sp.creditLimitMinor, lowBalanceAlertMinor: 2_000_00, activate: sp.activate, city: 'Jaipur',
+            name: sp.name,
+            contactPhone: `98${String(i).padStart(2, '0')}${t.id.replace(/\D/g, '').slice(0, 6).padEnd(6, '0')}`,
+            loginEmail: `agent${i + 1}@${t.slug}.example`,
+            password: 'pass@123',
+            billingMode: sp.billingMode,
+            commissionPct: 5,
+            creditLimitMinor: sp.creditLimitMinor,
+            lowBalanceAlertMinor: 2_000_00,
+            activate: sp.activate,
+            city: 'Jaipur',
           });
           b2b.agents += 1;
           if (sp.key === 'prepaid') {
-            await agentService.recordReceipt(created.agentId, { amountMinor: 25_000_00, reference: `SEED-DEP-${t.slug}` });
+            await agentService.recordReceipt(created.agentId, {
+              amountMinor: 25_000_00,
+              reference: `SEED-DEP-${t.slug}`,
+            });
             agentIds.push({ id: created.agentId, userId: created.userId, mode: 'prepaid' });
           }
           if (sp.key === 'postpaid') {
-            await agentService.recordReceipt(created.agentId, { amountMinor: 10_000_00, reference: `SEED-PAY-${t.slug}` });
+            await agentService.recordReceipt(created.agentId, {
+              amountMinor: 10_000_00,
+              reference: `SEED-PAY-${t.slug}`,
+            });
             agentIds.push({ id: created.agentId, userId: created.userId, mode: 'postpaid' });
           }
-          if (sp.key === 'suspended') await agentService.setStatus(created.agentId, 'suspended', 'Repeated late payments against statements');
+          if (sp.key === 'suspended')
+            await agentService.setStatus(
+              created.agentId,
+              'suspended',
+              'Repeated late payments against statements',
+            );
         }
       } catch (e) {
         b2b.failed += 1;
@@ -583,30 +834,69 @@ async function main(): Promise<void> {
     });
 
     // Agent bookings — as the agent's own login (AgentService resolves "me" from the user).
-    const tripsForAgents = (await client.query<{ id: string; route_id: string }>(
-      `SELECT id, route_id FROM trips WHERE tenant_id = $1 AND status IN ('scheduled','open','departed','closed') ORDER BY random() LIMIT 10`, [t.id])).rows;
+    const tripsForAgents = (
+      await client.query<{ id: string; route_id: string }>(
+        `SELECT id, route_id FROM trips WHERE tenant_id = $1 AND status IN ('scheduled','open','departed','closed') ORDER BY random() LIMIT 10`,
+        [t.id],
+      )
+    ).rows;
     for (const [i, trip] of tripsForAgents.entries()) {
       const ag = agentIds[i % Math.max(1, agentIds.length)];
       if (!ag) break;
       try {
-        await runInNewContext({ tenantId: t.id as TenantId, userId: ag.userId as never, actorType: 'user' }, async () => {
-          const stops = (await client.query<{ stop_id: string; sequence: number }>(`SELECT stop_id, sequence FROM route_stops WHERE route_id = $1 ORDER BY sequence`, [trip.route_id])).rows;
-          const seat = (await client.query<{ seat_number: string; seat_type: string }>(
-            `SELECT seat_number, seat_type FROM trip_seats WHERE trip_id = $1 AND is_bookable AND occupied_legs = 0 AND blocked_legs = 0 LIMIT 1`, [trip.id])).rows[0];
-          if (!seat || stops.length < 2) return;
-          const quote = await pricing.quote({ tripId: trip.id as never, fromStopId: stops[0].stop_id as never, toStopId: stops[stops.length - 1].stop_id as never, seatType: seat.seat_type, seatNumbers: [seat.seat_number] });
-          const sold = await agentService.agentBook({
-            quoteId: quote.quoteId, seatNumbers: [seat.seat_number],
-            passengers: [{ seatNumber: seat.seat_number, fullName: `Agent Walk-in ${i}`, age: 30 + i, gender: i % 2 ? 'female' : 'male' }],
-            contactPhone: `97${String(700000 + i).padStart(8, '0')}`,
-          });
-          b2b.agentBookings += 1;
-          if (i === 3) { // one cancellation → refund credited back to the agent's account
-            const c = await bookings.cancel(sold.bookingId, 'Passenger changed plans (agent)') as { refundMinor?: number };
-            if (c?.refundMinor && c.refundMinor > 0) await refunds.initiate({ bookingId: sold.bookingId, amountMinor: c.refundMinor, destination: 'source' });
-            b2b.agentCancels += 1;
-          }
-        });
+        await runInNewContext(
+          { tenantId: t.id as TenantId, userId: ag.userId as never, actorType: 'user' },
+          async () => {
+            const stops = (
+              await client.query<{ stop_id: string; sequence: number }>(
+                `SELECT stop_id, sequence FROM route_stops WHERE route_id = $1 ORDER BY sequence`,
+                [trip.route_id],
+              )
+            ).rows;
+            const seat = (
+              await client.query<{ seat_number: string; seat_type: string }>(
+                `SELECT seat_number, seat_type FROM trip_seats WHERE trip_id = $1 AND is_bookable AND occupied_legs = 0 AND blocked_legs = 0 LIMIT 1`,
+                [trip.id],
+              )
+            ).rows[0];
+            if (!seat || stops.length < 2) return;
+            const quote = await pricing.quote({
+              tripId: trip.id as never,
+              fromStopId: stops[0].stop_id as never,
+              toStopId: stops[stops.length - 1].stop_id as never,
+              seatType: seat.seat_type,
+              seatNumbers: [seat.seat_number],
+            });
+            const sold = await agentService.agentBook({
+              quoteId: quote.quoteId,
+              seatNumbers: [seat.seat_number],
+              passengers: [
+                {
+                  seatNumber: seat.seat_number,
+                  fullName: `Agent Walk-in ${i}`,
+                  age: 30 + i,
+                  gender: i % 2 ? 'female' : 'male',
+                },
+              ],
+              contactPhone: `97${String(700000 + i).padStart(8, '0')}`,
+            });
+            b2b.agentBookings += 1;
+            if (i === 3) {
+              // one cancellation → refund credited back to the agent's account
+              const c = (await bookings.cancel(
+                sold.bookingId,
+                'Passenger changed plans (agent)',
+              )) as { refundMinor?: number };
+              if (c?.refundMinor && c.refundMinor > 0)
+                await refunds.initiate({
+                  bookingId: sold.bookingId,
+                  amountMinor: c.refundMinor,
+                  destination: 'source',
+                });
+              b2b.agentCancels += 1;
+            }
+          },
+        );
       } catch (e) {
         b2b.failed += 1;
         process.stderr.write(`  ⚠ [${t.slug}] agent booking: ${(e as Error).message}\n`);
@@ -614,40 +904,106 @@ async function main(): Promise<void> {
     }
 
     await runInNewContext({ tenantId: t.id as TenantId, actorType: 'system' }, async () => {
-      const future = (await client.query<{ id: string; route_id: string }>(
-        `SELECT id, route_id FROM trips WHERE tenant_id = $1 AND status IN ('scheduled','open') AND departs_at > now() + interval '30 hours' ORDER BY departs_at LIMIT 4`, [t.id])).rows;
+      const future = (
+        await client.query<{ id: string; route_id: string }>(
+          `SELECT id, route_id FROM trips WHERE tenant_id = $1 AND status IN ('scheduled','open') AND departs_at > now() + interval '30 hours' ORDER BY departs_at LIMIT 4`,
+          [t.id],
+        )
+      ).rows;
       // Seat quota for the prepaid agent on the first future trip.
       if (future[0] && agentIds[0]) {
         try {
-          const seats = (await client.query<{ seat_number: string }>(
-            `SELECT seat_number FROM trip_seats WHERE trip_id = $1 AND is_bookable AND occupied_legs = 0 AND blocked_legs = 0 ORDER BY seat_number DESC LIMIT 2`, [future[0].id])).rows.map((r) => r.seat_number);
-          if (seats.length) { const r = await quotaService.allocate(future[0].id as never, { seatNumbers: seats, holderType: 'agent', holderId: agentIds[0].id, releaseMinutesBefore: 180 }); b2b.quotas += r.allocated; }
-        } catch (e) { b2b.failed += 1; process.stderr.write(`  ⚠ [${t.slug}] quota: ${(e as Error).message}\n`); }
+          const seats = (
+            await client.query<{ seat_number: string }>(
+              `SELECT seat_number FROM trip_seats WHERE trip_id = $1 AND is_bookable AND occupied_legs = 0 AND blocked_legs = 0 ORDER BY seat_number DESC LIMIT 2`,
+              [future[0].id],
+            )
+          ).rows.map((r) => r.seat_number);
+          if (seats.length) {
+            const r = await quotaService.allocate(future[0].id as never, {
+              seatNumbers: seats,
+              holderType: 'agent',
+              holderId: agentIds[0].id,
+              releaseMinutesBefore: 180,
+            });
+            b2b.quotas += r.allocated;
+          }
+        } catch (e) {
+          b2b.failed += 1;
+          process.stderr.write(`  ⚠ [${t.slug}] quota: ${(e as Error).message}\n`);
+        }
       }
       // Phone bookings: seats held for callers, released tomorrow if unpaid.
       for (const [i, trip] of future.slice(1, 4).entries()) {
         try {
-          const stops = (await client.query<{ stop_id: string }>(`SELECT stop_id FROM route_stops WHERE route_id = $1 ORDER BY sequence`, [trip.route_id])).rows;
-          const seat = (await client.query<{ seat_number: string; seat_type: string }>(
-            `SELECT seat_number, seat_type FROM trip_seats WHERE trip_id = $1 AND is_bookable AND occupied_legs = 0 AND blocked_legs = 0 LIMIT 1`, [trip.id])).rows[0];
+          const stops = (
+            await client.query<{ stop_id: string }>(
+              `SELECT stop_id FROM route_stops WHERE route_id = $1 ORDER BY sequence`,
+              [trip.route_id],
+            )
+          ).rows;
+          const seat = (
+            await client.query<{ seat_number: string; seat_type: string }>(
+              `SELECT seat_number, seat_type FROM trip_seats WHERE trip_id = $1 AND is_bookable AND occupied_legs = 0 AND blocked_legs = 0 LIMIT 1`,
+              [trip.id],
+            )
+          ).rows[0];
           if (!seat || stops.length < 2) continue;
-          const quote = await pricing.quote({ tripId: trip.id as never, fromStopId: stops[0].stop_id as never, toStopId: stops[stops.length - 1].stop_id as never, seatType: seat.seat_type, seatNumbers: [seat.seat_number] });
-          await bookings.hold({
-            quoteId: quote.quoteId, seatNumbers: [seat.seat_number], channel: 'phone', contactPhone: `96${String(500000 + i).padStart(8, '0')}`,
-            passengers: [{ seatNumber: seat.seat_number, fullName: `Phone Caller ${i + 1}`, age: 40, gender: 'male' }],
-          }, { holdUntil: new Date(Date.now() + 20 * 3_600_000) });
+          const quote = await pricing.quote({
+            tripId: trip.id as never,
+            fromStopId: stops[0].stop_id as never,
+            toStopId: stops[stops.length - 1].stop_id as never,
+            seatType: seat.seat_type,
+            seatNumbers: [seat.seat_number],
+          });
+          await bookings.hold(
+            {
+              quoteId: quote.quoteId,
+              seatNumbers: [seat.seat_number],
+              channel: 'phone',
+              contactPhone: `96${String(500000 + i).padStart(8, '0')}`,
+              passengers: [
+                {
+                  seatNumber: seat.seat_number,
+                  fullName: `Phone Caller ${i + 1}`,
+                  age: 40,
+                  gender: 'male',
+                },
+              ],
+            },
+            { holdUntil: new Date(Date.now() + 20 * 3_600_000) },
+          );
           b2b.phoneHolds += 1;
-        } catch (e) { b2b.failed += 1; process.stderr.write(`  ⚠ [${t.slug}] phone booking: ${(e as Error).message}\n`); }
+        } catch (e) {
+          b2b.failed += 1;
+          process.stderr.write(`  ⚠ [${t.slug}] phone booking: ${(e as Error).message}\n`);
+        }
       }
       // Waitlist demo rows (a real join needs a FULL trip, which random seed data rarely produces).
       if (future[1]) {
-        const st = (await client.query<{ stop_id: string; sequence: number }>(`SELECT stop_id, sequence FROM route_stops WHERE route_id = $1 ORDER BY sequence`, [future[1].route_id])).rows;
+        const st = (
+          await client.query<{ stop_id: string; sequence: number }>(
+            `SELECT stop_id, sequence FROM route_stops WHERE route_id = $1 ORDER BY sequence`,
+            [future[1].route_id],
+          )
+        ).rows;
         if (st.length >= 2) {
           for (const [i, status] of (['waiting', 'waiting', 'notified'] as const).entries()) {
             await client.query(
               `INSERT INTO trip_waitlist (id, tenant_id, trip_id, from_stop_id, to_stop_id, from_seq, to_seq, seat_count, contact_phone, status, notified_at)
                VALUES (uuid_generate_v7(), $1, $2, $3, $4, $5, $6, $7, $8, $9, CASE WHEN $9 = 'notified' THEN now() END) ON CONFLICT DO NOTHING`,
-              [t.id, future[1].id, st[0].stop_id, st[st.length - 1].stop_id, st[0].sequence, st[st.length - 1].sequence, 1 + i, `95${String(400000 + i).padStart(8, '0')}`, status]);
+              [
+                t.id,
+                future[1].id,
+                st[0].stop_id,
+                st[st.length - 1].stop_id,
+                st[0].sequence,
+                st[st.length - 1].sequence,
+                1 + i,
+                `95${String(400000 + i).padStart(8, '0')}`,
+                status,
+              ],
+            );
             b2b.waitlist += 1;
           }
         }
@@ -656,23 +1012,33 @@ async function main(): Promise<void> {
 
     // Trip expenses for departed trips (direct insert: seed history is older
     // than the 15-day entry window the API enforces for real users).
-    const departed = (await client.query<{ id: string }>(
-      `SELECT id FROM trips WHERE tenant_id = $1 AND departs_at < now() AND status <> 'cancelled' ORDER BY departs_at DESC LIMIT 40`, [t.id])).rows;
+    const departed = (
+      await client.query<{ id: string }>(
+        `SELECT id FROM trips WHERE tenant_id = $1 AND departs_at < now() AND status <> 'cancelled' ORDER BY departs_at DESC LIMIT 40`,
+        [t.id],
+      )
+    ).rows;
     for (const [i, trip] of departed.entries()) {
       const rows: [string, number, string | null][] = [
-        ['diesel', 8_000_00 + rand(7_000_00), null], ['toll', 500_00 + rand(1_500_00), null], ['driver_bata', 800_00, null], ['cleaner_bata', 400_00, null],
+        ['diesel', 8_000_00 + rand(7_000_00), null],
+        ['toll', 500_00 + rand(1_500_00), null],
+        ['driver_bata', 800_00, null],
+        ['cleaner_bata', 400_00, null],
       ];
       if (i % 5 === 0) rows.push(['repair', 1_200_00 + rand(3_000_00), 'Tyre puncture on the way']);
       for (const [category, amount, note] of rows) {
         await client.query(
           `INSERT INTO trip_expenses (id, tenant_id, trip_id, category, amount_minor, note, incurred_at) VALUES (uuid_generate_v7(), $1, $2, $3, $4, $5, now() - interval '1 day')`,
-          [t.id, trip.id, category, amount, note]);
+          [t.id, trip.id, category, amount, note],
+        );
         b2b.expenses += 1;
       }
-      if (i === 0) { // one corrected entry, kept with its void reason (audit trail)
+      if (i === 0) {
+        // one corrected entry, kept with its void reason (audit trail)
         await client.query(
           `INSERT INTO trip_expenses (id, tenant_id, trip_id, category, amount_minor, note, voided_at, void_reason) VALUES (uuid_generate_v7(), $1, $2, 'diesel', 9900000, 'Typo', now(), 'Entered 99,000 instead of 9,900')`,
-          [t.id, trip.id]);
+          [t.id, trip.id],
+        );
       }
     }
   }
@@ -681,9 +1047,16 @@ async function main(): Promise<void> {
   // ---- 5) Settlements (weekly windows, per tenant) -----------------------
   for (const t of tenantRows) {
     await runInNewContext({ tenantId: t.id as TenantId, actorType: 'system' }, async () => {
-      const bank = (await client.query<{ bank_account_holder: string | null; bank_account_number: string | null; bank_ifsc: string | null }>(
-        `SELECT bank_account_holder, bank_account_number, bank_ifsc FROM tenants WHERE id = $1`, [t.id],
-      )).rows[0];
+      const bank = (
+        await client.query<{
+          bank_account_holder: string | null;
+          bank_account_number: string | null;
+          bank_ifsc: string | null;
+        }>(
+          `SELECT bank_account_holder, bank_account_number, bank_ifsc FROM tenants WHERE id = $1`,
+          [t.id],
+        )
+      ).rows[0];
 
       let from = localDate(START_DATE);
       while (from < today) {
@@ -699,9 +1072,12 @@ async function main(): Promise<void> {
           // stay 'pending' (a fresh settlement hasn't been paid out yet,
           // which is the realistic common case).
           if (bank?.bank_account_number) {
-            const netRow = (await client.query<{ net_minor: string }>(
-              `SELECT net_minor FROM settlements WHERE id = $1`, [result.settlementId],
-            )).rows[0];
+            const netRow = (
+              await client.query<{ net_minor: string }>(
+                `SELECT net_minor FROM settlements WHERE id = $1`,
+                [result.settlementId],
+              )
+            ).rows[0];
             const amount = netRow ? Number(netRow.net_minor) : 0;
             if (amount > 0) {
               const status = pick(['pending', 'pending', 'sent', 'confirmed']);
@@ -710,11 +1086,21 @@ async function main(): Promise<void> {
                  VALUES (uuid_generate_v7(), $1, $2, $3, $4, $5, $6, $7,
                          CASE WHEN $7 IN ('sent','confirmed') THEN now() - interval '2 days' ELSE NULL END,
                          CASE WHEN $7 = 'confirmed' THEN now() - interval '1 day' ELSE NULL END)`,
-                [t.id, result.settlementId, amount, bank.bank_account_holder ?? 'Unknown', bank.bank_account_number, bank.bank_ifsc, status],
+                [
+                  t.id,
+                  result.settlementId,
+                  amount,
+                  bank.bank_account_holder ?? 'Unknown',
+                  bank.bank_account_number,
+                  bank.bank_ifsc,
+                  status,
+                ],
               );
             }
           }
-        } catch { /* no captured revenue in this window — expected for some weeks */ }
+        } catch {
+          /* no captured revenue in this window — expected for some weeks */
+        }
         from = addDays(from, 7);
       }
     });

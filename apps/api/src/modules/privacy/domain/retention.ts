@@ -27,7 +27,8 @@ export interface RetentionPolicy {
 const DAY_MS = 86_400_000;
 
 export function retentionDeadlineMs(createdAtMs: number, retentionDays: number): number {
-  if (retentionDays < 0) throw new DomainError(ErrorCode.COMMON_VALIDATION, 'retentionDays cannot be negative');
+  if (retentionDays < 0)
+    throw new DomainError(ErrorCode.COMMON_VALIDATION, 'retentionDays cannot be negative');
   return createdAtMs + retentionDays * DAY_MS;
 }
 
@@ -35,7 +36,14 @@ export function isDueForPurge(createdAtMs: number, retentionDays: number, nowMs:
   return nowMs >= retentionDeadlineMs(createdAtMs, retentionDays);
 }
 
-export const DEFAULT_PII_FIELDS = ['fullName', 'email', 'phone', 'contactEmail', 'contactPhone', 'address'] as const;
+export const DEFAULT_PII_FIELDS = [
+  'fullName',
+  'email',
+  'phone',
+  'contactEmail',
+  'contactPhone',
+  'address',
+] as const;
 
 /**
  * Produce an anonymised copy of a record: each present PII field is replaced with

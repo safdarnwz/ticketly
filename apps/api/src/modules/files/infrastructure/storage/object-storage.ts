@@ -38,7 +38,11 @@ export interface ObjectStorage {
 }
 
 export class StorageError extends Error {
-  constructor(message: string, readonly status?: number, readonly retryable = false) {
+  constructor(
+    message: string,
+    readonly status?: number,
+    readonly retryable = false,
+  ) {
     super(message);
     this.name = 'StorageError';
   }

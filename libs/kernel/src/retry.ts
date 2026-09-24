@@ -79,5 +79,7 @@ export async function withTimeout<T>(
 
 function abortReason(signal: AbortSignal | undefined): Error {
   const reason: unknown = signal?.reason;
-  return reason instanceof Error ? reason : new Error(typeof reason === 'string' ? reason : 'Aborted');
+  return reason instanceof Error
+    ? reason
+    : new Error(typeof reason === 'string' ? reason : 'Aborted');
 }

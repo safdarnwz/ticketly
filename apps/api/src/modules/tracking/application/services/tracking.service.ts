@@ -2,13 +2,25 @@ import { Injectable } from '@nestjs/common';
 
 import { AppConfig } from '@config';
 import { DatabaseService, UnitOfWork } from '@database';
-import { AppError, ErrorCode, requireTenantId, runInNewContext, type StopId, type TenantId, type TripId } from '@kernel';
+import {
+  AppError,
+  ErrorCode,
+  requireTenantId,
+  runInNewContext,
+  type StopId,
+  type TenantId,
+  type TripId,
+} from '@kernel';
 import { EventBus } from '@messaging';
 import { hmacSha256 } from '@security';
 
 import { nextStopEta, type StopProgress } from '../../domain/geo';
 import {
-  trackingSigningInput, encodeTrackingToken, verifyTrackingToken, verifyTrackingTokenSignatureOnly, type TrackingTokenPayload,
+  trackingSigningInput,
+  encodeTrackingToken,
+  verifyTrackingToken,
+  verifyTrackingTokenSignatureOnly,
+  type TrackingTokenPayload,
 } from '../../domain/tracking-token';
 
 /**
@@ -50,7 +62,17 @@ export class TrackingService {
     await this.db.execute_(
       `INSERT INTO gps_pings (tenant_id, trip_id, vehicle_id, lat, lng, speed_kmph, heading_deg, distance_covered_m, recorded_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-      [tenantId, input.tripId, input.vehicleId ?? null, input.lat, input.lng, input.speedKmph, input.headingDeg ?? null, input.distanceCoveredM, recordedAt],
+      [
+        tenantId,
+        input.tripId,
+        input.vehicleId ?? null,
+        input.lat,
+        input.lng,
+        input.speedKmph,
+        input.headingDeg ?? null,
+        input.distanceCoveredM,
+        recordedAt,
+      ],
       { name: 'tracking.ingestPing', primary: true },
     );
 
@@ -63,7 +85,10 @@ export class TrackingService {
       [input.tripId],
       { name: 'tracking.tripStops' },
     );
-    const progress: StopProgress[] = stops.map((s) => ({ stopId: s.stop_id, distanceFromOriginM: s.distance }));
+    const progress: StopProgress[] = stops.map((s) => ({
+      stopId: s.stop_id,
+      distanceFromOriginM: s.distance,
+    }));
     const eta = nextStopEta(progress, input.distanceCoveredM, input.speedKmph);
 
     // Delay: compare projected arrival at the next stop to its scheduled time.
@@ -71,7 +96,9 @@ export class TrackingService {
     const nextScheduled = stops.find((s) => s.stop_id === eta.nextStopId);
     if (nextScheduled) {
       const projectedArrival = new Date(recordedAt.getTime() + eta.etaSeconds * 1000);
-      delayMinutes = Math.round((projectedArrival.getTime() - new Date(nextScheduled.departs_at).getTime()) / 60000);
+      delayMinutes = Math.round(
+        (projectedArrival.getTime() - new Date(nextScheduled.departs_at).getTime()) / 60000,
+      );
     }
 
     const etaAt = eta.nextStopId ? new Date(recordedAt.getTime() + eta.etaSeconds * 1000) : null;
@@ -82,8 +109,18 @@ export class TrackingService {
          distance_covered_m=EXCLUDED.distance_covered_m, next_stop_id=EXCLUDED.next_stop_id,
          next_stop_eta_at=EXCLUDED.next_stop_eta_at, delay_minutes=EXCLUDED.delay_minutes,
          status='running', last_ping_at=EXCLUDED.last_ping_at, updated_at=now()`,
-      [input.tripId, tenantId, input.lat, input.lng, input.speedKmph, input.distanceCoveredM,
-       eta.nextStopId, etaAt, delayMinutes, recordedAt],
+      [
+        input.tripId,
+        tenantId,
+        input.lat,
+        input.lng,
+        input.speedKmph,
+        input.distanceCoveredM,
+        eta.nextStopId,
+        etaAt,
+        delayMinutes,
+        recordedAt,
+      ],
       { name: 'tracking.upsertLive', primary: true },
     );
 
@@ -146,7 +183,10 @@ export class TrackingService {
   /** Called with tenant context already bound (e.g. from TicketService.issueForBooking). */
   issueTrackingToken(bookingId: string, tripId: string, pnr: string, tripArrivesAt: Date): string {
     const payload: TrackingTokenPayload = {
-      v: 1, bookingId, tripId, pnr,
+      v: 1,
+      bookingId,
+      tripId,
+      pnr,
       issuedAtMs: Date.now(),
       // Valid from issuance through 12h after arrival — covers the whole
       // journey plus a safety margin, unlike the QR ticket token's tight
@@ -163,8 +203,15 @@ export class TrackingService {
 
   /** PUBLIC — no ambient tenant context. Resolves the tenant from the trip embedded in the token, then reads within that tenant's own RLS scope. */
   async getLiveLocationByToken(token: string): Promise<{
-    status: string; lat: number | null; lng: number | null; speedKmph: number; delayMinutes: number;
-    lastPingAt: string | null; pnr: string; fromStopName: string; toStopName: string;
+    status: string;
+    lat: number | null;
+    lng: number | null;
+    speedKmph: number;
+    delayMinutes: number;
+    lastPingAt: string | null;
+    pnr: string;
+    fromStopName: string;
+    toStopName: string;
     recentPings: { lat: number; lng: number; recordedAt: string }[];
   }> {
     const payloadPart = token.split('.')[0] ?? '';
@@ -179,8 +226,13 @@ export class TrackingService {
       // this, which only signature-verified data can be trusted to
       // contain — never skip straight to a live-status check without it.
       const sigOnly = verifyTrackingTokenSignatureOnly(token, sig);
-      const liveStatus = await this.uow.run({ name: 'tracking.expiryFallback', bypassRls: true }, async (scope) =>
-        scope.client.query<{ status: string | null }>(`SELECT status FROM trip_live WHERE trip_id = $1`, [sigOnly.tripId]),
+      const liveStatus = await this.uow.run(
+        { name: 'tracking.expiryFallback', bypassRls: true },
+        async (scope) =>
+          scope.client.query<{ status: string | null }>(
+            `SELECT status FROM trip_live WHERE trip_id = $1`,
+            [sigOnly.tripId],
+          ),
       );
       if (liveStatus.rows[0]?.status === 'running') {
         payload = sigOnly; // genuinely still en route — extend past the fixed expiry
@@ -189,15 +241,25 @@ export class TrackingService {
       }
     }
 
-    const tenantRow = await this.uow.run({ name: 'tracking.resolveTenant', bypassRls: true }, async (scope) =>
-      scope.client.query<{ tenant_id: string }>(`SELECT tenant_id FROM trips WHERE id = $1`, [payload.tripId]),
+    const tenantRow = await this.uow.run(
+      { name: 'tracking.resolveTenant', bypassRls: true },
+      async (scope) =>
+        scope.client.query<{ tenant_id: string }>(`SELECT tenant_id FROM trips WHERE id = $1`, [
+          payload.tripId,
+        ]),
     );
     const tenantId = tenantRow.rows[0]?.tenant_id;
-    if (!tenantId) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Trip not found' });
+    if (!tenantId)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Trip not found' });
 
     return runInNewContext({ tenantId: tenantId as TenantId, actorType: 'system' }, async () => {
       const live = await this.db.queryOne<{
-        status: string; lat: number | null; lng: number | null; speed_kmph: number; delay_minutes: number; last_ping_at: Date | null;
+        status: string;
+        lat: number | null;
+        lng: number | null;
+        speed_kmph: number;
+        delay_minutes: number;
+        last_ping_at: Date | null;
       }>(
         `SELECT status, lat, lng, speed_kmph, delay_minutes, last_ping_at FROM trip_live WHERE trip_id = $1`,
         [payload.tripId],
@@ -224,13 +286,17 @@ export class TrackingService {
 
       return {
         status: live?.status ?? 'not_started',
-        lat: live?.lat ?? null, lng: live?.lng ?? null,
-        speedKmph: live?.speed_kmph ?? 0, delayMinutes: live?.delay_minutes ?? 0,
+        lat: live?.lat ?? null,
+        lng: live?.lng ?? null,
+        speedKmph: live?.speed_kmph ?? 0,
+        delayMinutes: live?.delay_minutes ?? 0,
         lastPingAt: live?.last_ping_at ? live.last_ping_at.toISOString() : null,
         pnr: payload.pnr,
         fromStopName: stops?.from_stop_name ?? 'Boarding point',
         toStopName: stops?.to_stop_name ?? 'Dropping point',
-        recentPings: pings.reverse().map((p) => ({ lat: p.lat, lng: p.lng, recordedAt: p.recorded_at.toISOString() })),
+        recentPings: pings
+          .reverse()
+          .map((p) => ({ lat: p.lat, lng: p.lng, recordedAt: p.recorded_at.toISOString() })),
       };
     });
   }

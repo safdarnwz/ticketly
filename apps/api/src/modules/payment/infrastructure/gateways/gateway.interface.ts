@@ -62,7 +62,11 @@ export interface WebhookVerification {
  * refund.processed ...). Keying on the payment id alone swallowed every
  * event after the first as a "duplicate".
  */
-export function webhookDedupeKey(event: { type: string; gatewayPaymentId: string; gatewayRefundId?: string }): string {
+export function webhookDedupeKey(event: {
+  type: string;
+  gatewayPaymentId: string;
+  gatewayRefundId?: string;
+}): string {
   return `${event.type}:${event.gatewayRefundId ?? event.gatewayPaymentId}`;
 }
 
@@ -99,7 +103,12 @@ export abstract class PaymentGateway {
    * not a replacement; `BookingService.confirm` is idempotent either way).
    * Default: not supported (the sandbox gateways have no such client step).
    */
-  verifyClientCallback(_payload: Record<string, string>): { valid: boolean; gatewayOrderId?: string; gatewayPaymentId?: string; reason?: string } {
+  verifyClientCallback(_payload: Record<string, string>): {
+    valid: boolean;
+    gatewayOrderId?: string;
+    gatewayPaymentId?: string;
+    reason?: string;
+  } {
     return { valid: false, reason: `${this.name} does not support client-side verification` };
   }
 }

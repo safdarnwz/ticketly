@@ -58,9 +58,17 @@ export const DEFAULT_REST_RULES: RestRules = {
  * rules PLUS the 5-hour continuous-driving limit. Kept separate from
  * DEFAULT_REST_RULES so existing pure callers keep their exact behaviour.
  */
-export const RECOMMENDED_REST_RULES: RestRules = { ...DEFAULT_REST_RULES, maxContinuousDrivingMinutes: 5 * 60 };
+export const RECOMMENDED_REST_RULES: RestRules = {
+  ...DEFAULT_REST_RULES,
+  maxContinuousDrivingMinutes: 5 * 60,
+};
 
-export type ConflictKind = 'overlap' | 'insufficient_rest' | 'exceeds_daily_driving' | 'exceeds_duty_length' | 'exceeds_continuous_driving';
+export type ConflictKind =
+  | 'overlap'
+  | 'insufficient_rest'
+  | 'exceeds_daily_driving'
+  | 'exceeds_duty_length'
+  | 'exceeds_continuous_driving';
 
 export interface Conflict {
   kind: ConflictKind;
@@ -95,10 +103,13 @@ export function checkAssignment(
   }
 
   const dutyMinutes = (candidate.endMs - candidate.startMs) / MS_PER_MINUTE;
-  if (rules.maxContinuousDrivingMinutes && (candidate.drivingMinutes ?? 0) > rules.maxContinuousDrivingMinutes) {
+  if (
+    rules.maxContinuousDrivingMinutes &&
+    (candidate.drivingMinutes ?? 0) > rules.maxContinuousDrivingMinutes
+  ) {
     conflicts.push({
       kind: 'exceeds_continuous_driving',
-      message: `${Math.round((candidate.drivingMinutes ?? 0) / 60 * 10) / 10}h of driving in one duty exceeds the ${rules.maxContinuousDrivingMinutes / 60}h continuous limit — add a relief driver or a rest break`,
+      message: `${Math.round(((candidate.drivingMinutes ?? 0) / 60) * 10) / 10}h of driving in one duty exceeds the ${rules.maxContinuousDrivingMinutes / 60}h continuous limit — add a relief driver or a rest break`,
     });
   }
   if (dutyMinutes > rules.maxDutyMinutes) {
@@ -122,9 +133,10 @@ export function checkAssignment(
     }
 
     // 2. Minimum rest between adjacent duties.
-    const gapMs = candidate.startMs >= duty.endMs
-      ? candidate.startMs - duty.endMs
-      : duty.startMs - candidate.endMs;
+    const gapMs =
+      candidate.startMs >= duty.endMs
+        ? candidate.startMs - duty.endMs
+        : duty.startMs - candidate.endMs;
     if (gapMs < rules.minRestMinutes * MS_PER_MINUTE) {
       conflicts.push({
         kind: 'insufficient_rest',
@@ -138,7 +150,9 @@ export function checkAssignment(
   //    intersects the 24h span centred on the candidate.
   const windowStart = candidate.startMs - MS_PER_DAY;
   const windowEnd = candidate.endMs + MS_PER_DAY;
-  const relevant = [candidate, ...sameCrew].filter((d) => d.endMs > windowStart && d.startMs < windowEnd);
+  const relevant = [candidate, ...sameCrew].filter(
+    (d) => d.endMs > windowStart && d.startMs < windowEnd,
+  );
   const totalDriving = rollingMaxDriving(relevant);
   if (totalDriving > rules.maxDailyDrivingMinutes) {
     conflicts.push({
@@ -154,7 +168,11 @@ export function checkAssignment(
  * Throwing variant used by services: raises a DomainError listing every
  * conflict, or returns cleanly.
  */
-export function assertAssignable(candidate: Duty, existing: Duty[], rules: RestRules = DEFAULT_REST_RULES): void {
+export function assertAssignable(
+  candidate: Duty,
+  existing: Duty[],
+  rules: RestRules = DEFAULT_REST_RULES,
+): void {
   const result = checkAssignment(candidate, existing, rules);
   if (!result.ok) {
     throw new DomainError(
@@ -188,7 +206,6 @@ function rollingMaxDriving(duties: Duty[]): number {
   return max;
 }
 
-
 /* ─────────────── overrides, remaining hours, attendance ─────────────── */
 
 /**
@@ -201,27 +218,43 @@ export function isOverridable(conflicts: Conflict[]): boolean {
 }
 
 /** Driving minutes still allowed in the 24h window ending at `atMs`, and when the crew is next rested. */
-export function remainingAllowance(existing: Duty[], atMs: number, rules: RestRules = DEFAULT_REST_RULES): { remainingDrivingMinutes: number; nextAvailableAtMs: number | null } {
+export function remainingAllowance(
+  existing: Duty[],
+  atMs: number,
+  rules: RestRules = DEFAULT_REST_RULES,
+): { remainingDrivingMinutes: number; nextAvailableAtMs: number | null } {
   const windowStart = atMs - 24 * 60 * MS_PER_MINUTE;
   let driven = 0;
   for (const d of existing) {
     if (d.endMs <= windowStart || d.startMs >= atMs) continue;
     const overlap = Math.min(d.endMs, atMs) - Math.max(d.startMs, windowStart);
-    const share = (d.endMs - d.startMs) > 0 ? overlap / (d.endMs - d.startMs) : 0;
+    const share = d.endMs - d.startMs > 0 ? overlap / (d.endMs - d.startMs) : 0;
     driven += (d.drivingMinutes ?? 0) * share;
   }
   const lastEnd = existing.filter((d) => d.endMs <= atMs).reduce((m, d) => Math.max(m, d.endMs), 0);
   const rested = lastEnd ? lastEnd + rules.minRestMinutes * MS_PER_MINUTE : null;
-  return { remainingDrivingMinutes: Math.max(0, Math.floor(rules.maxDailyDrivingMinutes - driven)), nextAvailableAtMs: rested && rested > atMs ? rested : null };
+  return {
+    remainingDrivingMinutes: Math.max(0, Math.floor(rules.maxDailyDrivingMinutes - driven)),
+    nextAvailableAtMs: rested && rested > atMs ? rested : null,
+  };
 }
 
 export type Attendance = 'pending' | 'present' | 'late' | 'absent';
 export const LATE_GRACE_MINUTES = 15;
 
 /** What to record when a supervisor (or the crew member) marks attendance. */
-export function resolveAttendance(input: { requested: 'present' | 'absent'; dutyStartMs: number; markedAtMs: number; dutyEndMs: number }): Attendance {
-  if (input.markedAtMs > input.dutyEndMs) throw new Error('This duty has already ended — attendance can no longer be marked');
+export function resolveAttendance(input: {
+  requested: 'present' | 'absent';
+  dutyStartMs: number;
+  markedAtMs: number;
+  dutyEndMs: number;
+}): Attendance {
+  if (input.markedAtMs > input.dutyEndMs)
+    throw new Error('This duty has already ended — attendance can no longer be marked');
   if (input.requested === 'absent') return 'absent';
-  if (input.markedAtMs < input.dutyStartMs - 6 * 60 * MS_PER_MINUTE) throw new Error('Attendance can be marked from 6 hours before the duty starts');
-  return input.markedAtMs > input.dutyStartMs + LATE_GRACE_MINUTES * MS_PER_MINUTE ? 'late' : 'present';
+  if (input.markedAtMs < input.dutyStartMs - 6 * 60 * MS_PER_MINUTE)
+    throw new Error('Attendance can be marked from 6 hours before the duty starts');
+  return input.markedAtMs > input.dutyStartMs + LATE_GRACE_MINUTES * MS_PER_MINUTE
+    ? 'late'
+    : 'present';
 }

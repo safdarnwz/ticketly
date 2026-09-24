@@ -39,7 +39,10 @@ export function renderInvoicePdf(input: InvoicePdfInput): Promise<Buffer> {
 
     doc.fontSize(18).text('TAX INVOICE', { align: 'center' });
     doc.moveDown(0.5);
-    doc.fontSize(10).fillColor('#555').text('Issued under Rule 46, CGST Rules, 2017', { align: 'center' });
+    doc
+      .fontSize(10)
+      .fillColor('#555')
+      .text('Issued under Rule 46, CGST Rules, 2017', { align: 'center' });
     doc.moveDown(1.5);
     doc.fillColor('#000');
 
@@ -52,12 +55,15 @@ export function renderInvoicePdf(input: InvoicePdfInput): Promise<Buffer> {
       try {
         const base64 = input.supplierLogoDataUri.split(',')[1];
         if (base64) doc.image(Buffer.from(base64, 'base64'), 455, 40, { fit: [90, 50] });
-      } catch { /* corrupt/unsupported logo data — proceed without it */ }
+      } catch {
+        /* corrupt/unsupported logo data — proceed without it */
+      }
     }
 
     // Supplier / invoice-meta block
     doc.fontSize(12).text(input.supplierName, { continued: false });
-    if (input.supplierGstin) doc.fontSize(10).fillColor('#333').text(`GSTIN: ${input.supplierGstin}`);
+    if (input.supplierGstin)
+      doc.fontSize(10).fillColor('#333').text(`GSTIN: ${input.supplierGstin}`);
     if (input.supplierAddress) doc.fontSize(10).fillColor('#333').text(input.supplierAddress);
     doc.moveDown(1);
     doc.fillColor('#000');
@@ -66,7 +72,12 @@ export function renderInvoicePdf(input: InvoicePdfInput): Promise<Buffer> {
     doc.fontSize(10).text(`Invoice No: ${input.invoiceNumber}`, 50, metaTop);
     doc.text(`Invoice Date: ${input.invoiceDate.toLocaleDateString('en-IN')}`, 50, metaTop + 15);
     doc.text(`PNR: ${input.pnr}`, 300, metaTop, { align: 'right', width: 245 });
-    doc.text(`Place of supply: ${input.interState ? 'Inter-state' : 'Intra-state'}`, 300, metaTop + 15, { align: 'right', width: 245 });
+    doc.text(
+      `Place of supply: ${input.interState ? 'Inter-state' : 'Intra-state'}`,
+      300,
+      metaTop + 15,
+      { align: 'right', width: 245 },
+    );
     doc.moveDown(3);
 
     // Recipient block
@@ -91,7 +102,11 @@ export function renderInvoicePdf(input: InvoicePdfInput): Promise<Buffer> {
     doc.text(input.sac, 280, rowY, { width: 60 });
     doc.text(money(input.taxableMinor), 345, rowY, { width: 90, align: 'right' });
     doc.text(money(input.taxTotalMinor), 445, rowY, { width: 90, align: 'right' });
-    doc.moveTo(50, rowY + 20).lineTo(545, rowY + 20).strokeColor('#ddd').stroke();
+    doc
+      .moveTo(50, rowY + 20)
+      .lineTo(545, rowY + 20)
+      .strokeColor('#ddd')
+      .stroke();
 
     // GST split — CGST+SGST for intra-state, IGST for inter-state, matching
     // gst-invoice.ts's own split logic exactly (never re-derived here).
@@ -104,7 +119,10 @@ export function renderInvoicePdf(input: InvoicePdfInput): Promise<Buffer> {
       const half = Math.round(input.taxTotalMinor / 2);
       doc.text(`CGST: ${money(half)}`, 345, y, { width: 190, align: 'right' });
       y += 15;
-      doc.text(`SGST: ${money(input.taxTotalMinor - half)}`, 345, y, { width: 190, align: 'right' });
+      doc.text(`SGST: ${money(input.taxTotalMinor - half)}`, 345, y, {
+        width: 190,
+        align: 'right',
+      });
       y += 15;
     }
     if (input.roundOffMinor !== 0) {
@@ -112,12 +130,18 @@ export function renderInvoicePdf(input: InvoicePdfInput): Promise<Buffer> {
       y += 15;
     }
 
-    doc.fillColor('#000').fontSize(12).text(`Total: ${money(input.totalMinor)}`, 345, y + 5, { width: 190, align: 'right' });
+    doc
+      .fillColor('#000')
+      .fontSize(12)
+      .text(`Total: ${money(input.totalMinor)}`, 345, y + 5, { width: 190, align: 'right' });
 
-    doc.fontSize(8).fillColor('#888').text(
-      'This is a computer-generated invoice and does not require a signature.',
-      50, 750, { width: 495, align: 'center' },
-    );
+    doc
+      .fontSize(8)
+      .fillColor('#888')
+      .text('This is a computer-generated invoice and does not require a signature.', 50, 750, {
+        width: 495,
+        align: 'center',
+      });
 
     doc.end();
   });

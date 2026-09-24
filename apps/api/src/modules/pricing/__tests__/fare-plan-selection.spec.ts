@@ -1,11 +1,37 @@
 import { describe, expect, it } from 'vitest';
 
-import { appliesOn, isoWeekday, selectFarePlan, validatePlanWindow, type FarePlanCandidate } from '../domain/fare-plan-selection';
+import {
+  appliesOn,
+  isoWeekday,
+  selectFarePlan,
+  validatePlanWindow,
+  type FarePlanCandidate,
+} from '../domain/fare-plan-selection';
 
-const regular: FarePlanCandidate = { id: 'regular', effectiveFrom: '2026-01-01', effectiveTo: null, weekdays: null };
-const weekend: FarePlanCandidate = { id: 'weekend', effectiveFrom: '2026-01-01', effectiveTo: null, weekdays: [6, 7] };
-const diwali: FarePlanCandidate = { id: 'diwali', effectiveFrom: '2026-10-20', effectiveTo: '2026-11-05', weekdays: null };
-const nye: FarePlanCandidate = { id: 'nye', effectiveFrom: '2026-12-31', effectiveTo: '2026-12-31', weekdays: null };
+const regular: FarePlanCandidate = {
+  id: 'regular',
+  effectiveFrom: '2026-01-01',
+  effectiveTo: null,
+  weekdays: null,
+};
+const weekend: FarePlanCandidate = {
+  id: 'weekend',
+  effectiveFrom: '2026-01-01',
+  effectiveTo: null,
+  weekdays: [6, 7],
+};
+const diwali: FarePlanCandidate = {
+  id: 'diwali',
+  effectiveFrom: '2026-10-20',
+  effectiveTo: '2026-11-05',
+  weekdays: null,
+};
+const nye: FarePlanCandidate = {
+  id: 'nye',
+  effectiveFrom: '2026-12-31',
+  effectiveTo: '2026-12-31',
+  weekdays: null,
+};
 const all = [regular, weekend, diwali, nye];
 
 describe('selectFarePlan', () => {
@@ -28,16 +54,29 @@ describe('selectFarePlan', () => {
     expect(selectFarePlan(all, '2025-12-31')).toBeNull();
   });
   it('tie on specificity → the most recently started plan', () => {
-    const newer: FarePlanCandidate = { id: 'regular-2', effectiveFrom: '2026-06-01', effectiveTo: null, weekdays: null };
+    const newer: FarePlanCandidate = {
+      id: 'regular-2',
+      effectiveFrom: '2026-06-01',
+      effectiveTo: null,
+      weekdays: null,
+    };
     expect(selectFarePlan([regular, newer], '2026-07-01')!.id).toBe('regular-2');
   });
 });
 
 describe('validatePlanWindow', () => {
   it('rejects inverted ranges, bad or duplicate weekdays', () => {
-    expect(validatePlanWindow({ effectiveFrom: '2026-11-05', effectiveTo: '2026-10-20' })).toMatch(/end date/);
+    expect(validatePlanWindow({ effectiveFrom: '2026-11-05', effectiveTo: '2026-10-20' })).toMatch(
+      /end date/,
+    );
     expect(validatePlanWindow({ weekdays: [0] })).toMatch(/1 \(Mon\)/);
     expect(validatePlanWindow({ weekdays: [6, 6] })).toMatch(/twice/);
-    expect(validatePlanWindow({ effectiveFrom: '2026-10-20', effectiveTo: '2026-10-20', weekdays: [6, 7] })).toBeNull();
+    expect(
+      validatePlanWindow({
+        effectiveFrom: '2026-10-20',
+        effectiveTo: '2026-10-20',
+        weekdays: [6, 7],
+      }),
+    ).toBeNull();
   });
 });

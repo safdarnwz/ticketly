@@ -6,11 +6,16 @@ import { ApiStandardErrors, Public, RateLimit, RequirePermission, zodBody } from
 import { NotFoundError, type CityId, type RouteId, type SeatLayoutId, type StopId } from '@kernel';
 
 import {
-  CreateAmenitySchema, type CreateAmenityDto,
-  CreateRouteSchema, type CreateRouteDto,
-  CreateSeatLayoutSchema, type CreateSeatLayoutDto,
-  CreateStopSchema, type CreateStopDto,
-  CreateVehicleTypeSchema, type CreateVehicleTypeDto,
+  CreateAmenitySchema,
+  type CreateAmenityDto,
+  CreateRouteSchema,
+  type CreateRouteDto,
+  CreateSeatLayoutSchema,
+  type CreateSeatLayoutDto,
+  CreateStopSchema,
+  type CreateStopDto,
+  CreateVehicleTypeSchema,
+  type CreateVehicleTypeDto,
   SeatMapSchema,
 } from './dto/master-data.dto';
 import { AmenityRepository } from '../infrastructure/persistence/amenity.repository';
@@ -57,7 +62,10 @@ export class MasterDataController {
   @Public()
   @Get('cities/by-slug/:slug')
   @RateLimit(60, 60_000, 'ip')
-  @ApiOperation({ summary: 'Resolve a URL-safe city slug (e.g. "new-delhi") back to the real city — lets search-result URLs use readable city names instead of raw UUIDs' })
+  @ApiOperation({
+    summary:
+      'Resolve a URL-safe city slug (e.g. "new-delhi") back to the real city — lets search-result URLs use readable city names instead of raw UUIDs',
+  })
   async cityBySlug(@Param('slug') slug: string) {
     const city = await this.geography.findBySlug(slug);
     if (!city) throw new NotFoundError('City', slug);
@@ -67,7 +75,7 @@ export class MasterDataController {
   @Get('cities/:cityId/stops')
   @Public()
   @RateLimit(120, 60_000, 'ip')
-  @ApiOperation({ summary: 'List this operator\'s stops in a city (public)' })
+  @ApiOperation({ summary: "List this operator's stops in a city (public)" })
   async stopsInCity(@Param('cityId') cityId: string) {
     return { items: await this.stops.listByCity(cityId as CityId) };
   }
@@ -90,7 +98,20 @@ export class MasterDataController {
   @Patch('stops/:id')
   @RequirePermission(Permission.STOP_MANAGE)
   @ApiOperation({ summary: 'Edit a stop' })
-  async updateStop(@Param('id') id: string, @Body() dto: { name?: string; kind?: 'boarding' | 'dropping' | 'both'; landmark?: string; address?: string; pincode?: string; latitude?: number; longitude?: number; contactPhone?: string }) {
+  async updateStop(
+    @Param('id') id: string,
+    @Body()
+    dto: {
+      name?: string;
+      kind?: 'boarding' | 'dropping' | 'both';
+      landmark?: string;
+      address?: string;
+      pincode?: string;
+      latitude?: number;
+      longitude?: number;
+      contactPhone?: string;
+    },
+  ) {
     await this.stops.update(id as StopId, dto);
     return { ok: true };
   }
@@ -105,7 +126,9 @@ export class MasterDataController {
 
   @Post('stops/:id/deactivate')
   @RequirePermission(Permission.STOP_MANAGE)
-  @ApiOperation({ summary: 'Deactivate a stop — hides it from customer search without deleting route history' })
+  @ApiOperation({
+    summary: 'Deactivate a stop — hides it from customer search without deleting route history',
+  })
   async deactivateStop(@Param('id') id: string) {
     await this.stops.setActive(id as StopId, false);
     return { ok: true };
@@ -113,8 +136,26 @@ export class MasterDataController {
 
   @Post('stops/bulk-import')
   @RequirePermission(Permission.STOP_MANAGE)
-  @ApiOperation({ summary: 'Bulk-import stops — each row validated independently, a bad row is skipped and reported rather than aborting the whole batch' })
-  async bulkImportStops(@Body() dto: { rows: Array<{ cityId: string; name: string; kind?: 'boarding' | 'dropping' | 'both'; landmark?: string; address?: string; pincode?: string; latitude?: number; longitude?: number; contactPhone?: string }> }) {
+  @ApiOperation({
+    summary:
+      'Bulk-import stops — each row validated independently, a bad row is skipped and reported rather than aborting the whole batch',
+  })
+  async bulkImportStops(
+    @Body()
+    dto: {
+      rows: Array<{
+        cityId: string;
+        name: string;
+        kind?: 'boarding' | 'dropping' | 'both';
+        landmark?: string;
+        address?: string;
+        pincode?: string;
+        latitude?: number;
+        longitude?: number;
+        contactPhone?: string;
+      }>;
+    },
+  ) {
     return this.stops.bulkImport(dto.rows as never);
   }
 
@@ -139,7 +180,10 @@ export class MasterDataController {
   @Patch('seat-layouts/:id')
   @RequirePermission(Permission.LAYOUT_MANAGE)
   @ApiOperation({ summary: 'Edit an existing seat layout in place' })
-  async updateLayout(@Param('id') id: string, @Body(zodBody(CreateSeatLayoutSchema)) dto: CreateSeatLayoutDto) {
+  async updateLayout(
+    @Param('id') id: string,
+    @Body(zodBody(CreateSeatLayoutSchema)) dto: CreateSeatLayoutDto,
+  ) {
     return this.layoutService.update(id as SeatLayoutId, dto.name, dto.layout);
   }
 
@@ -152,8 +196,13 @@ export class MasterDataController {
 
   @Post('seat-layouts/:id/versions/:versionNumber/restore')
   @RequirePermission(Permission.LAYOUT_MANAGE)
-  @ApiOperation({ summary: 'Roll back to an earlier version — recorded as a new version, never rewrites history' })
-  async restoreLayoutVersion(@Param('id') id: string, @Param('versionNumber') versionNumber: string) {
+  @ApiOperation({
+    summary: 'Roll back to an earlier version — recorded as a new version, never rewrites history',
+  })
+  async restoreLayoutVersion(
+    @Param('id') id: string,
+    @Param('versionNumber') versionNumber: string,
+  ) {
     return this.layoutService.restoreVersion(id as SeatLayoutId, Number(versionNumber));
   }
 

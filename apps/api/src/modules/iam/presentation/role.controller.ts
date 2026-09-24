@@ -8,7 +8,12 @@ import { ApiStandardErrors, zodBody } from '@http';
 import { requireTenantId, type RoleId } from '@kernel';
 
 import { RequirePermission } from './decorators/require-permission.decorator';
-import { CreateRoleSchema, type CreateRoleDto, UpdateRolePermissionsSchema, type UpdateRolePermissionsDto } from './dto/role.dto';
+import {
+  CreateRoleSchema,
+  type CreateRoleDto,
+  UpdateRolePermissionsSchema,
+  type UpdateRolePermissionsDto,
+} from './dto/role.dto';
 import { RoleRepository } from '../infrastructure/persistence/role.repository';
 import { StaffAccessService } from '../application/services/staff-access.service';
 
@@ -43,8 +48,11 @@ export class RoleController {
 
   @Put(':id/permissions')
   @RequirePermission(Permission.ROLE_MANAGE)
-  @ApiOperation({ summary: 'Replace a role\'s permissions' })
-  async setPermissions(@Param('id') id: string, @Body(zodBody(UpdateRolePermissionsSchema)) dto: UpdateRolePermissionsDto) {
+  @ApiOperation({ summary: "Replace a role's permissions" })
+  async setPermissions(
+    @Param('id') id: string,
+    @Body(zodBody(UpdateRolePermissionsSchema)) dto: UpdateRolePermissionsDto,
+  ) {
     await this.uow.run({ name: 'role.setPermissions', tenantId: requireTenantId() }, async () => {
       await this.roles.setPermissions(id as RoleId, dto.permissions);
     });
@@ -55,7 +63,21 @@ export class RoleController {
   @HttpCode(201)
   @RequirePermission(Permission.ROLE_MANAGE)
   @ApiOperation({ summary: 'Copy a role with all its permissions under a new code and name' })
-  async duplicate(@Param('id') id: string, @Body(zodBody(z.object({ code: z.string().trim().regex(/^[a-z][a-z0-9_]{2,40}$/), name: z.string().trim().min(2).max(80) }))) dto: { code: string; name: string }) {
+  async duplicate(
+    @Param('id') id: string,
+    @Body(
+      zodBody(
+        z.object({
+          code: z
+            .string()
+            .trim()
+            .regex(/^[a-z][a-z0-9_]{2,40}$/),
+          name: z.string().trim().min(2).max(80),
+        }),
+      ),
+    )
+    dto: { code: string; name: string },
+  ) {
     return { id: await this.access.duplicateRole(id, dto.code, dto.name) };
   }
 

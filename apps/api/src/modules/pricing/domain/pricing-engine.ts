@@ -100,7 +100,8 @@ export class PricingEngine {
     // ── 1. dynamic yield ──
     const ladder = req.yield ?? NO_YIELD;
     const multiplier = clamp(
-      occupancyMultiplier(ladder, req.occupancyPct) * advanceMultiplier(ladder, req.daysToDeparture),
+      occupancyMultiplier(ladder, req.occupancyPct) *
+        advanceMultiplier(ladder, req.daysToDeparture),
       ladder.minMultiplier,
       ladder.maxMultiplier,
     );
@@ -117,23 +118,39 @@ export class PricingEngine {
 
     // ── 1b. operator floor / ceiling (281 / 282) ──
     if (req.bounds) {
-      const afterYield = base.plus(lines.reduce((a, l) => a.plus(l.amount), Money.zero(req.currency)));
+      const afterYield = base.plus(
+        lines.reduce((a, l) => a.plus(l.amount), Money.zero(req.currency)),
+      );
       const ceiling = req.bounds.ceilingMinor;
       const floor = req.bounds.floorMinor;
       if (ceiling !== null && ceiling !== undefined && afterYield.minor > ceiling) {
-        lines.push({ kind: 'dynamic', label: 'Fare ceiling', amount: Money.of(ceiling - afterYield.minor, req.currency) });
+        lines.push({
+          kind: 'dynamic',
+          label: 'Fare ceiling',
+          amount: Money.of(ceiling - afterYield.minor, req.currency),
+        });
       } else if (floor !== null && floor !== undefined && afterYield.minor < floor) {
-        lines.push({ kind: 'dynamic', label: 'Fare floor', amount: Money.of(floor - afterYield.minor, req.currency) });
+        lines.push({
+          kind: 'dynamic',
+          label: 'Fare floor',
+          amount: Money.of(floor - afterYield.minor, req.currency),
+        });
       }
     }
 
-    const netBeforeDiscount = base.plus(lines.reduce((a, l) => a.plus(l.amount), Money.zero(req.currency)));
+    const netBeforeDiscount = base.plus(
+      lines.reduce((a, l) => a.plus(l.amount), Money.zero(req.currency)),
+    );
 
     // ── 2. coupon / discount ──
     if (req.coupon) {
       const discount = computeCoupon(req.coupon, netBeforeDiscount, req.currency);
       if (discount.isPositive()) {
-        lines.push({ kind: 'coupon', label: `Coupon ${req.coupon.code}`, amount: discount.negate() });
+        lines.push({
+          kind: 'coupon',
+          label: `Coupon ${req.coupon.code}`,
+          amount: discount.negate(),
+        });
       }
     }
 
@@ -181,23 +198,32 @@ export class PricingEngine {
    * ₹100 discount get ₹33 and ₹67 respectively, not ₹50 each, so a seat can
    * never end up discounted below zero relative to its own fare.
    */
-  static priceManyDifferent(reqTemplate: Omit<PriceRequest, 'baseFareMinor'>, baseFaresMinor: number[]): FareBreakup[] {
-    if (baseFaresMinor.length < 1) throw new DomainError(ErrorCode.COMMON_VALIDATION, 'at least one seat fare is required');
+  static priceManyDifferent(
+    reqTemplate: Omit<PriceRequest, 'baseFareMinor'>,
+    baseFaresMinor: number[],
+  ): FareBreakup[] {
+    if (baseFaresMinor.length < 1)
+      throw new DomainError(ErrorCode.COMMON_VALIDATION, 'at least one seat fare is required');
     if (reqTemplate.coupon?.kind === 'flat') {
-      const perSeatNoCoupon = baseFaresMinor.map((baseFareMinor) => PricingEngine.price({ ...reqTemplate, baseFareMinor, coupon: null }));
+      const perSeatNoCoupon = baseFaresMinor.map((baseFareMinor) =>
+        PricingEngine.price({ ...reqTemplate, baseFareMinor, coupon: null }),
+      );
       const totalNet = perSeatNoCoupon.reduce((sum, b) => sum + b.netFare.minor, 0);
       const totalFlat = Math.min(reqTemplate.coupon.value, totalNet);
       const weights = perSeatNoCoupon.map((b) => b.netFare.minor);
       const shares = Money.of(totalFlat, reqTemplate.currency).allocate(weights);
       return baseFaresMinor.map((baseFareMinor, i) =>
         PricingEngine.price({
-          ...reqTemplate, baseFareMinor,
+          ...reqTemplate,
+          baseFareMinor,
           coupon: { code: reqTemplate.coupon!.code, kind: 'flat', value: shares[i].minor },
         }),
       );
     }
     // Percentage / no coupon: each seat prices independently off its own fare.
-    return baseFaresMinor.map((baseFareMinor) => PricingEngine.price({ ...reqTemplate, baseFareMinor }));
+    return baseFaresMinor.map((baseFareMinor) =>
+      PricingEngine.price({ ...reqTemplate, baseFareMinor }),
+    );
   }
 }
 
@@ -241,7 +267,9 @@ function computeCoupon(coupon: Coupon, fare: Money, currency: CurrencyCode): Mon
 function computeTaxes(policy: TaxPolicy, netFare: Money, _currency: CurrencyCode): TaxComponent[] {
   if (policy.exempt || policy.gstRatePct <= 0 || netFare.isZero()) return [];
   if (policy.interState) {
-    return [{ name: 'IGST', ratePct: policy.gstRatePct, amount: netFare.percent(policy.gstRatePct) }];
+    return [
+      { name: 'IGST', ratePct: policy.gstRatePct, amount: netFare.percent(policy.gstRatePct) },
+    ];
   }
   // Intra-state: split evenly into CGST + SGST, allocating so the two halves
   // sum exactly to the total GST (no lost paisa on an odd amount).

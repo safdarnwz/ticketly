@@ -11,14 +11,25 @@ export class FraudRepository {
   constructor(private readonly db: DatabaseService) {}
 
   async insert(input: {
-    bookingId: BookingId | null; customerId: UserId | null; result: RiskResult; signals: Json;
+    bookingId: BookingId | null;
+    customerId: UserId | null;
+    result: RiskResult;
+    signals: Json;
   }): Promise<string> {
     const id = newId();
     await this.db.execute_(
       `INSERT INTO fraud_assessments (id, booking_id, customer_id, score, band, decision, reasons, signals)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [id, input.bookingId, input.customerId, input.result.score, input.result.band, input.result.decision,
-       JSON.stringify(input.result.reasons), JSON.stringify(input.signals)],
+      [
+        id,
+        input.bookingId,
+        input.customerId,
+        input.result.score,
+        input.result.band,
+        input.result.decision,
+        JSON.stringify(input.result.reasons),
+        JSON.stringify(input.signals),
+      ],
       { name: 'fraud.insert', primary: true },
     );
     return id;

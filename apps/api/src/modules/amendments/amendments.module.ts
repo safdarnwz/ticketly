@@ -16,7 +16,14 @@ import { AmendmentsController } from './presentation/amendments.controller';
  * guarantee as a fresh booking, and pricing for the fare-difference math.
  */
 @Module({
-  imports: [ConfigModule, DatabaseModule, MessagingModule, BookingModule, PricingModule, SchedulingModule],
+  imports: [
+    ConfigModule,
+    DatabaseModule,
+    MessagingModule,
+    BookingModule,
+    PricingModule,
+    SchedulingModule,
+  ],
   controllers: [AmendmentsController],
   providers: [AmendmentService],
   exports: [AmendmentService],

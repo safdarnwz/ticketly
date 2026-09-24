@@ -1,13 +1,24 @@
 import { describe, it, expect } from 'vitest';
 
 import {
-  signingInput, encodeToken, decodeToken, isExpired, constantTimeEqual, verifyToken,
+  signingInput,
+  encodeToken,
+  decodeToken,
+  isExpired,
+  constantTimeEqual,
+  verifyToken,
   type TicketTokenPayload,
 } from '../domain/ticket-token';
 
 const payload = (o: Partial<TicketTokenPayload> = {}): TicketTokenPayload => ({
-  v: 1, bookingId: 'b1', pnr: 'YB12AB', tripId: 't1', seat: 'A1',
-  issuedAtMs: 1_000_000, expiresAtMs: 2_000_000, ...o,
+  v: 1,
+  bookingId: 'b1',
+  pnr: 'YB12AB',
+  tripId: 't1',
+  seat: 'A1',
+  issuedAtMs: 1_000_000,
+  expiresAtMs: 2_000_000,
+  ...o,
 });
 
 describe('ticket token encode/decode', () => {
@@ -21,7 +32,15 @@ describe('ticket token encode/decode', () => {
   });
 
   it('positive: signing input is stable regardless of key order in the source object', () => {
-    const a = signingInput({ v: 1, seat: 'A1', bookingId: 'b1', pnr: 'YB12AB', tripId: 't1', issuedAtMs: 1_000_000, expiresAtMs: 2_000_000 });
+    const a = signingInput({
+      v: 1,
+      seat: 'A1',
+      bookingId: 'b1',
+      pnr: 'YB12AB',
+      tripId: 't1',
+      issuedAtMs: 1_000_000,
+      expiresAtMs: 2_000_000,
+    });
     const b = signingInput(payload());
     expect(a).toBe(b);
   });

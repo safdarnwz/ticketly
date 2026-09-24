@@ -21,7 +21,15 @@ export function RequirePermission(
 ): MethodDecorator & ClassDecorator {
   const list = Array.isArray(permissions) ? permissions : [permissions];
   return (target: object, key?: string | symbol, descriptor?: PropertyDescriptor) => {
-    SetMetadata(REQUIRE_PERMISSION_KEY, list)(target, key as string, descriptor as PropertyDescriptor);
-    SetMetadata(REQUIRE_PERMISSION_MODE, mode)(target, key as string, descriptor as PropertyDescriptor);
+    SetMetadata(REQUIRE_PERMISSION_KEY, list)(
+      target,
+      key as string,
+      descriptor as PropertyDescriptor,
+    );
+    SetMetadata(REQUIRE_PERMISSION_MODE, mode)(
+      target,
+      key as string,
+      descriptor as PropertyDescriptor,
+    );
   };
 }

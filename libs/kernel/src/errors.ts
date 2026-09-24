@@ -134,7 +134,10 @@ export class BadRequestError extends AppError {
 /* ── 401 / 403 ───────────────────────────────────────────────────────────── */
 
 export class UnauthenticatedError extends AppError {
-  constructor(code: ErrorCodeValue = ErrorCode.COMMON_UNAUTHENTICATED, options: AppErrorOptions = {}) {
+  constructor(
+    code: ErrorCodeValue = ErrorCode.COMMON_UNAUTHENTICATED,
+    options: AppErrorOptions = {},
+  ) {
     super(code, 401, { message: 'Authentication required', severity: 'info', ...options });
   }
 }

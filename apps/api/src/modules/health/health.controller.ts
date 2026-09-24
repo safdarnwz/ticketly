@@ -1,4 +1,11 @@
-import { Controller, Get, HttpCode, ServiceUnavailableException, Version, VERSION_NEUTRAL } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  ServiceUnavailableException,
+  Version,
+  VERSION_NEUTRAL,
+} from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 
 import { CacheService } from '@cache';

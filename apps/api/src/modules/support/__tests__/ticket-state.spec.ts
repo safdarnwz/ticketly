@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 
 import {
-  assertTicketTransition, canTicketTransition, isTicketClosed, statusAfterMessage,
+  assertTicketTransition,
+  canTicketTransition,
+  isTicketClosed,
+  statusAfterMessage,
 } from '../domain/ticket-state';
 
 describe('ticket transitions', () => {

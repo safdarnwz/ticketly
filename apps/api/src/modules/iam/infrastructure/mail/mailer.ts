@@ -41,10 +41,15 @@ export class Mailer {
 
   private smtp?: { key: string; transporter: Transporter; from: string; fromAddress: string };
 
-  constructor(logger: Logger, private readonly credentials: IntegrationCredentialStore, config: AppConfig) {
+  constructor(
+    logger: Logger,
+    private readonly credentials: IntegrationCredentialStore,
+    config: AppConfig,
+  ) {
     this.log = logger.forContext('Mailer');
     const { gmailUser: user, gmailAppPassword: pass } = config.mail;
-    this.from = config.mail.from || (user ? `Ticketly <${user}>` : 'Ticketly <no-reply@ticketly.com>');
+    this.from =
+      config.mail.from || (user ? `Ticketly <${user}>` : 'Ticketly <no-reply@ticketly.com>');
     // Pull just the address out of "Name <addr>" (or use it as-is if it's
     // already a bare address) — this is what a per-operator fromName gets
     // recombined with below.
@@ -56,14 +61,24 @@ export class Mailer {
     }
   }
 
-  async send(input: { to: string; subject: string; html: string; text?: string; fromName?: string; attachments?: { filename: string; content: Buffer; contentType?: string }[] }): Promise<void> {
+  async send(input: {
+    to: string;
+    subject: string;
+    html: string;
+    text?: string;
+    fromName?: string;
+    attachments?: { filename: string; content: Buffer; contentType?: string }[];
+  }): Promise<void> {
     const saved = this.savedSmtp();
     const fromAddress = saved?.fromAddress ?? this.fromAddress;
     const defaultFrom = saved?.from ?? this.from;
     const from = input.fromName ? `${input.fromName} <${fromAddress}>` : defaultFrom;
     const transporter = saved?.transporter ?? this.transporter;
     if (!transporter) {
-      this.log.info({ to: input.to, subject: input.subject, from, attachments: input.attachments?.length ?? 0 }, 'Email (dev, not sent)');
+      this.log.info(
+        { to: input.to, subject: input.subject, from, attachments: input.attachments?.length ?? 0 },
+        'Email (dev, not sent)',
+      );
       return;
     }
     await transporter.sendMail({
@@ -74,7 +89,10 @@ export class Mailer {
       text: input.text,
       attachments: input.attachments,
     });
-    this.log.info({ to: input.to, subject: input.subject, from, attachments: input.attachments?.length ?? 0 }, 'Email sent');
+    this.log.info(
+      { to: input.to, subject: input.subject, from, attachments: input.attachments?.length ?? 0 },
+      'Email sent',
+    );
   }
 
   /** The admin-configured SMTP transport, or undefined to use the Gmail env account. */
@@ -82,11 +100,24 @@ export class Mailer {
     const saved = this.credentials.active('smtp');
     if (!saved) return undefined;
     const { host, port, secure, user, fromAddress, fromName } = saved.config;
-    const key = JSON.stringify([host, port, secure, user, fromAddress, fromName, saved.secrets.password]);
+    const key = JSON.stringify([
+      host,
+      port,
+      secure,
+      user,
+      fromAddress,
+      fromName,
+      saved.secrets.password,
+    ]);
     if (this.smtp?.key !== key) {
       this.smtp = {
         key,
-        transporter: nodemailer.createTransport({ host, port, secure, auth: { user, pass: saved.secrets.password } }),
+        transporter: nodemailer.createTransport({
+          host,
+          port,
+          secure,
+          auth: { user, pass: saved.secrets.password },
+        }),
         from: `${fromName} <${fromAddress}>`,
         fromAddress,
       };
@@ -94,4 +125,3 @@ export class Mailer {
     return this.smtp;
   }
 }
-

@@ -101,7 +101,10 @@ export function isFragment(value: unknown): value is SqlFragment {
 }
 
 /** Join fragments with a separator, skipping empties. */
-export function join(fragments: (SqlFragment | null | undefined)[], separator = ' AND '): SqlFragment {
+export function join(
+  fragments: (SqlFragment | null | undefined)[],
+  separator = ' AND ',
+): SqlFragment {
   const present = fragments.filter((f): f is SqlFragment => !!f && f.text.trim() !== '');
   if (present.length === 0) return { text: '', params: [] };
 
@@ -133,10 +136,7 @@ export function bulkInsert<T extends Record<string, unknown>>(
 ): SqlFragment[] {
   if (rows.length === 0) return [];
 
-  const maxRowsPerBatch = Math.min(
-    options.batchSize ?? 1_000,
-    Math.floor(65_000 / columns.length),
-  );
+  const maxRowsPerBatch = Math.min(options.batchSize ?? 1_000, Math.floor(65_000 / columns.length));
 
   return chunk(rows, maxRowsPerBatch).map((batch) => {
     const params: unknown[] = [];

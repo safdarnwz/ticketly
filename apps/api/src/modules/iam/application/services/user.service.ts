@@ -30,22 +30,31 @@ export class UserService {
     private readonly policies: PlatformPoliciesService,
   ) {}
 
-  async invite(input: { fullName: string; email: string; phone?: string; password: string; roles: string[] }): Promise<UserId> {
+  async invite(input: {
+    fullName: string;
+    email: string;
+    phone?: string;
+    password: string;
+    roles: string[];
+  }): Promise<UserId> {
     const tenantId = requireTenantId();
     const existing = await this.users.findByEmail(input.email);
     if (existing) throw new ConflictError('A user with this email already exists');
 
     await this.policies.assertPasswordAcceptable(input.password);
     const passwordHash = await this.hasher.hash(input.password);
-    const user = User.create(newId() as UserId, {
-      tenantId,
-      kind: 'staff',
-      fullName: input.fullName,
-      email: input.email,
-      phone: input.phone,
-      passwordHash,
-      status: 'active',
-    } as never);
+    const user = User.create(
+      newId() as UserId,
+      {
+        tenantId,
+        kind: 'staff',
+        fullName: input.fullName,
+        email: input.email,
+        phone: input.phone,
+        passwordHash,
+        status: 'active',
+      } as never,
+    );
 
     await this.uow.run({ name: 'user.invite', tenantId }, async () => {
       await this.users.insert(user);
@@ -54,23 +63,40 @@ export class UserService {
         if (!role) throw new NotFoundError('Role', code);
         await this.roles.grantToUser(user.id, role.id, null);
       }
-      await this.audit.recordInTx({ action: 'user.invited', resourceType: 'user', resourceId: user.id, changes: { roles: input.roles } });
+      await this.audit.recordInTx({
+        action: 'user.invited',
+        resourceType: 'user',
+        resourceId: user.id,
+        changes: { roles: input.roles },
+      });
     });
     return user.id;
   }
 
-  async update(userId: UserId, patch: { fullName?: string; phone?: string; status?: 'active' | 'disabled' }): Promise<void> {
+  async update(
+    userId: UserId,
+    patch: { fullName?: string; phone?: string; status?: 'active' | 'disabled' },
+  ): Promise<void> {
     await this.uow.run({ name: 'user.update', tenantId: requireTenantId() }, async () => {
       const user = await this.users.findById(userId);
       if (!user) throw new NotFoundError('User', userId);
-      if (patch.fullName || patch.phone) user.updateProfile({ fullName: patch.fullName ?? user.snapshot().fullName, phone: patch.phone ?? user.snapshot().phone });
+      if (patch.fullName || patch.phone)
+        user.updateProfile({
+          fullName: patch.fullName ?? user.snapshot().fullName,
+          phone: patch.phone ?? user.snapshot().phone,
+        });
       if (patch.status === 'disabled') {
         user.disable();
         await this.sessions.revokeAllForUser(userId, 'user-disabled');
       }
       if (patch.status === 'active') user.enable();
       await this.users.update(user, user.version);
-      await this.audit.recordInTx({ action: 'user.updated', resourceType: 'user', resourceId: userId, changes: patch });
+      await this.audit.recordInTx({
+        action: 'user.updated',
+        resourceType: 'user',
+        resourceId: userId,
+        changes: patch,
+      });
     });
   }
 
@@ -89,7 +115,12 @@ export class UserService {
       // Role change → existing access tokens carry stale permissions. Force a
       // re-login by revoking sessions (the customer app refreshes silently).
       await this.sessions.revokeAllForUser(userId, 'roles-changed');
-      await this.audit.recordInTx({ action: 'user.roles_assigned', resourceType: 'user', resourceId: userId, changes: { roles: roleCodes } });
+      await this.audit.recordInTx({
+        action: 'user.roles_assigned',
+        resourceType: 'user',
+        resourceId: userId,
+        changes: { roles: roleCodes },
+      });
     });
   }
 }

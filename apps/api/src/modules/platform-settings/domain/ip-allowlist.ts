@@ -7,7 +7,11 @@ import { BlockList, isIP } from 'node:net';
  * means "no restriction" — so turning the feature on is always an explicit act
  * and a fresh install can never lock its only admin out.
  */
-export interface ParsedEntry { address: string; prefix: number; family: 'ipv4' | 'ipv6' }
+export interface ParsedEntry {
+  address: string;
+  prefix: number;
+  family: 'ipv4' | 'ipv6';
+}
 
 export function parseAllowlistEntry(raw: string): ParsedEntry | null {
   const value = raw.trim();

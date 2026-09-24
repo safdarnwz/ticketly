@@ -41,7 +41,14 @@ import { AuditService } from '../iam/application/services/audit.service';
  * TenancyModule to get it.
  */
 @Module({
-  imports: [DatabaseModule, CacheModule, SecurityModule, BookingModule, PlatformSettingsModule, FilesModule],
+  imports: [
+    DatabaseModule,
+    CacheModule,
+    SecurityModule,
+    BookingModule,
+    PlatformSettingsModule,
+    FilesModule,
+  ],
   controllers: [TenantController, TenantAdminController],
   providers: [
     TenantRepository,
@@ -53,6 +60,13 @@ import { AuditService } from '../iam/application/services/audit.service';
     RoleRepository,
     AuditService,
   ],
-  exports: [TenantRepository, PlanRepository, PayoutRepository, PlatformSettingsModule, TenantContextService, TenantProvisioningService],
+  exports: [
+    TenantRepository,
+    PlanRepository,
+    PayoutRepository,
+    PlatformSettingsModule,
+    TenantContextService,
+    TenantProvisioningService,
+  ],
 })
 export class TenancyModule {}

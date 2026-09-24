@@ -97,7 +97,8 @@ export function registerConstraintMessages(entries: Record<string, string>): voi
 
 export function mapPostgresError(error: unknown, options: AppErrorOptions = {}): AppError {
   if (AppError.is(error)) return error;
-  if (!isPostgresError(error)) return new InternalError('Database error', { cause: error, ...options });
+  if (!isPostgresError(error))
+    return new InternalError('Database error', { cause: error, ...options });
 
   const base: AppErrorOptions = {
     cause: error,
@@ -140,7 +141,8 @@ export function mapPostgresError(error: unknown, options: AppErrorOptions = {}):
     case PG_CODE.CHECK_VIOLATION:
     case PG_CODE.EXCLUSION_VIOLATION:
       return new AppError(ErrorCode.DB_CHECK_VIOLATION, 422, {
-        message: constraintMessages.get(error.constraint ?? '') ?? 'A data integrity rule was violated',
+        message:
+          constraintMessages.get(error.constraint ?? '') ?? 'A data integrity rule was violated',
         details: { constraint: error.constraint ?? null },
         severity: 'info',
         ...base,
@@ -207,7 +209,8 @@ export function mapPostgresError(error: unknown, options: AppErrorOptions = {}):
     // `npm run db:refresh-reports`) resolves it without any code change.
     case PG_CODE.OBJECT_NOT_IN_PREREQUISITE_STATE:
       return new AppError(ErrorCode.DB_VIEW_NOT_READY, 503, {
-        message: "This report's data hasn't been generated yet — it refreshes automatically within a few minutes, or ask an administrator to refresh it now",
+        message:
+          "This report's data hasn't been generated yet — it refreshes automatically within a few minutes, or ask an administrator to refresh it now",
         retryable: true,
         retryAfterSeconds: 30,
         severity: 'warn',

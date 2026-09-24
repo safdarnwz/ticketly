@@ -5,11 +5,16 @@ import { splitRefundClawback } from '../domain/refund-clawback';
 /** captured = commission + commission GST + operator share (fare + fare GST pass through to the operator). */
 describe('splitRefundClawback', () => {
   const captured = { commissionMinor: 1000, commissionGstMinor: 180, operatorShareMinor: 8820 }; // total 10000
-  const foot = (r: ReturnType<typeof splitRefundClawback>) => r.commissionClawbackMinor + r.commissionGstClawbackMinor + r.operatorClawbackMinor;
+  const foot = (r: ReturnType<typeof splitRefundClawback>) =>
+    r.commissionClawbackMinor + r.commissionGstClawbackMinor + r.operatorClawbackMinor;
 
   it('happy: a full refund reverses every leg exactly', () => {
     const r = splitRefundClawback(captured, 10000);
-    expect(r).toEqual({ commissionClawbackMinor: 1000, commissionGstClawbackMinor: 180, operatorClawbackMinor: 8820 });
+    expect(r).toEqual({
+      commissionClawbackMinor: 1000,
+      commissionGstClawbackMinor: 180,
+      operatorClawbackMinor: 8820,
+    });
   });
 
   it('happy: a partial refund claws back each leg in proportion', () => {
@@ -22,7 +27,8 @@ describe('splitRefundClawback', () => {
 
   it('edge: rounding is absorbed by the operator leg — the legs always foot to the refund', () => {
     const odd = { commissionMinor: 333, commissionGstMinor: 60, operatorShareMinor: 607 }; // total 1000
-    for (const refund of [1, 7, 333, 777, 999, 1000]) expect(foot(splitRefundClawback(odd, refund))).toBe(refund);
+    for (const refund of [1, 7, 333, 777, 999, 1000])
+      expect(foot(splitRefundClawback(odd, refund))).toBe(refund);
   });
 
   it('edge: zero refund (non-refundable cancellation) yields zero legs', () => {
@@ -30,8 +36,13 @@ describe('splitRefundClawback', () => {
   });
 
   it('edge: nothing was ever captured → zero legs', () => {
-    expect(splitRefundClawback({ commissionMinor: 0, commissionGstMinor: 0, operatorShareMinor: 0 }, 0))
-      .toEqual({ commissionClawbackMinor: 0, commissionGstClawbackMinor: 0, operatorClawbackMinor: 0 });
+    expect(
+      splitRefundClawback({ commissionMinor: 0, commissionGstMinor: 0, operatorShareMinor: 0 }, 0),
+    ).toEqual({
+      commissionClawbackMinor: 0,
+      commissionGstClawbackMinor: 0,
+      operatorClawbackMinor: 0,
+    });
   });
 
   it('negative: a refund larger than the capture is rejected', () => {

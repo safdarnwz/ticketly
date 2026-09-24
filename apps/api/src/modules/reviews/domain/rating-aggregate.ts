@@ -22,13 +22,16 @@ import { DomainError, ErrorCode } from '@kernel';
 
 export interface RatingAggregate {
   count: number;
-  average: number;                    // 2 dp
+  average: number; // 2 dp
   distribution: Record<1 | 2 | 3 | 4 | 5, number>;
 }
 
 function assertStar(r: number): void {
   if (!Number.isInteger(r) || r < 1 || r > 5) {
-    throw new DomainError(ErrorCode.REVIEW_INVALID_RATING, `Rating must be an integer 1–5, got ${r}`);
+    throw new DomainError(
+      ErrorCode.REVIEW_INVALID_RATING,
+      `Rating must be an integer 1–5, got ${r}`,
+    );
   }
 }
 
@@ -57,7 +60,10 @@ export function bayesianRating(
   priorWeight = 10,
 ): number {
   if (count < 0 || priorWeight < 0) {
-    throw new DomainError(ErrorCode.COMMON_VALIDATION, 'count and priorWeight must be non-negative');
+    throw new DomainError(
+      ErrorCode.COMMON_VALIDATION,
+      'count and priorWeight must be non-negative',
+    );
   }
   if (count === 0 && priorWeight === 0) return 0;
   const score = (priorWeight * priorMean + average * count) / (priorWeight + count);

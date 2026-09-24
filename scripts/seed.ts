@@ -19,7 +19,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Pool, type PoolClient } from 'pg';
 
-import type { AppConfig} from '@config';
+import type { AppConfig } from '@config';
 import { buildAppConfig, loadEnv } from '@config';
 import { FieldEncryptor, PasswordHasher } from '@security';
 
@@ -61,7 +61,10 @@ async function seedSuperAdmin(client: PoolClient, config: AppConfig): Promise<vo
   let userId: string;
   if (existing.rows[0]) {
     userId = existing.rows[0].id;
-    await client.query(`UPDATE users SET password_hash = $1, status = 'active' WHERE id = $2`, [passwordHash, userId]);
+    await client.query(`UPDATE users SET password_hash = $1, status = 'active' WHERE id = $2`, [
+      passwordHash,
+      userId,
+    ]);
   } else {
     const inserted = await client.query<{ id: string }>(
       `INSERT INTO users (tenant_id, kind, status, email, email_blind, full_name, password_hash)
@@ -89,8 +92,12 @@ async function main(): Promise<void> {
   const env = loadEnv();
   const config = buildAppConfig(env);
   const pool = new Pool({
-    host: env.DB_HOST, port: env.DB_PORT, database: env.DB_NAME,
-    user: env.DB_USER, password: env.DB_PASSWORD, max: 1,
+    host: env.DB_HOST,
+    port: env.DB_PORT,
+    database: env.DB_NAME,
+    user: env.DB_USER,
+    password: env.DB_PASSWORD,
+    max: 1,
   });
   const client = await pool.connect();
   try {

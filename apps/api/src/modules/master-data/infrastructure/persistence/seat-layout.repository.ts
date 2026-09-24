@@ -2,11 +2,21 @@ import { Injectable } from '@nestjs/common';
 
 import { CacheNamespace, CacheService, CacheTtl } from '@cache';
 import { DatabaseService, registerConstraintMessages } from '@database';
-import { AppError, ErrorCode, newId, NotFoundError, requireTenantId, type Json, type SeatLayoutId } from '@kernel';
+import {
+  AppError,
+  ErrorCode,
+  newId,
+  NotFoundError,
+  requireTenantId,
+  type Json,
+  type SeatLayoutId,
+} from '@kernel';
 
 import { SeatMap } from '../../seat-layout/domain/seat-map';
 
-registerConstraintMessages({ seat_layouts_tenant_id_name_key: 'A seat layout with this name already exists' });
+registerConstraintMessages({
+  seat_layouts_tenant_id_name_key: 'A seat layout with this name already exists',
+});
 
 export interface SeatLayoutRecord {
   id: SeatLayoutId;
@@ -39,7 +49,16 @@ export class SeatLayoutRepository {
     await this.db.execute_(
       `INSERT INTO seat_layouts (id, tenant_id, name, decks, total_seats, seater_count, sleeper_count, layout)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [id, requireTenantId(), name.trim(), s.decks, s.totalSeats, s.seater, s.sleeper, JSON.stringify(seatMap.toPersistence())],
+      [
+        id,
+        requireTenantId(),
+        name.trim(),
+        s.decks,
+        s.totalSeats,
+        s.seater,
+        s.sleeper,
+        JSON.stringify(seatMap.toPersistence()),
+      ],
       { name: 'layout.create', primary: true },
     );
     return id;
@@ -60,7 +79,16 @@ export class SeatLayoutRepository {
     await this.db.execute_(
       `UPDATE seat_layouts SET name = $3, decks = $4, total_seats = $5, seater_count = $6, sleeper_count = $7, layout = $8
         WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
-      [requireTenantId(), id, name.trim(), s.decks, s.totalSeats, s.seater, s.sleeper, JSON.stringify(seatMap.toPersistence())],
+      [
+        requireTenantId(),
+        id,
+        name.trim(),
+        s.decks,
+        s.totalSeats,
+        s.seater,
+        s.sleeper,
+        JSON.stringify(seatMap.toPersistence()),
+      ],
       { name: 'layout.update', primary: true },
     );
     await this.cache.invalidate(id, CacheNamespace.SEAT_LAYOUT);
@@ -72,7 +100,13 @@ export class SeatLayoutRepository {
    * layer's uow.run wraps both), so a version row and the layout it
    * describes are always written atomically together.
    */
-  async snapshotVersion(id: SeatLayoutId, name: string, seatMap: SeatMap, changedBy: string | null, note?: string): Promise<number> {
+  async snapshotVersion(
+    id: SeatLayoutId,
+    name: string,
+    seatMap: SeatMap,
+    changedBy: string | null,
+    note?: string,
+  ): Promise<number> {
     const next = await this.db.queryOne<{ n: number }>(
       `SELECT coalesce(max(version_number), 0) + 1 AS n FROM seat_layout_versions WHERE tenant_id = $1 AND seat_layout_id = $2`,
       [requireTenantId(), id],
@@ -82,26 +116,58 @@ export class SeatLayoutRepository {
     await this.db.execute_(
       `INSERT INTO seat_layout_versions (id, tenant_id, seat_layout_id, version_number, name, layout, changed_by, change_note)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [newId(), requireTenantId(), id, versionNumber, name.trim(), JSON.stringify(seatMap.toPersistence()), changedBy, note ?? null],
+      [
+        newId(),
+        requireTenantId(),
+        id,
+        versionNumber,
+        name.trim(),
+        JSON.stringify(seatMap.toPersistence()),
+        changedBy,
+        note ?? null,
+      ],
       { name: 'layout.snapshotVersion', primary: true },
     );
     return versionNumber;
   }
 
-  async listVersions(id: SeatLayoutId): Promise<{ versionNumber: number; name: string; changedBy: string | null; changeNote: string | null; createdAt: Date; summary: unknown }[]> {
-    const rows = await this.db.query<{ version_number: number; name: string; changed_by: string | null; change_note: string | null; created_at: Date; layout: unknown }>(
+  async listVersions(id: SeatLayoutId): Promise<
+    {
+      versionNumber: number;
+      name: string;
+      changedBy: string | null;
+      changeNote: string | null;
+      createdAt: Date;
+      summary: unknown;
+    }[]
+  > {
+    const rows = await this.db.query<{
+      version_number: number;
+      name: string;
+      changed_by: string | null;
+      change_note: string | null;
+      created_at: Date;
+      layout: unknown;
+    }>(
       `SELECT version_number, name, changed_by, change_note, created_at, layout FROM seat_layout_versions
         WHERE tenant_id = $1 AND seat_layout_id = $2 ORDER BY version_number DESC`,
       [requireTenantId(), id],
       { name: 'layout.listVersions' },
     );
     return rows.map((r) => ({
-      versionNumber: r.version_number, name: r.name, changedBy: r.changed_by, changeNote: r.change_note, createdAt: r.created_at,
+      versionNumber: r.version_number,
+      name: r.name,
+      changedBy: r.changed_by,
+      changeNote: r.change_note,
+      createdAt: r.created_at,
       summary: SeatMap.create(r.layout as never).summary,
     }));
   }
 
-  async getVersion(id: SeatLayoutId, versionNumber: number): Promise<{ name: string; layout: unknown } | null> {
+  async getVersion(
+    id: SeatLayoutId,
+    versionNumber: number,
+  ): Promise<{ name: string; layout: unknown } | null> {
     const row = await this.db.queryOne<{ name: string; layout: unknown }>(
       `SELECT name, layout FROM seat_layout_versions WHERE tenant_id = $1 AND seat_layout_id = $2 AND version_number = $3`,
       [requireTenantId(), id, versionNumber],
@@ -122,7 +188,12 @@ export class SeatLayoutRepository {
           { name: 'layout.findById' },
         );
         if (!row) return null;
-        return { id: row.id, name: row.name, seatMap: SeatMap.fromPersistence(row.layout), isActive: row.is_active };
+        return {
+          id: row.id,
+          name: row.name,
+          seatMap: SeatMap.fromPersistence(row.layout),
+          isActive: row.is_active,
+        };
       },
     );
   }
@@ -134,7 +205,12 @@ export class SeatLayoutRepository {
   }
 
   async list(): Promise<{ id: SeatLayoutId; name: string; totalSeats: number; decks: number }[]> {
-    const rows = await this.db.query<{ id: SeatLayoutId; name: string; total_seats: number; decks: number }>(
+    const rows = await this.db.query<{
+      id: SeatLayoutId;
+      name: string;
+      total_seats: number;
+      decks: number;
+    }>(
       `SELECT id, name, total_seats, decks FROM seat_layouts
         WHERE tenant_id = $1 AND deleted_at IS NULL ORDER BY name`,
       [requireTenantId()],
@@ -159,7 +235,9 @@ export class SeatLayoutRepository {
   async delete(id: SeatLayoutId): Promise<void> {
     const inUse = await this.usageCount(id);
     if (inUse > 0) {
-      throw new AppError(ErrorCode.COMMON_VALIDATION, 409, { message: `Still used by ${inUse} vehicle(s) — reassign them to a different layout first` });
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 409, {
+        message: `Still used by ${inUse} vehicle(s) — reassign them to a different layout first`,
+      });
     }
     await this.db.execute_(
       `UPDATE seat_layouts SET deleted_at = now() WHERE tenant_id = $1 AND id = $2`,

@@ -443,7 +443,11 @@ export function buildAppConfig(env: Env): AppConfig {
     timeoutMs: env.STORAGE_TIMEOUT_MS,
   };
 
-  config.mail = { gmailUser: env.GMAIL_USER, gmailAppPassword: env.GMAIL_APP_PASSWORD, from: env.MAIL_FROM };
+  config.mail = {
+    gmailUser: env.GMAIL_USER,
+    gmailAppPassword: env.GMAIL_APP_PASSWORD,
+    from: env.MAIL_FROM,
+  };
 
   config.bootstrap = {
     superAdminEmail: env.SUPER_ADMIN_EMAIL.trim().toLowerCase(),
@@ -451,7 +455,13 @@ export function buildAppConfig(env: Env): AppConfig {
     superAdminName: env.SUPER_ADMIN_NAME,
   };
 
-  config.kyc = { digio: { clientId: env.DIGIO_CLIENT_ID, clientSecret: env.DIGIO_CLIENT_SECRET, environment: env.DIGIO_ENV } };
+  config.kyc = {
+    digio: {
+      clientId: env.DIGIO_CLIENT_ID,
+      clientSecret: env.DIGIO_CLIENT_SECRET,
+      environment: env.DIGIO_ENV,
+    },
+  };
 
   return config;
 }

@@ -6,8 +6,13 @@ import { Logger } from '@observability';
 import { FieldEncryptor } from '@security';
 
 import {
-  INTEGRATIONS, INTEGRATION_PROVIDERS, maskSecret, validateIntegrationUpdate,
-  type IntegrationConfig, type IntegrationProvider, type IntegrationSecrets,
+  INTEGRATIONS,
+  INTEGRATION_PROVIDERS,
+  maskSecret,
+  validateIntegrationUpdate,
+  type IntegrationConfig,
+  type IntegrationProvider,
+  type IntegrationSecrets,
 } from './domain/integration-catalog';
 
 export interface ActiveIntegration<P extends IntegrationProvider> {
@@ -58,7 +63,10 @@ const REFRESH_MS = 30_000;
 @Injectable()
 export class IntegrationCredentialStore implements OnModuleInit, OnModuleDestroy {
   private readonly log: Logger;
-  private snapshot = new Map<IntegrationProvider, { enabled: boolean; config: Record<string, unknown>; secrets: Record<string, unknown> | null }>();
+  private snapshot = new Map<
+    IntegrationProvider,
+    { enabled: boolean; config: Record<string, unknown>; secrets: Record<string, unknown> | null }
+  >();
   private timer?: NodeJS.Timeout;
   private firstLoad?: Promise<void>;
 
@@ -90,13 +98,18 @@ export class IntegrationCredentialStore implements OnModuleInit, OnModuleDestroy
   active<P extends IntegrationProvider>(provider: P): ActiveIntegration<P> | null {
     const entry = this.snapshot.get(provider);
     if (!entry?.enabled || !entry.secrets) return null;
-    return { config: entry.config as IntegrationConfig<P>, secrets: entry.secrets as IntegrationSecrets<P> };
+    return {
+      config: entry.config as IntegrationConfig<P>,
+      secrets: entry.secrets as IntegrationSecrets<P>,
+    };
   }
 
   async list(): Promise<IntegrationView[]> {
     const rows = await this.rows();
     const byProvider = new Map(rows.map((r) => [r.provider, r]));
-    return INTEGRATION_PROVIDERS.map((provider) => this.view(provider, byProvider.get(provider) ?? null));
+    return INTEGRATION_PROVIDERS.map((provider) =>
+      this.view(provider, byProvider.get(provider) ?? null),
+    );
   }
 
   async get(provider: IntegrationProvider): Promise<IntegrationView> {
@@ -105,24 +118,45 @@ export class IntegrationCredentialStore implements OnModuleInit, OnModuleDestroy
   }
 
   /** Save config + secrets. Omitted secrets keep their stored value. Does not change `enabled`. */
-  async save(provider: IntegrationProvider, input: { config: unknown; secrets?: Record<string, unknown> }, actorId: string | null): Promise<IntegrationView> {
+  async save(
+    provider: IntegrationProvider,
+    input: { config: unknown; secrets?: Record<string, unknown> },
+    actorId: string | null,
+  ): Promise<IntegrationView> {
     const existing = (await this.rows()).find((r) => r.provider === provider) ?? null;
-    const result = validateIntegrationUpdate(provider, input, existing ? this.decrypt(existing.secrets) : null);
-    if (!result.ok) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: result.errors.join('; '), details: { errors: result.errors } });
+    const result = validateIntegrationUpdate(
+      provider,
+      input,
+      existing ? this.decrypt(existing.secrets) : null,
+    );
+    if (!result.ok)
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+        message: result.errors.join('; '),
+        details: { errors: result.errors },
+      });
     await this.db.execute_(
       `INSERT INTO integration_credentials (provider, config, secrets, updated_by, updated_at)
        VALUES ($1, $2, $3, $4, now())
        ON CONFLICT (provider) DO UPDATE
          SET config = EXCLUDED.config, secrets = EXCLUDED.secrets, updated_by = EXCLUDED.updated_by, updated_at = now(),
              last_test_at = NULL, last_test_ok = NULL, last_test_error = NULL`,
-      [provider, JSON.stringify(result.config), this.encryptor.encrypt(JSON.stringify(result.secrets)), actorId],
+      [
+        provider,
+        JSON.stringify(result.config),
+        this.encryptor.encrypt(JSON.stringify(result.secrets)),
+        actorId,
+      ],
       { name: 'integrations.save', primary: true },
     );
     await this.reload();
     return this.get(provider);
   }
 
-  async setEnabled(provider: IntegrationProvider, enabled: boolean, actorId: string | null): Promise<IntegrationView> {
+  async setEnabled(
+    provider: IntegrationProvider,
+    enabled: boolean,
+    actorId: string | null,
+  ): Promise<IntegrationView> {
     if (enabled) {
       if (INTEGRATIONS[provider].runtime === 'none') {
         throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
@@ -130,19 +164,29 @@ export class IntegrationCredentialStore implements OnModuleInit, OnModuleDestroy
         });
       }
       const row = (await this.rows()).find((r) => r.provider === provider);
-      if (!row?.secrets) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: `Save ${INTEGRATIONS[provider].label} credentials before enabling it` });
+      if (!row?.secrets)
+        throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+          message: `Save ${INTEGRATIONS[provider].label} credentials before enabling it`,
+        });
     }
     const affected = await this.db.execute_(
       `UPDATE integration_credentials SET enabled = $2, updated_by = $3, updated_at = now() WHERE provider = $1`,
       [provider, enabled, actorId],
       { name: 'integrations.setEnabled', primary: true },
     );
-    if (affected === 0 && enabled) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Integration not configured' });
+    if (affected === 0 && enabled)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, {
+        message: 'Integration not configured',
+      });
     await this.reload();
     return this.get(provider);
   }
 
-  async recordTest(provider: IntegrationProvider, ok: boolean, error: string | null): Promise<void> {
+  async recordTest(
+    provider: IntegrationProvider,
+    ok: boolean,
+    error: string | null,
+  ): Promise<void> {
     await this.db.execute_(
       `UPDATE integration_credentials SET last_test_at = now(), last_test_ok = $2, last_test_error = $3 WHERE provider = $1`,
       [provider, ok, error?.slice(0, 500) ?? null],
@@ -153,16 +197,30 @@ export class IntegrationCredentialStore implements OnModuleInit, OnModuleDestroy
   private async reload(): Promise<void> {
     try {
       const rows = await this.rows();
-      const next = new Map<IntegrationProvider, { enabled: boolean; config: Record<string, unknown>; secrets: Record<string, unknown> | null }>();
+      const next = new Map<
+        IntegrationProvider,
+        {
+          enabled: boolean;
+          config: Record<string, unknown>;
+          secrets: Record<string, unknown> | null;
+        }
+      >();
       for (const r of rows) {
         if (!(INTEGRATION_PROVIDERS as string[]).includes(r.provider)) continue;
-        next.set(r.provider as IntegrationProvider, { enabled: r.enabled, config: r.config, secrets: this.decrypt(r.secrets) });
+        next.set(r.provider as IntegrationProvider, {
+          enabled: r.enabled,
+          config: r.config,
+          secrets: this.decrypt(r.secrets),
+        });
       }
       this.snapshot = next;
     } catch (err) {
       // Keep serving the last good snapshot (or the env fallback) — a DB blip
       // must not take SMS/email down with it.
-      this.log.warn({ err }, 'could not refresh integration credentials; keeping previous snapshot');
+      this.log.warn(
+        { err },
+        'could not refresh integration credentials; keeping previous snapshot',
+      );
     }
   }
 
@@ -179,7 +237,10 @@ export class IntegrationCredentialStore implements OnModuleInit, OnModuleDestroy
     try {
       return JSON.parse(this.encryptor.decrypt(stored) ?? 'null') as Record<string, unknown> | null;
     } catch (err) {
-      this.log.error({ err }, 'integration secrets could not be decrypted (ENCRYPTION_KEY changed?)');
+      this.log.error(
+        { err },
+        'integration secrets could not be decrypted (ENCRYPTION_KEY changed?)',
+      );
       return null;
     }
   }
@@ -196,11 +257,15 @@ export class IntegrationCredentialStore implements OnModuleInit, OnModuleDestroy
       enabled: row?.enabled ?? false,
       configured: Boolean(row?.secrets),
       config: row?.config ?? {},
-      secrets: Object.fromEntries(secretFields.map((f) => {
-        const v = secrets?.[f];
-        return [f, typeof v === 'string' && v.length > 0 ? maskSecret(v) : null];
-      })),
-      lastTest: row?.last_test_at ? { at: row.last_test_at, ok: Boolean(row.last_test_ok), error: row.last_test_error } : null,
+      secrets: Object.fromEntries(
+        secretFields.map((f) => {
+          const v = secrets?.[f];
+          return [f, typeof v === 'string' && v.length > 0 ? maskSecret(v) : null];
+        }),
+      ),
+      lastTest: row?.last_test_at
+        ? { at: row.last_test_at, ok: Boolean(row.last_test_ok), error: row.last_test_error }
+        : null,
       updatedAt: row?.updated_at ?? null,
     };
   }

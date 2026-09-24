@@ -22,17 +22,34 @@ export class SeatLayoutService {
     private readonly uow: UnitOfWork,
   ) {}
 
-  async create(name: string, layout: SeatMapProps): Promise<{ id: SeatLayoutId; summary: SeatMap['summary'] }> {
+  async create(
+    name: string,
+    layout: SeatMapProps,
+  ): Promise<{ id: SeatLayoutId; summary: SeatMap['summary'] }> {
     const seatMap = SeatMap.create(layout); // validates; throws on inconsistency
-    const id = await this.uow.run({ name: 'layout.create', tenantId: requireTenantId() }, async () => {
-      const newLayoutId = await this.layouts.create(name, seatMap);
-      await this.layouts.snapshotVersion(newLayoutId, name, seatMap, getUserId() ?? null, 'Created');
-      return newLayoutId;
-    });
+    const id = await this.uow.run(
+      { name: 'layout.create', tenantId: requireTenantId() },
+      async () => {
+        const newLayoutId = await this.layouts.create(name, seatMap);
+        await this.layouts.snapshotVersion(
+          newLayoutId,
+          name,
+          seatMap,
+          getUserId() ?? null,
+          'Created',
+        );
+        return newLayoutId;
+      },
+    );
     return { id, summary: seatMap.summary };
   }
 
-  async update(id: SeatLayoutId, name: string, layout: SeatMapProps, note?: string): Promise<{ summary: SeatMap['summary'] }> {
+  async update(
+    id: SeatLayoutId,
+    name: string,
+    layout: SeatMapProps,
+    note?: string,
+  ): Promise<{ summary: SeatMap['summary'] }> {
     const seatMap = SeatMap.create(layout); // validates; throws on inconsistency
     await this.uow.run({ name: 'layout.update', tenantId: requireTenantId() }, async () => {
       await this.layouts.update(id, name, seatMap);
@@ -46,13 +63,22 @@ export class SeatLayoutService {
   }
 
   /** Roll back to an earlier version — itself recorded as a NEW version (never rewrites history), so "undo the undo" always stays possible. */
-  async restoreVersion(id: SeatLayoutId, versionNumber: number): Promise<{ summary: SeatMap['summary'] }> {
+  async restoreVersion(
+    id: SeatLayoutId,
+    versionNumber: number,
+  ): Promise<{ summary: SeatMap['summary'] }> {
     const version = await this.layouts.getVersion(id, versionNumber);
     if (!version) throw new Error(`Version ${versionNumber} not found`);
     const seatMap = SeatMap.create(version.layout as SeatMapProps);
     await this.uow.run({ name: 'layout.restore', tenantId: requireTenantId() }, async () => {
       await this.layouts.update(id, version.name, seatMap);
-      await this.layouts.snapshotVersion(id, version.name, seatMap, getUserId() ?? null, `Restored from version ${versionNumber}`);
+      await this.layouts.snapshotVersion(
+        id,
+        version.name,
+        seatMap,
+        getUserId() ?? null,
+        `Restored from version ${versionNumber}`,
+      );
     });
     return { summary: seatMap.summary };
   }

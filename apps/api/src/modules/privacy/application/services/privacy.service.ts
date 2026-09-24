@@ -3,7 +3,12 @@ import { Injectable } from '@nestjs/common';
 import { UnitOfWork } from '@database';
 import { AppError, ErrorCode, getUserId, type UserId } from '@kernel';
 
-import { consentState, isProcessingAllowed, recordConsent, type ConsentPurpose } from '../../domain/consent';
+import {
+  consentState,
+  isProcessingAllowed,
+  recordConsent,
+  type ConsentPurpose,
+} from '../../domain/consent';
 import { PrivacyRepository } from '../../infrastructure/persistence/privacy.repository';
 
 /**
@@ -23,11 +28,16 @@ export class PrivacyService {
 
   private requireCustomer(): UserId {
     const id = getUserId();
-    if (!id) throw new AppError(ErrorCode.COMMON_UNAUTHENTICATED, 401, { message: 'Sign-in required' });
+    if (!id)
+      throw new AppError(ErrorCode.COMMON_UNAUTHENTICATED, 401, { message: 'Sign-in required' });
     return id;
   }
 
-  async setConsent(purpose: ConsentPurpose, granted: boolean, atMs = Date.now()): Promise<{ state: Record<string, boolean> }> {
+  async setConsent(
+    purpose: ConsentPurpose,
+    granted: boolean,
+    atMs = Date.now(),
+  ): Promise<{ state: Record<string, boolean> }> {
     const customerId = this.requireCustomer();
     const events = await this.repo.loadConsentEvents(customerId);
     // Domain validation (e.g. cannot withdraw a necessary purpose) throws here.
@@ -56,7 +66,10 @@ export class PrivacyService {
   async processErasure(requestId: string): Promise<{ status: string }> {
     return this.uow.run({ name: 'privacy.processErasure' }, async () => {
       const req = await this.repo.findErasureRequest(requestId);
-      if (!req) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Erasure request not found' });
+      if (!req)
+        throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, {
+          message: 'Erasure request not found',
+        });
       if (req.status === 'processed') return { status: 'processed' }; // idempotent
       await this.repo.anonymiseCustomerPii(req.customerId as UserId);
       await this.repo.markErasureProcessed(requestId);

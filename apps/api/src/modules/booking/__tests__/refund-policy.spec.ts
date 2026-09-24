@@ -46,7 +46,10 @@ describe('computeRefund — flat fee & cutoff', () => {
   });
 
   it('never lets the fee push the refund below zero', () => {
-    const policy: RefundPolicy = { tiers: [{ minHoursBeforeDeparture: 0, refundPct: 5 }], flatFeeMinor: 100000 };
+    const policy: RefundPolicy = {
+      tiers: [{ minHoursBeforeDeparture: 0, refundPct: 5 }],
+      flatFeeMinor: 100000,
+    };
     const r = computeRefund(paid, DEP, at(30), policy);
     expect(r.refund.minor).toBe(0);
   });

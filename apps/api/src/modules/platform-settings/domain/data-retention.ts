@@ -29,7 +29,9 @@ export const DEFAULT_DATA_RETENTION: DataRetentionPolicy = {
   otpChallengeDays: null,
 };
 
-export function normaliseDataRetention(stored: Partial<DataRetentionPolicy> | null | undefined): DataRetentionPolicy {
+export function normaliseDataRetention(
+  stored: Partial<DataRetentionPolicy> | null | undefined,
+): DataRetentionPolicy {
   return { ...DEFAULT_DATA_RETENTION, ...(stored ?? {}) };
 }
 
@@ -37,8 +39,12 @@ export function dataRetentionErrors(policy: Partial<DataRetentionPolicy>): strin
   const errors: string[] = [];
   for (const [key, days] of Object.entries(policy) as [RetentionKey, number | null][]) {
     const target = RETENTION_TARGETS[key];
-    if (!target) { errors.push(`unknown retention key '${key}'`); continue; }
-    if (days !== null && days < target.minDays) errors.push(`${key} must be at least ${target.minDays} days (or null to keep forever)`);
+    if (!target) {
+      errors.push(`unknown retention key '${key}'`);
+      continue;
+    }
+    if (days !== null && days < target.minDays)
+      errors.push(`${key} must be at least ${target.minDays} days (or null to keep forever)`);
   }
   return errors;
 }

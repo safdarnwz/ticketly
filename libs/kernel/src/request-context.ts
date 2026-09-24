@@ -65,7 +65,9 @@ export interface RequestContext {
 
 const storage = new AsyncLocalStorage<RequestContext>();
 
-export interface CreateContextInput extends Partial<Omit<RequestContext, 'permissions' | 'features' | 'extra'>> {
+export interface CreateContextInput extends Partial<
+  Omit<RequestContext, 'permissions' | 'features' | 'extra'>
+> {
   permissions?: Iterable<string>;
   features?: Iterable<string>;
   extra?: UnknownRecord;
@@ -112,9 +114,7 @@ export function getContext(): RequestContext | undefined {
 export function requireContext(): RequestContext {
   const ctx = storage.getStore();
   if (!ctx) {
-    throw new InternalError(
-      'No request context bound. Wrap background work in runInNewContext().',
-    );
+    throw new InternalError('No request context bound. Wrap background work in runInNewContext().');
   }
   return ctx;
 }

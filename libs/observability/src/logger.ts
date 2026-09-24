@@ -57,7 +57,11 @@ export function createRootLogger(config: AppConfig): PinoLogger {
       ? {
           transport: {
             target: 'pino-pretty',
-            options: { colorize: true, translateTime: 'HH:MM:ss.l', ignore: 'pid,hostname,service,version,instance,env' },
+            options: {
+              colorize: true,
+              translateTime: 'HH:MM:ss.l',
+              ignore: 'pid,hostname,service,version,instance,env',
+            },
           },
         }
       : {}),
@@ -124,7 +128,11 @@ export class Logger implements LoggerService {
     return this.pinoLogger.isLevelEnabled(level);
   }
 
-  private emit(level: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal', obj: UnknownRecord | string, message?: string): void {
+  private emit(
+    level: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal',
+    obj: UnknownRecord | string,
+    message?: string,
+  ): void {
     if (typeof obj === 'string') this.pinoLogger[level](obj);
     else this.pinoLogger[level](obj, message);
   }

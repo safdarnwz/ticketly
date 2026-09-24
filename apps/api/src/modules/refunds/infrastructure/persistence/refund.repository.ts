@@ -27,10 +27,15 @@ export interface RefundRow {
  */
 @Injectable()
 export class RefundRepository {
-  constructor(private readonly db: DatabaseService, private readonly uow: UnitOfWork) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly uow: UnitOfWork,
+  ) {}
 
   /** The captured intent for a booking (source of the gateway refund). */
-  async capturedIntentForBooking(bookingId: BookingId): Promise<{ id: PaymentId; gateway: string; gatewayPaymentId: string | null } | null> {
+  async capturedIntentForBooking(
+    bookingId: BookingId,
+  ): Promise<{ id: PaymentId; gateway: string; gatewayPaymentId: string | null } | null> {
     return this.db.queryOne(
       `SELECT id, gateway, gateway_payment_id AS "gatewayPaymentId"
          FROM payment_intents WHERE tenant_id = $1 AND booking_id = $2 AND status = 'captured'
@@ -44,8 +49,14 @@ export class RefundRepository {
    * The captured commission/operator split for a booking, read from the ledger
    * (the source of truth) so a refund claws back exactly what was booked.
    */
-  async capturedSplit(bookingId: BookingId): Promise<{ commissionMinor: number; commissionGstMinor: number; operatorShareMinor: number }> {
-    const row = await this.db.queryOne<{ commission: number; commission_gst: number; operator: number }>(
+  async capturedSplit(
+    bookingId: BookingId,
+  ): Promise<{ commissionMinor: number; commissionGstMinor: number; operatorShareMinor: number }> {
+    const row = await this.db.queryOne<{
+      commission: number;
+      commission_gst: number;
+      operator: number;
+    }>(
       `SELECT
          coalesce(sum(CASE WHEN lp.account = 'platform_revenue' THEN -lp.amount_minor ELSE 0 END), 0)::bigint AS commission,
          coalesce(sum(CASE WHEN lp.account = 'commission_tax_payable' THEN -lp.amount_minor ELSE 0 END), 0)::bigint AS commission_gst,
@@ -71,10 +82,19 @@ export class RefundRepository {
    * booking.paidMinor, which a partial cancellation has already reduced.
    */
   async offlineCapturedSplit(bookingId: BookingId): Promise<{
-    commissionMinor: number; commissionGstMinor: number;
-    remainingCommissionMinor: number; remainingCommissionGstMinor: number; saleTotalMinor: number;
+    commissionMinor: number;
+    commissionGstMinor: number;
+    remainingCommissionMinor: number;
+    remainingCommissionGstMinor: number;
+    saleTotalMinor: number;
   }> {
-    const row = await this.db.queryOne<{ c: string; g: string; rc: string; rg: string; sale: string }>(
+    const row = await this.db.queryOne<{
+      c: string;
+      g: string;
+      rc: string;
+      rg: string;
+      sale: string;
+    }>(
       `SELECT
          coalesce(sum(CASE WHEN le.entry_type = 'booking.captured_offline' AND lp.account = 'platform_revenue' THEN -lp.amount_minor ELSE 0 END), 0) AS c,
          coalesce(sum(CASE WHEN le.entry_type = 'booking.captured_offline' AND lp.account = 'commission_tax_payable' THEN -lp.amount_minor ELSE 0 END), 0) AS g,
@@ -152,14 +172,27 @@ export class RefundRepository {
   async findForUpdate(refundId: string): Promise<RefundRow | null> {
     const scope = currentTransaction();
     if (!scope) throw new Error('refund.findForUpdate must run inside a transaction');
-    const res = await scope.client.query<Raw>(`${SELECT} WHERE tenant_id = $1 AND id = $2 FOR UPDATE`, [requireTenantId(), refundId]);
+    const res = await scope.client.query<Raw>(
+      `${SELECT} WHERE tenant_id = $1 AND id = $2 FOR UPDATE`,
+      [requireTenantId(), refundId],
+    );
     return res.rows[0] ? map(res.rows[0]) : null;
   }
 
   async create(input: {
-    bookingId: BookingId; paymentIntentId: PaymentId | null; amountMinor: number; currency: string;
-    status: RefundStatus; destination: RefundDestination; cancellationId: string | null;
-    altAccountDetails?: { accountHolder: string; accountNumber: string; ifsc: string; bankName?: string } | null;
+    bookingId: BookingId;
+    paymentIntentId: PaymentId | null;
+    amountMinor: number;
+    currency: string;
+    status: RefundStatus;
+    destination: RefundDestination;
+    cancellationId: string | null;
+    altAccountDetails?: {
+      accountHolder: string;
+      accountNumber: string;
+      ifsc: string;
+      bankName?: string;
+    } | null;
   }): Promise<string> {
     const scope = currentTransaction();
     const id = newId();
@@ -167,9 +200,19 @@ export class RefundRepository {
                                        alt_account_holder, alt_account_number, alt_ifsc, alt_bank_name)
                  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`;
     const params = [
-      id, requireTenantId(), input.bookingId, input.paymentIntentId, input.amountMinor, input.currency, input.status, input.destination, input.cancellationId,
-      input.altAccountDetails?.accountHolder ?? null, input.altAccountDetails?.accountNumber ?? null,
-      input.altAccountDetails?.ifsc ?? null, input.altAccountDetails?.bankName ?? null,
+      id,
+      requireTenantId(),
+      input.bookingId,
+      input.paymentIntentId,
+      input.amountMinor,
+      input.currency,
+      input.status,
+      input.destination,
+      input.cancellationId,
+      input.altAccountDetails?.accountHolder ?? null,
+      input.altAccountDetails?.accountNumber ?? null,
+      input.altAccountDetails?.ifsc ?? null,
+      input.altAccountDetails?.bankName ?? null,
     ];
     if (scope) await scope.client.query(sql, params);
     else await this.db.execute_(sql, params, { name: 'refund.create', primary: true });
@@ -194,19 +237,30 @@ export class RefundRepository {
    * between our commit and the PSP call). Cross-tenant, RLS bypassed —
    * returns ids + tenant only; the sweeper re-dispatches each as its tenant.
    */
-  async pendingDispatch(gateway: string, olderThanSeconds: number, limit: number): Promise<{ id: string; tenantId: string }[]> {
+  async pendingDispatch(
+    gateway: string,
+    olderThanSeconds: number,
+    limit: number,
+  ): Promise<{ id: string; tenantId: string }[]> {
     return this.uow.run({ name: 'refund.pendingDispatch', bypassRls: true }, async (scope) =>
-      (await scope.client.query<{ id: string; tenant_id: string }>(
-        `SELECT r.id, r.tenant_id FROM refunds r
+      (
+        await scope.client.query<{ id: string; tenant_id: string }>(
+          `SELECT r.id, r.tenant_id FROM refunds r
            JOIN payment_intents p ON p.id = r.payment_intent_id
           WHERE r.status = 'processing' AND r.gateway_refund_id IS NULL AND r.destination = 'source'
             AND p.gateway = $1 AND r.updated_at < now() - make_interval(secs => $2)
           ORDER BY r.updated_at LIMIT $3`,
-        [gateway, olderThanSeconds, limit],
-      )).rows.map((r) => ({ id: r.id, tenantId: r.tenant_id })));
+          [gateway, olderThanSeconds, limit],
+        )
+      ).rows.map((r) => ({ id: r.id, tenantId: r.tenant_id })),
+    );
   }
 
-  async transition(refundId: string, to: RefundStatus, patch: { gatewayRefundId?: string; failureReason?: string; reconciled?: boolean } = {}): Promise<void> {
+  async transition(
+    refundId: string,
+    to: RefundStatus,
+    patch: { gatewayRefundId?: string; failureReason?: string; reconciled?: boolean } = {},
+  ): Promise<void> {
     const scope = currentTransaction();
     const sql = `UPDATE refunds SET status = $3,
                    gateway_refund_id = coalesce($4, gateway_refund_id),
@@ -214,18 +268,33 @@ export class RefundRepository {
                    reconciled_at = CASE WHEN $6 THEN now() ELSE reconciled_at END,
                    updated_at = now()
                  WHERE tenant_id = $1 AND id = $2`;
-    const params = [requireTenantId(), refundId, to, patch.gatewayRefundId ?? null, patch.failureReason ?? null, patch.reconciled ?? false];
+    const params = [
+      requireTenantId(),
+      refundId,
+      to,
+      patch.gatewayRefundId ?? null,
+      patch.failureReason ?? null,
+      patch.reconciled ?? false,
+    ];
     if (scope) await scope.client.query(sql, params);
     else await this.db.execute_(sql, params, { name: 'refund.transition', primary: true });
   }
 
   async findByGatewayRefundId(gatewayRefundId: string): Promise<RefundRow | null> {
-    const row = await this.db.queryOne<Raw>(`${SELECT} WHERE gateway_refund_id = $1 LIMIT 1`, [gatewayRefundId], { name: 'refund.byGatewayId', primary: true });
+    const row = await this.db.queryOne<Raw>(
+      `${SELECT} WHERE gateway_refund_id = $1 LIMIT 1`,
+      [gatewayRefundId],
+      { name: 'refund.byGatewayId', primary: true },
+    );
     return row ? map(row) : null;
   }
 
   async listByBooking(bookingId: BookingId): Promise<RefundRow[]> {
-    const rows = await this.db.query<Raw>(`${SELECT} WHERE tenant_id = $1 AND booking_id = $2 ORDER BY created_at`, [requireTenantId(), bookingId], { name: 'refund.listByBooking' });
+    const rows = await this.db.query<Raw>(
+      `${SELECT} WHERE tenant_id = $1 AND booking_id = $2 ORDER BY created_at`,
+      [requireTenantId(), bookingId],
+      { name: 'refund.listByBooking' },
+    );
     return rows.map(map);
   }
 }
@@ -236,10 +305,21 @@ const SELECT = `SELECT id, booking_id AS "bookingId", payment_intent_id AS "paym
                   FROM refunds`;
 
 interface Raw {
-  id: string; bookingId: BookingId; paymentIntentId: PaymentId | null; amountMinor: number | string;
-  currency: string; status: RefundStatus; destination: RefundDestination; gatewayRefundId: string | null; cancellationId: string | null;
+  id: string;
+  bookingId: BookingId;
+  paymentIntentId: PaymentId | null;
+  amountMinor: number | string;
+  currency: string;
+  status: RefundStatus;
+  destination: RefundDestination;
+  gatewayRefundId: string | null;
+  cancellationId: string | null;
   dispatchAttempt: number;
 }
 function map(r: Raw): RefundRow {
-  return { ...r, amountMinor: Number(r.amountMinor), dispatchAttempt: Number(r.dispatchAttempt ?? 0) };
+  return {
+    ...r,
+    amountMinor: Number(r.amountMinor),
+    dispatchAttempt: Number(r.dispatchAttempt ?? 0),
+  };
 }

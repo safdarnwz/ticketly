@@ -70,7 +70,10 @@ describe('SegmentMap — utilities & edges', () => {
   it('lists two free gaps when the middle is occupied', () => {
     const five = SegmentMap.forStops(5); // legs 0..3
     const occ = five.occupy(0n, 1, 2); // leg 1 busy
-    expect(five.freeSegments(occ)).toEqual([{ from: 0, to: 1 }, { from: 2, to: 4 }]);
+    expect(five.freeSegments(occ)).toEqual([
+      { from: 0, to: 1 },
+      { from: 2, to: 4 },
+    ]);
   });
 
   it('rejects invalid segments', () => {

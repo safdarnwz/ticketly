@@ -21,8 +21,8 @@ import { DomainError, ErrorCode } from '@kernel';
 
 export interface JourneyLeg {
   tripId: string;
-  fromHub: string;   // origin stop/city id of this leg
-  toHub: string;     // destination stop/city id of this leg
+  fromHub: string; // origin stop/city id of this leg
+  toHub: string; // destination stop/city id of this leg
   departsAt: string; // ISO 8601
   arrivesAt: string; // ISO 8601
   priceMinor: number;
@@ -47,7 +47,8 @@ export interface ConnectingJourney {
 
 function toMs(iso: string): number {
   const t = Date.parse(iso);
-  if (Number.isNaN(t)) throw new DomainError(ErrorCode.COMMON_VALIDATION, `Invalid timestamp '${iso}'`);
+  if (Number.isNaN(t))
+    throw new DomainError(ErrorCode.COMMON_VALIDATION, `Invalid timestamp '${iso}'`);
   return t;
 }
 
@@ -85,6 +86,8 @@ export function buildConnections(
   }
 
   // Best door-to-door duration first, then cheaper.
-  out.sort((a, b) => a.totalDurationMin - b.totalDurationMin || a.totalPriceMinor - b.totalPriceMinor);
+  out.sort(
+    (a, b) => a.totalDurationMin - b.totalDurationMin || a.totalPriceMinor - b.totalPriceMinor,
+  );
   return out;
 }

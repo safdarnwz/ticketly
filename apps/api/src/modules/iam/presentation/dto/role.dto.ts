@@ -3,7 +3,11 @@ import { z } from 'zod';
 import type { Json } from '@kernel';
 
 export const CreateRoleSchema = z.object({
-  code: z.string().min(2).max(40).regex(/^[a-z][a-z0-9_-]*$/),
+  code: z
+    .string()
+    .min(2)
+    .max(40)
+    .regex(/^[a-z][a-z0-9_-]*$/),
   name: z.string().min(1).max(80),
   description: z.string().max(500).optional(),
   permissions: z.array(z.string().min(1)),

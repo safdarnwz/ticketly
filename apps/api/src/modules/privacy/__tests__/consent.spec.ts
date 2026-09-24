@@ -1,12 +1,25 @@
 import { describe, it, expect } from 'vitest';
 
-import { consentState, isProcessingAllowed, recordConsent, type ConsentEvent } from '../domain/consent';
+import {
+  consentState,
+  isProcessingAllowed,
+  recordConsent,
+  type ConsentEvent,
+} from '../domain/consent';
 
-const ev = (purpose: ConsentEvent['purpose'], granted: boolean, atMs: number): ConsentEvent => ({ purpose, granted, atMs });
+const ev = (purpose: ConsentEvent['purpose'], granted: boolean, atMs: number): ConsentEvent => ({
+  purpose,
+  granted,
+  atMs,
+});
 
 describe('consent', () => {
   it('happy: latest event per purpose wins', () => {
-    const events = [ev('marketing', true, 100), ev('marketing', false, 200), ev('analytics', true, 150)];
+    const events = [
+      ev('marketing', true, 100),
+      ev('marketing', false, 200),
+      ev('analytics', true, 150),
+    ];
     expect(consentState(events)).toEqual({ marketing: false, analytics: true });
   });
 

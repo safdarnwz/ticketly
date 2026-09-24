@@ -1,7 +1,15 @@
 import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
-import { AppError, ErrorCode, requireTenantId, runInNewContext, type TenantId, type TicketId, type TripId } from '@kernel';
+import {
+  AppError,
+  ErrorCode,
+  requireTenantId,
+  runInNewContext,
+  type TenantId,
+  type TicketId,
+  type TripId,
+} from '@kernel';
 import { Logger } from '@observability';
 
 import { BookingRepository } from '../../infrastructure/persistence/booking.repository';
@@ -45,15 +53,21 @@ export class TripOpsService {
    * and skipped rather than aborting the whole operation — the trip still
    * gets marked cancelled, and the skipped booking can be retried.
    */
-  async cancelTrip(tripId: TripId, reason: string): Promise<{ cancelledBookings: number; failed: number }> {
+  async cancelTrip(
+    tripId: TripId,
+    reason: string,
+  ): Promise<{ cancelledBookings: number; failed: number }> {
     const trip = await this.trips.getById(tripId);
     if (trip.status === 'cancelled') return { cancelledBookings: 0, failed: 0 }; // idempotent
     if (trip.status === 'departed') {
-      throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, { message: 'Trip has already departed — cannot cancel' });
+      throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
+        message: 'Trip has already departed — cannot cancel',
+      });
     }
 
     const active = await this.bookings.listActiveByTrip(tripId);
-    let cancelledBookings = 0, failed = 0;
+    let cancelledBookings = 0,
+      failed = 0;
     for (const b of active) {
       try {
         // forceFullRefund: true — this is the OPERATOR cancelling, not the
@@ -66,7 +80,10 @@ export class TripOpsService {
         await this.cancelLinkedConnectionLeg(b.id, requireTenantId());
       } catch (err) {
         failed += 1;
-        this.log.error({ err, bookingId: b.id, pnr: b.pnr, tripId }, 'could not cancel booking during trip cancellation — needs manual follow-up');
+        this.log.error(
+          { err, bookingId: b.id, pnr: b.pnr, tripId },
+          'could not cancel booking during trip cancellation — needs manual follow-up',
+        );
       }
     }
 
@@ -89,16 +106,24 @@ export class TripOpsService {
    * this service's own log for manual follow-up either way.
    */
   private async cancelLinkedConnectionLeg(bookingId: string, tenantId: string): Promise<void> {
-    const link = await this.uow.run({ name: 'tripOps.findConnection', bypassRls: true }, async (scope) => {
-      const row = await scope.client.query<{
-        id: string; leg1_tenant_id: string; leg1_booking_id: string; leg2_tenant_id: string; leg2_booking_id: string; status: string;
-      }>(
-        `SELECT id, leg1_tenant_id, leg1_booking_id, leg2_tenant_id, leg2_booking_id, status FROM journey_connections
+    const link = await this.uow.run(
+      { name: 'tripOps.findConnection', bypassRls: true },
+      async (scope) => {
+        const row = await scope.client.query<{
+          id: string;
+          leg1_tenant_id: string;
+          leg1_booking_id: string;
+          leg2_tenant_id: string;
+          leg2_booking_id: string;
+          status: string;
+        }>(
+          `SELECT id, leg1_tenant_id, leg1_booking_id, leg2_tenant_id, leg2_booking_id, status FROM journey_connections
           WHERE status = 'active' AND ((leg1_tenant_id = $1 AND leg1_booking_id = $2) OR (leg2_tenant_id = $1 AND leg2_booking_id = $2))`,
-        [tenantId, bookingId],
-      );
-      return row.rows[0] ?? null;
-    });
+          [tenantId, bookingId],
+        );
+        return row.rows[0] ?? null;
+      },
+    );
     if (!link) return; // not part of any connection — nothing to do
 
     const isLeg1 = link.leg1_booking_id === bookingId;
@@ -107,9 +132,17 @@ export class TripOpsService {
 
     try {
       await runInNewContext({ tenantId: otherTenantId as TenantId, actorType: 'system' }, () =>
-        this.bookingService.cancel(otherBookingId as never, 'Connecting journey broken — the other leg was cancelled by its operator', true));
+        this.bookingService.cancel(
+          otherBookingId as never,
+          'Connecting journey broken — the other leg was cancelled by its operator',
+          true,
+        ),
+      );
     } catch (err) {
-      this.log.error({ err, connectionId: link.id, otherBookingId, otherTenantId }, 'could not auto-cancel the other leg of a broken connection — needs manual follow-up');
+      this.log.error(
+        { err, connectionId: link.id, otherBookingId, otherTenantId },
+        'could not auto-cancel the other leg of a broken connection — needs manual follow-up',
+      );
       return; // status update below reflects only what actually succeeded
     }
 
@@ -124,7 +157,10 @@ export class TripOpsService {
   /** Stop taking new bookings on this trip without cancelling it or anyone already booked — e.g. the bus is nearly full and the operator wants to hold the last few seats for counter sales. */
   async stopSales(tripId: TripId): Promise<void> {
     const trip = await this.trips.getById(tripId);
-    if (trip.status !== 'open') throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, { message: `Trip is '${trip.status}', not 'open' — nothing to stop` });
+    if (trip.status !== 'open')
+      throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
+        message: `Trip is '${trip.status}', not 'open' — nothing to stop`,
+      });
     await this.trips.setStatus(tripId, 'closed');
   }
 
@@ -132,7 +168,9 @@ export class TripOpsService {
   async resumeSales(tripId: TripId): Promise<void> {
     const trip = await this.trips.getById(tripId);
     if (trip.status === 'departed' || trip.status === 'cancelled') {
-      throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, { message: `Trip is '${trip.status}' — sales cannot resume` });
+      throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
+        message: `Trip is '${trip.status}' — sales cannot resume`,
+      });
     }
     await this.trips.setStatus(tripId, 'open');
   }
@@ -146,13 +184,18 @@ export class TripOpsService {
    */
   async markNoShow(ticketId: TicketId): Promise<void> {
     await this.uow.run({ name: 'trip.markNoShow', tenantId: requireTenantId() }, async (scope) => {
-      const ticket = (await scope.client.query<{ status: string }>(
-        `SELECT status FROM tickets WHERE tenant_id = $1 AND id = $2 FOR UPDATE`,
-        [requireTenantId(), ticketId],
-      )).rows[0];
-      if (!ticket) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Ticket not found' });
+      const ticket = (
+        await scope.client.query<{ status: string }>(
+          `SELECT status FROM tickets WHERE tenant_id = $1 AND id = $2 FOR UPDATE`,
+          [requireTenantId(), ticketId],
+        )
+      ).rows[0];
+      if (!ticket)
+        throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Ticket not found' });
       if (ticket.status === 'boarded') {
-        throw new AppError(ErrorCode.COMMON_CONFLICT, 422, { message: 'Passenger already boarded — cannot mark as no-show' });
+        throw new AppError(ErrorCode.COMMON_CONFLICT, 422, {
+          message: 'Passenger already boarded — cannot mark as no-show',
+        });
       }
       await scope.client.query(`UPDATE tickets SET status = 'no_show' WHERE id = $1`, [ticketId]);
     });

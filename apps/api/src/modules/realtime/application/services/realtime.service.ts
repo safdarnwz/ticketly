@@ -31,7 +31,10 @@ export class RealtimeService {
 
   private subjectFor(tripId: string): Subject<SeatUpdate> {
     let s = this.streams.get(tripId);
-    if (!s) { s = new Subject<SeatUpdate>(); this.streams.set(tripId, s); }
+    if (!s) {
+      s = new Subject<SeatUpdate>();
+      this.streams.set(tripId, s);
+    }
     return s;
   }
 

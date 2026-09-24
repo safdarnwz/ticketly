@@ -10,7 +10,11 @@ import { FileService } from '../../files/application/file.service';
 import { BadRequestError } from '@kernel';
 
 const UpsertPageSchema = z.object({
-  slug: z.string().min(1).max(120).regex(/^[a-z0-9-]+$/),
+  slug: z
+    .string()
+    .min(1)
+    .max(120)
+    .regex(/^[a-z0-9-]+$/),
   title: z.string().min(1).max(160),
   body: z.string().max(50000).default(''),
   status: z.enum(['draft', 'published']).default('draft'),
@@ -40,16 +44,35 @@ const OfferSchema = z.object({
 @Controller({ path: '', version: '1' })
 @ApiStandardErrors()
 export class CmsController {
-  constructor(private readonly cms: CmsService, private readonly files: FileService) {}
+  constructor(
+    private readonly cms: CmsService,
+    private readonly files: FileService,
+  ) {}
 
   @Post('cms/uploads')
   @HttpCode(201)
   @RequirePlatformAdmin()
-  @ApiOperation({ summary: 'Upload a banner/offer image as raw bytes (Content-Type: application/octet-stream). JPG/PNG/WEBP ≤ 5 MB.' })
-  async upload(@Query('purpose') purpose: string, @Query('fileName') fileName: string | undefined, @Body() body: Buffer) {
-    if (purpose !== 'cms_banner' && purpose !== 'offer_banner') throw new BadRequestError("purpose must be 'cms_banner' or 'offer_banner'");
-    if (!Buffer.isBuffer(body) || body.length === 0) throw new BadRequestError('Send the image as raw bytes with Content-Type: application/octet-stream');
-    const f = await this.files.upload({ purpose, bytes: body, fileName, sub: [purpose === 'cms_banner' ? 'banners' : 'offers'] });
+  @ApiOperation({
+    summary:
+      'Upload a banner/offer image as raw bytes (Content-Type: application/octet-stream). JPG/PNG/WEBP ≤ 5 MB.',
+  })
+  async upload(
+    @Query('purpose') purpose: string,
+    @Query('fileName') fileName: string | undefined,
+    @Body() body: Buffer,
+  ) {
+    if (purpose !== 'cms_banner' && purpose !== 'offer_banner')
+      throw new BadRequestError("purpose must be 'cms_banner' or 'offer_banner'");
+    if (!Buffer.isBuffer(body) || body.length === 0)
+      throw new BadRequestError(
+        'Send the image as raw bytes with Content-Type: application/octet-stream',
+      );
+    const f = await this.files.upload({
+      purpose,
+      bytes: body,
+      fileName,
+      sub: [purpose === 'cms_banner' ? 'banners' : 'offers'],
+    });
     return { fileId: f.id, url: f.url, fileName: f.fileName, sizeBytes: f.sizeBytes };
   }
 
@@ -94,7 +117,13 @@ export class CmsController {
     const file = await this.files.requireForPurpose(dto.imageFileId, 'cms_banner');
     const { imageFileId: _f, ...rest } = dto;
     void _f;
-    return { id: await this.cms.createBanner({ ...rest, imageUrl: (await this.files.urlFor(file)) ?? undefined, imageFileId: file.id }) };
+    return {
+      id: await this.cms.createBanner({
+        ...rest,
+        imageUrl: (await this.files.urlFor(file)) ?? undefined,
+        imageFileId: file.id,
+      }),
+    };
   }
 
   @Post('content/offers')
@@ -103,9 +132,17 @@ export class CmsController {
   @RequirePlatformAdmin()
   @ApiOperation({ summary: 'Create/update a promotional offer' })
   async upsertOffer(@Body(zodBody(OfferSchema)) dto: z.infer<typeof OfferSchema>) {
-    const file = dto.bannerFileId ? await this.files.requireForPurpose(dto.bannerFileId, 'offer_banner') : null;
+    const file = dto.bannerFileId
+      ? await this.files.requireForPurpose(dto.bannerFileId, 'offer_banner')
+      : null;
     const { bannerFileId: _f, ...rest } = dto;
     void _f;
-    return { id: await this.cms.upsertOffer({ ...rest, bannerUrl: file ? (await this.files.urlFor(file)) ?? undefined : undefined, bannerFileId: file?.id }) };
+    return {
+      id: await this.cms.upsertOffer({
+        ...rest,
+        bannerUrl: file ? ((await this.files.urlFor(file)) ?? undefined) : undefined,
+        bannerFileId: file?.id,
+      }),
+    };
   }
 }

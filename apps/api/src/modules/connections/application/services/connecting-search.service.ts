@@ -45,7 +45,11 @@ export interface LegSummary {
 export class ConnectingSearchService {
   constructor(private readonly uow: UnitOfWork) {}
 
-  async search(originCityId: string, destinationCityId: string, date: LocalDate): Promise<ConnectingOption[]> {
+  async search(
+    originCityId: string,
+    destinationCityId: string,
+    date: LocalDate,
+  ): Promise<ConnectingOption[]> {
     if (originCityId === destinationCityId) return [];
 
     return this.uow.run({ name: 'connections.search', bypassRls: true }, async (scope) => {
@@ -57,9 +61,14 @@ export class ConnectingSearchService {
       // origin_city_id <> dest_city_id is already enforced when routes are
       // created, so no extra guard is needed for that.
       const pairs = await scope.client.query<{
-        leg1_tenant_id: string; leg1_route_id: string; leg1_operator: string;
-        leg2_tenant_id: string; leg2_route_id: string; leg2_operator: string;
-        connection_city_id: string; connection_city_name: string;
+        leg1_tenant_id: string;
+        leg1_route_id: string;
+        leg1_operator: string;
+        leg2_tenant_id: string;
+        leg2_route_id: string;
+        leg2_operator: string;
+        connection_city_id: string;
+        connection_city_name: string;
       }>(
         `SELECT r1.tenant_id AS leg1_tenant_id, r1.id AS leg1_route_id, t1.display_name AS leg1_operator,
                 r2.tenant_id AS leg2_tenant_id, r2.id AS leg2_route_id, t2.display_name AS leg2_operator,
@@ -89,7 +98,11 @@ export class ConnectingSearchService {
         // leg2 to the SAME calendar date as leg1 would silently drop valid
         // overnight connections.
         const leg1Trips = await scope.client.query<{
-          id: string; departs_at: Date; arrives_at: Date; total_seats: number; vehicle_id: string | null;
+          id: string;
+          departs_at: Date;
+          arrives_at: Date;
+          total_seats: number;
+          vehicle_id: string | null;
         }>(
           `SELECT id, departs_at, arrives_at, total_seats, vehicle_id FROM trips
             WHERE tenant_id = $1 AND route_id = $2 AND journey_date = $3 AND status = 'open'`,
@@ -98,7 +111,11 @@ export class ConnectingSearchService {
         if (leg1Trips.rows.length === 0) continue;
 
         const leg2Trips = await scope.client.query<{
-          id: string; departs_at: Date; arrives_at: Date; total_seats: number; vehicle_id: string | null;
+          id: string;
+          departs_at: Date;
+          arrives_at: Date;
+          total_seats: number;
+          vehicle_id: string | null;
         }>(
           `SELECT id, departs_at, arrives_at, total_seats, vehicle_id FROM trips
             WHERE tenant_id = $1 AND route_id = $2 AND journey_date IN ($3::date, ($3::date + interval '1 day')::date) AND status = 'open'`,
@@ -108,11 +125,24 @@ export class ConnectingSearchService {
 
         for (const t1 of leg1Trips.rows) {
           for (const t2 of leg2Trips.rows) {
-            const layoverMinutes = Math.round((t2.departs_at.getTime() - t1.arrives_at.getTime()) / 60_000);
-            if (layoverMinutes < MIN_LAYOVER_MINUTES || layoverMinutes > MAX_LAYOVER_MINUTES) continue;
+            const layoverMinutes = Math.round(
+              (t2.departs_at.getTime() - t1.arrives_at.getTime()) / 60_000,
+            );
+            if (layoverMinutes < MIN_LAYOVER_MINUTES || layoverMinutes > MAX_LAYOVER_MINUTES)
+              continue;
 
-            const leg1Detail = await this.legDetail(scope.client, pair.leg1_tenant_id, pair.leg1_route_id, t1);
-            const leg2Detail = await this.legDetail(scope.client, pair.leg2_tenant_id, pair.leg2_route_id, t2);
+            const leg1Detail = await this.legDetail(
+              scope.client,
+              pair.leg1_tenant_id,
+              pair.leg1_route_id,
+              t1,
+            );
+            const leg2Detail = await this.legDetail(
+              scope.client,
+              pair.leg2_tenant_id,
+              pair.leg2_route_id,
+              t2,
+            );
             if (!leg1Detail || !leg2Detail) continue;
             if (leg1Detail.availableSeats === 0 || leg2Detail.availableSeats === 0) continue;
 
@@ -129,18 +159,27 @@ export class ConnectingSearchService {
 
       // Shortest total journey time first — the ordering a passenger
       // actually cares about, not insertion order off two nested loops.
-      return options.sort((a, b) =>
-        (new Date(a.leg2.arrivesAt).getTime() - new Date(a.leg1.departsAt).getTime()) -
-        (new Date(b.leg2.arrivesAt).getTime() - new Date(b.leg1.departsAt).getTime()));
+      return options.sort(
+        (a, b) =>
+          new Date(a.leg2.arrivesAt).getTime() -
+          new Date(a.leg1.departsAt).getTime() -
+          (new Date(b.leg2.arrivesAt).getTime() - new Date(b.leg1.departsAt).getTime()),
+      );
     });
   }
 
   private async legDetail(
     client: PoolClient,
-    tenantId: string, routeId: string,
+    tenantId: string,
+    routeId: string,
     trip: { id: string; departs_at: Date; arrives_at: Date; total_seats: number },
   ): Promise<Omit<LegSummary, 'operatorName'> | null> {
-    const stopRow = await client.query<{ from_stop_id: string; from_stop_name: string; to_stop_id: string; to_stop_name: string }>(
+    const stopRow = await client.query<{
+      from_stop_id: string;
+      from_stop_name: string;
+      to_stop_id: string;
+      to_stop_name: string;
+    }>(
       `SELECT frs.stop_id AS from_stop_id, fs.name AS from_stop_name, trs.stop_id AS to_stop_id, ts.name AS to_stop_name
          FROM route_stops frs
          JOIN stops fs ON fs.id = frs.stop_id
@@ -167,10 +206,15 @@ export class ConnectingSearchService {
     );
 
     return {
-      tenantId, tripId: trip.id, routeId,
-      fromStopId: stops.from_stop_id, fromStopName: stops.from_stop_name,
-      toStopId: stops.to_stop_id, toStopName: stops.to_stop_name,
-      departsAt: trip.departs_at.toISOString(), arrivesAt: trip.arrives_at.toISOString(),
+      tenantId,
+      tripId: trip.id,
+      routeId,
+      fromStopId: stops.from_stop_id,
+      fromStopName: stops.from_stop_name,
+      toStopId: stops.to_stop_id,
+      toStopName: stops.to_stop_name,
+      departsAt: trip.departs_at.toISOString(),
+      arrivesAt: trip.arrives_at.toISOString(),
       baseFareMinor: fareRow.rows[0]?.base_fare_minor ?? 0,
       availableSeats: seatCountRow.rows[0]?.available ?? 0,
     };

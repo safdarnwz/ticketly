@@ -2,13 +2,21 @@ import { Injectable } from '@nestjs/common';
 
 import { DatabaseService, registerConstraintMessages } from '@database';
 import {
-  newId, NotFoundError, requireTenantId,
-  type Json, type RouteId, type ServiceId, type VehicleId, type VehicleTypeId,
+  newId,
+  NotFoundError,
+  requireTenantId,
+  type Json,
+  type RouteId,
+  type ServiceId,
+  type VehicleId,
+  type VehicleTypeId,
 } from '@kernel';
 
 import type { RecurrenceRule } from '../../domain/recurrence';
 
-registerConstraintMessages({ services_tenant_id_code_key: 'A service with this code already exists' });
+registerConstraintMessages({
+  services_tenant_id_code_key: 'A service with this code already exists',
+});
 
 export type ServiceStatus = 'draft' | 'active' | 'paused' | 'ended';
 
@@ -28,15 +36,27 @@ export class ServiceRepository {
   constructor(private readonly db: DatabaseService) {}
 
   async create(input: {
-    code: string; routeId: RouteId; vehicleTypeId: VehicleTypeId;
-    defaultVehicleId?: VehicleId; startMinute: number; recurrence: RecurrenceRule;
+    code: string;
+    routeId: RouteId;
+    vehicleTypeId: VehicleTypeId;
+    defaultVehicleId?: VehicleId;
+    startMinute: number;
+    recurrence: RecurrenceRule;
   }): Promise<ServiceId> {
     const id = newId() as ServiceId;
     await this.db.execute_(
       `INSERT INTO services (id, tenant_id, code, route_id, vehicle_type_id, default_vehicle_id, start_minute, recurrence)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [id, requireTenantId(), input.code.trim(), input.routeId, input.vehicleTypeId,
-       input.defaultVehicleId ?? null, input.startMinute, JSON.stringify(input.recurrence)],
+      [
+        id,
+        requireTenantId(),
+        input.code.trim(),
+        input.routeId,
+        input.vehicleTypeId,
+        input.defaultVehicleId ?? null,
+        input.startMinute,
+        JSON.stringify(input.recurrence),
+      ],
       { name: 'service.create', primary: true },
     );
     return id;
@@ -98,13 +118,24 @@ export class ServiceRepository {
 }
 
 interface Row {
-  id: ServiceId; code: string; route_id: RouteId; vehicle_type_id: VehicleTypeId;
-  default_vehicle_id: VehicleId | null; start_minute: number; recurrence: Json; status: ServiceStatus;
+  id: ServiceId;
+  code: string;
+  route_id: RouteId;
+  vehicle_type_id: VehicleTypeId;
+  default_vehicle_id: VehicleId | null;
+  start_minute: number;
+  recurrence: Json;
+  status: ServiceStatus;
 }
 function map(r: Row): ServiceRecord {
   return {
-    id: r.id, code: r.code, routeId: r.route_id, vehicleTypeId: r.vehicle_type_id,
-    defaultVehicleId: r.default_vehicle_id, startMinute: r.start_minute,
-    recurrence: r.recurrence as unknown as RecurrenceRule, status: r.status,
+    id: r.id,
+    code: r.code,
+    routeId: r.route_id,
+    vehicleTypeId: r.vehicle_type_id,
+    defaultVehicleId: r.default_vehicle_id,
+    startMinute: r.start_minute,
+    recurrence: r.recurrence as unknown as RecurrenceRule,
+    status: r.status,
   };
 }

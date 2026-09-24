@@ -7,7 +7,9 @@ import { ApiResponse } from '@nestjs/swagger';
  * error shape without each controller repeating it.
  */
 export const ApiStandardErrors = (...extra: number[]): MethodDecorator & ClassDecorator => {
-  const statuses = [...new Set([400, 401, 403, 404, 409, 422, 429, 500, ...extra])].sort((a, b) => a - b);
+  const statuses = [...new Set([400, 401, 403, 404, 409, 422, 429, 500, ...extra])].sort(
+    (a, b) => a - b,
+  );
   return applyDecorators(
     ...statuses.map((status) =>
       ApiResponse({

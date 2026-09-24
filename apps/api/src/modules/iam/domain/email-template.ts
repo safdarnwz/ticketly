@@ -22,12 +22,21 @@ export interface EmailPalette {
 }
 
 export const DEFAULT_EMAIL_PALETTE: EmailPalette = {
-  primary: '#000000', primaryFg: '#FFFFFF', accent: '#CB2957',
-  bg: '#FFFFFF', surface: '#FFFFFF', text: '#000000', textMuted: '#6E6E6E', border: '#DDDDDD',
+  primary: '#000000',
+  primaryFg: '#FFFFFF',
+  accent: '#CB2957',
+  bg: '#FFFFFF',
+  surface: '#FFFFFF',
+  text: '#000000',
+  textMuted: '#6E6E6E',
+  border: '#DDDDDD',
 };
 
 function esc(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+  return s.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string,
+  );
 }
 
 /** The shared themed shell every email is rendered into. */
@@ -36,7 +45,7 @@ export function renderEmail(input: {
   brandName?: string;
   title: string;
   heading: string;
-  bodyHtml: string;         // trusted, pre-escaped HTML fragment
+  bodyHtml: string; // trusted, pre-escaped HTML fragment
   cta?: { label: string; url: string };
   footerNote?: string;
 }): string {
@@ -73,11 +82,18 @@ export function renderEmail(input: {
 </body></html>`;
 }
 
-export function renderOtpEmail(opts: { palette?: EmailPalette; brandName?: string; code: string; name?: string; purpose?: string }): string {
+export function renderOtpEmail(opts: {
+  palette?: EmailPalette;
+  brandName?: string;
+  code: string;
+  name?: string;
+  purpose?: string;
+}): string {
   const p = opts.palette ?? DEFAULT_EMAIL_PALETTE;
   const reason = opts.purpose === 'register' ? 'complete your registration' : 'sign in';
   return renderEmail({
-    palette: p, brandName: opts.brandName,
+    palette: p,
+    brandName: opts.brandName,
     title: 'Your verification code',
     heading: `Hi ${opts.name ? esc(opts.name) : 'there'}, here’s your code`,
     bodyHtml: `<p>Use this one-time code to ${reason}. It expires in 5 minutes.</p>
@@ -101,7 +117,13 @@ export function renderWelcomeEmail(opts: { palette?: EmailPalette; name: string 
 }
 
 export function renderBookingConfirmedEmail(opts: {
-  palette?: EmailPalette; name?: string; pnr: string; route: string; departAt: string; seats: string; totalFormatted: string;
+  palette?: EmailPalette;
+  name?: string;
+  pnr: string;
+  route: string;
+  departAt: string;
+  seats: string;
+  totalFormatted: string;
 }): string {
   return renderEmail({
     palette: opts.palette,
@@ -158,6 +180,9 @@ export function renderOperatorStatusEmail(opts: {
     title: `Operator application — ${opts.status.replace('_', ' ')}`,
     heading: v.heading,
     bodyHtml: v.body,
-    cta: opts.status === 'approved' ? { label: 'Go to console', url: opts.consoleUrl ?? 'https://app.ticketly.com' } : undefined,
+    cta:
+      opts.status === 'approved'
+        ? { label: 'Go to console', url: opts.consoleUrl ?? 'https://app.ticketly.com' }
+        : undefined,
   });
 }

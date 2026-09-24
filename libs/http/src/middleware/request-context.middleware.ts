@@ -55,7 +55,10 @@ function single(value: string | string[] | undefined): string | undefined {
 function clientIp(request: FastifyRequest['raw']): string | undefined {
   const forwarded = single(request.headers['x-forwarded-for']);
   if (forwarded) {
-    const parts = forwarded.split(',').map((p) => p.trim()).filter(Boolean);
+    const parts = forwarded
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean);
     if (parts.length > 0) return parts[parts.length - 1];
   }
   return request.socket?.remoteAddress ?? undefined;

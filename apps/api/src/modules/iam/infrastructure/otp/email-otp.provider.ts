@@ -17,7 +17,12 @@ export class EmailOtpProvider extends OtpProvider {
     await this.mailer.send({
       to,
       subject: `${code} is your Ticketly code`,
-      html: renderOtpEmail({ code, name: ctx?.name, purpose: ctx?.purpose, brandName: ctx?.brandName }),
+      html: renderOtpEmail({
+        code,
+        name: ctx?.name,
+        purpose: ctx?.purpose,
+        brandName: ctx?.brandName,
+      }),
       text: `Your Ticketly verification code is ${code}. It expires in 5 minutes.`,
     });
   }

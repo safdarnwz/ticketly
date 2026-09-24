@@ -16,7 +16,17 @@ import { PlatformSettingsModule } from '../platform-settings/platform-settings.m
 
 /** B2B agent network: operator console (/agents) + agent self-service (/agent-portal). */
 @Module({
-  imports: [DatabaseModule, MessagingModule, BookingModule, PaymentModule, IamModule, AgentLedgerModule, QuotasModule, AmendmentsModule, PlatformSettingsModule],
+  imports: [
+    DatabaseModule,
+    MessagingModule,
+    BookingModule,
+    PaymentModule,
+    IamModule,
+    AgentLedgerModule,
+    QuotasModule,
+    AmendmentsModule,
+    PlatformSettingsModule,
+  ],
   controllers: [AgentController, AgentPortalController],
   providers: [AgentService],
   exports: [AgentService],

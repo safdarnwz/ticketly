@@ -54,7 +54,10 @@ export async function bindTenant(client: PoolClient, tenantId: TenantId | null):
 }
 
 /** Transaction-scoped binding — reverted automatically at COMMIT/ROLLBACK. */
-export async function bindTenantLocal(client: PoolClient, tenantId: TenantId | null): Promise<void> {
+export async function bindTenantLocal(
+  client: PoolClient,
+  tenantId: TenantId | null,
+): Promise<void> {
   await client.query('SELECT set_config($1, $2, true)', ['app.tenant_id', tenantId ?? '']);
   // The session-level memo is now stale for this client; forget it so the next
   // non-transactional lease re-binds explicitly.

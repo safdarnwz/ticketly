@@ -32,10 +32,21 @@ export class WebhookDeliveryService {
   }
 
   /** Fan out one event to every active webhook a tenant has registered for it. */
-  async deliverToTenant(tenantId: string, eventType: string, eventId: string, payload: unknown): Promise<void> {
+  async deliverToTenant(
+    tenantId: string,
+    eventType: string,
+    eventId: string,
+    payload: unknown,
+  ): Promise<void> {
     const targets = await this.webhooks.findActiveForTenant(tenantId, eventType);
     for (const target of targets) {
-      const deliveryId = await this.webhooks.enqueueDelivery({ webhookId: target.id, tenantId, eventType, eventId, payload });
+      const deliveryId = await this.webhooks.enqueueDelivery({
+        webhookId: target.id,
+        tenantId,
+        eventType,
+        eventId,
+        payload,
+      });
       if (!deliveryId) continue; // already enqueued for this (webhook, event) — at-least-once dedupe
       await this.attempt(deliveryId, target.url, target.secret, payload, 0);
     }
@@ -50,13 +61,22 @@ export class WebhookDeliveryService {
     return due.length;
   }
 
-  private async attempt(deliveryId: string, url: string, secret: string, payload: unknown, attemptsSoFar: number): Promise<void> {
+  private async attempt(
+    deliveryId: string,
+    url: string,
+    secret: string,
+    payload: unknown,
+    attemptsSoFar: number,
+  ): Promise<void> {
     const body = JSON.stringify(payload);
     const signature = createHmac('sha256', secret).update(body).digest('hex');
     try {
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Ticketly-Signature': `sha256=${signature}` },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Ticketly-Signature': `sha256=${signature}`,
+        },
         body,
         signal: AbortSignal.timeout(10_000),
       });

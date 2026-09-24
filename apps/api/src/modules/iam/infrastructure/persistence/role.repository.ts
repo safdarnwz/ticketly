@@ -3,7 +3,17 @@ import { type LoginWindow } from '../../domain/access-policy';
 
 import { CacheNamespace, CacheService, CacheTtl } from '@cache';
 import { DatabaseService, registerConstraintMessages } from '@database';
-import { newId, requireTenantId, type Json, type RoleId, type TenantId, type UserId , ConflictError, NotFoundError, getTenantId } from '@kernel';
+import {
+  newId,
+  requireTenantId,
+  type Json,
+  type RoleId,
+  type TenantId,
+  type UserId,
+  ConflictError,
+  NotFoundError,
+  getTenantId,
+} from '@kernel';
 
 registerConstraintMessages({
   roles_tenant_id_code_key: 'A role with this code already exists',
@@ -27,30 +37,74 @@ export const SYSTEM_ROLES: { code: string; name: string; permissions: string[] }
     code: 'admin',
     name: 'Administrator',
     permissions: [
-      'tenant:read', 'tenant:manage', 'user:read', 'user:manage', 'role:manage',
-      'route:read', 'route:manage', 'stop:manage', 'layout:manage',
-      'vehicle:read', 'vehicle:manage', 'crew:manage',
-      'service:read', 'service:manage', 'trip:manage', 'inventory:manage',
-      'fare:read', 'fare:manage', 'booking:read', 'booking:create', 'booking:cancel',
-      'booking:reschedule', 'payment:read', 'payment:refund', 'settlement:manage',
-      'tracking:read', 'report:read', 'report:export', 'agent:read', 'agent:manage',
+      'tenant:read',
+      'tenant:manage',
+      'user:read',
+      'user:manage',
+      'role:manage',
+      'route:read',
+      'route:manage',
+      'stop:manage',
+      'layout:manage',
+      'vehicle:read',
+      'vehicle:manage',
+      'crew:manage',
+      'service:read',
+      'service:manage',
+      'trip:manage',
+      'inventory:manage',
+      'fare:read',
+      'fare:manage',
+      'booking:read',
+      'booking:create',
+      'booking:cancel',
+      'booking:reschedule',
+      'payment:read',
+      'payment:refund',
+      'settlement:manage',
+      'tracking:read',
+      'report:read',
+      'report:export',
+      'agent:read',
+      'agent:manage',
     ],
   },
   {
     code: 'manager',
     name: 'Operations Manager',
     permissions: [
-      'route:read', 'vehicle:read', 'crew:manage', 'service:read', 'service:manage',
-      'trip:manage', 'inventory:manage', 'fare:read', 'booking:read', 'booking:cancel',
-      'booking:reschedule', 'tracking:read', 'report:read',
+      'route:read',
+      'vehicle:read',
+      'crew:manage',
+      'service:read',
+      'service:manage',
+      'trip:manage',
+      'inventory:manage',
+      'fare:read',
+      'booking:read',
+      'booking:cancel',
+      'booking:reschedule',
+      'tracking:read',
+      'report:read',
     ],
   },
   {
     code: 'support',
     name: 'Support Agent',
-    permissions: ['booking:read', 'booking:create', 'booking:cancel', 'booking:reschedule', 'payment:read', 'report:read'],
+    permissions: [
+      'booking:read',
+      'booking:create',
+      'booking:cancel',
+      'booking:reschedule',
+      'payment:read',
+      'report:read',
+    ],
   },
-  { code: 'viewer', name: 'Viewer', permissions: ['booking:read', 'report:read', 'route:read', 'service:read'] },
+  {
+    code: 'viewer',
+    name: 'Viewer',
+    permissions: ['booking:read', 'report:read', 'route:read', 'service:read'],
+  },
   // B2B travel agent — an EXTERNAL party. agent:portal ONLY: never the
   // generic booking:* permissions, which reach every booking in the tenant.
   { code: 'agent', name: 'Travel Agent', permissions: ['agent:portal'] },
@@ -65,13 +119,20 @@ export const SYSTEM_ROLES: { code: string; name: string; permissions: string[] }
  * are cheap.
  */
 export interface ResolvedAccess {
-  permissions: string[]; roles: string[]; active: boolean;
-  accessExpiresAt: string | null; tokensValidAfter: string | null; loginWindow: LoginWindow | null;
+  permissions: string[];
+  roles: string[];
+  active: boolean;
+  accessExpiresAt: string | null;
+  tokensValidAfter: string | null;
+  loginWindow: LoginWindow | null;
 }
 
 @Injectable()
 export class RoleRepository {
-  constructor(private readonly db: DatabaseService, private readonly cache: CacheService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly cache: CacheService,
+  ) {}
 
   /**
    * Flattened permission set for a user, unioned across all their roles.
@@ -87,7 +148,14 @@ export class RoleRepository {
       userId,
       { namespace: CacheNamespace.USER_PERMISSIONS, ttlSeconds: CacheTtl.PERMISSIONS },
       async () => {
-        const rows = await this.db.query<{ user_ok: boolean; permission: string | null; role_code: string | null; access_expires_at: string | null; tokens_valid_after: string | null; login_window: LoginWindow | null }>(
+        const rows = await this.db.query<{
+          user_ok: boolean;
+          permission: string | null;
+          role_code: string | null;
+          access_expires_at: string | null;
+          tokens_valid_after: string | null;
+          login_window: LoginWindow | null;
+        }>(
           `SELECT (u.status = 'active' AND u.deleted_at IS NULL) AS user_ok, rp.permission, r.code AS role_code,
                   u.access_expires_at, u.tokens_valid_after, u.login_window
              FROM users u
@@ -141,7 +209,8 @@ export class RoleRepository {
       { name: 'rbac.list' },
     );
     const roles: Role[] = [];
-    for (const row of rows) roles.push({ ...mapRole(row), permissions: await this.permissionsOf(row.id) });
+    for (const row of rows)
+      roles.push({ ...mapRole(row), permissions: await this.permissionsOf(row.id) });
     return roles;
   }
 
@@ -159,7 +228,15 @@ export class RoleRepository {
     await this.db.execute_(
       `INSERT INTO roles (id, tenant_id, code, name, description, is_system, conditions)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [id, input.tenantId, input.code, input.name, input.description ?? '', input.isSystem ?? false, JSON.stringify(input.conditions ?? {})],
+      [
+        id,
+        input.tenantId,
+        input.code,
+        input.name,
+        input.description ?? '',
+        input.isSystem ?? false,
+        JSON.stringify(input.conditions ?? {}),
+      ],
       { name: 'rbac.createRole', primary: true },
     );
     await this.setPermissions(id, input.permissions);
@@ -167,7 +244,10 @@ export class RoleRepository {
   }
 
   async setPermissions(roleId: RoleId, permissions: string[]): Promise<void> {
-    await this.db.execute_(`DELETE FROM role_permissions WHERE role_id = $1`, [roleId], { name: 'rbac.clearPerms', primary: true });
+    await this.db.execute_(`DELETE FROM role_permissions WHERE role_id = $1`, [roleId], {
+      name: 'rbac.clearPerms',
+      primary: true,
+    });
     if (permissions.length === 0) return;
     const values: unknown[] = [];
     const tuples = permissions.map((perm, i) => {
@@ -183,7 +263,12 @@ export class RoleRepository {
     await this.cache.invalidatePrefix(CacheNamespace.USER_PERMISSIONS);
   }
 
-  async grantToUser(userId: UserId, roleId: RoleId, grantedBy: UserId | null, expiresAt: Date | null = null): Promise<void> {
+  async grantToUser(
+    userId: UserId,
+    roleId: RoleId,
+    grantedBy: UserId | null,
+    expiresAt: Date | null = null,
+  ): Promise<void> {
     await this.db.execute_(
       `INSERT INTO user_roles (user_id, role_id, granted_by, expires_at) VALUES ($1,$2,$3,$4)
        ON CONFLICT (user_id, role_id) DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by`,
@@ -196,13 +281,22 @@ export class RoleRepository {
   /** Copy a role (its permissions) under a new code/name (202). */
   async duplicate(roleId: RoleId, code: string, name: string): Promise<string> {
     const src = await this.db.queryOne<{ id: string; description: string | null }>(
-      `SELECT id, description FROM roles WHERE id = $1 AND deleted_at IS NULL AND (tenant_id = $2 OR tenant_id IS NULL)`, [roleId, getTenantId() ?? null], { name: 'rbac.dupSrc' });
+      `SELECT id, description FROM roles WHERE id = $1 AND deleted_at IS NULL AND (tenant_id = $2 OR tenant_id IS NULL)`,
+      [roleId, getTenantId() ?? null],
+      { name: 'rbac.dupSrc' },
+    );
     if (!src) throw new NotFoundError('Role', roleId);
     const id = newId();
-    await this.db.execute_(`INSERT INTO roles (id, tenant_id, code, name, description, is_system) VALUES ($1,$2,$3,$4,$5,false)`,
-      [id, requireTenantId(), code, name, src.description], { name: 'rbac.dupInsert', primary: true });
-    await this.db.execute_(`INSERT INTO role_permissions (role_id, permission) SELECT $1, permission FROM role_permissions WHERE role_id = $2`,
-      [id, roleId], { name: 'rbac.dupPerms', primary: true });
+    await this.db.execute_(
+      `INSERT INTO roles (id, tenant_id, code, name, description, is_system) VALUES ($1,$2,$3,$4,$5,false)`,
+      [id, requireTenantId(), code, name, src.description],
+      { name: 'rbac.dupInsert', primary: true },
+    );
+    await this.db.execute_(
+      `INSERT INTO role_permissions (role_id, permission) SELECT $1, permission FROM role_permissions WHERE role_id = $2`,
+      [id, roleId],
+      { name: 'rbac.dupPerms', primary: true },
+    );
     return id;
   }
 
@@ -210,11 +304,20 @@ export class RoleRepository {
   async softDelete(roleId: RoleId): Promise<void> {
     const r = await this.db.queryOne<{ is_system: boolean; holders: string }>(
       `SELECT r.is_system, (SELECT count(*) FROM user_roles ur WHERE ur.role_id = r.id AND (ur.expires_at IS NULL OR ur.expires_at > now())) AS holders
-         FROM roles r WHERE r.id = $1 AND r.tenant_id = $2 AND r.deleted_at IS NULL`, [roleId, requireTenantId()], { name: 'rbac.delCheck', primary: true });
+         FROM roles r WHERE r.id = $1 AND r.tenant_id = $2 AND r.deleted_at IS NULL`,
+      [roleId, requireTenantId()],
+      { name: 'rbac.delCheck', primary: true },
+    );
     if (!r) throw new NotFoundError('Role', roleId);
     if (r.is_system) throw new ConflictError('Built-in roles cannot be deleted');
-    if (Number(r.holders) > 0) throw new ConflictError(`This role is still assigned to ${r.holders} user(s) — remove it from them first`);
-    await this.db.execute_(`UPDATE roles SET deleted_at = now() WHERE id = $1`, [roleId], { name: 'rbac.delete', primary: true });
+    if (Number(r.holders) > 0)
+      throw new ConflictError(
+        `This role is still assigned to ${r.holders} user(s) — remove it from them first`,
+      );
+    await this.db.execute_(`UPDATE roles SET deleted_at = now() WHERE id = $1`, [roleId], {
+      name: 'rbac.delete',
+      primary: true,
+    });
   }
 
   async revokeFromUser(userId: UserId, roleId: RoleId): Promise<void> {

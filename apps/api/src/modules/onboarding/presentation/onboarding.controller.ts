@@ -6,7 +6,14 @@ import { ApiStandardErrors, Public, RateLimit, RequirePermission, zodBody } from
 import { getUserId } from '@kernel';
 
 import { OnboardingService } from '../application/services/onboarding.service';
-import { ApplyOperatorSchema, type ApplyOperatorDto, ApproveSchema, type ApproveDto, RejectSchema, type RejectDto } from './dto/onboarding.dto';
+import {
+  ApplyOperatorSchema,
+  type ApplyOperatorDto,
+  ApproveSchema,
+  type ApproveDto,
+  RejectSchema,
+  type RejectDto,
+} from './dto/onboarding.dto';
 
 /**
  * Operator onboarding endpoints. `POST /operators/apply` is public (the
@@ -28,8 +35,14 @@ export class OnboardingController {
   @Post('operators/apply/documents')
   @HttpCode(201)
   @RateLimit(20, 3_600_000, 'ip')
-  @ApiOperation({ summary: 'Upload one application document as raw bytes (PDF/JPG/PNG/DOC/DOCX ≤ 5 MB)' })
-  async uploadApplicationDocument(@Query('docType') docType: string, @Query('fileName') fileName: string | undefined, @Body() body: Buffer) {
+  @ApiOperation({
+    summary: 'Upload one application document as raw bytes (PDF/JPG/PNG/DOC/DOCX ≤ 5 MB)',
+  })
+  async uploadApplicationDocument(
+    @Query('docType') docType: string,
+    @Query('fileName') fileName: string | undefined,
+    @Body() body: Buffer,
+  ) {
     return this.onboarding.uploadApplicationDocument(docType, body, fileName);
   }
 
@@ -72,7 +85,7 @@ export class OnboardingController {
   @RequirePermission(Permission.PLATFORM_OPERATORS)
   @ApiOperation({ summary: 'Approve → provision operator tenant + admin user' })
   async approve(@Param('id') id: string, @Body(zodBody(ApproveSchema)) dto: ApproveDto) {
-    return this.onboarding.approve(id, (getUserId() ?? null), dto?.note);
+    return this.onboarding.approve(id, getUserId() ?? null, dto?.note);
   }
 
   @ApiBearerAuth('bearer')
@@ -81,7 +94,7 @@ export class OnboardingController {
   @RequirePermission(Permission.PLATFORM_OPERATORS)
   @ApiOperation({ summary: 'Reject an application with a reason' })
   async reject(@Param('id') id: string, @Body(zodBody(RejectSchema)) dto: RejectDto) {
-    await this.onboarding.reject(id, dto.reason, (getUserId() ?? null));
+    await this.onboarding.reject(id, dto.reason, getUserId() ?? null);
     return { ok: true };
   }
 
@@ -89,9 +102,12 @@ export class OnboardingController {
   @Post('admin/operator-applications/:id/hold')
   @HttpCode(200)
   @RequirePermission(Permission.PLATFORM_OPERATORS)
-  @ApiOperation({ summary: 'Keep an application pending with a reason (e.g. more documents needed) — emailed to the applicant' })
+  @ApiOperation({
+    summary:
+      'Keep an application pending with a reason (e.g. more documents needed) — emailed to the applicant',
+  })
   async hold(@Param('id') id: string, @Body(zodBody(RejectSchema)) dto: RejectDto) {
-    await this.onboarding.hold(id, dto.reason, (getUserId() ?? null));
+    await this.onboarding.hold(id, dto.reason, getUserId() ?? null);
     return { ok: true };
   }
 
@@ -101,7 +117,7 @@ export class OnboardingController {
   @RequirePermission(Permission.PLATFORM_OPERATORS)
   @ApiOperation({ summary: 'Move a rejected application back to pending, with a reason' })
   async reopen(@Param('id') id: string, @Body(zodBody(RejectSchema)) dto: RejectDto) {
-    await this.onboarding.reopen(id, dto.reason, (getUserId() ?? null));
+    await this.onboarding.reopen(id, dto.reason, getUserId() ?? null);
     return { ok: true };
   }
 }

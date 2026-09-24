@@ -40,7 +40,10 @@ export class InvoiceController {
   @RequirePermission(Permission.SETTLEMENT_MANAGE)
   @ApiOperation({ summary: 'Issue a GST tax invoice for a confirmed booking' })
   async issue(@Body(zodBody(IssueInvoiceSchema)) dto: z.infer<typeof IssueInvoiceSchema>) {
-    const result = await this.invoices.issueForBooking(dto.bookingId as BookingId, dto.supplierGstin);
+    const result = await this.invoices.issueForBooking(
+      dto.bookingId as BookingId,
+      dto.supplierGstin,
+    );
     return result ?? { issued: false, reason: 'Booking is not confirmed' };
   }
 }

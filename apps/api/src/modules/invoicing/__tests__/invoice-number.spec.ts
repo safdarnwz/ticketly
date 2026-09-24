@@ -23,15 +23,26 @@ describe('financialYear (India, Apr–Mar)', () => {
 
 describe('formatInvoiceNumber', () => {
   it('formats prefix/FY/padded-sequence', () => {
-    expect(formatInvoiceNumber({ prefix: 'INV', date: new Date('2026-05-01T00:00:00Z'), sequence: 123 })).toBe('INV/2026-27/000123');
+    expect(
+      formatInvoiceNumber({ prefix: 'INV', date: new Date('2026-05-01T00:00:00Z'), sequence: 123 }),
+    ).toBe('INV/2026-27/000123');
   });
 
   it('sanitises the prefix and pads', () => {
-    expect(formatInvoiceNumber({ prefix: 'orange-tvl', date: new Date('2026-05-01T00:00:00Z'), sequence: 7, pad: 4 })).toBe('ORANGETVL/2026-27/0007');
+    expect(
+      formatInvoiceNumber({
+        prefix: 'orange-tvl',
+        date: new Date('2026-05-01T00:00:00Z'),
+        sequence: 7,
+        pad: 4,
+      }),
+    ).toBe('ORANGETVL/2026-27/0007');
   });
 
   it('rejects a zero/negative sequence', () => {
-    expect(() => formatInvoiceNumber({ prefix: 'INV', date: new Date(), sequence: 0 })).toThrow(/>= 1/);
+    expect(() => formatInvoiceNumber({ prefix: 'INV', date: new Date(), sequence: 0 })).toThrow(
+      />= 1/,
+    );
   });
 });
 

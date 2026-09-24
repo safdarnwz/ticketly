@@ -3,14 +3,7 @@ import { Reflector } from '@nestjs/core';
 import type { FastifyRequest } from 'fastify';
 
 import { IS_PUBLIC_KEY } from '@http';
-import {
-  AppError,
-  getContext,
-  UnauthenticatedError,
-  ErrorCode,
-  
-  
-} from '@kernel';
+import { AppError, getContext, UnauthenticatedError, ErrorCode } from '@kernel';
 
 import { ApiKeyService } from '../../application/services/api-key.service';
 import { TokenService } from '@security';
@@ -82,19 +75,32 @@ export class AuthGuard implements CanActivate {
     return true;
   }
 
-  private async authenticateBearer(token: string, ctx: NonNullable<ReturnType<typeof getContext>>): Promise<void> {
+  private async authenticateBearer(
+    token: string,
+    ctx: NonNullable<ReturnType<typeof getContext>>,
+  ): Promise<void> {
     const claims = this.tokens.verifyAccess(token);
     // Permissions are embedded in the token for speed; we re-resolve only when
     // the token predates a grant change (detected via the permission hash on
     // sensitive routes — the permission guard can force a refresh).
     ctx.userId = claims.sub;
-    ctx.tenantId = (claims.tid ?? undefined);
+    ctx.tenantId = claims.tid ?? undefined;
     ctx.actorType = 'user';
-    const resolved = claims.roles && claims.roles.length > 0
-      ? await this.roles.resolvePermissions(claims.sub)
-      : { permissions: [], roles: claims.roles ?? [], active: true, accessExpiresAt: null, tokensValidAfter: null, loginWindow: null };
+    const resolved =
+      claims.roles && claims.roles.length > 0
+        ? await this.roles.resolvePermissions(claims.sub)
+        : {
+            permissions: [],
+            roles: claims.roles ?? [],
+            active: true,
+            accessExpiresAt: null,
+            tokensValidAfter: null,
+            loginWindow: null,
+          };
     if (!resolved.active) {
-      throw new AppError(ErrorCode.AUTH_TOKEN_INVALID, 401, { message: 'This account has been disabled — please contact your administrator' });
+      throw new AppError(ErrorCode.AUTH_TOKEN_INVALID, 401, {
+        message: 'This account has been disabled — please contact your administrator',
+      });
     }
     const denied = evaluateAccess({
       accessExpiresAt: resolved.accessExpiresAt ? new Date(resolved.accessExpiresAt) : null,
@@ -102,15 +108,28 @@ export class AuthGuard implements CanActivate {
       tokenIssuedAtSec: (claims as { iat?: number }).iat,
       loginWindow: resolved.loginWindow,
     });
-    if (denied === 'expired') throw new AppError(ErrorCode.AUTH_TOKEN_INVALID, 401, { message: 'Your access period has ended — contact your administrator' });
-    if (denied === 'session_revoked') throw new AppError(ErrorCode.AUTH_SESSION_REVOKED, 401, { message: 'You were signed out by an administrator — please sign in again' });
-    if (denied === 'outside_login_window') throw new AppError(ErrorCode.AUTH_TOKEN_INVALID, 403, { message: 'Sign-in is not allowed at this time for your account' });
+    if (denied === 'expired')
+      throw new AppError(ErrorCode.AUTH_TOKEN_INVALID, 401, {
+        message: 'Your access period has ended — contact your administrator',
+      });
+    if (denied === 'session_revoked')
+      throw new AppError(ErrorCode.AUTH_SESSION_REVOKED, 401, {
+        message: 'You were signed out by an administrator — please sign in again',
+      });
+    if (denied === 'outside_login_window')
+      throw new AppError(ErrorCode.AUTH_TOKEN_INVALID, 403, {
+        message: 'Sign-in is not allowed at this time for your account',
+      });
     (ctx.permissions as Set<string>) = new Set(resolved.permissions);
     (ctx.extra as Record<string, unknown>).roles = resolved.roles;
     (ctx.extra as Record<string, unknown>).sessionId = claims.sid;
   }
 
-  private async authenticateApiKey(key: string, ctx: NonNullable<ReturnType<typeof getContext>>, ip: string): Promise<void> {
+  private async authenticateApiKey(
+    key: string,
+    ctx: NonNullable<ReturnType<typeof getContext>>,
+    ip: string,
+  ): Promise<void> {
     const record = await this.apiKeys.verify(key, ip);
     if (!record) {
       throw new UnauthenticatedError(ErrorCode.AUTH_TOKEN_INVALID, { message: 'Invalid API key' });

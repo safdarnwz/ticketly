@@ -44,7 +44,11 @@ export class DatabaseStorage implements ObjectStorage {
   }
 
   async delete(key: string): Promise<void> {
-    await this.db.execute_(`DELETE FROM stored_file_blobs WHERE object_key = $1 AND tenant_id IS NOT DISTINCT FROM $2`, [key, scope()], { name: 'storage.db.delete', primary: true });
+    await this.db.execute_(
+      `DELETE FROM stored_file_blobs WHERE object_key = $1 AND tenant_id IS NOT DISTINCT FROM $2`,
+      [key, scope()],
+      { name: 'storage.db.delete', primary: true },
+    );
   }
 
   async signedGetUrl(): Promise<null> {

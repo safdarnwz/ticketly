@@ -53,6 +53,9 @@ export function annotate(attributes: Record<string, string | number | boolean>):
   trace.getSpan(context.active())?.setAttributes(attributes);
 }
 
-export function addEvent(name: string, attributes?: Record<string, string | number | boolean>): void {
+export function addEvent(
+  name: string,
+  attributes?: Record<string, string | number | boolean>,
+): void {
   trace.getSpan(context.active())?.addEvent(name, attributes);
 }

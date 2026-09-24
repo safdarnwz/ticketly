@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 
 import {
-  renderEmail, renderOtpEmail, renderBookingConfirmedEmail, renderOperatorStatusEmail,
+  renderEmail,
+  renderOtpEmail,
+  renderBookingConfirmedEmail,
+  renderOperatorStatusEmail,
   DEFAULT_EMAIL_PALETTE,
 } from '../domain/email-template';
 
@@ -15,12 +18,21 @@ describe('email templates', () => {
   });
 
   it('positive: a custom palette is applied', () => {
-    const html = renderOtpEmail({ code: '111', palette: { ...DEFAULT_EMAIL_PALETTE, primary: '#123456' } });
+    const html = renderOtpEmail({
+      code: '111',
+      palette: { ...DEFAULT_EMAIL_PALETTE, primary: '#123456' },
+    });
     expect(html).toContain('#123456');
   });
 
   it('positive: booking confirmation includes PNR, seats and total', () => {
-    const html = renderBookingConfirmedEmail({ pnr: 'YB12AB', route: 'Delhi → Jaipur', departAt: '10:00', seats: 'A1, A2', totalFormatted: '₹1,200.00' });
+    const html = renderBookingConfirmedEmail({
+      pnr: 'YB12AB',
+      route: 'Delhi → Jaipur',
+      departAt: '10:00',
+      seats: 'A1, A2',
+      totalFormatted: '₹1,200.00',
+    });
     expect(html).toContain('YB12AB');
     expect(html).toContain('A1, A2');
     expect(html).toContain('₹1,200.00');
@@ -28,7 +40,11 @@ describe('email templates', () => {
 
   it('positive: operator approved vs rejected render different CTAs', () => {
     const ok = renderOperatorStatusEmail({ name: 'Acme', status: 'approved' });
-    const no = renderOperatorStatusEmail({ name: 'Acme', status: 'rejected', reason: 'Incomplete GST' });
+    const no = renderOperatorStatusEmail({
+      name: 'Acme',
+      status: 'rejected',
+      reason: 'Incomplete GST',
+    });
     expect(ok).toContain('approved');
     expect(ok).toContain('Go to console');
     expect(no).toContain('Incomplete GST');

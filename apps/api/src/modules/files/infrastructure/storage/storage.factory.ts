@@ -16,11 +16,20 @@ export function createStorage(s: StorageSettings, db: DatabaseService): ObjectSt
     case 'r2':
     case 's3':
       return new S3CompatibleStorage(s.provider, s.bucket, {
-        endpoint: s.endpoint, region: s.provider === 'r2' ? (s.region || 'auto') : s.region,
-        accessKeyId: s.accessKeyId, secretAccessKey: s.secretAccessKey, forcePathStyle: s.forcePathStyle, timeoutMs: s.timeoutMs,
+        endpoint: s.endpoint,
+        region: s.provider === 'r2' ? s.region || 'auto' : s.region,
+        accessKeyId: s.accessKeyId,
+        secretAccessKey: s.secretAccessKey,
+        forcePathStyle: s.forcePathStyle,
+        timeoutMs: s.timeoutMs,
       });
     case 'azure':
-      return new AzureBlobStorage(s.bucket, { account: s.azureAccount, accountKey: s.azureAccountKey, timeoutMs: s.timeoutMs, endpoint: s.endpoint || undefined });
+      return new AzureBlobStorage(s.bucket, {
+        account: s.azureAccount,
+        accountKey: s.azureAccountKey,
+        timeoutMs: s.timeoutMs,
+        endpoint: s.endpoint || undefined,
+      });
     case 'database':
     default:
       return new DatabaseStorage(db);

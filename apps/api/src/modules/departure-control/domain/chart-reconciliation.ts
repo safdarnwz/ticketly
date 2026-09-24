@@ -22,9 +22,9 @@ import { Money, DomainError, ErrorCode, type CurrencyCode } from '@kernel';
 
 export interface ChartInput {
   totalSeats: number;
-  confirmedSeats: number;   // seats sold (occupying the departure leg)
-  boardedSeats: number;     // scanned boarded
-  spotSalesCount: number;   // onboard/spot sales at departure
+  confirmedSeats: number; // seats sold (occupying the departure leg)
+  boardedSeats: number; // scanned boarded
+  spotSalesCount: number; // onboard/spot sales at departure
   spotSalesCashMinor: number; // cash the conductor declares from spot sales
   expectedSpotFareMinor: number; // fare that SHOULD have been collected per spot sale
 }
@@ -36,7 +36,7 @@ export interface ChartResult {
   cashDeclaredMinor: number;
   cashExpectedMinor: number;
   cashVarianceMinor: number; // + surplus, − shortage
-  reconciled: boolean;       // true when cash matches expectation
+  reconciled: boolean; // true when cash matches expectation
 }
 
 export function reconcileChart(input: ChartInput, currency: CurrencyCode = 'INR'): ChartResult {
@@ -50,7 +50,10 @@ export function reconcileChart(input: ChartInput, currency: CurrencyCode = 'INR'
     throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Boarded exceeds confirmed + spot sales');
   }
 
-  const noShowSeats = Math.max(0, input.confirmedSeats - Math.min(input.boardedSeats, input.confirmedSeats));
+  const noShowSeats = Math.max(
+    0,
+    input.confirmedSeats - Math.min(input.boardedSeats, input.confirmedSeats),
+  );
   const vacantSeats = input.totalSeats - input.confirmedSeats - input.spotSalesCount;
 
   const cashExpected = Money.of(input.expectedSpotFareMinor * input.spotSalesCount, currency);
@@ -60,9 +63,12 @@ export function reconcileChart(input: ChartInput, currency: CurrencyCode = 'INR'
   return {
     noShowSeats,
     vacantSeats: Math.max(0, vacantSeats),
-    boardingRatePct: input.confirmedSeats > 0
-      ? Math.round((Math.min(input.boardedSeats, input.confirmedSeats) / input.confirmedSeats) * 100)
-      : 0,
+    boardingRatePct:
+      input.confirmedSeats > 0
+        ? Math.round(
+            (Math.min(input.boardedSeats, input.confirmedSeats) / input.confirmedSeats) * 100,
+          )
+        : 0,
     cashDeclaredMinor: cashDeclared.minor,
     cashExpectedMinor: cashExpected.minor,
     cashVarianceMinor: variance.minor,

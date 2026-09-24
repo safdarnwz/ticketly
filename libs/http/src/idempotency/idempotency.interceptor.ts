@@ -1,4 +1,9 @@
-import { Injectable, type CallHandler, type ExecutionContext, type NestInterceptor } from '@nestjs/common';
+import {
+  Injectable,
+  type CallHandler,
+  type ExecutionContext,
+  type NestInterceptor,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { from, of, type Observable } from 'rxjs';
@@ -67,7 +72,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
       });
     }
 
-    const tenantId = (ctx?.tenantId ?? null);
+    const tenantId = ctx?.tenantId ?? null;
     const userId = (ctx?.userId ?? null) as Uuid | null;
     const fingerprint = IdempotencyStore.fingerprint(request.method, request.url, request.body);
 

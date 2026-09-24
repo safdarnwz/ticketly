@@ -15,7 +15,14 @@ const PASSWORD = 'pass@123';
 async function main(): Promise<void> {
   const env = loadEnv();
   const config = buildAppConfig(env);
-  const pool = new Pool({ host: env.DB_HOST, port: env.DB_PORT, database: env.DB_NAME, user: env.DB_USER, password: env.DB_PASSWORD, max: 1 });
+  const pool = new Pool({
+    host: env.DB_HOST,
+    port: env.DB_PORT,
+    database: env.DB_NAME,
+    user: env.DB_USER,
+    password: env.DB_PASSWORD,
+    max: 1,
+  });
   const client = await pool.connect();
   const encryptor = new FieldEncryptor(config);
   const hasher = new PasswordHasher(config);
@@ -30,8 +37,14 @@ async function main(): Promise<void> {
       const emailEnc = encryptor.encrypt(email);
       const emailBlind = encryptor.blindIndex(email);
 
-      const role = await client.query<{ id: string }>(`SELECT id FROM roles WHERE tenant_id = $1 AND code = 'operator_admin' LIMIT 1`, [t.id]);
-      if (!role.rows[0]) { process.stderr.write(`⚠ no operator_admin role for ${t.slug} — skipping\n`); continue; }
+      const role = await client.query<{ id: string }>(
+        `SELECT id FROM roles WHERE tenant_id = $1 AND code = 'operator_admin' LIMIT 1`,
+        [t.id],
+      );
+      if (!role.rows[0]) {
+        process.stderr.write(`⚠ no operator_admin role for ${t.slug} — skipping\n`);
+        continue;
+      }
 
       await client.query('BEGIN');
       const existing = await client.query<{ id: string }>(
@@ -41,7 +54,10 @@ async function main(): Promise<void> {
       let userId: string;
       if (existing.rows[0]) {
         userId = existing.rows[0].id;
-        await client.query(`UPDATE users SET password_hash = $1, status = 'active' WHERE id = $2`, [passwordHash, userId]);
+        await client.query(`UPDATE users SET password_hash = $1, status = 'active' WHERE id = $2`, [
+          passwordHash,
+          userId,
+        ]);
       } else {
         const inserted = await client.query<{ id: string }>(
           `INSERT INTO users (tenant_id, kind, status, email, email_blind, full_name, password_hash)
@@ -50,7 +66,10 @@ async function main(): Promise<void> {
         );
         userId = inserted.rows[0].id;
       }
-      await client.query(`INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [userId, role.rows[0].id]);
+      await client.query(
+        `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [userId, role.rows[0].id],
+      );
       await client.query('COMMIT');
       process.stdout.write(`✓ ${t.slug}: ${email} / ${PASSWORD}\n`);
     }

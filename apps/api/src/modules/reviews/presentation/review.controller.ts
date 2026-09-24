@@ -28,7 +28,12 @@ export class ReviewController {
   @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'Leave a review for a completed booking (verified travellers only)' })
   async create(@Body(zodBody(CreateReviewSchema)) dto: z.infer<typeof CreateReviewSchema>) {
-    return this.reviews.create({ bookingId: dto.bookingId as BookingId, rating: dto.rating, title: dto.title, body: dto.body });
+    return this.reviews.create({
+      bookingId: dto.bookingId as BookingId,
+      rating: dto.rating,
+      title: dto.title,
+      body: dto.body,
+    });
   }
 
   @Get('routes/:routeId/reviews')

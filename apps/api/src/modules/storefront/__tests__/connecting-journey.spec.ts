@@ -3,17 +3,34 @@ import { describe, it, expect } from 'vitest';
 import { buildConnections, type JourneyLeg } from '../domain/connecting-journey';
 
 const leg = (o: Partial<JourneyLeg>): JourneyLeg => ({
-  tripId: 't', fromHub: 'A', toHub: 'H',
-  departsAt: '2026-09-01T06:00:00Z', arrivesAt: '2026-09-01T10:00:00Z',
-  priceMinor: 30000, availableSeats: 10, currency: 'INR', ...o,
+  tripId: 't',
+  fromHub: 'A',
+  toHub: 'H',
+  departsAt: '2026-09-01T06:00:00Z',
+  arrivesAt: '2026-09-01T10:00:00Z',
+  priceMinor: 30000,
+  availableSeats: 10,
+  currency: 'INR',
+  ...o,
 });
 
 describe('buildConnections', () => {
   const opts = { minLayoverMin: 30, maxLayoverMin: 240 };
 
   it('happy: pairs A→H with H→B within the layover window', () => {
-    const first = [leg({ tripId: 'f1', fromHub: 'A', toHub: 'H', arrivesAt: '2026-09-01T10:00:00Z' })];
-    const second = [leg({ tripId: 's1', fromHub: 'H', toHub: 'B', departsAt: '2026-09-01T11:00:00Z', arrivesAt: '2026-09-01T14:00:00Z', priceMinor: 25000 })];
+    const first = [
+      leg({ tripId: 'f1', fromHub: 'A', toHub: 'H', arrivesAt: '2026-09-01T10:00:00Z' }),
+    ];
+    const second = [
+      leg({
+        tripId: 's1',
+        fromHub: 'H',
+        toHub: 'B',
+        departsAt: '2026-09-01T11:00:00Z',
+        arrivesAt: '2026-09-01T14:00:00Z',
+        priceMinor: 25000,
+      }),
+    ];
     const r = buildConnections(first, second, opts);
     expect(r).toHaveLength(1);
     expect(r[0].layoverMin).toBe(60);
@@ -52,8 +69,22 @@ describe('buildConnections', () => {
       leg({ tripId: 'f-slow', toHub: 'H', arrivesAt: '2026-09-01T10:00:00Z', availableSeats: 3 }),
     ];
     const second = [
-      leg({ tripId: 's-fast', fromHub: 'H', toHub: 'B', departsAt: '2026-09-01T10:45:00Z', arrivesAt: '2026-09-01T12:00:00Z', availableSeats: 8 }),
-      leg({ tripId: 's-slow', fromHub: 'H', toHub: 'B', departsAt: '2026-09-01T10:45:00Z', arrivesAt: '2026-09-01T15:00:00Z', availableSeats: 8 }),
+      leg({
+        tripId: 's-fast',
+        fromHub: 'H',
+        toHub: 'B',
+        departsAt: '2026-09-01T10:45:00Z',
+        arrivesAt: '2026-09-01T12:00:00Z',
+        availableSeats: 8,
+      }),
+      leg({
+        tripId: 's-slow',
+        fromHub: 'H',
+        toHub: 'B',
+        departsAt: '2026-09-01T10:45:00Z',
+        arrivesAt: '2026-09-01T15:00:00Z',
+        availableSeats: 8,
+      }),
     ];
     const r = buildConnections(first, second, { minLayoverMin: 30, maxLayoverMin: 120 });
     expect(r).toHaveLength(2);

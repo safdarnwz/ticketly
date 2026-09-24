@@ -7,11 +7,16 @@ import { z } from 'zod';
  */
 // Unified login: an email OR a mobile number, plus password. `identifier` is the
 // canonical field; `email` is still accepted for backward compatibility.
-export const LoginSchema = z.object({
-  identifier: z.string().min(3).max(320).optional(),
-  email: z.string().email().max(320).optional(),
-  password: z.string().min(1).max(256),
-}).refine((v) => Boolean(v.identifier ?? v.email), { message: 'identifier or email is required', path: ['identifier'] });
+export const LoginSchema = z
+  .object({
+    identifier: z.string().min(3).max(320).optional(),
+    email: z.string().email().max(320).optional(),
+    password: z.string().min(1).max(256),
+  })
+  .refine((v) => Boolean(v.identifier ?? v.email), {
+    message: 'identifier or email is required',
+    path: ['identifier'],
+  });
 export type LoginDto = z.infer<typeof LoginSchema>;
 
 export const CheckIdentitySchema = z.object({

@@ -1,18 +1,34 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  approvalBlockers, canTransition, computeCompliance, minReason, normaliseRegistration,
-  validateChassis, validateDocument, validateManufactureYear, validateRegistration, type DocVersion,
+  approvalBlockers,
+  canTransition,
+  computeCompliance,
+  minReason,
+  normaliseRegistration,
+  validateChassis,
+  validateDocument,
+  validateManufactureYear,
+  validateRegistration,
+  type DocVersion,
 } from '../domain/vehicle-verification';
 
 const TODAY = '2026-09-23';
 const future = '2027-09-01';
 const past = '2026-09-01';
 const doc = (docType: string, over: Partial<DocVersion> = {}): DocVersion => ({
-  id: `${docType}-${Math.random()}`, docType, documentNo: 'X1', validFrom: '2025-01-01', expiresOn: future,
-  status: 'verified', hasFile: true, supersededAt: null, ...over,
+  id: `${docType}-${Math.random()}`,
+  docType,
+  documentNo: 'X1',
+  validFrom: '2025-01-01',
+  expiresOn: future,
+  status: 'verified',
+  hasFile: true,
+  supersededAt: null,
+  ...over,
 });
-const allVerified = () => ['rc', 'insurance', 'permit', 'fitness', 'puc', 'road_tax'].map((t) => doc(t));
+const allVerified = () =>
+  ['rc', 'insurance', 'permit', 'fitness', 'puc', 'road_tax'].map((t) => doc(t));
 
 describe('registration number', () => {
   it('normalises spacing and case', () => {
@@ -50,20 +66,75 @@ describe('chassis & year', () => {
 
 describe('document validation', () => {
   it('requires a known type, valid dates, and not already expired', () => {
-    expect(validateDocument({ docType: 'rc', documentNo: 'MH12AB1234', expiresOn: future, today: TODAY, registrationNo: 'MH12AB1234' })).toBeNull();
-    expect(validateDocument({ docType: 'visa', documentNo: '1', expiresOn: future, today: TODAY })).toMatch(/Unknown/);
-    expect(validateDocument({ docType: 'insurance', documentNo: '1', expiresOn: past, today: TODAY })).toMatch(/expired/);
-    expect(validateDocument({ docType: 'insurance', documentNo: '1', validFrom: '2027-12-01', expiresOn: future, today: TODAY })).toMatch(/after the expiry/);
-    expect(validateDocument({ docType: 'insurance', documentNo: '1', validFrom: '2026-12-01', expiresOn: future, today: TODAY })).toMatch(/future/);
-    expect(validateDocument({ docType: 'insurance', documentNo: '1', expiresOn: '2027-02-30x', today: TODAY })).toMatch(/valid/);
+    expect(
+      validateDocument({
+        docType: 'rc',
+        documentNo: 'MH12AB1234',
+        expiresOn: future,
+        today: TODAY,
+        registrationNo: 'MH12AB1234',
+      }),
+    ).toBeNull();
+    expect(
+      validateDocument({ docType: 'visa', documentNo: '1', expiresOn: future, today: TODAY }),
+    ).toMatch(/Unknown/);
+    expect(
+      validateDocument({ docType: 'insurance', documentNo: '1', expiresOn: past, today: TODAY }),
+    ).toMatch(/expired/);
+    expect(
+      validateDocument({
+        docType: 'insurance',
+        documentNo: '1',
+        validFrom: '2027-12-01',
+        expiresOn: future,
+        today: TODAY,
+      }),
+    ).toMatch(/after the expiry/);
+    expect(
+      validateDocument({
+        docType: 'insurance',
+        documentNo: '1',
+        validFrom: '2026-12-01',
+        expiresOn: future,
+        today: TODAY,
+      }),
+    ).toMatch(/future/);
+    expect(
+      validateDocument({
+        docType: 'insurance',
+        documentNo: '1',
+        expiresOn: '2027-02-30x',
+        today: TODAY,
+      }),
+    ).toMatch(/valid/);
   });
   it('requires a document number for required types', () => {
-    expect(validateDocument({ docType: 'permit', documentNo: ' ', expiresOn: future, today: TODAY })).toMatch(/number is required/);
-    expect(validateDocument({ docType: 'photo_front', expiresOn: future, today: TODAY })).toBeNull();
+    expect(
+      validateDocument({ docType: 'permit', documentNo: ' ', expiresOn: future, today: TODAY }),
+    ).toMatch(/number is required/);
+    expect(
+      validateDocument({ docType: 'photo_front', expiresOn: future, today: TODAY }),
+    ).toBeNull();
   });
   it('RC number must match the bus registration', () => {
-    expect(validateDocument({ docType: 'rc', documentNo: 'MH12AB9999', expiresOn: future, today: TODAY, registrationNo: 'MH12AB1234' })).toMatch(/does not match/);
-    expect(validateDocument({ docType: 'rc', documentNo: 'mh-12-ab-1234', expiresOn: future, today: TODAY, registrationNo: 'MH12AB1234' })).toBeNull();
+    expect(
+      validateDocument({
+        docType: 'rc',
+        documentNo: 'MH12AB9999',
+        expiresOn: future,
+        today: TODAY,
+        registrationNo: 'MH12AB1234',
+      }),
+    ).toMatch(/does not match/);
+    expect(
+      validateDocument({
+        docType: 'rc',
+        documentNo: 'mh-12-ab-1234',
+        expiresOn: future,
+        today: TODAY,
+        registrationNo: 'MH12AB1234',
+      }),
+    ).toBeNull();
   });
 });
 
@@ -74,14 +145,19 @@ describe('compliance', () => {
     expect(approvalBlockers(c)).toEqual([]);
   });
   it('missing document blocks approval and submission', () => {
-    const c = computeCompliance(allVerified().filter((d) => d.docType !== 'puc'), TODAY);
+    const c = computeCompliance(
+      allVerified().filter((d) => d.docType !== 'puc'),
+      TODAY,
+    );
     expect(c.compliant).toBe(false);
     expect(c.missing).toEqual(['puc']);
     expect(c.readyForSubmission).toBe(false);
     expect(approvalBlockers(c)[0]).toMatch(/Missing/);
   });
   it('pending upload: ready to submit, but not compliant until verified', () => {
-    const docs = allVerified().map((d) => (d.docType === 'insurance' ? { ...d, status: 'pending' as const } : d));
+    const docs = allVerified().map((d) =>
+      d.docType === 'insurance' ? { ...d, status: 'pending' as const } : d,
+    );
     const c = computeCompliance(docs, TODAY);
     expect(c.readyForSubmission).toBe(true);
     expect(c.compliant).toBe(false);
@@ -89,17 +165,24 @@ describe('compliance', () => {
     expect(approvalBlockers(c)[0]).toMatch(/Not yet verified/);
   });
   it('pending upload without a file does not count', () => {
-    const docs = allVerified().map((d) => (d.docType === 'insurance' ? { ...d, status: 'pending' as const, hasFile: false } : d));
+    const docs = allVerified().map((d) =>
+      d.docType === 'insurance' ? { ...d, status: 'pending' as const, hasFile: false } : d,
+    );
     expect(computeCompliance(docs, TODAY).readyForSubmission).toBe(false);
   });
   it('a renewal pending review does NOT remove compliance of the still-valid verified version', () => {
-    const docs = [...allVerified(), doc('insurance', { status: 'pending', expiresOn: '2028-09-01' })];
+    const docs = [
+      ...allVerified(),
+      doc('insurance', { status: 'pending', expiresOn: '2028-09-01' }),
+    ];
     const c = computeCompliance(docs, TODAY);
     expect(c.compliant).toBe(true);
     expect(c.pendingReview).toContain('insurance');
   });
   it('an expired verified document makes the bus non-compliant', () => {
-    const docs = allVerified().map((d) => (d.docType === 'fitness' ? { ...d, expiresOn: past } : d));
+    const docs = allVerified().map((d) =>
+      d.docType === 'fitness' ? { ...d, expiresOn: past } : d,
+    );
     const c = computeCompliance(docs, TODAY);
     expect(c.compliant).toBe(false);
     expect(c.expired).toEqual(['fitness']);
@@ -111,13 +194,17 @@ describe('compliance', () => {
     expect(c.expiringSoon).toEqual(['puc']);
   });
   it('rejected-only document blocks with a clear reason', () => {
-    const docs = allVerified().map((d) => (d.docType === 'permit' ? { ...d, status: 'rejected' as const } : d));
+    const docs = allVerified().map((d) =>
+      d.docType === 'permit' ? { ...d, status: 'rejected' as const } : d,
+    );
     const c = computeCompliance(docs, TODAY);
     expect(c.rejected).toEqual(['permit']);
     expect(approvalBlockers(c).join(' ')).toMatch(/Rejected: Permit/);
   });
   it('superseded versions are ignored', () => {
-    const docs = allVerified().map((d) => (d.docType === 'rc' ? { ...d, supersededAt: '2026-01-01' } : d));
+    const docs = allVerified().map((d) =>
+      d.docType === 'rc' ? { ...d, supersededAt: '2026-01-01' } : d,
+    );
     expect(computeCompliance(docs, TODAY).missing).toEqual(['rc']);
   });
 });

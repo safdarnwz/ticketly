@@ -7,8 +7,10 @@ import { type BookingId } from '@kernel';
 
 import { RefundService } from '../application/services/refund.service';
 import {
-  InitiateRefundSchema, type InitiateRefundDto,
-  ReconcileRefundSchema, type ReconcileRefundDto,
+  InitiateRefundSchema,
+  type InitiateRefundDto,
+  ReconcileRefundSchema,
+  type ReconcileRefundDto,
 } from './dto/refund.dto';
 
 /**
@@ -35,9 +37,16 @@ export class RefundController {
   @HttpCode(200)
   @Idempotent()
   @RequirePermission(Permission.PAYMENT_REFUND)
-  @ApiOperation({ summary: 'Initiate a refund (to the original source, or an alternate bank account the customer supplies)' })
+  @ApiOperation({
+    summary:
+      'Initiate a refund (to the original source, or an alternate bank account the customer supplies)',
+  })
   async initiate(@Body(zodBody(InitiateRefundSchema)) dto: InitiateRefundDto) {
-    return this.refunds.initiate({ bookingId: dto.bookingId as BookingId, amountMinor: dto.amountMinor, destination: dto.destination });
+    return this.refunds.initiate({
+      bookingId: dto.bookingId as BookingId,
+      amountMinor: dto.amountMinor,
+      destination: dto.destination,
+    });
   }
 
   @Post('refunds/reconcile')

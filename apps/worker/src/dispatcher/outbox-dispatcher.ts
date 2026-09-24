@@ -2,7 +2,14 @@ import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/com
 
 import { AppConfig } from '@config';
 import { DatabaseService } from '@database';
-import { createContext, runWithContext, sleep, type DomainEvent, type TenantId, type Uuid } from '@kernel';
+import {
+  createContext,
+  runWithContext,
+  sleep,
+  type DomainEvent,
+  type TenantId,
+  type Uuid,
+} from '@kernel';
 import { Logger, Metrics } from '@observability';
 
 import { EventDispatcher } from './event-dispatcher';
@@ -107,7 +114,9 @@ export class OutboxDispatcher implements OnModuleInit, OnModuleDestroy {
 
         // Mark claimed rows 'processing' so a crash mid-batch is visible.
         const ids = claimed.rows.map((r) => r.id);
-        await client.query(`UPDATE outbox_events SET status = 'processing' WHERE id = ANY($1)`, [ids]);
+        await client.query(`UPDATE outbox_events SET status = 'processing' WHERE id = ANY($1)`, [
+          ids,
+        ]);
         await client.query('COMMIT');
 
         // Process each event OUTSIDE the claim transaction (handlers do their
@@ -157,7 +166,11 @@ export class OutboxDispatcher implements OnModuleInit, OnModuleDestroy {
         { name: 'outbox.deadLetter', primary: true },
       );
       this.metrics.jobRuns.inc({ job: 'outbox', outcome: 'dead' });
-      this.log.error(error, 'event dead-lettered after max attempts', { eventType: row.event_type, id: row.id, attempts });
+      this.log.error(error, 'event dead-lettered after max attempts', {
+        eventType: row.event_type,
+        id: row.id,
+        attempts,
+      });
       return;
     }
 
@@ -172,7 +185,10 @@ export class OutboxDispatcher implements OnModuleInit, OnModuleDestroy {
       { name: 'outbox.retryLater', primary: true },
     );
     this.metrics.jobRuns.inc({ job: 'outbox', outcome: 'retry' });
-    this.log.warn({ eventType: row.event_type, id: row.id, attempts, delaySec }, 'event delivery failed; will retry');
+    this.log.warn(
+      { eventType: row.event_type, id: row.id, attempts, delaySec },
+      'event delivery failed; will retry',
+    );
   }
 
   /** Requeue failed rows whose backoff has elapsed (a light periodic nudge). */

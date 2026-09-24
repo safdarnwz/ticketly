@@ -4,12 +4,27 @@
  * Pure + deterministic: same company name → same colour. Output contains no
  * script/links, so it passes the same SVG safety check as uploaded logos.
  */
-const PALETTE = ['#0F766E', '#1D4ED8', '#7C3AED', '#B45309', '#BE123C', '#15803D', '#0369A1', '#9333EA'];
+const PALETTE = [
+  '#0F766E',
+  '#1D4ED8',
+  '#7C3AED',
+  '#B45309',
+  '#BE123C',
+  '#15803D',
+  '#0369A1',
+  '#9333EA',
+];
 
 export function initialsOf(name: string): string {
-  const words = name.replace(/\b(pvt|private|ltd|limited|llp|travels?|tours?|and|&)\b\.?/gi, ' ').trim().split(/\s+/).filter(Boolean);
+  const words = name
+    .replace(/\b(pvt|private|ltd|limited|llp|travels?|tours?|and|&)\b\.?/gi, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
   const src = words.length ? words : name.trim().split(/\s+/);
-  const letters = (src.length >= 2 ? src[0][0] + src[1][0] : (src[0] ?? 'OP').slice(0, 2)).toUpperCase();
+  const letters = (
+    src.length >= 2 ? src[0][0] + src[1][0] : (src[0] ?? 'OP').slice(0, 2)
+  ).toUpperCase();
   return letters.replace(/[^A-Z0-9]/g, '') || 'OP';
 }
 

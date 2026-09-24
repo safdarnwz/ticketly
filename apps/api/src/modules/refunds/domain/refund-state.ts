@@ -24,7 +24,8 @@ import { DomainError, ErrorCode } from '@kernel';
  * arbitrary bank account — so it always starts `processing` too and is
  * settled by a human actually sending the transfer and marking it `manual`.
  */
-export type RefundStatus = 'initiated' | 'processing' | 'settled' | 'failed' | 'cancelled' | 'manual';
+export type RefundStatus =
+  'initiated' | 'processing' | 'settled' | 'failed' | 'cancelled' | 'manual';
 export type RefundDestination = 'source' | 'alternate_account';
 
 const TRANSITIONS: Record<RefundStatus, RefundStatus[]> = {
@@ -42,9 +43,13 @@ export function canRefundTransition(from: RefundStatus, to: RefundStatus): boole
 
 export function assertRefundTransition(from: RefundStatus, to: RefundStatus): void {
   if (!canRefundTransition(from, to)) {
-    throw new DomainError(ErrorCode.REFUND_NOT_ALLOWED, `A refund cannot move from '${from}' to '${to}'`, {
-      details: { from, to },
-    });
+    throw new DomainError(
+      ErrorCode.REFUND_NOT_ALLOWED,
+      `A refund cannot move from '${from}' to '${to}'`,
+      {
+        details: { from, to },
+      },
+    );
   }
 }
 

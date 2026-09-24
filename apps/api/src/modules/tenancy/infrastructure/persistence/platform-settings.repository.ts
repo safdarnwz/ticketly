@@ -114,7 +114,11 @@ export class PlatformSettingsRepository {
    * (kind, reference_type, reference_id) — a retried outbox delivery of the
    * same notification event can never double-charge.
    */
-  async chargeNotification(tenantId: string, channel: 'sms' | 'whatsapp', notificationId: string): Promise<void> {
+  async chargeNotification(
+    tenantId: string,
+    channel: 'sms' | 'whatsapp',
+    notificationId: string,
+  ): Promise<void> {
     const [baseMinor, gstRatePct] = await Promise.all([
       channel === 'sms' ? this.smsFeeMinor() : this.whatsappFeeMinor(),
       this.commissionGstRatePercent(),

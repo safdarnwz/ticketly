@@ -6,14 +6,27 @@ import { ApiOperation, ApiTags, ApiSecurity, ApiBearerAuth } from '@nestjs/swagg
 
 import { Permission } from '@contracts';
 import { ApiStandardErrors, Idempotent, RateLimit, RequirePermission, zodBody } from '@http';
-import { getContext, getUserId, localDate, type BookingId, type CityId, type StopId, type TripId } from '@kernel';
+import {
+  getContext,
+  getUserId,
+  localDate,
+  type BookingId,
+  type CityId,
+  type StopId,
+  type TripId,
+} from '@kernel';
 
 import { BookingService } from '../../booking/application/services/booking.service';
 import { PaymentService } from '../../payment/application/services/payment.service';
 import { PricingService } from '../../pricing/application/services/pricing.service';
 import { SearchService } from '../../search/application/services/search.service';
 import { HoldSchema, type HoldDto } from '../../booking/presentation/dto/booking.dto';
-import { QuoteSchema, type QuoteDto, SearchSchema, type SearchDto } from '../../pricing/presentation/dto/pricing.dto';
+import {
+  QuoteSchema,
+  type QuoteDto,
+  SearchSchema,
+  type SearchDto,
+} from '../../pricing/presentation/dto/pricing.dto';
 import { WebhookRepository } from '../infrastructure/webhook.repository';
 
 /**
@@ -37,9 +50,16 @@ import { WebhookRepository } from '../infrastructure/webhook.repository';
  * integration contract; the event catalogue in `@messaging` is the webhook
  * contract.
  */
-const PartnerConfirmSchema = z.object({ bookingId: z.string().uuid(), paidMinor: z.number().int().positive(), reference: z.string().trim().max(100).optional() });
+const PartnerConfirmSchema = z.object({
+  bookingId: z.string().uuid(),
+  paidMinor: z.number().int().positive(),
+  reference: z.string().trim().max(100).optional(),
+});
 type PartnerConfirmDto = z.infer<typeof PartnerConfirmSchema>;
-const PartnerCancelSchema = z.object({ bookingId: z.string().uuid(), reason: z.string().trim().max(300).optional() });
+const PartnerCancelSchema = z.object({
+  bookingId: z.string().uuid(),
+  reason: z.string().trim().max(300).optional(),
+});
 type PartnerCancelDto = z.infer<typeof PartnerCancelSchema>;
 
 @ApiTags('distribution')
@@ -102,10 +122,17 @@ export class DistributionController {
   @HttpCode(200)
   @Idempotent()
   @RateLimit(120, 60_000, 'tenant')
-  @ApiOperation({ summary: 'Confirm a held booking after partner-side payment (posts commission/payable/tax to the ledger identically to a direct online payment)' })
+  @ApiOperation({
+    summary:
+      'Confirm a held booking after partner-side payment (posts commission/payable/tax to the ledger identically to a direct online payment)',
+  })
   async confirm(@Body(zodBody(PartnerConfirmSchema)) body: PartnerConfirmDto) {
     await this.assertPartnerBooking(body.bookingId as BookingId);
-    return this.payment.confirmPartnerBooking(body.bookingId as BookingId, body.paidMinor, body.reference);
+    return this.payment.confirmPartnerBooking(
+      body.bookingId as BookingId,
+      body.paidMinor,
+      body.reference,
+    );
   }
 
   @Post('bookings/cancel')
@@ -134,9 +161,12 @@ export class DistributionController {
     // The public webhook contract — kept in sync with @messaging EventType.
     return {
       events: [
-        'booking.confirmed', 'booking.cancelled',
-        'trip.delayed', 'trip.departed',
-        'payment.captured', 'refund.settled',
+        'booking.confirmed',
+        'booking.cancelled',
+        'trip.delayed',
+        'trip.departed',
+        'payment.captured',
+        'refund.settled',
       ],
       note: 'Webhooks are signed: header `X-Ticketly-Signature: sha256=<hex>`, hex = HMAC_SHA256(your webhook secret, the raw JSON body). Verify before trusting.',
       partner: getContext()?.extra?.partnerName ?? null,
@@ -153,13 +183,18 @@ export class DistributionController {
   @RequirePermission(Permission.TENANT_MANAGE)
   @ApiOperation({ summary: 'Register a partner webhook (returns the signing secret ONCE)' })
   async registerWebhook(@Body() dto: { name: string; url: string; eventTypes?: string[] }) {
-    return this.webhooks.register({ name: dto.name, url: dto.url, eventTypes: dto.eventTypes ?? [], createdBy: getUserId() ?? null });
+    return this.webhooks.register({
+      name: dto.name,
+      url: dto.url,
+      eventTypes: dto.eventTypes ?? [],
+      createdBy: getUserId() ?? null,
+    });
   }
 
   @Get('webhooks')
   @ApiBearerAuth('bearer')
   @RequirePermission(Permission.TENANT_MANAGE)
-  @ApiOperation({ summary: 'List this operator\'s registered partner webhooks' })
+  @ApiOperation({ summary: "List this operator's registered partner webhooks" })
   async listWebhooks() {
     return { items: await this.webhooks.list() };
   }
@@ -167,7 +202,9 @@ export class DistributionController {
   @Get('webhooks/:id/deliveries')
   @ApiBearerAuth('bearer')
   @RequirePermission(Permission.TENANT_MANAGE)
-  @ApiOperation({ summary: 'Recent delivery attempts for a webhook (debugging a partner integration)' })
+  @ApiOperation({
+    summary: 'Recent delivery attempts for a webhook (debugging a partner integration)',
+  })
   async webhookDeliveries(@Param('id') id: string) {
     return { items: await this.webhooks.recentDeliveries(id) };
   }

@@ -44,12 +44,19 @@ export class Msg91WhatsAppProvider implements NotificationProvider {
 
   isConfigured(): boolean {
     const { msg91 } = this.config.notifications;
-    return this.credentials.active('msg91_whatsapp') !== null || (msg91.enabled && msg91.whatsappIntegratedNumber.length > 0);
+    return (
+      this.credentials.active('msg91_whatsapp') !== null ||
+      (msg91.enabled && msg91.whatsappIntegratedNumber.length > 0)
+    );
   }
 
   private settings(): { authKey: string; whatsappIntegratedNumber: string } {
     const saved = this.credentials.active('msg91_whatsapp');
-    if (saved) return { authKey: saved.secrets.authKey, whatsappIntegratedNumber: saved.config.integratedNumber };
+    if (saved)
+      return {
+        authKey: saved.secrets.authKey,
+        whatsappIntegratedNumber: saved.config.integratedNumber,
+      };
     const { msg91 } = this.config.notifications;
     return { authKey: msg91.authKey, whatsappIntegratedNumber: msg91.whatsappIntegratedNumber };
   }
@@ -69,7 +76,10 @@ export class Msg91WhatsAppProvider implements NotificationProvider {
           payload: { to: mobile, type: 'text', text: { body: req.body } },
         }),
       });
-      const json = (await res.json().catch(() => null)) as { message?: string; request_id?: string } | null;
+      const json = (await res.json().catch(() => null)) as {
+        message?: string;
+        request_id?: string;
+      } | null;
       if (!res.ok) {
         const error = json?.message ?? `HTTP ${res.status}`;
         this.log.warn({ to: mobile, error }, 'MSG91 WhatsApp send failed');

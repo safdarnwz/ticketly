@@ -233,7 +233,10 @@ export const envSchema = z.object({
   /* ── KYC: Digio (DigiLocker) ── */
   DIGIO_CLIENT_ID: z.string().default(''),
   DIGIO_CLIENT_SECRET: z.string().default(''),
-  DIGIO_ENV: z.string().default('sandbox').transform((v): 'sandbox' | 'production' => (v === 'production' ? 'production' : 'sandbox')),
+  DIGIO_ENV: z
+    .string()
+    .default('sandbox')
+    .transform((v): 'sandbox' | 'production' => (v === 'production' ? 'production' : 'sandbox')),
 
   /* ── Customer-facing web origin (tracking links etc.) ── */
   PUBLIC_WEB_URL: z.string().url().default('https://www.ticketly.com'),
@@ -257,15 +260,15 @@ export const envSchema = z.object({
    * (scripts/storage-migrate.ts), never a code change.
    */
   STORAGE_PROVIDER: z.enum(['database', 'r2', 's3', 'azure']).default('database'),
-  STORAGE_BUCKET: z.string().default(''),            // R2/S3 bucket, or Azure container
-  STORAGE_REGION: z.string().default('auto'),        // 'auto' for R2; e.g. 'ap-south-1' for S3
-  STORAGE_ENDPOINT: z.string().default(''),          // R2: https://<account-id>.r2.cloudflarestorage.com ; S3: https://s3.<region>.amazonaws.com
-  STORAGE_FORCE_PATH_STYLE: bool(true),              // R2 requires path-style; AWS prefers virtual-hosted
+  STORAGE_BUCKET: z.string().default(''), // R2/S3 bucket, or Azure container
+  STORAGE_REGION: z.string().default('auto'), // 'auto' for R2; e.g. 'ap-south-1' for S3
+  STORAGE_ENDPOINT: z.string().default(''), // R2: https://<account-id>.r2.cloudflarestorage.com ; S3: https://s3.<region>.amazonaws.com
+  STORAGE_FORCE_PATH_STYLE: bool(true), // R2 requires path-style; AWS prefers virtual-hosted
   STORAGE_ACCESS_KEY_ID: z.string().default(''),
   STORAGE_SECRET_ACCESS_KEY: z.string().default(''),
   STORAGE_AZURE_ACCOUNT: z.string().default(''),
   STORAGE_AZURE_ACCOUNT_KEY: z.string().default(''), // base64 account key
-  STORAGE_KEY_PREFIX: z.string().default(''),        // e.g. 'prod' → prod/orange-travels/...
+  STORAGE_KEY_PREFIX: z.string().default(''), // e.g. 'prod' → prod/orange-travels/...
   /** Public CDN origin for PUBLIC objects (logos, bus photos), e.g. https://cdn.ticketly.com (a Cloudflare custom domain on the R2 bucket). */
   STORAGE_PUBLIC_BASE_URL: z.string().default(''),
   STORAGE_SIGNED_URL_TTL_SECONDS: int(300, 30, 3600), // private documents: short-lived signed links only

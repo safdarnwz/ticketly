@@ -73,7 +73,13 @@ export class ReportingService {
     const { series } = (await this.revenue(from, to)) as { series: Record<string, unknown>[] };
     const header = 'date,bookings,gross,cancelled,seats_sold';
     const lines = series.map((r) =>
-      [r.date, r.bookings, Number(r.grossMinor) / 100, Number(r.cancelledMinor) / 100, r.seatsSold].join(','),
+      [
+        r.date,
+        r.bookings,
+        Number(r.grossMinor) / 100,
+        Number(r.cancelledMinor) / 100,
+        r.seatsSold,
+      ].join(','),
     );
     return [header, ...lines].join('\n');
   }
@@ -97,7 +103,12 @@ export class ReportingService {
     );
     const total = Number(totals?.total ?? 0);
     const cancelled = Number(totals?.cancelled ?? 0);
-    return { series: rows, cancellationRatePct: total > 0 ? Math.round((cancelled / total) * 1000) / 10 : 0, totalCancelled: cancelled, totalBookings: total };
+    return {
+      series: rows,
+      cancellationRatePct: total > 0 ? Math.round((cancelled / total) * 1000) / 10 : 0,
+      totalCancelled: cancelled,
+      totalBookings: total,
+    };
   }
 
   /** Which hour of the day sells the most — helps staffing/counter-hours decisions. */

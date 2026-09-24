@@ -64,21 +64,35 @@ export class LedgerTransaction {
 
   static create(input: LedgerEntryInput): LedgerTransaction {
     if (input.postings.length < 2) {
-      throw new DomainError(ErrorCode.LEDGER_UNBALANCED, 'A ledger entry needs at least two postings');
+      throw new DomainError(
+        ErrorCode.LEDGER_UNBALANCED,
+        'A ledger entry needs at least two postings',
+      );
     }
     const sum = input.postings.reduce((acc, p) => acc + p.amountMinor, 0);
     if (sum !== 0) {
-      throw new DomainError(ErrorCode.LEDGER_UNBALANCED, `Ledger entry does not balance: net ${sum} minor units (debits must equal credits)`);
+      throw new DomainError(
+        ErrorCode.LEDGER_UNBALANCED,
+        `Ledger entry does not balance: net ${sum} minor units (debits must equal credits)`,
+      );
     }
     if (input.postings.some((p) => p.amountMinor === 0)) {
       throw new DomainError(ErrorCode.LEDGER_UNBALANCED, 'A posting cannot be zero');
     }
-    return new LedgerTransaction(input.type, input.currency, input.postings, input.sourceType, input.sourceId);
+    return new LedgerTransaction(
+      input.type,
+      input.currency,
+      input.postings,
+      input.sourceType,
+      input.sourceId,
+    );
   }
 
   /** Total debited (sum of positive postings) — equals total credited. */
   get magnitude(): Money {
-    const debits = this.postings.filter((p) => p.amountMinor > 0).reduce((a, p) => a + p.amountMinor, 0);
+    const debits = this.postings
+      .filter((p) => p.amountMinor > 0)
+      .reduce((a, p) => a + p.amountMinor, 0);
     return Money.of(debits, this.currency);
   }
 }
@@ -124,7 +138,10 @@ export function captureEntry(input: {
 }): LedgerTransaction {
   const operatorShare = input.totalMinor - input.commissionMinor - input.commissionGstMinor;
   if (operatorShare < 0) {
-    throw new DomainError(ErrorCode.LEDGER_UNBALANCED, 'Commission + commission GST exceed the booking total');
+    throw new DomainError(
+      ErrorCode.LEDGER_UNBALANCED,
+      'Commission + commission GST exceed the booking total',
+    );
   }
   return LedgerTransaction.create({
     type: 'booking.captured',
@@ -133,7 +150,11 @@ export function captureEntry(input: {
     sourceId: input.bookingId,
     postings: [
       { account: LedgerAccounts.GATEWAY_CLEARING, amountMinor: input.totalMinor },
-      { account: LedgerAccounts.OPERATOR_PAYABLE, amountMinor: -operatorShare, ref: input.operatorId },
+      {
+        account: LedgerAccounts.OPERATOR_PAYABLE,
+        amountMinor: -operatorShare,
+        ref: input.operatorId,
+      },
       { account: LedgerAccounts.PLATFORM_REVENUE, amountMinor: -input.commissionMinor },
       { account: LedgerAccounts.COMMISSION_TAX_PAYABLE, amountMinor: -input.commissionGstMinor },
     ].filter((p) => p.amountMinor !== 0),
@@ -160,9 +181,16 @@ export function refundEntry(input: {
   commissionGstClawbackMinor: number;
 }): LedgerTransaction {
   const postings: Posting[] = [
-    { account: LedgerAccounts.OPERATOR_PAYABLE, amountMinor: input.operatorClawbackMinor, ref: input.operatorId },
+    {
+      account: LedgerAccounts.OPERATOR_PAYABLE,
+      amountMinor: input.operatorClawbackMinor,
+      ref: input.operatorId,
+    },
     { account: LedgerAccounts.PLATFORM_REVENUE, amountMinor: input.commissionClawbackMinor },
-    { account: LedgerAccounts.COMMISSION_TAX_PAYABLE, amountMinor: input.commissionGstClawbackMinor },
+    {
+      account: LedgerAccounts.COMMISSION_TAX_PAYABLE,
+      amountMinor: input.commissionGstClawbackMinor,
+    },
     { account: LedgerAccounts.CUSTOMER_REFUNDS, amountMinor: -input.refundMinor },
   ].filter((p) => p.amountMinor !== 0);
   return LedgerTransaction.create({
@@ -234,7 +262,10 @@ export function offlineRefundEntry(input: {
     sourceId: input.bookingId,
     postings: [
       { account: LedgerAccounts.PLATFORM_REVENUE, amountMinor: input.commissionClawbackMinor },
-      { account: LedgerAccounts.COMMISSION_TAX_PAYABLE, amountMinor: input.commissionGstClawbackMinor },
+      {
+        account: LedgerAccounts.COMMISSION_TAX_PAYABLE,
+        amountMinor: input.commissionGstClawbackMinor,
+      },
       { account: LedgerAccounts.OPERATOR_PAYABLE, amountMinor: -total, ref: input.operatorId },
     ].filter((p) => p.amountMinor !== 0),
   });
@@ -249,7 +280,12 @@ export function offlineRefundEntry(input: {
  *   DR operator_payable   partnerCommission   (operator's share reduced)
  *   CR gateway_clearing   partnerCommission   (platform received that much less)
  */
-export function partnerCommissionEntry(input: { currency: CurrencyCode; bookingId: string; operatorId: string; partnerCommissionMinor: number }): LedgerTransaction | null {
+export function partnerCommissionEntry(input: {
+  currency: CurrencyCode;
+  bookingId: string;
+  operatorId: string;
+  partnerCommissionMinor: number;
+}): LedgerTransaction | null {
   if (input.partnerCommissionMinor <= 0) return null;
   return LedgerTransaction.create({
     type: 'booking.partner_commission',
@@ -257,14 +293,23 @@ export function partnerCommissionEntry(input: { currency: CurrencyCode; bookingI
     sourceType: 'booking',
     sourceId: input.bookingId,
     postings: [
-      { account: LedgerAccounts.OPERATOR_PAYABLE, amountMinor: input.partnerCommissionMinor, ref: input.operatorId },
+      {
+        account: LedgerAccounts.OPERATOR_PAYABLE,
+        amountMinor: input.partnerCommissionMinor,
+        ref: input.operatorId,
+      },
       { account: LedgerAccounts.GATEWAY_CLEARING, amountMinor: -input.partnerCommissionMinor },
     ],
   });
 }
 
 /** On a refund of a partner sale: the partner gives back its commission share → operator's share restored. */
-export function partnerCommissionReversalEntry(input: { currency: CurrencyCode; bookingId: string; operatorId: string; clawbackMinor: number }): LedgerTransaction | null {
+export function partnerCommissionReversalEntry(input: {
+  currency: CurrencyCode;
+  bookingId: string;
+  operatorId: string;
+  clawbackMinor: number;
+}): LedgerTransaction | null {
   if (input.clawbackMinor <= 0) return null;
   return LedgerTransaction.create({
     type: 'refund.partner_commission',
@@ -273,7 +318,11 @@ export function partnerCommissionReversalEntry(input: { currency: CurrencyCode; 
     sourceId: input.bookingId,
     postings: [
       { account: LedgerAccounts.GATEWAY_CLEARING, amountMinor: input.clawbackMinor },
-      { account: LedgerAccounts.OPERATOR_PAYABLE, amountMinor: -input.clawbackMinor, ref: input.operatorId },
+      {
+        account: LedgerAccounts.OPERATOR_PAYABLE,
+        amountMinor: -input.clawbackMinor,
+        ref: input.operatorId,
+      },
     ],
   });
 }
@@ -297,8 +346,16 @@ export function settlementEntry(input: {
     sourceType: 'settlement',
     sourceId: input.settlementId,
     postings: [
-      { account: LedgerAccounts.OPERATOR_PAYABLE, amountMinor: input.amountMinor, ref: input.operatorId },
-      { account: LedgerAccounts.OPERATOR_WALLET, amountMinor: -input.amountMinor, ref: input.operatorId },
+      {
+        account: LedgerAccounts.OPERATOR_PAYABLE,
+        amountMinor: input.amountMinor,
+        ref: input.operatorId,
+      },
+      {
+        account: LedgerAccounts.OPERATOR_WALLET,
+        amountMinor: -input.amountMinor,
+        ref: input.operatorId,
+      },
     ],
   });
 }

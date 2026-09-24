@@ -15,7 +15,12 @@ export class CmsRepository {
   constructor(private readonly db: DatabaseService) {}
 
   // ── Pages ────────────────────────────────────────────────────────────────
-  async upsertPage(input: { slug: string; title: string; body: string; status: string }): Promise<string> {
+  async upsertPage(input: {
+    slug: string;
+    title: string;
+    body: string;
+    status: string;
+  }): Promise<string> {
     const row = await this.db.queryOne<{ id: string }>(
       `INSERT INTO cms_pages (id, slug, title, body, status)
        VALUES ($1,$2,$3,$4,$5)
@@ -50,19 +55,45 @@ export class CmsRepository {
     );
   }
 
-  async insertBanner(input: { title: string; imageUrl?: string; imageFileId?: string; linkUrl?: string; sortOrder: number; activeFrom?: string; activeTo?: string }): Promise<string> {
+  async insertBanner(input: {
+    title: string;
+    imageUrl?: string;
+    imageFileId?: string;
+    linkUrl?: string;
+    sortOrder: number;
+    activeFrom?: string;
+    activeTo?: string;
+  }): Promise<string> {
     const id = newId();
     await this.db.execute_(
       `INSERT INTO cms_banners (id, title, image_url, link_url, sort_order, active_from, active_to, image_file_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [id, input.title, input.imageUrl ?? null, input.linkUrl ?? null, input.sortOrder, input.activeFrom ?? null, input.activeTo ?? null, input.imageFileId ?? null],
+      [
+        id,
+        input.title,
+        input.imageUrl ?? null,
+        input.linkUrl ?? null,
+        input.sortOrder,
+        input.activeFrom ?? null,
+        input.activeTo ?? null,
+        input.imageFileId ?? null,
+      ],
       { name: 'cms.insertBanner', primary: true },
     );
     return id;
   }
 
   // ── Offers ───────────────────────────────────────────────────────────────
-  async upsertOffer(input: { code: string; title: string; description?: string; couponCode?: string; bannerUrl?: string; bannerFileId?: string; validFrom: string; validTo: string }): Promise<string> {
+  async upsertOffer(input: {
+    code: string;
+    title: string;
+    description?: string;
+    couponCode?: string;
+    bannerUrl?: string;
+    bannerFileId?: string;
+    validFrom: string;
+    validTo: string;
+  }): Promise<string> {
     const row = await this.db.queryOne<{ id: string }>(
       `INSERT INTO offers (id, code, title, description, coupon_code, banner_url, valid_from, valid_to, banner_file_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
@@ -70,7 +101,17 @@ export class CmsRepository {
          coupon_code = EXCLUDED.coupon_code, banner_url = EXCLUDED.banner_url, banner_file_id = EXCLUDED.banner_file_id,
          valid_from = EXCLUDED.valid_from, valid_to = EXCLUDED.valid_to, updated_at = now()
        RETURNING id`,
-      [newId(), input.code, input.title, input.description ?? null, input.couponCode ?? null, input.bannerUrl ?? null, input.validFrom, input.validTo, input.bannerFileId ?? null],
+      [
+        newId(),
+        input.code,
+        input.title,
+        input.description ?? null,
+        input.couponCode ?? null,
+        input.bannerUrl ?? null,
+        input.validFrom,
+        input.validTo,
+        input.bannerFileId ?? null,
+      ],
       { name: 'cms.upsertOffer', primary: true },
     );
     return row?.id ?? '';

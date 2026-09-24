@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { computeGstInvoice, type InvoiceLineInput } from '../domain/gst-invoice';
 
-const line = (taxableMinor: number, gstRatePct = 5): InvoiceLineInput => ({ description: 'Bus fare', sac: '9964', taxableMinor, gstRatePct });
+const line = (taxableMinor: number, gstRatePct = 5): InvoiceLineInput => ({
+  description: 'Bus fare',
+  sac: '9964',
+  taxableMinor,
+  gstRatePct,
+});
 
 describe('computeGstInvoice — intra-state (CGST+SGST)', () => {
   it('splits 5% into CGST 2.5% + SGST 2.5% and foots exactly', () => {

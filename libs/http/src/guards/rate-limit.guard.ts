@@ -46,7 +46,11 @@ export class RateLimitGuard implements CanActivate {
     const { rateLimit } = this.config;
 
     if (ctx?.tenantId) {
-      checks.push({ key: `t:${ctx.tenantId}`, limit: rateLimit.maxPerTenant, windowMs: rateLimit.windowMs });
+      checks.push({
+        key: `t:${ctx.tenantId}`,
+        limit: rateLimit.maxPerTenant,
+        windowMs: rateLimit.windowMs,
+      });
     }
     if (ctx?.ip) {
       checks.push({ key: `ip:${ctx.ip}`, limit: rateLimit.maxPerIp, windowMs: rateLimit.windowMs });

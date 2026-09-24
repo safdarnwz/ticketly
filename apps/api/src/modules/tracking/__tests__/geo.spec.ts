@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { bearingDegrees, etaSeconds, haversineMeters, isWithin, nextStopEta } from '../domain/geo';
 
 // Known landmarks for distance sanity checks.
-const HYD = { lat: 17.3850, lng: 78.4867 };
+const HYD = { lat: 17.385, lng: 78.4867 };
 const BLR = { lat: 12.9716, lng: 77.5946 };
 
 describe('haversineMeters', () => {

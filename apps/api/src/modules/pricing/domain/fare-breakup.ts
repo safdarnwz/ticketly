@@ -52,7 +52,10 @@ export class FareBreakup {
 
   /** Sum of base + all adjustment lines (before tax). Never negative. */
   get netFare(): Money {
-    const adjustments = this.lines.reduce((acc, l) => acc.plus(l.amount), Money.zero(this.currency));
+    const adjustments = this.lines.reduce(
+      (acc, l) => acc.plus(l.amount),
+      Money.zero(this.currency),
+    );
     return this.base.plus(adjustments).clampZero();
   }
 
@@ -77,7 +80,11 @@ export class FareBreakup {
       currency: this.currency,
       base: this.base.toJSON(),
       lines: this.lines.map((l) => ({ kind: l.kind, label: l.label, amount: l.amount.toJSON() })),
-      taxes: this.taxes.map((t) => ({ name: t.name, ratePct: t.ratePct, amount: t.amount.toJSON() })),
+      taxes: this.taxes.map((t) => ({
+        name: t.name,
+        ratePct: t.ratePct,
+        amount: t.amount.toJSON(),
+      })),
       netFare: this.netFare.toJSON(),
       taxTotal: this.taxTotal.toJSON(),
       discount: this.discountTotal.toJSON(),

@@ -4,9 +4,16 @@ import { Injectable } from '@nestjs/common';
 
 import { AppConfig } from '@config';
 
-function scryptAsync(password: string, salt: Buffer, keyLength: number, options: ScryptOptions): Promise<Buffer> {
+function scryptAsync(
+  password: string,
+  salt: Buffer,
+  keyLength: number,
+  options: ScryptOptions,
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    scrypt(password, salt, keyLength, options, (err, derived) => (err ? reject(err) : resolve(derived)));
+    scrypt(password, salt, keyLength, options, (err, derived) =>
+      err ? reject(err) : resolve(derived),
+    );
   });
 }
 
@@ -50,12 +57,12 @@ export class PasswordHasher {
   async hash(password: string): Promise<string> {
     assertPasswordShape(password);
     const salt = randomBytes(16);
-    const derived = (await scryptAsync(password.normalize('NFKC'), salt, this.keyLength, {
+    const derived = await scryptAsync(password.normalize('NFKC'), salt, this.keyLength, {
       N: this.cost,
       r: this.blockSize,
       p: this.parallelism,
       maxmem: 256 * 1024 * 1024,
-    }));
+    });
     return `scrypt$${this.cost}$${this.blockSize}$${this.parallelism}$${salt.toString('base64')}$${derived.toString('base64')}`;
   }
 
@@ -63,12 +70,17 @@ export class PasswordHasher {
     const parsed = parseHash(stored);
     if (!parsed) return false;
     try {
-      const derived = (await scryptAsync(password.normalize('NFKC'), parsed.salt, parsed.hash.length, {
-        N: parsed.n,
-        r: parsed.r,
-        p: parsed.p,
-        maxmem: 256 * 1024 * 1024,
-      }));
+      const derived = await scryptAsync(
+        password.normalize('NFKC'),
+        parsed.salt,
+        parsed.hash.length,
+        {
+          N: parsed.n,
+          r: parsed.r,
+          p: parsed.p,
+          maxmem: 256 * 1024 * 1024,
+        },
+      );
       return derived.length === parsed.hash.length && timingSafeEqual(derived, parsed.hash);
     } catch {
       return false;

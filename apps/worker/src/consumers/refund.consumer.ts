@@ -42,7 +42,10 @@ export class RefundConsumer implements OnModuleInit {
         if (!event.tenantId) return;
         const p = event.payload as { gatewayRefundId?: string; status?: 'processed' | 'failed' };
         if (!p.gatewayRefundId || (p.status !== 'processed' && p.status !== 'failed')) return;
-        await this.refunds.reconcileGatewayEvent({ gatewayRefundId: p.gatewayRefundId, status: p.status });
+        await this.refunds.reconcileGatewayEvent({
+          gatewayRefundId: p.gatewayRefundId,
+          status: p.status,
+        });
       },
     };
   }
@@ -53,13 +56,22 @@ export class RefundConsumer implements OnModuleInit {
       handle: async (event: DomainEvent) => {
         if (!event.tenantId) return;
         const payload = event.payload as {
-          cancellationId?: string; refundMinor?: number; refundDestination?: 'source' | 'alternate_account';
-          altAccountDetails?: { accountHolder: string; accountNumber: string; ifsc: string; bankName?: string } | null;
+          cancellationId?: string;
+          refundMinor?: number;
+          refundDestination?: 'source' | 'alternate_account';
+          altAccountDetails?: {
+            accountHolder: string;
+            accountNumber: string;
+            ifsc: string;
+            bankName?: string;
+          } | null;
         };
         const amountMinor = Number(payload.refundMinor ?? 0);
         if (amountMinor <= 0) return; // non-refundable cancellation — nothing to do
         await this.refunds.initiate({
-          bookingId: event.aggregateId as BookingId, amountMinor, cancellationId: payload.cancellationId,
+          bookingId: event.aggregateId as BookingId,
+          amountMinor,
+          cancellationId: payload.cancellationId,
           destination: payload.refundDestination ?? 'source',
           altAccountDetails: payload.altAccountDetails ?? undefined,
         });
@@ -83,13 +95,22 @@ export class RefundConsumer implements OnModuleInit {
       handle: async (event: DomainEvent) => {
         if (!event.tenantId) return;
         const payload = event.payload as {
-          cancellationId?: string; refundMinor?: number; refundDestination?: 'source' | 'alternate_account';
-          altAccountDetails?: { accountHolder: string; accountNumber: string; ifsc: string; bankName?: string } | null;
+          cancellationId?: string;
+          refundMinor?: number;
+          refundDestination?: 'source' | 'alternate_account';
+          altAccountDetails?: {
+            accountHolder: string;
+            accountNumber: string;
+            ifsc: string;
+            bankName?: string;
+          } | null;
         };
         const amountMinor = Number(payload.refundMinor ?? 0);
         if (amountMinor <= 0) return;
         await this.refunds.initiate({
-          bookingId: event.aggregateId as BookingId, amountMinor, cancellationId: payload.cancellationId,
+          bookingId: event.aggregateId as BookingId,
+          amountMinor,
+          cancellationId: payload.cancellationId,
           destination: payload.refundDestination ?? 'source',
           altAccountDetails: payload.altAccountDetails ?? undefined,
         });

@@ -1,6 +1,14 @@
 import { z } from 'zod';
 
-export const APPLICATION_DOC_TYPES = ['gst_certificate', 'pan_card', 'cancelled_cheque', 'aadhaar', 'business_registration', 'fleet_list', 'other'] as const;
+export const APPLICATION_DOC_TYPES = [
+  'gst_certificate',
+  'pan_card',
+  'cancelled_cheque',
+  'aadhaar',
+  'business_registration',
+  'fleet_list',
+  'other',
+] as const;
 
 export const ApplyOperatorSchema = z.object({
   // Personal
@@ -27,13 +35,16 @@ export const ApplyOperatorSchema = z.object({
   country: z.string().max(80).optional(),
   pinCode: z.string().max(12).optional(),
   // Business
-  business: z.object({
-    numberOfBuses: z.number().int().min(0).optional(),
-    busTypes: z.array(z.string()).optional(),
-    cities: z.array(z.string()).optional(),
-    yearsInBusiness: z.number().int().min(0).optional(),
-    dailyTrips: z.number().int().min(0).optional(),
-  }).partial().optional(),
+  business: z
+    .object({
+      numberOfBuses: z.number().int().min(0).optional(),
+      busTypes: z.array(z.string()).optional(),
+      cities: z.array(z.string()).optional(),
+      yearsInBusiness: z.number().int().min(0).optional(),
+      dailyTrips: z.number().int().min(0).optional(),
+    })
+    .partial()
+    .optional(),
   // Payout bank account — vetted as part of THIS application review, so it
   // becomes the tenant's active payout account the moment they're approved
   // (no separate "add your bank account" step after onboarding). Any LATER
@@ -41,8 +52,17 @@ export const ApplyOperatorSchema = z.object({
   // operator/bank-details endpoints) — this initial one does not, since the
   // whole application is already being reviewed by a human.
   bankAccountHolder: z.string().min(1).max(200).optional(),
-  bankAccountNumber: z.string().min(4).max(34).regex(/^[0-9]+$/).optional(),
-  bankIfsc: z.string().length(11).regex(/^[A-Z]{4}0[A-Z0-9]{6}$/i).optional(),
+  bankAccountNumber: z
+    .string()
+    .min(4)
+    .max(34)
+    .regex(/^[0-9]+$/)
+    .optional(),
+  bankIfsc: z
+    .string()
+    .length(11)
+    .regex(/^[A-Z]{4}0[A-Z0-9]{6}$/i)
+    .optional(),
   bankName: z.string().max(120).optional(),
   // Documents (uploaded references / URLs)
   /** docType → fileId from POST /operators/apply/documents (URLs are no longer accepted). */
@@ -51,7 +71,12 @@ export const ApplyOperatorSchema = z.object({
 export type ApplyOperatorDto = z.infer<typeof ApplyOperatorSchema>;
 
 /** Used for reject, hold and reopen — a reason is always required. */
-export const RejectSchema = z.object({ reason: z.string().trim().min(10, 'Please give a reason of at least 10 characters').max(1000) });
-export const ApproveSchema = z.object({ note: z.string().trim().max(1000).optional() }).optional().default({});
+export const RejectSchema = z.object({
+  reason: z.string().trim().min(10, 'Please give a reason of at least 10 characters').max(1000),
+});
+export const ApproveSchema = z
+  .object({ note: z.string().trim().max(1000).optional() })
+  .optional()
+  .default({});
 export type ApproveDto = z.infer<typeof ApproveSchema>;
 export type RejectDto = z.infer<typeof RejectSchema>;

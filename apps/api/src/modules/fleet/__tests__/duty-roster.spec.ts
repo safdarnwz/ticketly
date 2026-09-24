@@ -6,7 +6,13 @@ const H = 3_600_000; // ms per hour
 const base = Date.UTC(2026, 2, 15, 0, 0, 0); // 2026-03-15 00:00 UTC
 
 function duty(id: string, crewId: string, startH: number, endH: number, drivingMin?: number): Duty {
-  return { id, crewId, startMs: base + startH * H, endMs: base + endH * H, drivingMinutes: drivingMin };
+  return {
+    id,
+    crewId,
+    startMs: base + startH * H,
+    endMs: base + endH * H,
+    drivingMinutes: drivingMin,
+  };
 }
 
 describe('checkAssignment — happy path', () => {

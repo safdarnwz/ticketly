@@ -24,10 +24,13 @@ export class CrmController {
 
   @Get(':id')
   @RequirePermission(Permission.BOOKING_READ)
-  @ApiOperation({ summary: 'Customer profile — spend, booking count, frequent-traveller flag, blacklist status' })
+  @ApiOperation({
+    summary: 'Customer profile — spend, booking count, frequent-traveller flag, blacklist status',
+  })
   async profile(@Param('id') id: string) {
     const profile = await this.customers.profile(id as UserId);
-    if (!profile) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Customer not found' });
+    if (!profile)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Customer not found' });
     return profile;
   }
 
@@ -40,7 +43,10 @@ export class CrmController {
 
   @Post(':id/blacklist')
   @RequirePermission(Permission.BOOKING_CANCEL)
-  @ApiOperation({ summary: 'Blacklist a customer — blocks NEW bookings; existing bookings and their history stay fully visible to support' })
+  @ApiOperation({
+    summary:
+      'Blacklist a customer — blocks NEW bookings; existing bookings and their history stay fully visible to support',
+  })
   async blacklist(@Param('id') id: string, @Body() dto: { reason: string }) {
     await this.customers.setBlacklist(id as UserId, true, dto.reason);
     return { ok: true };
@@ -56,7 +62,10 @@ export class CrmController {
 
   @Post(':id/preferences')
   @RequirePermission(Permission.BOOKING_READ)
-  @ApiOperation({ summary: "Update a customer's saved preferences (seat position, meal, notification channel, etc.) — merges with existing" })
+  @ApiOperation({
+    summary:
+      "Update a customer's saved preferences (seat position, meal, notification channel, etc.) — merges with existing",
+  })
   async setPreferences(@Param('id') id: string, @Body() preferences: Record<string, unknown>) {
     await this.customers.setPreferences(id as UserId, preferences);
     return { ok: true };

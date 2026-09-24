@@ -67,6 +67,20 @@ import { ConnectionMonitorScheduler } from './schedulers/connection-monitor.sche
     QuotasModule,
     DemandModule,
   ],
-  providers: [EventDispatcher, OutboxDispatcher, NotificationConsumer, WaitlistConsumer, InvoiceConsumer, RefundConsumer, AmendmentConsumer, WebhookConsumer, PayoutConsumer, SchedulerService, PayoutScheduler, TripReminderScheduler, ConnectionMonitorScheduler],
+  providers: [
+    EventDispatcher,
+    OutboxDispatcher,
+    NotificationConsumer,
+    WaitlistConsumer,
+    InvoiceConsumer,
+    RefundConsumer,
+    AmendmentConsumer,
+    WebhookConsumer,
+    PayoutConsumer,
+    SchedulerService,
+    PayoutScheduler,
+    TripReminderScheduler,
+    ConnectionMonitorScheduler,
+  ],
 })
 export class WorkerModule {}

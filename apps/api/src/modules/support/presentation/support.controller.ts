@@ -34,14 +34,25 @@ export class SupportController {
   @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'Open a support ticket' })
   async open(@Body(zodBody(OpenTicketSchema)) dto: z.infer<typeof OpenTicketSchema>) {
-    return this.support.open({ subject: dto.subject, body: dto.body, category: dto.category, priority: dto.priority, bookingId: dto.bookingId as BookingId | undefined });
+    return this.support.open({
+      subject: dto.subject,
+      body: dto.body,
+      category: dto.category,
+      priority: dto.priority,
+      bookingId: dto.bookingId as BookingId | undefined,
+    });
   }
 
   @Get()
   @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'List support tickets' })
   async list(@Query('status') status?: string, @Query('customerId') customerId?: string) {
-    return { tickets: await this.support.list({ status: status as TicketStatus | undefined, customerId: customerId as UserId | undefined }) };
+    return {
+      tickets: await this.support.list({
+        status: status as TicketStatus | undefined,
+        customerId: customerId as UserId | undefined,
+      }),
+    };
   }
 
   @Get(':id')
@@ -55,7 +66,10 @@ export class SupportController {
   @HttpCode(200)
   @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'Reply on a ticket' })
-  async reply(@Param('id') id: string, @Body(zodBody(ReplySchema)) dto: z.infer<typeof ReplySchema>) {
+  async reply(
+    @Param('id') id: string,
+    @Body(zodBody(ReplySchema)) dto: z.infer<typeof ReplySchema>,
+  ) {
     return this.support.reply(id as SupportTicketId, dto);
   }
 
@@ -63,7 +77,10 @@ export class SupportController {
   @HttpCode(200)
   @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'Change a ticket status' })
-  async transition(@Param('id') id: string, @Body(zodBody(TransitionSchema)) dto: z.infer<typeof TransitionSchema>) {
+  async transition(
+    @Param('id') id: string,
+    @Body(zodBody(TransitionSchema)) dto: z.infer<typeof TransitionSchema>,
+  ) {
     return this.support.transition(id as SupportTicketId, dto.status);
   }
 }

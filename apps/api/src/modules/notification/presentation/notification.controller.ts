@@ -7,7 +7,6 @@ import { DatabaseService } from '@database';
 import { ApiStandardErrors, RequirePermission, zodBody } from '@http';
 import { newId, requireTenantId } from '@kernel';
 
-
 const UpsertTemplateSchema = z.object({
   eventType: z.string().min(1).max(60),
   channel: z.enum(['sms', 'email', 'whatsapp', 'push']),

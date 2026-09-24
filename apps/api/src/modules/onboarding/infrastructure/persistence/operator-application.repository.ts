@@ -27,12 +27,32 @@ export class OperatorApplicationRepository {
   constructor(private readonly db: DatabaseService) {}
 
   async insert(input: {
-    firstName: string; lastName: string; email: string; mobile: string; designation?: string; passwordHash: string;
-    companyName: string; companyType?: string; gstNumber?: string; panNumber?: string; registrationNumber?: string;
-    officialEmail?: string; companyMobile?: string; website?: string;
-    addressLine1?: string; addressLine2?: string; city?: string; state?: string; country?: string; pinCode?: string;
-    bankAccountHolder?: string; bankAccountNumber?: string; bankIfsc?: string; bankName?: string;
-    business: Json; documents: Json;
+    firstName: string;
+    lastName: string;
+    email: string;
+    mobile: string;
+    designation?: string;
+    passwordHash: string;
+    companyName: string;
+    companyType?: string;
+    gstNumber?: string;
+    panNumber?: string;
+    registrationNumber?: string;
+    officialEmail?: string;
+    companyMobile?: string;
+    website?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    pinCode?: string;
+    bankAccountHolder?: string;
+    bankAccountNumber?: string;
+    bankIfsc?: string;
+    bankName?: string;
+    business: Json;
+    documents: Json;
   }): Promise<string> {
     const id = newId();
     await this.db.execute_(
@@ -43,12 +63,35 @@ export class OperatorApplicationRepository {
          address_line1, address_line2, city, state, country, pin_code,
          bank_account_holder, bank_account_number, bank_ifsc, bank_name, business, documents)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)`,
-      [id, input.firstName, input.lastName, input.email, input.mobile, input.designation ?? null, input.passwordHash,
-       input.companyName, input.companyType ?? null, input.gstNumber ?? null, input.panNumber ?? null, input.registrationNumber ?? null,
-       input.officialEmail ?? null, input.companyMobile ?? null, input.website ?? null,
-       input.addressLine1 ?? null, input.addressLine2 ?? null, input.city ?? null, input.state ?? null, input.country ?? 'India', input.pinCode ?? null,
-       input.bankAccountHolder ?? null, input.bankAccountNumber ?? null, input.bankIfsc ? input.bankIfsc.toUpperCase() : null, input.bankName ?? null,
-       JSON.stringify(input.business), JSON.stringify(input.documents)],
+      [
+        id,
+        input.firstName,
+        input.lastName,
+        input.email,
+        input.mobile,
+        input.designation ?? null,
+        input.passwordHash,
+        input.companyName,
+        input.companyType ?? null,
+        input.gstNumber ?? null,
+        input.panNumber ?? null,
+        input.registrationNumber ?? null,
+        input.officialEmail ?? null,
+        input.companyMobile ?? null,
+        input.website ?? null,
+        input.addressLine1 ?? null,
+        input.addressLine2 ?? null,
+        input.city ?? null,
+        input.state ?? null,
+        input.country ?? 'India',
+        input.pinCode ?? null,
+        input.bankAccountHolder ?? null,
+        input.bankAccountNumber ?? null,
+        input.bankIfsc ? input.bankIfsc.toUpperCase() : null,
+        input.bankName ?? null,
+        JSON.stringify(input.business),
+        JSON.stringify(input.documents),
+      ],
       { name: 'onboarding.insert', primary: true },
     );
     return id;
@@ -67,7 +110,13 @@ export class OperatorApplicationRepository {
    * simply duplicating) a business that's already in the review pipeline
    * or already running on the platform.
    */
-  async findActiveDuplicate(input: { email: string; mobile: string; gstNumber?: string; panNumber?: string; excludeId?: string }): Promise<{ id: string; matchedOn: string } | null> {
+  async findActiveDuplicate(input: {
+    email: string;
+    mobile: string;
+    gstNumber?: string;
+    panNumber?: string;
+    excludeId?: string;
+  }): Promise<{ id: string; matchedOn: string } | null> {
     const row = await this.db.queryOne<{ id: string; matched_on: string }>(
       `SELECT id,
               CASE
@@ -83,7 +132,13 @@ export class OperatorApplicationRepository {
                OR ($3::text IS NOT NULL AND gst_number = $3)
                OR ($4::text IS NOT NULL AND pan_number = $4))
         LIMIT 1`,
-      [input.email, input.mobile, input.gstNumber ?? null, input.panNumber ?? null, input.excludeId ?? null],
+      [
+        input.email,
+        input.mobile,
+        input.gstNumber ?? null,
+        input.panNumber ?? null,
+        input.excludeId ?? null,
+      ],
       { name: 'onboarding.findActiveDuplicate', primary: true },
     );
     return row ? { id: row.id, matchedOn: row.matched_on } : null;
@@ -92,7 +147,10 @@ export class OperatorApplicationRepository {
   async list(status?: ApplicationStatus): Promise<unknown[]> {
     const params: unknown[] = [];
     let where = '';
-    if (status) { params.push(status); where = `WHERE oa.status = $1`; }
+    if (status) {
+      params.push(status);
+      where = `WHERE oa.status = $1`;
+    }
     return this.db.query(
       `SELECT oa.id, oa.status, oa.first_name AS "firstName", oa.last_name AS "lastName", oa.email, oa.mobile,
               oa.company_name AS "companyName", oa.city, oa.state, oa.created_at AS "createdAt", oa.reviewed_at AS "reviewedAt",
@@ -108,11 +166,10 @@ export class OperatorApplicationRepository {
   }
 
   async getFull(id: string): Promise<Record<string, unknown> | null> {
-    return this.db.queryOne(
-      `SELECT * FROM operator_applications WHERE id = $1`,
-      [id],
-      { name: 'onboarding.getFull', primary: true },
-    );
+    return this.db.queryOne(`SELECT * FROM operator_applications WHERE id = $1`, [id], {
+      name: 'onboarding.getFull',
+      primary: true,
+    });
   }
 
   async findForUpdate(id: string): Promise<OperatorApplicationRow | null> {
@@ -170,7 +227,13 @@ export class OperatorApplicationRepository {
     );
   }
 
-  async recordEvent(input: { applicationId: string; from: ApplicationStatus | null; to: ApplicationStatus; reason: string | null; actorId: string | null }): Promise<void> {
+  async recordEvent(input: {
+    applicationId: string;
+    from: ApplicationStatus | null;
+    to: ApplicationStatus;
+    reason: string | null;
+    actorId: string | null;
+  }): Promise<void> {
     const scope = currentTransaction();
     if (!scope) throw new Error('recordEvent requires a transaction');
     await scope.client.query(

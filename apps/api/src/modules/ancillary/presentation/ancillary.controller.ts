@@ -10,12 +10,16 @@ import { AncillaryService } from '../application/services/ancillary.service';
 
 const AttachAncillarySchema = z.object({
   bookingId: z.string().uuid(),
-  items: z.array(z.object({ ancillaryId: z.string().uuid(), quantity: z.number().int().min(1).max(20) })).min(1),
+  items: z
+    .array(z.object({ ancillaryId: z.string().uuid(), quantity: z.number().int().min(1).max(20) }))
+    .min(1),
 });
 const UpsertAncillarySchema = z.object({
-  code: z.string().min(1).max(40), name: z.string().min(1).max(120),
+  code: z.string().min(1).max(40),
+  name: z.string().min(1).max(120),
   kind: z.enum(['insurance', 'meal', 'luggage', 'priority', 'other']),
-  priceMinor: z.number().int().min(0), perPassenger: z.boolean().default(true),
+  priceMinor: z.number().int().min(0),
+  perPassenger: z.boolean().default(true),
 });
 
 /** Customer-facing add-on (insurance, meals, luggage) endpoints, and the operator-facing catalogue-management endpoint. */
@@ -39,14 +43,19 @@ export class AncillaryController {
   @RequirePermission(Permission.BOOKING_CREATE)
   @ApiOperation({ summary: 'Attach add-ons to a booking' })
   async attach(@Body(zodBody(AttachAncillarySchema)) dto: z.infer<typeof AttachAncillarySchema>) {
-    return this.ancillary.attach(dto.bookingId as BookingId, dto.items.map((i) => ({ ancillaryId: i.ancillaryId as Uuid, quantity: i.quantity })));
+    return this.ancillary.attach(
+      dto.bookingId as BookingId,
+      dto.items.map((i) => ({ ancillaryId: i.ancillaryId as Uuid, quantity: i.quantity })),
+    );
   }
 
   @Post('catalogue')
   @HttpCode(201)
   @RequirePermission(Permission.TENANT_MANAGE)
   @ApiOperation({ summary: 'Operator: create/update an ancillary service' })
-  async upsertAncillary(@Body(zodBody(UpsertAncillarySchema)) dto: z.infer<typeof UpsertAncillarySchema>) {
+  async upsertAncillary(
+    @Body(zodBody(UpsertAncillarySchema)) dto: z.infer<typeof UpsertAncillarySchema>,
+  ) {
     return { id: await this.ancillary.upsert(dto) };
   }
 }

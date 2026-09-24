@@ -43,8 +43,16 @@ export class SessionRepository {
     await this.db.execute_(
       `INSERT INTO sessions (id, tenant_id, user_id, refresh_hash, user_agent, ip, parent_id, expires_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [id, input.tenantId, input.userId, SessionRepository.hashToken(input.refreshToken),
-       input.userAgent ?? null, input.ip ?? null, input.parentId ?? null, input.expiresAt],
+      [
+        id,
+        input.tenantId,
+        input.userId,
+        SessionRepository.hashToken(input.refreshToken),
+        input.userAgent ?? null,
+        input.ip ?? null,
+        input.parentId ?? null,
+        input.expiresAt,
+      ],
       { name: 'session.create', primary: true },
     );
     return id;
@@ -101,10 +109,9 @@ export class SessionRepository {
   }
 
   async touch(id: SessionId): Promise<void> {
-    await this.db.execute_(
-      `UPDATE sessions SET last_used_at = now() WHERE id = $1`,
-      [id],
-      { name: 'session.touch', primary: true },
-    );
+    await this.db.execute_(`UPDATE sessions SET last_used_at = now() WHERE id = $1`, [id], {
+      name: 'session.touch',
+      primary: true,
+    });
   }
 }

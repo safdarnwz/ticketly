@@ -45,7 +45,11 @@ export class AmendmentConsumer implements OnModuleInit {
         const payload = event.payload as { refund?: number };
         const refundMinor = Number(payload.refund ?? 0);
         if (refundMinor <= 0) return; // fare went up or stayed the same — nothing to refund
-        await this.refunds.initiate({ bookingId: event.aggregateId as BookingId, amountMinor: refundMinor, destination: 'source' });
+        await this.refunds.initiate({
+          bookingId: event.aggregateId as BookingId,
+          amountMinor: refundMinor,
+          destination: 'source',
+        });
         this.log.info({ bookingId: event.aggregateId, refundMinor }, 'reschedule refund initiated');
       },
     };

@@ -28,10 +28,20 @@ export class DepartureControlService {
     private readonly uow: UnitOfWork,
   ) {}
 
-  async chart(tripId: TripId, req: ChartRequest = {}): Promise<{ chartId: string; reconciled: boolean; cashVarianceMinor: number; noShowSeats: number; vacantSeats: number }> {
+  async chart(
+    tripId: TripId,
+    req: ChartRequest = {},
+  ): Promise<{
+    chartId: string;
+    reconciled: boolean;
+    cashVarianceMinor: number;
+    noShowSeats: number;
+    vacantSeats: number;
+  }> {
     return this.uow.run({ name: 'dcs.chart', tenantId: requireTenantId() }, async () => {
       const counts = await this.repo.tripCounts(tripId);
-      if (!counts) throw new AppError(ErrorCode.DCS_TRIP_NOT_FOUND, 404, { message: 'Trip not found' });
+      if (!counts)
+        throw new AppError(ErrorCode.DCS_TRIP_NOT_FOUND, 404, { message: 'Trip not found' });
 
       const result = reconcileChart({
         totalSeats: counts.totalSeats,
@@ -54,7 +64,7 @@ export class DepartureControlService {
         cashExpectedMinor: result.cashExpectedMinor,
         cashVarianceMinor: result.cashVarianceMinor,
         reconciled: result.reconciled,
-        chartedBy: (getUserId() ?? null),
+        chartedBy: getUserId() ?? null,
       });
 
       return {
@@ -69,7 +79,10 @@ export class DepartureControlService {
 
   async getChart(tripId: TripId): Promise<unknown> {
     const chart = await this.repo.findChart(tripId);
-    if (!chart) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Trip has not been charted yet' });
+    if (!chart)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, {
+        message: 'Trip has not been charted yet',
+      });
     return chart;
   }
 }

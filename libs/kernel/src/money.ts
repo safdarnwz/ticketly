@@ -49,7 +49,9 @@ export class Money {
   /** From minor units — the canonical constructor. Use for DB reads. */
   static of(minor: number, currency: CurrencyCode = 'INR'): Money {
     if (!Number.isSafeInteger(minor)) {
-      throw new BadRequestError(`Money.of expects a safe integer of minor units, received ${minor}`);
+      throw new BadRequestError(
+        `Money.of expects a safe integer of minor units, received ${minor}`,
+      );
     }
     return new Money(minor, currency);
   }
@@ -121,7 +123,8 @@ export class Money {
    * commission across segments, apportioning a coupon across seats.
    */
   allocate(nOrWeights: number | number[]): Money[] {
-    const weights: number[] = typeof nOrWeights === 'number' ? new Array<number>(nOrWeights).fill(1) : nOrWeights;
+    const weights: number[] =
+      typeof nOrWeights === 'number' ? new Array<number>(nOrWeights).fill(1) : nOrWeights;
     const totalWeight = weights.reduce((a, b) => a + b, 0);
     if (totalWeight <= 0) throw new BadRequestError('allocate() requires positive weights');
 

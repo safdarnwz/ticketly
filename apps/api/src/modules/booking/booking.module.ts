@@ -25,9 +25,30 @@ import { SeatUpgradeRepository } from './infrastructure/persistence/seat-upgrade
  * for why (it needs BookingService, and scheduling→booking would cycle).
  */
 @Module({
-  imports: [ConfigModule, DatabaseModule, MessagingModule, PricingModule, SchedulingModule, CrmModule],
+  imports: [
+    ConfigModule,
+    DatabaseModule,
+    MessagingModule,
+    PricingModule,
+    SchedulingModule,
+    CrmModule,
+  ],
   controllers: [BookingController, ConcessionController],
-  providers: [BookingRepository, SeatLockRepository, SeatUpgradeRepository, BookingService, TripOpsService, ConcessionRepository],
-  exports: [BookingRepository, SeatLockRepository, SeatUpgradeRepository, BookingService, TripOpsService, ConcessionRepository],
+  providers: [
+    BookingRepository,
+    SeatLockRepository,
+    SeatUpgradeRepository,
+    BookingService,
+    TripOpsService,
+    ConcessionRepository,
+  ],
+  exports: [
+    BookingRepository,
+    SeatLockRepository,
+    SeatUpgradeRepository,
+    BookingService,
+    TripOpsService,
+    ConcessionRepository,
+  ],
 })
 export class BookingModule {}

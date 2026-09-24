@@ -19,7 +19,11 @@ export class AgentRefundService {
   constructor(private readonly agents: AgentRepository) {}
 
   /** @returns false if the booking was not sold by an agent. Idempotent per refund id. */
-  async creditRefund(input: { bookingId: BookingId; refundId: string; refundMinor: number }): Promise<boolean> {
+  async creditRefund(input: {
+    bookingId: BookingId;
+    refundId: string;
+    refundMinor: number;
+  }): Promise<boolean> {
     const agentId = await this.agents.agentForBooking(input.bookingId);
     if (!agentId) return false;
     await this.agents.lockForUpdate(agentId);
@@ -29,11 +33,27 @@ export class AgentRefundService {
     // exact share and the agent never keeps commission on a refunded seat.
     const clawback = Math.min(
       sale.remainingCommissionMinor,
-      commissionClawbackMinor({ commissionCreditedMinor: sale.commissionMinor, refundMinor: input.refundMinor, paidMinor: sale.saleMinor }),
+      commissionClawbackMinor({
+        commissionCreditedMinor: sale.commissionMinor,
+        refundMinor: input.refundMinor,
+        paidMinor: sale.saleMinor,
+      }),
     );
-    await this.agents.post({ agentId, kind: 'refund_credit', magnitudeMinor: input.refundMinor, bookingId: input.bookingId, reference: `refund:${input.refundId}` });
+    await this.agents.post({
+      agentId,
+      kind: 'refund_credit',
+      magnitudeMinor: input.refundMinor,
+      bookingId: input.bookingId,
+      reference: `refund:${input.refundId}`,
+    });
     if (clawback > 0) {
-      await this.agents.post({ agentId, kind: 'commission_reversal', magnitudeMinor: clawback, bookingId: input.bookingId, reference: `refund:${input.refundId}` });
+      await this.agents.post({
+        agentId,
+        kind: 'commission_reversal',
+        magnitudeMinor: clawback,
+        bookingId: input.bookingId,
+        reference: `refund:${input.refundId}`,
+      });
     }
     return true;
   }

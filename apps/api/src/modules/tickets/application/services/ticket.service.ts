@@ -11,8 +11,13 @@ import { StopRepository } from '../../../master-data/infrastructure/persistence/
 import { TenantRepository } from '../../../tenancy/infrastructure/persistence/tenant.repository';
 import { TrackingService } from '../../../tracking/application/services/tracking.service';
 import {
-  signingInput, encodeToken, verifyToken, type TicketTokenPayload,
-  bookingQrSigningInput, verifyBookingQrToken, type BookingQrPayload,
+  signingInput,
+  encodeToken,
+  verifyToken,
+  type TicketTokenPayload,
+  bookingQrSigningInput,
+  verifyBookingQrToken,
+  type BookingQrPayload,
 } from '../../domain/ticket-token';
 
 export interface IssuedTicket {
@@ -52,11 +57,16 @@ export class TicketService {
     return hmacSha256(this.signingKey(), payloadPart);
   }
 
-  async issueForBooking(bookingId: BookingId): Promise<{ pnr: string; tickets: IssuedTicket[]; bookingQrToken: string }> {
+  async issueForBooking(
+    bookingId: BookingId,
+  ): Promise<{ pnr: string; tickets: IssuedTicket[]; bookingQrToken: string }> {
     const booking = await this.bookings.findForUpdate(bookingId);
-    if (!booking) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
+    if (!booking)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
     if (booking.status !== 'confirmed' && booking.status !== 'completed') {
-      throw new AppError(ErrorCode.COMMON_PRECONDITION_FAILED, 412, { message: 'Only a confirmed booking has tickets' });
+      throw new AppError(ErrorCode.COMMON_PRECONDITION_FAILED, 412, {
+        message: 'Only a confirmed booking has tickets',
+      });
     }
     const trip = await this.trips.getById(booking.tripId);
     const seats = await this.bookings.loadSeats(bookingId);
@@ -68,15 +78,32 @@ export class TicketService {
 
     const tickets = seats.map((s) => {
       const payload: TicketTokenPayload = {
-        v: 1, bookingId, pnr: booking.pnr, tripId: booking.tripId, seat: s.seatNumber, issuedAtMs, expiresAtMs,
+        v: 1,
+        bookingId,
+        pnr: booking.pnr,
+        tripId: booking.tripId,
+        seat: s.seatNumber,
+        issuedAtMs,
+        expiresAtMs,
       };
       const part = signingInput(payload);
-      return { seat: s.seatNumber, ticketId: idBySeat.get(s.seatNumber) ?? null, boardingToken: encodeToken(part, this.sign(part)) };
+      return {
+        seat: s.seatNumber,
+        ticketId: idBySeat.get(s.seatNumber) ?? null,
+        boardingToken: encodeToken(part, this.sign(part)),
+      };
     });
 
     // ONE booking-level token — the QR actually printed on the ticket. Same
     // signing key, same expiry window; encodes the PNR, not any one seat.
-    const bookingQrPayload: BookingQrPayload = { v: 1, bookingId, pnr: booking.pnr, tripId: booking.tripId, issuedAtMs, expiresAtMs };
+    const bookingQrPayload: BookingQrPayload = {
+      v: 1,
+      bookingId,
+      pnr: booking.pnr,
+      tripId: booking.tripId,
+      issuedAtMs,
+      expiresAtMs,
+    };
     const bookingQrPart = bookingQrSigningInput(bookingQrPayload);
     const bookingQrToken = encodeToken(bookingQrPart, this.sign(bookingQrPart));
 
@@ -101,16 +128,24 @@ export class TicketService {
   async renderHtml(bookingId: BookingId): Promise<string> {
     const { pnr, tickets, bookingQrToken } = await this.issueForBooking(bookingId);
     const booking = await this.bookings.findForUpdate(bookingId);
-    if (!booking) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
+    if (!booking)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
 
     const trip = await this.trips.getById(booking.tripId);
-    const trackingToken = this.tracking.issueTrackingToken(bookingId, booking.tripId, pnr, trip.arrivesAt);
+    const trackingToken = this.tracking.issueTrackingToken(
+      bookingId,
+      booking.tripId,
+      pnr,
+      trip.arrivesAt,
+    );
     const trackingUrl = this.tracking.buildTrackingUrl(trackingToken);
     const route = await this.routes.getById(trip.routeId);
     const origin = route.path.stops[0];
     const fromStop = route.path.stops.find((s) => s.sequence === booking.fromSeq);
     const toStop = route.path.stops.find((s) => s.sequence === booking.toSeq);
-    const stopIds = [fromStop?.stopId, toStop?.stopId].filter((x): x is NonNullable<typeof x> => !!x);
+    const stopIds = [fromStop?.stopId, toStop?.stopId].filter(
+      (x): x is NonNullable<typeof x> => !!x,
+    );
     const stopNames = await this.stops.loadMany(stopIds);
     const fromDetail = fromStop ? stopNames.get(fromStop.stopId) : undefined;
     const toDetail = toStop ? stopNames.get(toStop.stopId) : undefined;
@@ -127,13 +162,17 @@ export class TicketService {
     const originOffset = origin ? origin.departDayOffset * 1440 + origin.departMinute : 0;
     const toClock = (s: typeof fromStop, useArrival: boolean) => {
       if (!s) return null;
-      const offset = useArrival ? s.arrivalDayOffset * 1440 + s.arrivalMinute : s.departDayOffset * 1440 + s.departMinute;
+      const offset = useArrival
+        ? s.arrivalDayOffset * 1440 + s.arrivalMinute
+        : s.departDayOffset * 1440 + s.departMinute;
       return new Date(trip.departsAt.getTime() + (offset - originOffset) * 60_000);
     };
     const boardingTime = toClock(fromStop, false);
     const arrivalTime = toClock(toStop, true);
-    const fmtDate = (d: Date) => d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    const fmtTime = (d: Date) => d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const fmtDate = (d: Date) =>
+      d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const fmtTime = (d: Date) =>
+      d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
     const operator = await this.tenants.getGstDetails();
     const logoDataUri = await this.tenants.getLogoUrl();
@@ -143,11 +182,15 @@ export class TicketService {
     const fareMinor = booking.totalMinor - booking.taxMinor;
     const money = (m: number) => `₹${(m / 100).toFixed(2)}`;
 
-    const rows = tickets.map((t) => `
+    const rows = tickets
+      .map(
+        (t) => `
       <div class="seat">
         <div class="seat-no">Seat ${escapeHtml(t.seat)}</div>
         <div class="pax-name">${escapeHtml(nameBySeat.get(t.seat) ?? '—')}</div>
-      </div>`).join('');
+      </div>`,
+      )
+      .join('');
 
     return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>${escapeHtml(operator?.legalName ?? 'Bus')} Ticket ${escapeHtml(pnr)}</title>
@@ -217,5 +260,8 @@ export class TicketService {
 }
 
 function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+  return s.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string,
+  );
 }

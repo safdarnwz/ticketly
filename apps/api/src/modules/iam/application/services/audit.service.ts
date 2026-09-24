@@ -89,12 +89,23 @@ export class AuditService {
    * (it's append-only and never customer-facing), so a plain query is fine —
    * unlike bookings/appearance/etc. this doesn't need bypassRls.
    */
-  async list(filter: { tenantId?: string; action?: string; resourceType?: string; limit?: number } = {}): Promise<unknown[]> {
+  async list(
+    filter: { tenantId?: string; action?: string; resourceType?: string; limit?: number } = {},
+  ): Promise<unknown[]> {
     const conditions: string[] = [];
     const params: unknown[] = [];
-    if (filter.tenantId) { params.push(filter.tenantId); conditions.push(`tenant_id = $${params.length}`); }
-    if (filter.action) { params.push(`%${filter.action}%`); conditions.push(`action ILIKE $${params.length}`); }
-    if (filter.resourceType) { params.push(filter.resourceType); conditions.push(`resource_type = $${params.length}`); }
+    if (filter.tenantId) {
+      params.push(filter.tenantId);
+      conditions.push(`tenant_id = $${params.length}`);
+    }
+    if (filter.action) {
+      params.push(`%${filter.action}%`);
+      conditions.push(`action ILIKE $${params.length}`);
+    }
+    if (filter.resourceType) {
+      params.push(filter.resourceType);
+      conditions.push(`resource_type = $${params.length}`);
+    }
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     params.push(Math.min(filter.limit ?? 100, 500));
 

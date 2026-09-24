@@ -39,7 +39,10 @@ export class RouteService {
 
     // Origin/destination cities must match the first/last stop's city.
     if (input.stops.length < 2) {
-      throw new DomainError(ErrorCode.COMMON_VALIDATION, 'A route needs at least an origin and destination stop');
+      throw new DomainError(
+        ErrorCode.COMMON_VALIDATION,
+        'A route needs at least an origin and destination stop',
+      );
     }
 
     return this.uow.run({ name: 'route.create', tenantId: requireTenantId() }, async () =>
@@ -51,7 +54,10 @@ export class RouteService {
     await this.uow.run({ name: 'route.publish', tenantId: requireTenantId() }, async () => {
       const route = await this.routes.getById(id);
       if (route.path.stops.length < 2) {
-        throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Cannot publish a route with fewer than 2 stops');
+        throw new DomainError(
+          ErrorCode.COMMON_VALIDATION,
+          'Cannot publish a route with fewer than 2 stops',
+        );
       }
       await this.routes.setStatus(id, 'published');
       this.events.publish({

@@ -20,13 +20,25 @@ export class SupportRepository {
   constructor(private readonly db: DatabaseService) {}
 
   async createTicket(input: {
-    subject: string; category: string; priority: string; customerId: UserId | null; bookingId: BookingId | null;
+    subject: string;
+    category: string;
+    priority: string;
+    customerId: UserId | null;
+    bookingId: BookingId | null;
   }): Promise<string> {
     const id = newId();
     const scope = currentTransaction();
     const sql = `INSERT INTO support_tickets (id, tenant_id, booking_id, customer_id, subject, category, priority)
                  VALUES ($1,$2,$3,$4,$5,$6,$7)`;
-    const params = [id, requireTenantId(), input.bookingId, input.customerId, input.subject, input.category, input.priority];
+    const params = [
+      id,
+      requireTenantId(),
+      input.bookingId,
+      input.customerId,
+      input.subject,
+      input.category,
+      input.priority,
+    ];
     if (scope) await scope.client.query(sql, params);
     else await this.db.execute_(sql, params, { name: 'support.createTicket', primary: true });
     return id;
@@ -36,16 +48,34 @@ export class SupportRepository {
     const scope = currentTransaction();
     const sql = `SELECT id, status, subject, category, priority, customer_id AS "customerId", booking_id AS "bookingId"
                    FROM support_tickets WHERE tenant_id = $1 AND id = $2${scope ? ' FOR UPDATE' : ''}`;
-    if (scope) return (await scope.client.query<TicketRow>(sql, [requireTenantId(), ticketId])).rows[0] ?? null;
-    return this.db.queryOne<TicketRow>(sql, [requireTenantId(), ticketId], { name: 'support.findTicket', primary: true });
+    if (scope)
+      return (
+        (await scope.client.query<TicketRow>(sql, [requireTenantId(), ticketId])).rows[0] ?? null
+      );
+    return this.db.queryOne<TicketRow>(sql, [requireTenantId(), ticketId], {
+      name: 'support.findTicket',
+      primary: true,
+    });
   }
 
-  async addMessage(input: { ticketId: SupportTicketId; authorKind: string; authorId: UserId | null; body: string }): Promise<string> {
+  async addMessage(input: {
+    ticketId: SupportTicketId;
+    authorKind: string;
+    authorId: UserId | null;
+    body: string;
+  }): Promise<string> {
     const id = newId();
     const scope = currentTransaction();
     const sql = `INSERT INTO support_messages (id, tenant_id, ticket_id, author_kind, author_id, body)
                  VALUES ($1,$2,$3,$4,$5,$6)`;
-    const params = [id, requireTenantId(), input.ticketId, input.authorKind, input.authorId, input.body];
+    const params = [
+      id,
+      requireTenantId(),
+      input.ticketId,
+      input.authorKind,
+      input.authorId,
+      input.body,
+    ];
     if (scope) await scope.client.query(sql, params);
     else await this.db.execute_(sql, params, { name: 'support.addMessage', primary: true });
     return id;
@@ -72,11 +102,21 @@ export class SupportRepository {
     );
   }
 
-  async listTickets(filter: { customerId?: UserId; status?: TicketStatus; limit?: number }): Promise<unknown[]> {
+  async listTickets(filter: {
+    customerId?: UserId;
+    status?: TicketStatus;
+    limit?: number;
+  }): Promise<unknown[]> {
     const conds = ['tenant_id = $1'];
     const params: unknown[] = [requireTenantId()];
-    if (filter.customerId) { params.push(filter.customerId); conds.push(`customer_id = $${params.length}`); }
-    if (filter.status) { params.push(filter.status); conds.push(`status = $${params.length}`); }
+    if (filter.customerId) {
+      params.push(filter.customerId);
+      conds.push(`customer_id = $${params.length}`);
+    }
+    if (filter.status) {
+      params.push(filter.status);
+      conds.push(`status = $${params.length}`);
+    }
     params.push(Math.min(filter.limit ?? 50, 200));
     return this.db.query(
       `SELECT id, subject, category, priority, status, created_at AS "createdAt", updated_at AS "updatedAt"

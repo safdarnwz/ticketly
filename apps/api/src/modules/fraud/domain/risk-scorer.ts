@@ -19,21 +19,21 @@ import { DomainError, ErrorCode } from '@kernel';
  */
 
 export interface RiskSignals {
-  accountAgeDays: number;      // 0 for a brand-new account
-  bookingsLast24h: number;     // velocity
+  accountAgeDays: number; // 0 for a brand-new account
+  bookingsLast24h: number; // velocity
   amountMinor: number;
   seatCount: number;
-  emailDisposable: boolean;    // throwaway email domain
-  paymentMethodNew: boolean;   // card/UPI first seen on this account
+  emailDisposable: boolean; // throwaway email domain
+  paymentMethodNew: boolean; // card/UPI first seen on this account
   billingCountryMismatch: boolean; // billing vs IP/issuer country differ
-  nightBooking: boolean;       // placed 00:00–05:00 local
+  nightBooking: boolean; // placed 00:00–05:00 local
 }
 
 export type RiskBand = 'low' | 'medium' | 'high';
 export type RiskDecision = 'allow' | 'review' | 'deny';
 
 export interface RiskResult {
-  score: number;      // 0–100
+  score: number; // 0–100
   band: RiskBand;
   decision: RiskDecision;
   reasons: { code: string; points: number }[];
@@ -43,12 +43,19 @@ const HIGH_VALUE_MINOR = 500_000; // ₹5,000
 const VERY_HIGH_VALUE_MINOR = 1_500_000; // ₹15,000
 
 export function scoreRisk(signals: RiskSignals): RiskResult {
-  if (signals.accountAgeDays < 0 || signals.bookingsLast24h < 0 || signals.amountMinor < 0 || signals.seatCount < 0) {
+  if (
+    signals.accountAgeDays < 0 ||
+    signals.bookingsLast24h < 0 ||
+    signals.amountMinor < 0 ||
+    signals.seatCount < 0
+  ) {
     throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Risk signals cannot be negative');
   }
 
   const reasons: { code: string; points: number }[] = [];
-  const add = (code: string, points: number): void => { if (points > 0) reasons.push({ code, points }); };
+  const add = (code: string, points: number): void => {
+    if (points > 0) reasons.push({ code, points });
+  };
 
   // New / very new account.
   if (signals.accountAgeDays === 0) add('brand_new_account', 20);

@@ -33,7 +33,14 @@ function b64urlDecode(input: string): string {
 }
 
 export function trackingSigningInput(payload: TrackingTokenPayload): string {
-  const ordered = { v: payload.v, bookingId: payload.bookingId, tripId: payload.tripId, pnr: payload.pnr, issuedAtMs: payload.issuedAtMs, expiresAtMs: payload.expiresAtMs };
+  const ordered = {
+    v: payload.v,
+    bookingId: payload.bookingId,
+    tripId: payload.tripId,
+    pnr: payload.pnr,
+    issuedAtMs: payload.issuedAtMs,
+    expiresAtMs: payload.expiresAtMs,
+  };
   return b64urlEncode(JSON.stringify(ordered));
 }
 
@@ -41,7 +48,11 @@ export function encodeTrackingToken(payloadPart: string, signaturePart: string):
   return `${payloadPart}.${signaturePart}`;
 }
 
-export function decodeTrackingToken(token: string): { payloadPart: string; signaturePart: string; payload: TrackingTokenPayload } {
+export function decodeTrackingToken(token: string): {
+  payloadPart: string;
+  signaturePart: string;
+  payload: TrackingTokenPayload;
+} {
   const parts = token.split('.');
   if (parts.length !== 2 || !parts[0] || !parts[1]) {
     throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Malformed tracking link');
@@ -65,7 +76,11 @@ function constantTimeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-export function verifyTrackingToken(token: string, expectedSignature: string, nowMs: number): TrackingTokenPayload {
+export function verifyTrackingToken(
+  token: string,
+  expectedSignature: string,
+  nowMs: number,
+): TrackingTokenPayload {
   const decoded = decodeTrackingToken(token);
   if (!constantTimeEqual(decoded.signaturePart, expectedSignature)) {
     throw new DomainError(ErrorCode.COMMON_FORBIDDEN, 'Tracking link signature does not verify');
@@ -89,7 +104,10 @@ export function verifyTrackingToken(token: string, expectedSignature: string, no
  * uses this fallback after separately confirming the trip hasn't
  * actually completed.
  */
-export function verifyTrackingTokenSignatureOnly(token: string, expectedSignature: string): TrackingTokenPayload {
+export function verifyTrackingTokenSignatureOnly(
+  token: string,
+  expectedSignature: string,
+): TrackingTokenPayload {
   const decoded = decodeTrackingToken(token);
   if (!constantTimeEqual(decoded.signaturePart, expectedSignature)) {
     throw new DomainError(ErrorCode.COMMON_FORBIDDEN, 'Tracking link signature does not verify');

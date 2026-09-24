@@ -61,7 +61,10 @@ export abstract class BaseRepository<TDomain, TRow extends QueryResultRow> {
 
   /* ── reads ────────────────────────────────────────────────────────────*/
 
-  async findById(id: Uuid, options: { forUpdate?: boolean; primary?: boolean } = {}): Promise<TDomain | null> {
+  async findById(
+    id: Uuid,
+    options: { forUpdate?: boolean; primary?: boolean } = {},
+  ): Promise<TDomain | null> {
     const lock = options.forUpdate ? ' FOR UPDATE' : '';
     const row = await this.db.queryOne<TRow>(
       `SELECT ${this.columns} FROM ${this.table}
@@ -133,7 +136,9 @@ export abstract class BaseRepository<TDomain, TRow extends QueryResultRow> {
     );
 
     const page = buildPage(rows, request, (row) =>
-      sortColumns.map((column) => (row as Record<string, unknown>)[toCamel(column)] as string | number | null),
+      sortColumns.map(
+        (column) => (row as Record<string, unknown>)[toCamel(column)] as string | number | null,
+      ),
     );
     return { ...page, items: page.items.map((row) => this.toDomain(row)) };
   }

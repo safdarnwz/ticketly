@@ -4,13 +4,24 @@ import type { FastifyRequest } from 'fastify';
 
 import { AppConfig } from '@config';
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Idempotent, Public, RateLimit, RequirePermission, RequirePlatformAdmin, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  Idempotent,
+  Public,
+  RateLimit,
+  RequirePermission,
+  RequirePlatformAdmin,
+  zodBody,
+} from '@http';
 import { localDate, type BookingId } from '@kernel';
 
 import {
-  ChargeTestSchema, type ChargeTestDto,
-  CreateIntentSchema, type CreateIntentDto,
-  GenerateSettlementSchema, type GenerateSettlementDto,
+  ChargeTestSchema,
+  type ChargeTestDto,
+  CreateIntentSchema,
+  type CreateIntentDto,
+  GenerateSettlementSchema,
+  type GenerateSettlementDto,
 } from './dto/payment.dto';
 import { TEST_PAYMENT_METHODS } from '../domain/test-gateway';
 import { LedgerRepository } from '../infrastructure/persistence/ledger.repository';
@@ -80,7 +91,10 @@ export class PaymentController {
   @HttpCode(200)
   @Idempotent()
   @RequirePermission(Permission.BOOKING_CREATE)
-  @ApiOperation({ summary: 'Upgrade a ticket to a different seat (e.g. seater→sleeper) before the 1hr-before-departure cutoff — charges only the fare differential + its own GST' })
+  @ApiOperation({
+    summary:
+      'Upgrade a ticket to a different seat (e.g. seater→sleeper) before the 1hr-before-departure cutoff — charges only the fare differential + its own GST',
+  })
   async upgradeSeat(@Body() dto: { ticketId: string; toSeatNumber: string }) {
     return this.payment.upgradeSeat(dto.ticketId, dto.toSeatNumber);
   }
@@ -89,7 +103,9 @@ export class PaymentController {
   @HttpCode(201)
   @Public()
   @Idempotent()
-  @ApiOperation({ summary: 'Create a payment intent for a held booking (guest checkout, same as hold/confirm)' })
+  @ApiOperation({
+    summary: 'Create a payment intent for a held booking (guest checkout, same as hold/confirm)',
+  })
   async createIntent(@Body(zodBody(CreateIntentSchema)) dto: CreateIntentDto) {
     return this.payment.createIntent(dto.bookingId as BookingId);
   }
@@ -99,8 +115,19 @@ export class PaymentController {
   @Public()
   @Idempotent()
   @RateLimit(30, 60_000, 'ip')
-  @ApiOperation({ summary: "Verify the gateway's client-side checkout callback and confirm the booking immediately (webhook still runs too)" })
-  async verify(@Body() dto: { bookingId: string; razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) {
+  @ApiOperation({
+    summary:
+      "Verify the gateway's client-side checkout callback and confirm the booking immediately (webhook still runs too)",
+  })
+  async verify(
+    @Body()
+    dto: {
+      bookingId: string;
+      razorpay_order_id: string;
+      razorpay_payment_id: string;
+      razorpay_signature: string;
+    },
+  ) {
     const { bookingId, ...callback } = dto;
     return this.payment.verifyAndCapture(bookingId as BookingId, callback);
   }
@@ -115,7 +142,9 @@ export class PaymentController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Payment gateway webhook (signature-verified)' })
   async webhook(@Req() request: FastifyRequest, @Headers() headers: Record<string, string>) {
-    const raw = (request as unknown as { rawBody?: Buffer }).rawBody ?? Buffer.from(JSON.stringify(request.body ?? {}));
+    const raw =
+      (request as unknown as { rawBody?: Buffer }).rawBody ??
+      Buffer.from(JSON.stringify(request.body ?? {}));
     return this.payment.handleWebhook(raw, headers);
   }
 
@@ -132,7 +161,9 @@ export class PaymentController {
   @ApiBearerAuth('bearer')
   @RequirePermission(Permission.ALL)
   @RequirePlatformAdmin()
-  @ApiOperation({ summary: "An operator's platform commission override (null = using the platform default)" })
+  @ApiOperation({
+    summary: "An operator's platform commission override (null = using the platform default)",
+  })
   async getCommission(@Param('tenantId') tenantId: string) {
     return { override: await this.payments.getCommissionForTenant(tenantId) };
   }
@@ -142,8 +173,19 @@ export class PaymentController {
   @ApiBearerAuth('bearer')
   @RequirePermission(Permission.ALL)
   @RequirePlatformAdmin()
-  @ApiOperation({ summary: "Set an operator's negotiated platform commission (overrides the global default)" })
-  async setCommission(@Body() dto: { tenantId: string; model: 'percent' | 'flat' | 'percent_plus'; percent?: number; flatMinor?: number; capMinor?: number }) {
+  @ApiOperation({
+    summary: "Set an operator's negotiated platform commission (overrides the global default)",
+  })
+  async setCommission(
+    @Body()
+    dto: {
+      tenantId: string;
+      model: 'percent' | 'flat' | 'percent_plus';
+      percent?: number;
+      flatMinor?: number;
+      capMinor?: number;
+    },
+  ) {
     await this.payments.setCommissionForTenant(dto.tenantId, dto);
     return { ok: true };
   }

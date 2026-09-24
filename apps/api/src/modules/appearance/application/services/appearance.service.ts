@@ -1,6 +1,14 @@
 import { Injectable } from '@nestjs/common';
 
-import { DEFAULT_THEME, resolveTheme, themeToCss, mergeTheme, validateTheme, type Theme, type ThemePatch } from '../../domain/theme';
+import {
+  DEFAULT_THEME,
+  resolveTheme,
+  themeToCss,
+  mergeTheme,
+  validateTheme,
+  type Theme,
+  type ThemePatch,
+} from '../../domain/theme';
 import { AppearanceRepository } from '../../infrastructure/persistence/appearance.repository';
 
 const PLATFORM_SCOPE = '';
@@ -46,7 +54,10 @@ export class AppearanceService {
   }
 
   /** All stored overrides + the baseline default (for the admin editor). */
-  async overview(): Promise<{ default: Theme; overrides: { scope: string; theme: ThemePatch; updatedAt: string }[] }> {
+  async overview(): Promise<{
+    default: Theme;
+    overrides: { scope: string; theme: ThemePatch; updatedAt: string }[];
+  }> {
     return { default: DEFAULT_THEME, overrides: await this.repo.listAll() };
   }
 }

@@ -132,7 +132,9 @@ export async function migrateUp(
           await client.query('COMMIT');
         } catch (error) {
           await client.query('ROLLBACK');
-          throw new Error(`Migration '${file.name}' failed: ${(error as Error).message}`, { cause: error });
+          throw new Error(`Migration '${file.name}' failed: ${(error as Error).message}`, {
+            cause: error,
+          });
         }
       } else {
         // Non-transactional: the statement itself is atomic (e.g. CREATE INDEX
@@ -188,7 +190,11 @@ export async function migrateDown(
   }
 }
 
-async function recordApplied(client: PoolClient, file: MigrationFile, durationMs: number): Promise<void> {
+async function recordApplied(
+  client: PoolClient,
+  file: MigrationFile,
+  durationMs: number,
+): Promise<void> {
   await client.query(
     `INSERT INTO schema_migrations (name, checksum, duration_ms) VALUES ($1, $2, $3)
      ON CONFLICT (name) DO UPDATE SET checksum = EXCLUDED.checksum`,

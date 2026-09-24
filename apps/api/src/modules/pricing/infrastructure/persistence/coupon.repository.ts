@@ -19,7 +19,11 @@ export class CouponRepository {
   constructor(private readonly db: DatabaseService) {}
 
   /** @param journeyDate YYYY-MM-DD — the coupon is refused on its blackout dates. */
-  async validateAndLoad(code: string, customerId?: string, journeyDate?: string): Promise<Coupon | null> {
+  async validateAndLoad(
+    code: string,
+    customerId?: string,
+    journeyDate?: string,
+  ): Promise<Coupon | null> {
     const row = await this.db.queryOne<CouponRow>(
       `SELECT id, code, kind, value, max_discount_minor, min_fare_minor,
               valid_from, valid_to, max_redemptions, usage_count, first_booking_only, per_user_limit
@@ -91,20 +95,40 @@ export class CouponRepository {
   }
 
   async create(input: {
-    code: string; kind: 'percent' | 'flat'; value: number;
-    maxDiscountMinor?: number; minFareMinor?: number;
-    validFrom?: string; validTo?: string; maxRedemptions?: number; perUserLimit?: number; blackoutDates?: string[];
-    firstBookingOnly?: boolean; description?: string;
+    code: string;
+    kind: 'percent' | 'flat';
+    value: number;
+    maxDiscountMinor?: number;
+    minFareMinor?: number;
+    validFrom?: string;
+    validTo?: string;
+    maxRedemptions?: number;
+    perUserLimit?: number;
+    blackoutDates?: string[];
+    firstBookingOnly?: boolean;
+    description?: string;
   }): Promise<string> {
     const id = newId();
     await this.db.execute_(
       `INSERT INTO coupons (id, tenant_id, code, kind, value, max_discount_minor, min_fare_minor,
                             valid_from, valid_to, max_redemptions, per_user_limit, first_booking_only, description, blackout_dates)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::date[])`,
-      [id, requireTenantId(), input.code.trim().toUpperCase(), input.kind, input.value,
-       input.maxDiscountMinor ?? null, input.minFareMinor ?? null, input.validFrom ?? null,
-       input.validTo ?? null, input.maxRedemptions ?? null, input.perUserLimit ?? null,
-       input.firstBookingOnly ?? false, input.description ?? null, [...new Set(input.blackoutDates ?? [])]],
+      [
+        id,
+        requireTenantId(),
+        input.code.trim().toUpperCase(),
+        input.kind,
+        input.value,
+        input.maxDiscountMinor ?? null,
+        input.minFareMinor ?? null,
+        input.validFrom ?? null,
+        input.validTo ?? null,
+        input.maxRedemptions ?? null,
+        input.perUserLimit ?? null,
+        input.firstBookingOnly ?? false,
+        input.description ?? null,
+        [...new Set(input.blackoutDates ?? [])],
+      ],
       { name: 'coupon.create', primary: true },
     );
     return id;
@@ -118,7 +142,21 @@ export class CouponRepository {
     );
   }
 
-  async list(): Promise<{ id: string; code: string; kind: string; value: number; usageCount: number; maxRedemptions: number | null; validFrom: Date | null; validTo: Date | null; isActive: boolean; firstBookingOnly: boolean; description: string | null }[]> {
+  async list(): Promise<
+    {
+      id: string;
+      code: string;
+      kind: string;
+      value: number;
+      usageCount: number;
+      maxRedemptions: number | null;
+      validFrom: Date | null;
+      validTo: Date | null;
+      isActive: boolean;
+      firstBookingOnly: boolean;
+      description: string | null;
+    }[]
+  > {
     return this.db.query(
       `SELECT id, code, kind, value, usage_count AS "usageCount", max_redemptions AS "maxRedemptions",
               valid_from AS "validFrom", valid_to AS "validTo", is_active AS "isActive",
@@ -130,8 +168,16 @@ export class CouponRepository {
   }
 
   /** Per-coupon usage stats — redemptions and (approximately) how much discount they've given out, derived from bookings that carried this coupon code. */
-  async stats(id: string): Promise<{ usageCount: number; maxRedemptions: number | null; estimatedDiscountGivenMinor: number }> {
-    const row = await this.db.queryOne<{ usage_count: number; max_redemptions: number | null; code: string }>(
+  async stats(id: string): Promise<{
+    usageCount: number;
+    maxRedemptions: number | null;
+    estimatedDiscountGivenMinor: number;
+  }> {
+    const row = await this.db.queryOne<{
+      usage_count: number;
+      max_redemptions: number | null;
+      code: string;
+    }>(
       `SELECT usage_count, max_redemptions, code FROM coupons WHERE tenant_id = $1 AND id = $2`,
       [requireTenantId(), id],
       { name: 'coupon.stats' },
@@ -142,14 +188,25 @@ export class CouponRepository {
       [requireTenantId(), row.code],
       { name: 'coupon.discountTotal' },
     );
-    return { usageCount: row.usage_count, maxRedemptions: row.max_redemptions, estimatedDiscountGivenMinor: Number(discount?.total ?? 0) };
+    return {
+      usageCount: row.usage_count,
+      maxRedemptions: row.max_redemptions,
+      estimatedDiscountGivenMinor: Number(discount?.total ?? 0),
+    };
   }
 }
 
 interface CouponRow {
-  id: string; code: string; kind: string; value: number;
-  max_discount_minor: number | null; min_fare_minor: number | null;
-  valid_from: Date | null; valid_to: Date | null;
-  max_redemptions: number | null; usage_count: number;
-  first_booking_only: boolean; per_user_limit: number | null;
+  id: string;
+  code: string;
+  kind: string;
+  value: number;
+  max_discount_minor: number | null;
+  min_fare_minor: number | null;
+  valid_from: Date | null;
+  valid_to: Date | null;
+  max_redemptions: number | null;
+  usage_count: number;
+  first_booking_only: boolean;
+  per_user_limit: number | null;
 }

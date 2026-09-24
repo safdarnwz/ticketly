@@ -20,14 +20,15 @@ import { DomainError, ErrorCode } from '@kernel';
 
 export interface SseEvent {
   event?: string;
-  data: unknown;   // serialised to JSON if not a string
+  data: unknown; // serialised to JSON if not a string
   id?: string;
   retryMs?: number;
 }
 
 /** Encode one SSE frame per the text/event-stream spec (ends with a blank line). */
 export function formatSseFrame(evt: SseEvent): string {
-  if (evt.data === undefined) throw new DomainError(ErrorCode.COMMON_VALIDATION, 'SSE event needs data');
+  if (evt.data === undefined)
+    throw new DomainError(ErrorCode.COMMON_VALIDATION, 'SSE event needs data');
   const lines: string[] = [];
   if (evt.id) lines.push(`id: ${evt.id}`);
   if (evt.event) lines.push(`event: ${evt.event}`);
@@ -39,8 +40,8 @@ export function formatSseFrame(evt: SseEvent): string {
 }
 
 export interface SeatDelta {
-  taken: string[];   // were available, now not
-  freed: string[];   // were not available, now are
+  taken: string[]; // were available, now not
+  freed: string[]; // were not available, now are
   changed: boolean;
 }
 

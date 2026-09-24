@@ -33,13 +33,20 @@ export class InvoiceService {
     private readonly uow: UnitOfWork,
   ) {}
 
-  async issueForBooking(bookingId: BookingId, supplierGstin?: string): Promise<{ invoiceId: string; invoiceNumber: string } | null> {
+  async issueForBooking(
+    bookingId: BookingId,
+    supplierGstin?: string,
+  ): Promise<{ invoiceId: string; invoiceNumber: string } | null> {
     return this.uow.run({ name: 'invoice.issue', tenantId: requireTenantId() }, async () => {
       const booking = await this.bookings.findForUpdate(bookingId);
       if (!booking || booking.status !== 'confirmed') return null;
 
       // Idempotent: at-least-once delivery must not raise a second invoice.
-      const already = (await this.invoices.findByBooking(bookingId)) as { id: string; kind: string; invoiceNumber: string }[];
+      const already = (await this.invoices.findByBooking(bookingId)) as {
+        id: string;
+        kind: string;
+        invoiceNumber: string;
+      }[];
       const priorTax = already.find((i) => i.kind === 'tax');
       if (priorTax) return { invoiceId: priorTax.id, invoiceNumber: priorTax.invoiceNumber };
 
@@ -68,25 +75,51 @@ export class InvoiceService {
       const ancillaryTaxableMinor = ancillaryRow ?? 0;
       const ticketTaxableMinor = taxableMinor - ancillaryTaxableMinor;
 
-      const lines: { description: string; sac: string; taxableMinor: number; gstRatePct: number }[] = [];
+      const lines: {
+        description: string;
+        sac: string;
+        taxableMinor: number;
+        gstRatePct: number;
+      }[] = [];
       if (ticketTaxableMinor > 0) {
         // The rate ACTUALLY applied to the TICKET PORTION, derived at full
         // precision from what remains once the ancillary share is set
         // aside — deliberately NOT "today's" platform GST setting, which
         // may have changed in the (usually sub-second) gap between payment
         // capture and this event-driven invoice issuance.
-        const ticketTaxMinor = ancillaryTaxableMinor > 0
-          ? booking.taxMinor - Math.round((ancillaryTaxableMinor * await this.platformSettings.commissionGstRatePercent()) / 100)
-          : booking.taxMinor;
-        const ticketGstRatePct = ticketTaxableMinor > 0 ? (ticketTaxMinor * 100) / ticketTaxableMinor : 0;
-        lines.push({ description: 'Passenger transport by road', sac: '9964', taxableMinor: ticketTaxableMinor, gstRatePct: ticketGstRatePct });
+        const ticketTaxMinor =
+          ancillaryTaxableMinor > 0
+            ? booking.taxMinor -
+              Math.round(
+                (ancillaryTaxableMinor * (await this.platformSettings.commissionGstRatePercent())) /
+                  100,
+              )
+            : booking.taxMinor;
+        const ticketGstRatePct =
+          ticketTaxableMinor > 0 ? (ticketTaxMinor * 100) / ticketTaxableMinor : 0;
+        lines.push({
+          description: 'Passenger transport by road',
+          sac: '9964',
+          taxableMinor: ticketTaxableMinor,
+          gstRatePct: ticketGstRatePct,
+        });
       }
       if (ancillaryTaxableMinor > 0) {
         const ancillaryGstRatePct = await this.platformSettings.commissionGstRatePercent();
-        lines.push({ description: 'Travel add-ons (insurance/meals/luggage)', sac: '9997', taxableMinor: ancillaryTaxableMinor, gstRatePct: ancillaryGstRatePct });
+        lines.push({
+          description: 'Travel add-ons (insurance/meals/luggage)',
+          sac: '9997',
+          taxableMinor: ancillaryTaxableMinor,
+          gstRatePct: ancillaryGstRatePct,
+        });
       }
       if (lines.length === 0) {
-        lines.push({ description: 'Passenger transport by road', sac: '9964', taxableMinor: 0, gstRatePct: 0 });
+        lines.push({
+          description: 'Passenger transport by road',
+          sac: '9964',
+          taxableMinor: 0,
+          gstRatePct: 0,
+        });
       }
 
       const computed = computeGstInvoice({
@@ -108,7 +141,11 @@ export class InvoiceService {
       const customPrefix = await this.tenants.getInvoicePrefix();
       const invoicePrefix = customPrefix || 'INV';
       const sequence = await this.invoices.nextSequence(invoicePrefix, new Date());
-      const invoiceNumber = formatInvoiceNumber({ prefix: invoicePrefix, date: new Date(), sequence });
+      const invoiceNumber = formatInvoiceNumber({
+        prefix: invoicePrefix,
+        date: new Date(),
+        sequence,
+      });
 
       const invoiceId = await this.invoices.insert({
         bookingId,
@@ -128,19 +165,36 @@ export class InvoiceService {
   }
 
   /** Raise a credit note against a booking's tax invoice on cancellation. */
-  async creditNoteForBooking(bookingId: BookingId): Promise<{ invoiceId: string; invoiceNumber: string } | null> {
+  async creditNoteForBooking(
+    bookingId: BookingId,
+  ): Promise<{ invoiceId: string; invoiceNumber: string } | null> {
     return this.uow.run({ name: 'invoice.creditNote', tenantId: requireTenantId() }, async () => {
-      const existing = (await this.invoices.findByBooking(bookingId)) as { id: string; kind: string; invoiceNumber: string; interState: boolean; taxableMinor: number; taxTotalMinor: number; totalMinor: number; lines: Json; taxLines: Json }[];
+      const existing = (await this.invoices.findByBooking(bookingId)) as {
+        id: string;
+        kind: string;
+        invoiceNumber: string;
+        interState: boolean;
+        taxableMinor: number;
+        taxTotalMinor: number;
+        totalMinor: number;
+        lines: Json;
+        taxLines: Json;
+      }[];
       const original = existing.find((i) => i.kind === 'tax');
       if (!original) return null;
       // Idempotent: one credit note per booking.
       const priorCredit = existing.find((i) => i.kind === 'credit');
-      if (priorCredit) return { invoiceId: priorCredit.id, invoiceNumber: priorCredit.invoiceNumber };
+      if (priorCredit)
+        return { invoiceId: priorCredit.id, invoiceNumber: priorCredit.invoiceNumber };
 
       const customPrefix = await this.tenants.getInvoicePrefix();
       const creditPrefix = customPrefix ? `${customPrefix}-CN` : 'CRN';
       const sequence = await this.invoices.nextSequence(creditPrefix, new Date());
-      const invoiceNumber = formatInvoiceNumber({ prefix: creditPrefix, date: new Date(), sequence });
+      const invoiceNumber = formatInvoiceNumber({
+        prefix: creditPrefix,
+        date: new Date(),
+        sequence,
+      });
 
       const invoiceId = await this.invoices.insert({
         bookingId,
@@ -178,9 +232,16 @@ export class InvoiceService {
     const booking = await this.bookings.findForUpdate(bookingId);
     if (!booking?.contactEmail) return; // no email on file — nothing to send to
 
-    const invoiceRows = await this.invoices.findByBooking(bookingId) as {
-      invoiceNumber: string; interState: boolean; taxableMinor: number; taxTotalMinor: number;
-      roundOffMinor: number; totalMinor: number; supplierGstin: string | null; issuedAt: string; kind: string;
+    const invoiceRows = (await this.invoices.findByBooking(bookingId)) as {
+      invoiceNumber: string;
+      interState: boolean;
+      taxableMinor: number;
+      taxTotalMinor: number;
+      roundOffMinor: number;
+      totalMinor: number;
+      supplierGstin: string | null;
+      issuedAt: string;
+      kind: string;
     }[];
     const invoice = invoiceRows.find((r) => r.kind === 'tax');
     if (!invoice) return; // issueForBooking returned null (booking not confirmed yet) — nothing to email
@@ -190,10 +251,14 @@ export class InvoiceService {
     const route = await this.routes.getById(booking.routeId);
     const origin = route.path.stops[0];
     const destination = route.path.stops[route.path.stops.length - 1];
-    const stopIds = [origin?.stopId, destination?.stopId].filter((x): x is NonNullable<typeof x> => !!x);
+    const stopIds = [origin?.stopId, destination?.stopId].filter(
+      (x): x is NonNullable<typeof x> => !!x,
+    );
     const stopNames = await this.stops.loadMany(stopIds);
     const originName = origin ? (stopNames.get(origin.stopId)?.name ?? 'Origin') : 'Origin';
-    const destinationName = destination ? (stopNames.get(destination.stopId)?.name ?? 'Destination') : 'Destination';
+    const destinationName = destination
+      ? (stopNames.get(destination.stopId)?.name ?? 'Destination')
+      : 'Destination';
 
     const pdf = await renderInvoicePdf({
       invoiceNumber: invoice.invoiceNumber,
@@ -218,7 +283,13 @@ export class InvoiceService {
       to: booking.contactEmail,
       subject: `Tax Invoice ${invoice.invoiceNumber} — PNR ${booking.pnr}`,
       html: `<p>Please find attached the GST tax invoice for your booking (PNR ${booking.pnr}).</p><p>This is a computer-generated invoice and does not require a signature.</p>`,
-      attachments: [{ filename: `Invoice-${invoice.invoiceNumber}.pdf`, content: pdf, contentType: 'application/pdf' }],
+      attachments: [
+        {
+          filename: `Invoice-${invoice.invoiceNumber}.pdf`,
+          content: pdf,
+          contentType: 'application/pdf',
+        },
+      ],
       fromName: supplier?.legalName ?? undefined,
     });
   }

@@ -46,21 +46,43 @@ export class PayoutRepository {
    * actually pay, so the failure is visible (worker logs + retries the
    * event) instead of a payout quietly vanishing.
    */
-  async createFromSettlement(tenantId: string, settlementId: string, amountMinor: number, currency: string): Promise<string> {
+  async createFromSettlement(
+    tenantId: string,
+    settlementId: string,
+    amountMinor: number,
+    currency: string,
+  ): Promise<string> {
     return this.uow.run({ name: 'payout.create', bypassRls: true }, async (scope) => {
-      const bank = (await scope.client.query<{ bank_account_holder: string | null; bank_account_number: string | null; bank_ifsc: string | null }>(
-        `SELECT bank_account_holder, bank_account_number, bank_ifsc FROM tenants WHERE id = $1`,
-        [tenantId],
-      )).rows[0];
+      const bank = (
+        await scope.client.query<{
+          bank_account_holder: string | null;
+          bank_account_number: string | null;
+          bank_ifsc: string | null;
+        }>(
+          `SELECT bank_account_holder, bank_account_number, bank_ifsc FROM tenants WHERE id = $1`,
+          [tenantId],
+        )
+      ).rows[0];
       if (!bank?.bank_account_number || !bank.bank_ifsc || !bank.bank_account_holder) {
-        throw new Error(`Operator ${tenantId} has no bank details on file — cannot create payout instruction for settlement ${settlementId}`);
+        throw new Error(
+          `Operator ${tenantId} has no bank details on file — cannot create payout instruction for settlement ${settlementId}`,
+        );
       }
       const id = newId();
       await scope.client.query(
         `INSERT INTO payout_instructions (id, tenant_id, settlement_id, amount_minor, currency, beneficiary_name, bank_account_number, bank_ifsc)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
          ON CONFLICT (settlement_id) DO NOTHING`,
-        [id, tenantId, settlementId, amountMinor, currency, bank.bank_account_holder, bank.bank_account_number, bank.bank_ifsc],
+        [
+          id,
+          tenantId,
+          settlementId,
+          amountMinor,
+          currency,
+          bank.bank_account_holder,
+          bank.bank_account_number,
+          bank.bank_ifsc,
+        ],
       );
       return id;
     });
@@ -143,7 +165,11 @@ export class PayoutRepository {
    */
 
   /** Operator submits a change. Supersedes any earlier pending request for the same tenant (one at a time — see the partial unique index). */
-  async submitBankChangeRequest(tenantId: string, submittedBy: string | null, input: { accountHolder: string; accountNumber: string; ifsc: string; bankName?: string }): Promise<string> {
+  async submitBankChangeRequest(
+    tenantId: string,
+    submittedBy: string | null,
+    input: { accountHolder: string; accountNumber: string; ifsc: string; bankName?: string },
+  ): Promise<string> {
     return this.uow.run({ name: 'payout.submitBankChange', bypassRls: true }, async (scope) => {
       await scope.client.query(
         `UPDATE bank_account_change_requests SET status = 'rejected', rejection_reason = 'superseded by a newer request', reviewed_at = now()
@@ -154,45 +180,85 @@ export class PayoutRepository {
       await scope.client.query(
         `INSERT INTO bank_account_change_requests (id, tenant_id, account_holder, account_number, ifsc, bank_name, submitted_by)
          VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [id, tenantId, input.accountHolder, input.accountNumber, input.ifsc.toUpperCase(), input.bankName ?? null, submittedBy],
+        [
+          id,
+          tenantId,
+          input.accountHolder,
+          input.accountNumber,
+          input.ifsc.toUpperCase(),
+          input.bankName ?? null,
+          submittedBy,
+        ],
       );
       return id;
     });
   }
 
   /** The operator's own pending request, if any — so their bank-details page can show "under review". */
-  async pendingBankChangeRequest(tenantId: string): Promise<{ id: string; accountHolder: string; accountNumber: string; ifsc: string; createdAt: Date } | null> {
+  async pendingBankChangeRequest(tenantId: string): Promise<{
+    id: string;
+    accountHolder: string;
+    accountNumber: string;
+    ifsc: string;
+    createdAt: Date;
+  } | null> {
     return this.uow.run({ name: 'payout.pendingBankChange', bypassRls: true }, async (scope) => {
-      const result = await scope.client.query<{ id: string; account_holder: string; account_number: string; ifsc: string; created_at: Date }>(
+      const result = await scope.client.query<{
+        id: string;
+        account_holder: string;
+        account_number: string;
+        ifsc: string;
+        created_at: Date;
+      }>(
         `SELECT id, account_holder, account_number, ifsc, created_at FROM bank_account_change_requests
           WHERE tenant_id = $1 AND status = 'pending' ORDER BY created_at DESC LIMIT 1`,
         [tenantId],
       );
       const row = result.rows[0];
-      return row ? { id: row.id, accountHolder: row.account_holder, accountNumber: row.account_number, ifsc: row.ifsc, createdAt: row.created_at } : null;
+      return row
+        ? {
+            id: row.id,
+            accountHolder: row.account_holder,
+            accountNumber: row.account_number,
+            ifsc: row.ifsc,
+            createdAt: row.created_at,
+          }
+        : null;
     });
   }
 
   /** Every pending change request, across every operator — for the super-admin review queue. */
   async listPendingBankChangeRequests(): Promise<PendingBankChange[]> {
-    return this.uow.run({ name: 'payout.listPendingBankChanges', bypassRls: true }, async (scope) => {
-      const result = await scope.client.query<PendingBankChange>(
-        `SELECT r.id, r.tenant_id AS "tenantId", t.display_name AS "tenantName", r.account_holder AS "accountHolder",
+    return this.uow.run(
+      { name: 'payout.listPendingBankChanges', bypassRls: true },
+      async (scope) => {
+        const result = await scope.client.query<PendingBankChange>(
+          `SELECT r.id, r.tenant_id AS "tenantId", t.display_name AS "tenantName", r.account_holder AS "accountHolder",
                 r.account_number AS "accountNumber", r.ifsc, r.bank_name AS "bankName", r.created_at AS "createdAt"
            FROM bank_account_change_requests r JOIN tenants t ON t.id = r.tenant_id
           WHERE r.status = 'pending' ORDER BY r.created_at`,
-      );
-      return result.rows;
-    });
+        );
+        return result.rows;
+      },
+    );
   }
 
   /** Approve: copy the requested details into the tenant's ACTIVE payout account, atomically with marking the request approved. */
   async approveBankChange(requestId: string, reviewerId: string | null): Promise<void> {
     await this.uow.run({ name: 'payout.approveBankChange', bypassRls: true }, async (scope) => {
-      const req = (await scope.client.query<{ tenant_id: string; account_holder: string; account_number: string; ifsc: string; bank_name: string | null; status: string }>(
-        `SELECT tenant_id, account_holder, account_number, ifsc, bank_name, status FROM bank_account_change_requests WHERE id = $1 FOR UPDATE`,
-        [requestId],
-      )).rows[0];
+      const req = (
+        await scope.client.query<{
+          tenant_id: string;
+          account_holder: string;
+          account_number: string;
+          ifsc: string;
+          bank_name: string | null;
+          status: string;
+        }>(
+          `SELECT tenant_id, account_holder, account_number, ifsc, bank_name, status FROM bank_account_change_requests WHERE id = $1 FOR UPDATE`,
+          [requestId],
+        )
+      ).rows[0];
       if (!req) throw new Error('Bank change request not found');
       if (req.status !== 'pending') return; // idempotent — already reviewed
 
@@ -208,7 +274,11 @@ export class PayoutRepository {
     });
   }
 
-  async rejectBankChange(requestId: string, reviewerId: string | null, reason: string): Promise<void> {
+  async rejectBankChange(
+    requestId: string,
+    reviewerId: string | null,
+    reason: string,
+  ): Promise<void> {
     await this.uow.run({ name: 'payout.rejectBankChange', bypassRls: true }, async (scope) => {
       await scope.client.query(
         `UPDATE bank_account_change_requests SET status = 'rejected', rejection_reason = $3, reviewed_by = $2, reviewed_at = now()

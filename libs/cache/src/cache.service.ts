@@ -165,7 +165,11 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
         this.metrics.cacheOps.inc({ layer: 'l1', namespace: options.namespace, result: 'hit' });
         return hit.v;
       }
-      if (hit && options.staleWhileRevalidateSeconds && hit.e + options.staleWhileRevalidateSeconds * 1000 > now) {
+      if (
+        hit &&
+        options.staleWhileRevalidateSeconds &&
+        hit.e + options.staleWhileRevalidateSeconds * 1000 > now
+      ) {
         this.metrics.cacheOps.inc({ layer: 'l1', namespace: options.namespace, result: 'stale' });
         void this.refreshInBackground(fullKey, options, loader);
         return hit.v;
@@ -189,7 +193,10 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
           this.metrics.cacheOps.inc({ layer: 'l2', namespace: options.namespace, result: 'miss' });
         } catch (error) {
           this.metrics.cacheOps.inc({ layer: 'l2', namespace: options.namespace, result: 'error' });
-          this.log.warn({ err: (error as Error).message }, 'L2 read failed; falling through to loader');
+          this.log.warn(
+            { err: (error as Error).message },
+            'L2 read failed; falling through to loader',
+          );
         }
       }
 
@@ -200,7 +207,10 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Plain read. Returns `undefined` on miss — no loader is invoked. */
-  async get<T>(key: string, options: Pick<CacheOptions, 'namespace' | 'skipL1'>): Promise<T | undefined> {
+  async get<T>(
+    key: string,
+    options: Pick<CacheOptions, 'namespace' | 'skipL1'>,
+  ): Promise<T | undefined> {
     const fullKey = this.key(options.namespace, key);
     const now = Date.now();
 
@@ -339,7 +349,10 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 
   private async publishInvalidation(pattern: string): Promise<void> {
     try {
-      await this.redis?.publish(INVALIDATION_CHANNEL, JSON.stringify({ pattern, from: process.pid }));
+      await this.redis?.publish(
+        INVALIDATION_CHANNEL,
+        JSON.stringify({ pattern, from: process.pid }),
+      );
     } catch {
       /* best effort — L1 TTL bounds the staleness anyway */
     }

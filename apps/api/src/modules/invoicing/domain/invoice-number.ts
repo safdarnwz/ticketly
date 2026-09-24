@@ -30,8 +30,14 @@ export function financialYear(date: Date): string {
  * Format an invoice number from its parts.
  *   prefix / FY / zero-padded sequence   →   "INV/2026-27/000123"
  */
-export function formatInvoiceNumber(input: { prefix: string; date: Date; sequence: number; pad?: number }): string {
-  if (input.sequence < 1) throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Invoice sequence must be >= 1');
+export function formatInvoiceNumber(input: {
+  prefix: string;
+  date: Date;
+  sequence: number;
+  pad?: number;
+}): string {
+  if (input.sequence < 1)
+    throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Invoice sequence must be >= 1');
   const seq = String(input.sequence).padStart(input.pad ?? 6, '0');
   const prefix = (input.prefix || 'INV').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   return `${prefix}/${financialYear(input.date)}/${seq}`;

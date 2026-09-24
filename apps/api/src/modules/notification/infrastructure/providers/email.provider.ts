@@ -19,7 +19,13 @@ export class EmailNotificationProvider implements NotificationProvider {
 
   async send(req: SendRequest): Promise<SendResult> {
     try {
-      await this.mailer.send({ to: req.recipient, subject: req.subject ?? '(no subject)', html: req.body, text: req.body, fromName: req.fromName });
+      await this.mailer.send({
+        to: req.recipient,
+        subject: req.subject ?? '(no subject)',
+        html: req.body,
+        text: req.body,
+        fromName: req.fromName,
+      });
       return { ok: true };
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : 'send failed' };

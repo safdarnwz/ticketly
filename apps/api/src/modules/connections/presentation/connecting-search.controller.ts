@@ -14,8 +14,15 @@ export class ConnectingSearchController {
 
   @Get()
   @Public()
-  @ApiOperation({ summary: 'Two-leg connecting journeys across operators when no direct route exists (e.g. Delhi -> Kolkata -> Bhubaneswar) — layover between legs is always 2-24 hours' })
-  async find(@Query('originCityId') originCityId: string, @Query('destinationCityId') destinationCityId: string, @Query('date') date: string) {
+  @ApiOperation({
+    summary:
+      'Two-leg connecting journeys across operators when no direct route exists (e.g. Delhi -> Kolkata -> Bhubaneswar) — layover between legs is always 2-24 hours',
+  })
+  async find(
+    @Query('originCityId') originCityId: string,
+    @Query('destinationCityId') destinationCityId: string,
+    @Query('date') date: string,
+  ) {
     const options = await this.search.search(originCityId, destinationCityId, localDate(date));
     return { options };
   }

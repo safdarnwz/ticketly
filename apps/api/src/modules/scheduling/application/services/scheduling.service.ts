@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
-import { DomainError, ErrorCode, localDate, minuteOfDay, requireTenantId, type ServiceId } from '@kernel';
+import {
+  DomainError,
+  ErrorCode,
+  localDate,
+  minuteOfDay,
+  requireTenantId,
+  type ServiceId,
+} from '@kernel';
 
 import { expandRecurrence, type RecurrenceRule } from '../../domain/recurrence';
 import { MaterializationService } from './materialization.service';
@@ -22,15 +29,22 @@ export class SchedulingService {
   ) {}
 
   async createService(input: {
-    code: string; routeId: string; vehicleTypeId: string; defaultVehicleId?: string;
-    startTime: string; recurrence: RecurrenceRule;
+    code: string;
+    routeId: string;
+    vehicleTypeId: string;
+    defaultVehicleId?: string;
+    startTime: string;
+    recurrence: RecurrenceRule;
   }): Promise<ServiceId> {
     // Validate the recurrence rule up front (throws on a bad rule) and confirm
     // the route is published.
     expandRecurrence(input.recurrence, input.recurrence.startDate, input.recurrence.startDate);
     const route = await this.routes.getById(input.routeId as never);
     if (route.status !== 'published') {
-      throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Route must be published before a service can run on it');
+      throw new DomainError(
+        ErrorCode.COMMON_VALIDATION,
+        'Route must be published before a service can run on it',
+      );
     }
 
     return this.uow.run({ name: 'service.create', tenantId: requireTenantId() }, async () =>

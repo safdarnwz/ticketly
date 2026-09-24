@@ -4,7 +4,10 @@ import { Reflector } from '@nestjs/core';
 import type { PermissionValue } from '@contracts';
 import { ForbiddenError, getContext } from '@kernel';
 
-import { REQUIRE_PERMISSION_KEY, REQUIRE_PERMISSION_MODE } from '../decorators/require-permission.decorator';
+import {
+  REQUIRE_PERMISSION_KEY,
+  REQUIRE_PERMISSION_MODE,
+} from '../decorators/require-permission.decorator';
 import { REQUIRE_PLATFORM_ADMIN_KEY } from '../decorators/require-platform-admin.decorator';
 
 /**
@@ -31,12 +34,14 @@ export class PermissionGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const requiresPlatformAdmin = this.reflector.getAllAndOverride<boolean>(REQUIRE_PLATFORM_ADMIN_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiresPlatformAdmin = this.reflector.getAllAndOverride<boolean>(
+      REQUIRE_PLATFORM_ADMIN_KEY,
+      [context.getHandler(), context.getClass()],
+    );
     if (requiresPlatformAdmin && getContext()?.tenantId) {
-      throw new ForbiddenError({ message: 'This action requires a platform (non-tenant) principal' });
+      throw new ForbiddenError({
+        message: 'This action requires a platform (non-tenant) principal',
+      });
     }
 
     const required = this.reflector.getAllAndOverride<PermissionValue[]>(REQUIRE_PERMISSION_KEY, [
@@ -45,10 +50,11 @@ export class PermissionGuard implements CanActivate {
     ]);
     if (!required || required.length === 0) return true;
 
-    const mode = this.reflector.getAllAndOverride<'all' | 'any'>(REQUIRE_PERMISSION_MODE, [
-      context.getHandler(),
-      context.getClass(),
-    ]) ?? 'all';
+    const mode =
+      this.reflector.getAllAndOverride<'all' | 'any'>(REQUIRE_PERMISSION_MODE, [
+        context.getHandler(),
+        context.getClass(),
+      ]) ?? 'all';
 
     const permissions = getContext()?.permissions ?? new Set<string>();
     if (permissions.has('*')) return true;

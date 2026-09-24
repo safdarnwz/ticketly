@@ -74,14 +74,30 @@ export class PlanRepository {
     return rows.map(mapPlan);
   }
 
-  async create(input: { code: string; name: string; monthlyPrice: number; currency: string; features: Record<string, boolean>; quotas: Record<string, number | null>; sortOrder: number }): Promise<string> {
+  async create(input: {
+    code: string;
+    name: string;
+    monthlyPrice: number;
+    currency: string;
+    features: Record<string, boolean>;
+    quotas: Record<string, number | null>;
+    sortOrder: number;
+  }): Promise<string> {
     const row = await this.db.queryOne<{ id: string }>(
       `INSERT INTO plans (id, code, name, monthly_price, currency, sort_order, features, quotas)
        VALUES (uuid_generate_v7(), $1,$2,$3,$4,$5,$6,$7)
        ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, monthly_price = EXCLUDED.monthly_price,
          features = EXCLUDED.features, quotas = EXCLUDED.quotas
        RETURNING id`,
-      [input.code, input.name, input.monthlyPrice, input.currency, input.sortOrder, JSON.stringify(input.features), JSON.stringify(input.quotas)],
+      [
+        input.code,
+        input.name,
+        input.monthlyPrice,
+        input.currency,
+        input.sortOrder,
+        JSON.stringify(input.features),
+        JSON.stringify(input.quotas),
+      ],
       { name: 'plan.create', primary: true },
     );
     await this.cache.invalidatePrefix(CacheNamespace.TENANT);
@@ -89,7 +105,10 @@ export class PlanRepository {
   }
 
   async setActive(id: string, isActive: boolean): Promise<void> {
-    await this.db.execute_(`UPDATE plans SET is_active = $2 WHERE id = $1`, [id, isActive], { name: 'plan.setActive', primary: true });
+    await this.db.execute_(`UPDATE plans SET is_active = $2 WHERE id = $1`, [id, isActive], {
+      name: 'plan.setActive',
+      primary: true,
+    });
     await this.cache.invalidatePrefix(CacheNamespace.TENANT);
   }
 }

@@ -43,7 +43,10 @@ describe('evaluateDocument — happy / negative / edge', () => {
   });
 
   it('edge: a document not yet in effect (future validFrom) is treated as missing', () => {
-    const e = evaluateDocument({ type: 'permit', validFrom: localDate('2026-04-01'), expiresOn: localDate('2027-04-01') }, TODAY);
+    const e = evaluateDocument(
+      { type: 'permit', validFrom: localDate('2026-04-01'), expiresOn: localDate('2027-04-01') },
+      TODAY,
+    );
     expect(e.status).toBe('missing');
   });
 

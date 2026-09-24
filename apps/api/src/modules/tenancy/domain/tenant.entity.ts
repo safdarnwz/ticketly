@@ -54,17 +54,20 @@ export class Tenant extends AggregateRoot<TenantId> {
     return new Tenant(id, props, version);
   }
 
-  static provision(id: TenantId, input: {
-    slug: string;
-    legalName: string;
-    displayName: string;
-    contactEmail: string;
-    contactPhone?: string | null;
-    planId?: Uuid | null;
-    timezone?: string;
-    currency?: string;
-    locale?: string;
-  }): Tenant {
+  static provision(
+    id: TenantId,
+    input: {
+      slug: string;
+      legalName: string;
+      displayName: string;
+      contactEmail: string;
+      contactPhone?: string | null;
+      planId?: Uuid | null;
+      timezone?: string;
+      currency?: string;
+      locale?: string;
+    },
+  ): Tenant {
     const tenant = new Tenant(
       id,
       {
@@ -102,12 +105,21 @@ export class Tenant extends AggregateRoot<TenantId> {
   activate(): void {
     if (this.props.status === 'active') return;
     if (this.props.status === 'closed') {
-      throw new DomainError(ErrorCode.BOOKING_INVALID_STATE, 'A closed operator cannot be re-activated');
+      throw new DomainError(
+        ErrorCode.BOOKING_INVALID_STATE,
+        'A closed operator cannot be re-activated',
+      );
     }
     this.props.status = 'active';
     this.props.suspendedReason = null;
     this.record(
-      createEvent({ type: 'tenant.activated', aggregateType: 'tenant', aggregateId: this.id, tenantId: this.id, payload: {} }),
+      createEvent({
+        type: 'tenant.activated',
+        aggregateType: 'tenant',
+        aggregateId: this.id,
+        tenantId: this.id,
+        payload: {},
+      }),
     );
   }
 
@@ -134,11 +146,30 @@ export class Tenant extends AggregateRoot<TenantId> {
   changePlan(planId: Uuid): void {
     this.props.planId = planId;
     this.record(
-      createEvent({ type: 'tenant.plan_changed', aggregateType: 'tenant', aggregateId: this.id, tenantId: this.id, payload: { planId } }),
+      createEvent({
+        type: 'tenant.plan_changed',
+        aggregateType: 'tenant',
+        aggregateId: this.id,
+        tenantId: this.id,
+        payload: { planId },
+      }),
     );
   }
 
-  updateProfile(patch: Partial<Pick<TenantProps, 'displayName' | 'contactEmail' | 'contactPhone' | 'timezone' | 'currency' | 'locale' | 'settings'>>): void {
+  updateProfile(
+    patch: Partial<
+      Pick<
+        TenantProps,
+        | 'displayName'
+        | 'contactEmail'
+        | 'contactPhone'
+        | 'timezone'
+        | 'currency'
+        | 'locale'
+        | 'settings'
+      >
+    >,
+  ): void {
     Object.assign(this.props, patch);
   }
 

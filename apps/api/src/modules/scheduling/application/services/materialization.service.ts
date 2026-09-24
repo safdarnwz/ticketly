@@ -3,8 +3,17 @@ import { Injectable } from '@nestjs/common';
 import { AppConfig } from '@config';
 import { UnitOfWork } from '@database';
 import {
-  addDays, todayIn, localDate, requireTenantId, toInstant,
-  type LocalDate, type ServiceId, type TripId, type TimeZone, type SeatLayoutId, type VehicleId
+  addDays,
+  todayIn,
+  localDate,
+  requireTenantId,
+  toInstant,
+  type LocalDate,
+  type ServiceId,
+  type TripId,
+  type TimeZone,
+  type SeatLayoutId,
+  type VehicleId,
 } from '@kernel';
 import { DomainError, ErrorCode } from '@kernel';
 import { EventBus } from '@messaging';
@@ -16,7 +25,11 @@ import { RouteRepository } from '../../../master-data/infrastructure/persistence
 import { FleetService } from '../../../fleet/application/services/fleet.service';
 import { datesToMaterialise } from '../../domain/recurrence';
 import { ServiceRepository } from '../../infrastructure/persistence/service.repository';
-import { TripRepository, type SeatInit, type TripStopRow } from '../../infrastructure/persistence/trip.repository';
+import {
+  TripRepository,
+  type SeatInit,
+  type TripStopRow,
+} from '../../infrastructure/persistence/trip.repository';
 
 /**
  * ============================================================================
@@ -82,7 +95,12 @@ export class MaterializationService {
     const horizonEnd = addDays(today, horizonDays ?? this.config.domain.inventoryHorizonDays);
 
     const already = await this.services.materialisedDates(serviceId);
-    const dates = datesToMaterialise(service.recurrence, today, horizonEnd, already.map((d) => localDate(d)));
+    const dates = datesToMaterialise(
+      service.recurrence,
+      today,
+      horizonEnd,
+      already.map((d) => localDate(d)),
+    );
 
     const seatInit: SeatInit[] = layout.seatMap.toJSON().seats.map((s) => ({
       seatNumber: s.number,
@@ -149,7 +167,10 @@ export class MaterializationService {
     // Road-legality check for the default vehicle on this journey date.
     let vehicleId = service.defaultVehicleId;
     if (vehicleId && !(await this.fleet.isRoadLegalOn(vehicleId, journeyDate))) {
-      this.log.warn({ vehicleId, journeyDate }, 'default vehicle not road-legal on date; leaving unassigned');
+      this.log.warn(
+        { vehicleId, journeyDate },
+        'default vehicle not road-legal on date; leaving unassigned',
+      );
       vehicleId = null;
     }
     // Permit-category check, separate from the document-expiry check above —
@@ -158,32 +179,38 @@ export class MaterializationService {
     // of whether its permit document is currently valid. See
     // isPermittedForIndividualSale's own doc comment for the full reasoning.
     if (vehicleId && !(await this.fleet.isPermittedForIndividualSale(vehicleId))) {
-      this.log.warn({ vehicleId, journeyDate }, 'default vehicle is not permitted for individual-seat sale (contract-carriage or unrecorded permit type); leaving unassigned');
+      this.log.warn(
+        { vehicleId, journeyDate },
+        'default vehicle is not permitted for individual-seat sale (contract-carriage or unrecorded permit type); leaving unassigned',
+      );
       vehicleId = null;
     }
 
-    return this.uow.run<TripId>({ name: 'trip.materialise', tenantId: requireTenantId() }, async () => {
-      const tripId = await this.trips.insertTrip({
-        serviceId: service.id,
-        routeId: service.routeId,
-        vehicleId,
-        seatLayoutId,
-        journeyDate,
-        departsAt,
-        arrivesAt,
-        stopCount: stops.length,
-        stops,
-        seats: seatInit,
-        extra,
-      });
-      this.events.publish({
-        type: extra ? 'trip.extra_created' : 'trip.materialised',
-        aggregateType: 'trip',
-        aggregateId: tripId,
-        payload: { serviceId: service.id, journeyDate, seats: seatInit.length },
-      });
-      return tripId;
-    });
+    return this.uow.run<TripId>(
+      { name: 'trip.materialise', tenantId: requireTenantId() },
+      async () => {
+        const tripId = await this.trips.insertTrip({
+          serviceId: service.id,
+          routeId: service.routeId,
+          vehicleId,
+          seatLayoutId,
+          journeyDate,
+          departsAt,
+          arrivesAt,
+          stopCount: stops.length,
+          stops,
+          seats: seatInit,
+          extra,
+        });
+        this.events.publish({
+          type: extra ? 'trip.extra_created' : 'trip.materialised',
+          aggregateType: 'trip',
+          aggregateId: tripId,
+          payload: { serviceId: service.id, journeyDate, seats: seatInit.length },
+        });
+        return tripId;
+      },
+    );
   }
 
   /**
@@ -196,47 +223,120 @@ export class MaterializationService {
    * never blocks the others (bulk festival specials).
    */
   async createExtraTrips(input: {
-    serviceId: ServiceId; journeyDates: LocalDate[]; departureMinute?: number; vehicleId?: VehicleId | null;
-    reason: string; openForSale: boolean; ladiesSpecial: boolean; allowOverlap: boolean;
-  }): Promise<{ created: { tripId: TripId; journeyDate: string }[]; skipped: { journeyDate: string; reason: string }[] }> {
+    serviceId: ServiceId;
+    journeyDates: LocalDate[];
+    departureMinute?: number;
+    vehicleId?: VehicleId | null;
+    reason: string;
+    openForSale: boolean;
+    ladiesSpecial: boolean;
+    allowOverlap: boolean;
+  }): Promise<{
+    created: { tripId: TripId; journeyDate: string }[];
+    skipped: { journeyDate: string; reason: string }[];
+  }> {
     const reason = input.reason?.trim() ?? '';
-    if (reason.length < 3) throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Give a reason for the extra trip (e.g. "Diwali rush")');
+    if (reason.length < 3)
+      throw new DomainError(
+        ErrorCode.COMMON_VALIDATION,
+        'Give a reason for the extra trip (e.g. "Diwali rush")',
+      );
     const dates = [...new Set(input.journeyDates)].sort();
-    if (dates.length === 0 || dates.length > 31) throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Choose 1 to 31 dates');
-    if (input.departureMinute !== undefined && !(Number.isInteger(input.departureMinute) && input.departureMinute >= 0 && input.departureMinute < 1440)) {
-      throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Departure time must be between 00:00 and 23:59');
+    if (dates.length === 0 || dates.length > 31)
+      throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Choose 1 to 31 dates');
+    if (
+      input.departureMinute !== undefined &&
+      !(
+        Number.isInteger(input.departureMinute) &&
+        input.departureMinute >= 0 &&
+        input.departureMinute < 1440
+      )
+    ) {
+      throw new DomainError(
+        ErrorCode.COMMON_VALIDATION,
+        'Departure time must be between 00:00 and 23:59',
+      );
     }
     const service = await this.services.getById(input.serviceId);
-    if (service.status !== 'active') throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Extra trips can only be added to an active service');
+    if (service.status !== 'active')
+      throw new DomainError(
+        ErrorCode.COMMON_VALIDATION,
+        'Extra trips can only be added to an active service',
+      );
     const route = await this.routes.getById(service.routeId);
     const vehicleType = await this.vehicleTypes.getById(service.vehicleTypeId);
-    if (!vehicleType.seatLayoutId) throw new DomainError(ErrorCode.COMMON_VALIDATION, 'The service bus type has no seat layout');
+    if (!vehicleType.seatLayoutId)
+      throw new DomainError(ErrorCode.COMMON_VALIDATION, 'The service bus type has no seat layout');
     const layout = await this.layouts.getById(vehicleType.seatLayoutId);
     const seatInit: SeatInit[] = layout.seatMap.toJSON().seats.map((s) => ({
-      seatNumber: s.number, seatType: s.type, isBookable: s.bookable !== false, ladiesOnly: input.ladiesSpecial || s.ladiesOnly === true,
+      seatNumber: s.number,
+      seatType: s.type,
+      isBookable: s.bookable !== false,
+      ladiesOnly: input.ladiesSpecial || s.ladiesOnly === true,
     }));
     const tz = this.config.domain.timezone;
     const today = todayIn(tz);
-    const effective = { ...service, startMinute: input.departureMinute ?? service.startMinute, defaultVehicleId: input.vehicleId ?? null };
+    const effective = {
+      ...service,
+      startMinute: input.departureMinute ?? service.startMinute,
+      defaultVehicleId: input.vehicleId ?? null,
+    };
 
     const created: { tripId: TripId; journeyDate: string }[] = [];
     const skipped: { journeyDate: string; reason: string }[] = [];
     for (const d of dates) {
       const journeyDate = localDate(d);
-      if (journeyDate < today) { skipped.push({ journeyDate: d, reason: 'date is in the past' }); continue; }
+      if (journeyDate < today) {
+        skipped.push({ journeyDate: d, reason: 'date is in the past' });
+        continue;
+      }
       try {
         const departs = toInstant(journeyDate, effective.startMinute, tz);
-        if (departs.getTime() <= Date.now()) { skipped.push({ journeyDate: d, reason: 'departure time has already passed' }); continue; }
+        if (departs.getTime() <= Date.now()) {
+          skipped.push({ journeyDate: d, reason: 'departure time has already passed' });
+          continue;
+        }
         if (!input.allowOverlap) {
           const near = await this.trips.tripsNear(service.routeId, departs, 30);
-          if (near > 0) { skipped.push({ journeyDate: d, reason: 'another trip on this route leaves within 30 minutes — set allowOverlap to create it anyway' }); continue; }
+          if (near > 0) {
+            skipped.push({
+              journeyDate: d,
+              reason:
+                'another trip on this route leaves within 30 minutes — set allowOverlap to create it anyway',
+            });
+            continue;
+          }
         }
         const last = route.path.stops[route.path.stops.length - 1];
-        const durationMin = last ? last.arrivalDayOffset * 1440 + last.arrivalMinute - (route.path.stops[0].departDayOffset * 1440 + route.path.stops[0].departMinute) : 0;
-        if (input.vehicleId && await this.trips.vehicleBusyAround(input.vehicleId, departs, durationMin)) {
-          skipped.push({ journeyDate: d, reason: 'the chosen bus is already running another trip at that time' }); continue;
+        const durationMin = last
+          ? last.arrivalDayOffset * 1440 +
+            last.arrivalMinute -
+            (route.path.stops[0].departDayOffset * 1440 + route.path.stops[0].departMinute)
+          : 0;
+        if (
+          input.vehicleId &&
+          (await this.trips.vehicleBusyAround(input.vehicleId, departs, durationMin))
+        ) {
+          skipped.push({
+            journeyDate: d,
+            reason: 'the chosen bus is already running another trip at that time',
+          });
+          continue;
         }
-        const tripId = await this.materialiseOne(effective, route, layout.id, seatInit, journeyDate, tz, { isExtra: true, reason, ladiesSpecial: input.ladiesSpecial, closedChannels: input.openForSale ? [] : ['direct_web', 'agent', 'ota', 'phone'] });
+        const tripId = await this.materialiseOne(
+          effective,
+          route,
+          layout.id,
+          seatInit,
+          journeyDate,
+          tz,
+          {
+            isExtra: true,
+            reason,
+            ladiesSpecial: input.ladiesSpecial,
+            closedChannels: input.openForSale ? [] : ['direct_web', 'agent', 'ota', 'phone'],
+          },
+        );
         created.push({ tripId, journeyDate: d });
       } catch (e) {
         skipped.push({ journeyDate: d, reason: e instanceof Error ? e.message : 'failed' });

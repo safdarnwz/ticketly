@@ -26,8 +26,8 @@ export class RealtimeController {
   @Sse('trips/:tripId/seats')
   @ApiOperation({ summary: 'Live seat-availability stream (SSE)' })
   seats(@Param('tripId') tripId: string): Observable<MessageEvent> {
-    return this.realtime.stream(tripId as TripId).pipe(
-      map((u: SeatUpdate): MessageEvent => ({ type: u.type, data: u.data })),
-    );
+    return this.realtime
+      .stream(tripId as TripId)
+      .pipe(map((u: SeatUpdate): MessageEvent => ({ type: u.type, data: u.data })));
   }
 }

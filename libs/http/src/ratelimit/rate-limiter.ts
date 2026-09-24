@@ -121,8 +121,7 @@ export class RateLimiter {
   ): RateLimitResult {
     const windowStart = Math.floor(now / windowMs) * windowMs;
     const entry = this.local.get(key);
-    const bucket =
-      entry && entry.windowStart === windowStart ? entry : { count: 0, windowStart };
+    const bucket = entry && entry.windowStart === windowStart ? entry : { count: 0, windowStart };
 
     if (bucket.count + cost > limit) {
       return {

@@ -73,7 +73,9 @@ export class RoutePath {
   /** Reconstruct the original RouteStopInput[] this path was built from — used to duplicate a route without re-deriving fragile timing math by hand. */
   toRouteStopInputs(): RouteStopInput[] {
     return this.stops.map((s) => ({
-      stopId: s.stopId, sequence: s.sequence, distanceFromOriginM: s.distanceFromOriginM,
+      stopId: s.stopId,
+      sequence: s.sequence,
+      distanceFromOriginM: s.distanceFromOriginM,
       departOffsetMin: s.departDayOffset * 1440 + s.departMinute - this.startMinute,
     }));
   }
@@ -96,7 +98,9 @@ export class RoutePath {
     // Sequences must be unique and strictly increasing from 0.
     for (let i = 0; i < sorted.length; i += 1) {
       if (sorted[i].sequence !== i) {
-        throw fail(`Stop sequences must be 0,1,2,… with no gaps (found ${sorted[i].sequence} at position ${i})`);
+        throw fail(
+          `Stop sequences must be 0,1,2,… with no gaps (found ${sorted[i].sequence} at position ${i})`,
+        );
       }
     }
 
@@ -105,7 +109,9 @@ export class RoutePath {
     const computed: ComputedStop[] = sorted.map((stop, index) => {
       // Monotonic distance and time — you cannot travel backwards.
       if (stop.distanceFromOriginM < prevDistance) {
-        throw fail(`Distance decreases at stop ${index} (${stop.distanceFromOriginM}m after ${prevDistance}m)`);
+        throw fail(
+          `Distance decreases at stop ${index} (${stop.distanceFromOriginM}m after ${prevDistance}m)`,
+        );
       }
       if (index === 0) {
         if (stop.departOffsetMin !== 0) throw fail('The origin stop must depart at offset 0');
@@ -172,7 +178,8 @@ export class RoutePath {
           toSequence: to.sequence,
           distanceM: to.distanceFromOriginM - from.distanceFromOriginM,
           durationMin:
-            (to.arrivalDayOffset * 1440 + to.arrivalMinute) -
+            to.arrivalDayOffset * 1440 +
+            to.arrivalMinute -
             (from.departDayOffset * 1440 + from.departMinute),
         });
       }

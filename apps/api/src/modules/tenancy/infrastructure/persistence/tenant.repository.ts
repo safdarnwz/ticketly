@@ -79,10 +79,23 @@ export class TenantRepository {
           settings, feature_overrides, suspended_reason, version, created_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
       [
-        tenant.id, p.slug, p.legalName, p.displayName, p.status, p.planId, p.primaryDomain,
-        p.contactEmail, p.contactPhone, p.timezone, p.currency, p.locale,
-        JSON.stringify(p.settings), JSON.stringify(p.featureOverrides), p.suspendedReason,
-        tenant.version, p.createdAt,
+        tenant.id,
+        p.slug,
+        p.legalName,
+        p.displayName,
+        p.status,
+        p.planId,
+        p.primaryDomain,
+        p.contactEmail,
+        p.contactPhone,
+        p.timezone,
+        p.currency,
+        p.locale,
+        JSON.stringify(p.settings),
+        JSON.stringify(p.featureOverrides),
+        p.suspendedReason,
+        tenant.version,
+        p.createdAt,
       ],
       { name: 'tenant.insert', primary: true },
     );
@@ -99,9 +112,20 @@ export class TenantRepository {
          version = version + 1, updated_at = now()
        WHERE id=$1 AND version=$15 AND deleted_at IS NULL`,
       [
-        tenant.id, p.legalName, p.displayName, p.status, p.planId, p.primaryDomain,
-        p.contactEmail, p.contactPhone, p.timezone, p.currency, p.locale,
-        JSON.stringify(p.settings), JSON.stringify(p.featureOverrides), p.suspendedReason,
+        tenant.id,
+        p.legalName,
+        p.displayName,
+        p.status,
+        p.planId,
+        p.primaryDomain,
+        p.contactEmail,
+        p.contactPhone,
+        p.timezone,
+        p.currency,
+        p.locale,
+        JSON.stringify(p.settings),
+        JSON.stringify(p.featureOverrides),
+        p.suspendedReason,
         expectedVersion,
       ],
       { name: 'tenant.update', primary: true },
@@ -119,7 +143,17 @@ export class TenantRepository {
   }
 
   /** Platform-admin listing — every operator, newest first. Not tenant-scoped by design. */
-  async list(): Promise<Array<{ id: TenantId; slug: string; displayName: string; status: TenantStatus; contactEmail: string; suspendedReason: string | null; createdAt: Date }>> {
+  async list(): Promise<
+    Array<{
+      id: TenantId;
+      slug: string;
+      displayName: string;
+      status: TenantStatus;
+      contactEmail: string;
+      suspendedReason: string | null;
+      createdAt: Date;
+    }>
+  > {
     return this.db.query(
       `SELECT id, slug, display_name AS "displayName", status, contact_email AS "contactEmail",
               suspended_reason AS "suspendedReason", created_at AS "createdAt"
@@ -130,7 +164,11 @@ export class TenantRepository {
   }
 
   /** Set (true/false) or clear (null) one per-operator feature override. */
-  async setFeatureOverride(tenantId: string, feature: string, enabled: boolean | null): Promise<void> {
+  async setFeatureOverride(
+    tenantId: string,
+    feature: string,
+    enabled: boolean | null,
+  ): Promise<void> {
     await this.db.execute_(
       enabled === null
         ? `UPDATE tenants SET feature_overrides = feature_overrides - $2 WHERE id = $1`
@@ -144,16 +182,17 @@ export class TenantRepository {
   async clearFeatureEverywhere(feature: string): Promise<string[]> {
     const rows = await this.db.query<{ id: string }>(
       `UPDATE tenants SET feature_overrides = feature_overrides - $1 WHERE feature_overrides ? $1 RETURNING id`,
-      [feature], { name: 'tenant.clearFeature', primary: true });
+      [feature],
+      { name: 'tenant.clearFeature', primary: true },
+    );
     return rows.map((r) => r.id);
   }
 
   async changePlan(tenantId: string, planId: string): Promise<void> {
-    await this.db.execute_(
-      `UPDATE tenants SET plan_id = $2 WHERE id = $1`,
-      [tenantId, planId],
-      { name: 'tenant.changePlan', primary: true },
-    );
+    await this.db.execute_(`UPDATE tenants SET plan_id = $2 WHERE id = $1`, [tenantId, planId], {
+      name: 'tenant.changePlan',
+      primary: true,
+    });
   }
 
   /** Platform-wide counts by status — for the super-admin analytics dashboard. */
@@ -166,7 +205,11 @@ export class TenantRepository {
       [],
       { name: 'tenant.countsByStatus', primary: true },
     );
-    return { active: Number(row?.active ?? 0), suspended: Number(row?.suspended ?? 0), total: Number(row?.total ?? 0) };
+    return {
+      active: Number(row?.active ?? 0),
+      suspended: Number(row?.suspended ?? 0),
+      total: Number(row?.total ?? 0),
+    };
   }
 
   private toDomain(row: TenantRow): Tenant {
@@ -198,27 +241,50 @@ export class TenantRepository {
    * anymore — an operator changing their own account without a human
    * reviewing it first is exactly the anti-fraud gap this closes.
    */
-  async getBankDetails(tenantId?: string): Promise<{ accountHolder: string | null; accountNumber: string | null; ifsc: string | null; bankName: string | null; updatedAt: Date | null } | null> {
-    const row = await this.db.queryOne<{ bank_account_holder: string | null; bank_account_number: string | null; bank_ifsc: string | null; bank_name: string | null; bank_details_updated_at: Date | null }>(
+  async getBankDetails(tenantId?: string): Promise<{
+    accountHolder: string | null;
+    accountNumber: string | null;
+    ifsc: string | null;
+    bankName: string | null;
+    updatedAt: Date | null;
+  } | null> {
+    const row = await this.db.queryOne<{
+      bank_account_holder: string | null;
+      bank_account_number: string | null;
+      bank_ifsc: string | null;
+      bank_name: string | null;
+      bank_details_updated_at: Date | null;
+    }>(
       `SELECT bank_account_holder, bank_account_number, bank_ifsc, bank_name, bank_details_updated_at FROM tenants WHERE id = $1`,
       [tenantId ?? requireTenantId()],
       { name: 'tenant.getBankDetails', primary: true },
     );
     if (!row) return null;
     return {
-      accountHolder: row.bank_account_holder, accountNumber: row.bank_account_number,
-      ifsc: row.bank_ifsc, bankName: row.bank_name, updatedAt: row.bank_details_updated_at,
+      accountHolder: row.bank_account_holder,
+      accountNumber: row.bank_account_number,
+      ifsc: row.bank_ifsc,
+      bankName: row.bank_name,
+      updatedAt: row.bank_details_updated_at,
     };
   }
 
   /** GSTIN + registered address + legal name for tax-invoice/e-ticket issuance (CGST Rule 46 mandatory supplier fields) — see migration 0036. */
-  async getGstDetails(tenantId?: string): Promise<{ legalName: string; gstin: string | null; registeredAddress: string | null } | null> {
-    const row = await this.db.queryOne<{ legal_name: string; gstin: string | null; registered_address: string | null }>(
+  async getGstDetails(
+    tenantId?: string,
+  ): Promise<{ legalName: string; gstin: string | null; registeredAddress: string | null } | null> {
+    const row = await this.db.queryOne<{
+      legal_name: string;
+      gstin: string | null;
+      registered_address: string | null;
+    }>(
       `SELECT legal_name, gstin, registered_address FROM tenants WHERE id = $1`,
       [tenantId ?? requireTenantId()],
       { name: 'tenant.getGstDetails', primary: true },
     );
-    return row ? { legalName: row.legal_name, gstin: row.gstin, registeredAddress: row.registered_address } : null;
+    return row
+      ? { legalName: row.legal_name, gstin: row.gstin, registeredAddress: row.registered_address }
+      : null;
   }
 
   /**
@@ -249,7 +315,11 @@ export class TenantRepository {
     );
   }
 
-  async setLogoFile(input: { fileId: string; objectKey: string; url: string | null }): Promise<void> {
+  async setLogoFile(input: {
+    fileId: string;
+    objectKey: string;
+    url: string | null;
+  }): Promise<void> {
     await this.db.execute_(
       `UPDATE tenants SET settings = settings || jsonb_build_object('logoFileId', $2::text, 'logoObjectKey', $3::text, 'logoCdnUrl', $4::text),
               version = version + 1 WHERE id = $1`,

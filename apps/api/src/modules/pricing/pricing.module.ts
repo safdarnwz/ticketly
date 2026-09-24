@@ -26,7 +26,13 @@ import { PricingService } from './application/services/pricing.service';
  * a coupon atomically inside the booking transaction.
  */
 @Module({
-  imports: [DatabaseModule, CacheModule, SchedulingModule, MasterDataModule, PlatformSettingsModule],
+  imports: [
+    DatabaseModule,
+    CacheModule,
+    SchedulingModule,
+    MasterDataModule,
+    PlatformSettingsModule,
+  ],
   controllers: [PricingController],
   providers: [FareRepository, CouponRepository, PricingService],
   exports: [FareRepository, CouponRepository, PricingService],

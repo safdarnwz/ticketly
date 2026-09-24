@@ -18,7 +18,11 @@ import { FileController } from './presentation/file.controller';
   controllers: [FileController],
   providers: [
     StoredFileRepository,
-    { provide: OBJECT_STORAGE, useFactory: (config: AppConfig, db: DatabaseService) => createStorage(config.storage, db), inject: [AppConfig, DatabaseService] },
+    {
+      provide: OBJECT_STORAGE,
+      useFactory: (config: AppConfig, db: DatabaseService) => createStorage(config.storage, db),
+      inject: [AppConfig, DatabaseService],
+    },
     FileService,
   ],
   exports: [StoredFileRepository, FileService, OBJECT_STORAGE],

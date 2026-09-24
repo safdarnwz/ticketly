@@ -61,7 +61,16 @@ export class RouteRepository {
     await this.db.execute_(
       `INSERT INTO routes (id, tenant_id, code, name, origin_city_id, dest_city_id, total_distance_m, total_duration_min)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [id, tenantId, input.code.trim(), input.name.trim(), input.originCityId, input.destCityId, path.totalDistanceM, path.totalDurationMin],
+      [
+        id,
+        tenantId,
+        input.code.trim(),
+        input.name.trim(),
+        input.originCityId,
+        input.destCityId,
+        path.totalDistanceM,
+        path.totalDurationMin,
+      ],
       { name: 'route.create', primary: true },
     );
 
@@ -70,9 +79,16 @@ export class RouteRepository {
     const rowSql = input.stops.map((s, i) => {
       const b = i * 10;
       params.push(
-        newId(), tenantId, id, s.stopId, s.sequence,
-        s.distanceFromOriginM, s.departOffsetMin, s.dwellMin ?? 0,
-        s.canBoard ?? true, s.canAlight ?? true,
+        newId(),
+        tenantId,
+        id,
+        s.stopId,
+        s.sequence,
+        s.distanceFromOriginM,
+        s.departOffsetMin,
+        s.dwellMin ?? 0,
+        s.canBoard ?? true,
+        s.canAlight ?? true,
       );
       return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7},$${b + 8},$${b + 9},$${b + 10})`;
     });
@@ -160,8 +176,15 @@ export class RouteRepository {
     return rows.map((r) => r.id);
   }
 
-  async list(status?: RouteStatus): Promise<{ id: RouteId; code: string; name: string; status: RouteStatus }[]> {
-    const rows = await this.db.query<{ id: RouteId; code: string; name: string; status: RouteStatus }>(
+  async list(
+    status?: RouteStatus,
+  ): Promise<{ id: RouteId; code: string; name: string; status: RouteStatus }[]> {
+    const rows = await this.db.query<{
+      id: RouteId;
+      code: string;
+      name: string;
+      status: RouteStatus;
+    }>(
       `SELECT id, code, name, status FROM routes
         WHERE tenant_id = $1 AND deleted_at IS NULL ${status ? 'AND status = $2' : ''}
         ORDER BY code`,
@@ -203,7 +226,10 @@ export class RouteRepository {
    * assuming intra-state on missing data.
    */
   async isInterState(routeId: RouteId): Promise<boolean> {
-    const row = await this.db.queryOne<{ origin_state_code: string; operator_gstin: string | null }>(
+    const row = await this.db.queryOne<{
+      origin_state_code: string;
+      operator_gstin: string | null;
+    }>(
       `SELECT s.code AS origin_state_code, t.gstin AS operator_gstin
          FROM routes r
          JOIN cities o ON o.id = r.origin_city_id
@@ -220,9 +246,19 @@ export class RouteRepository {
 }
 
 interface RouteRow {
-  id: RouteId; code: string; name: string; origin_city_id: CityId; dest_city_id: CityId; status: RouteStatus;
+  id: RouteId;
+  code: string;
+  name: string;
+  origin_city_id: CityId;
+  dest_city_id: CityId;
+  status: RouteStatus;
 }
 interface StopRow {
-  stop_id: StopId; sequence: number; distance_from_origin_m: number; depart_offset_min: number;
-  dwell_min: number; can_board: boolean; can_alight: boolean;
+  stop_id: StopId;
+  sequence: number;
+  distance_from_origin_m: number;
+  depart_offset_min: number;
+  dwell_min: number;
+  can_board: boolean;
+  can_alight: boolean;
 }

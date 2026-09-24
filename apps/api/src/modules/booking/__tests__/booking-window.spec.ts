@@ -12,11 +12,19 @@ describe('checkBookingWindow (242/243)', () => {
     expect(checkBookingWindow(at(-1), undefined, now)).toMatch(/already departed/);
   });
   it('closes N minutes before departure', () => {
-    expect(checkBookingWindow(at(0.5), { maxAdvanceDays: null, minMinutesBeforeDeparture: 60 }, now)).toMatch(/closes 60 minutes/);
-    expect(checkBookingWindow(at(2), { maxAdvanceDays: null, minMinutesBeforeDeparture: 60 }, now)).toBeNull();
+    expect(
+      checkBookingWindow(at(0.5), { maxAdvanceDays: null, minMinutesBeforeDeparture: 60 }, now),
+    ).toMatch(/closes 60 minutes/);
+    expect(
+      checkBookingWindow(at(2), { maxAdvanceDays: null, minMinutesBeforeDeparture: 60 }, now),
+    ).toBeNull();
   });
   it('opens only N days ahead', () => {
-    expect(checkBookingWindow(at(24 * 31), { maxAdvanceDays: 30, minMinutesBeforeDeparture: 0 }, now)).toMatch(/open 30 days/);
-    expect(checkBookingWindow(at(24 * 29), { maxAdvanceDays: 30, minMinutesBeforeDeparture: 0 }, now)).toBeNull();
+    expect(
+      checkBookingWindow(at(24 * 31), { maxAdvanceDays: 30, minMinutesBeforeDeparture: 0 }, now),
+    ).toMatch(/open 30 days/);
+    expect(
+      checkBookingWindow(at(24 * 29), { maxAdvanceDays: 30, minMinutesBeforeDeparture: 0 }, now),
+    ).toBeNull();
   });
 });

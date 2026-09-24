@@ -20,14 +20,19 @@ export class InvoiceRepository {
     const key = seriesKey(prefix, date);
     const scope = currentTransaction();
     const runner = scope
-      ? (sql: string, p: unknown[]) => scope.client.query<{ last_sequence: number }>(sql, p).then((r) => r.rows[0] ?? null)
-      : (sql: string, p: unknown[]) => this.db.queryOne<{ last_sequence: number }>(sql, p, { name: 'invoice.nextSeq', primary: true });
-    const row = (await runner(
+      ? (sql: string, p: unknown[]) =>
+          scope.client.query<{ last_sequence: number }>(sql, p).then((r) => r.rows[0] ?? null)
+      : (sql: string, p: unknown[]) =>
+          this.db.queryOne<{ last_sequence: number }>(sql, p, {
+            name: 'invoice.nextSeq',
+            primary: true,
+          });
+    const row = await runner(
       `INSERT INTO invoice_series (tenant_id, series_key, last_sequence) VALUES ($1, $2, 1)
        ON CONFLICT (tenant_id, series_key) DO UPDATE SET last_sequence = invoice_series.last_sequence + 1, updated_at = now()
        RETURNING last_sequence`,
       [requireTenantId(), key],
-    ));
+    );
     return row?.last_sequence ?? 1;
   }
 
@@ -53,10 +58,24 @@ export class InvoiceRepository {
         (id, tenant_id, booking_id, kind, invoice_number, supplier_gstin, recipient_gstin, place_of_supply,
          inter_state, taxable_minor, tax_total_minor, round_off_minor, total_minor, lines, tax_lines, original_invoice_id)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`;
-    const params = [id, requireTenantId(), input.bookingId, input.kind, input.invoiceNumber,
-      input.supplierGstin ?? null, input.recipientGstin ?? null, input.placeOfSupply ?? null, input.interState,
-      input.taxableMinor, input.taxTotalMinor, input.roundOffMinor, input.totalMinor,
-      JSON.stringify(input.lines), JSON.stringify(input.taxLines), input.originalInvoiceId ?? null];
+    const params = [
+      id,
+      requireTenantId(),
+      input.bookingId,
+      input.kind,
+      input.invoiceNumber,
+      input.supplierGstin ?? null,
+      input.recipientGstin ?? null,
+      input.placeOfSupply ?? null,
+      input.interState,
+      input.taxableMinor,
+      input.taxTotalMinor,
+      input.roundOffMinor,
+      input.totalMinor,
+      JSON.stringify(input.lines),
+      JSON.stringify(input.taxLines),
+      input.originalInvoiceId ?? null,
+    ];
     if (scope) await scope.client.query(sql, params);
     else await this.db.execute_(sql, params, { name: 'invoice.insert', primary: true });
     return id;

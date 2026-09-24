@@ -7,7 +7,11 @@ import { AppError, ErrorCode } from '@kernel';
 
 import { PlatformSettingsRepository } from '../../../tenancy/infrastructure/persistence/platform-settings.repository';
 import type { YieldLadder } from '../../domain/pricing-engine';
-import { selectFarePlan, validatePlanWindow, type FarePlanCandidate } from '../../domain/fare-plan-selection';
+import {
+  selectFarePlan,
+  validatePlanWindow,
+  type FarePlanCandidate,
+} from '../../domain/fare-plan-selection';
 import type { PeakWindow } from '../../domain/pricing-rules';
 
 export interface ResolvedFare {
@@ -65,18 +69,29 @@ export class FareRepository {
       key,
       { namespace: CacheNamespace.FARE_RULE, ttlSeconds: CacheTtl.FARE_RULES },
       async () => {
-
         // 1. exact segment rule
-        const exact = await this.db.queryOne<{ base_fare_minor: number; per_km_minor: number | null }>(
+        const exact = await this.db.queryOne<{
+          base_fare_minor: number;
+          per_km_minor: number | null;
+        }>(
           `SELECT base_fare_minor, per_km_minor FROM fare_rules
             WHERE tenant_id = $1 AND fare_plan_id = $2 AND from_stop_id = $3 AND to_stop_id = $4 AND seat_type = $5`,
           [requireTenantId(), plan.id, input.fromStopId, input.toStopId, input.seatType],
           { name: 'fare.exact' },
         );
-        if (exact) return { baseFareMinor: exact.base_fare_minor, currency: plan.currency, seatType: input.seatType, farePlanId: plan.id };
+        if (exact)
+          return {
+            baseFareMinor: exact.base_fare_minor,
+            currency: plan.currency,
+            seatType: input.seatType,
+            farePlanId: plan.id,
+          };
 
         // 2. per-km fallback rule (from/to NULL) for the seat type
-        const perKm = await this.db.queryOne<{ per_km_minor: number | null; base_fare_minor: number }>(
+        const perKm = await this.db.queryOne<{
+          per_km_minor: number | null;
+          base_fare_minor: number;
+        }>(
           `SELECT per_km_minor, base_fare_minor FROM fare_rules
             WHERE tenant_id = $1 AND fare_plan_id = $2 AND from_stop_id IS NULL AND to_stop_id IS NULL AND seat_type = $3`,
           [requireTenantId(), plan.id, input.seatType],
@@ -87,7 +102,12 @@ export class FareRepository {
           const fare = perKm.per_km_minor
             ? Math.round(perKm.per_km_minor * km)
             : perKm.base_fare_minor;
-          return { baseFareMinor: Math.max(fare, perKm.base_fare_minor), currency: plan.currency, seatType: input.seatType, farePlanId: plan.id };
+          return {
+            baseFareMinor: Math.max(fare, perKm.base_fare_minor),
+            currency: plan.currency,
+            seatType: input.seatType,
+            farePlanId: plan.id,
+          };
         }
 
         return null;
@@ -103,11 +123,30 @@ export class FareRepository {
    * compliance bug, not a business feature).
    */
   /** Route floor/ceiling + peak windows, and the trip's manual adjustment (both optional). */
-  async pricingControls(routeId: RouteId, tripId: string): Promise<{ floorMinor: number | null; ceilingMinor: number | null; peakWindows: PeakWindow[]; tripPct: number | null }> {
+  async pricingControls(
+    routeId: RouteId,
+    tripId: string,
+  ): Promise<{
+    floorMinor: number | null;
+    ceilingMinor: number | null;
+    peakWindows: PeakWindow[];
+    tripPct: number | null;
+  }> {
     const [r, t] = await Promise.all([
-      this.db.queryOne<{ floor_minor: string | null; ceiling_minor: string | null; peak_windows: PeakWindow[] }>(
-        `SELECT floor_minor, ceiling_minor, peak_windows FROM route_pricing_rules WHERE tenant_id = $1 AND route_id = $2`, [requireTenantId(), routeId], { name: 'fare.routeRules' }),
-      this.db.queryOne<{ pct: string }>(`SELECT pct FROM trip_fare_adjustments WHERE tenant_id = $1 AND trip_id = $2`, [requireTenantId(), tripId], { name: 'fare.tripAdjustment' }),
+      this.db.queryOne<{
+        floor_minor: string | null;
+        ceiling_minor: string | null;
+        peak_windows: PeakWindow[];
+      }>(
+        `SELECT floor_minor, ceiling_minor, peak_windows FROM route_pricing_rules WHERE tenant_id = $1 AND route_id = $2`,
+        [requireTenantId(), routeId],
+        { name: 'fare.routeRules' },
+      ),
+      this.db.queryOne<{ pct: string }>(
+        `SELECT pct FROM trip_fare_adjustments WHERE tenant_id = $1 AND trip_id = $2`,
+        [requireTenantId(), tripId],
+        { name: 'fare.tripAdjustment' },
+      ),
     ]);
     return {
       floorMinor: r?.floor_minor != null ? Number(r.floor_minor) : null,
@@ -117,23 +156,40 @@ export class FareRepository {
     };
   }
 
-  async saveRouteRules(routeId: string, i: { floorMinor: number | null; ceilingMinor: number | null; peakWindows: PeakWindow[] }, by: string | null): Promise<void> {
+  async saveRouteRules(
+    routeId: string,
+    i: { floorMinor: number | null; ceilingMinor: number | null; peakWindows: PeakWindow[] },
+    by: string | null,
+  ): Promise<void> {
     await this.db.execute_(
       `INSERT INTO route_pricing_rules (tenant_id, route_id, floor_minor, ceiling_minor, peak_windows, updated_by) VALUES ($1,$2,$3,$4,$5,$6)
        ON CONFLICT (tenant_id, route_id) DO UPDATE SET floor_minor = EXCLUDED.floor_minor, ceiling_minor = EXCLUDED.ceiling_minor,
          peak_windows = EXCLUDED.peak_windows, updated_by = EXCLUDED.updated_by, updated_at = now()`,
-      [requireTenantId(), routeId, i.floorMinor, i.ceilingMinor, JSON.stringify(i.peakWindows), by], { name: 'fare.saveRouteRules', primary: true });
+      [requireTenantId(), routeId, i.floorMinor, i.ceilingMinor, JSON.stringify(i.peakWindows), by],
+      { name: 'fare.saveRouteRules', primary: true },
+    );
   }
 
-  async setTripAdjustment(tripId: string, pct: number | null, reason: string | null, by: string | null): Promise<void> {
+  async setTripAdjustment(
+    tripId: string,
+    pct: number | null,
+    reason: string | null,
+    by: string | null,
+  ): Promise<void> {
     if (pct === null) {
-      await this.db.execute_(`DELETE FROM trip_fare_adjustments WHERE tenant_id = $1 AND trip_id = $2`, [requireTenantId(), tripId], { name: 'fare.clearTripAdj', primary: true });
+      await this.db.execute_(
+        `DELETE FROM trip_fare_adjustments WHERE tenant_id = $1 AND trip_id = $2`,
+        [requireTenantId(), tripId],
+        { name: 'fare.clearTripAdj', primary: true },
+      );
       return;
     }
     await this.db.execute_(
       `INSERT INTO trip_fare_adjustments (tenant_id, trip_id, pct, reason, created_by) VALUES ($1,$2,$3,$4,$5)
        ON CONFLICT (tenant_id, trip_id) DO UPDATE SET pct = EXCLUDED.pct, reason = EXCLUDED.reason, created_by = EXCLUDED.created_by, updated_at = now()`,
-      [requireTenantId(), tripId, pct, reason, by], { name: 'fare.setTripAdj', primary: true });
+      [requireTenantId(), tripId, pct, reason, by],
+      { name: 'fare.setTripAdj', primary: true },
+    );
   }
 
   async routePricing(routeId: RouteId): Promise<RoutePricing> {
@@ -154,33 +210,70 @@ export class FareRepository {
       ),
       this.platformSettings.gstRatePercent(),
     ]);
-    const ladder = row?.ladder ?? { occupancy: [], advancePurchase: [], maxMultiplier: 1, minMultiplier: 1 };
+    const ladder = row?.ladder ?? {
+      occupancy: [],
+      advancePurchase: [],
+      maxMultiplier: 1,
+      minMultiplier: 1,
+    };
     return { ladder, gstRatePct };
   }
 
   /** The route's active plans with their date window + weekday filter (cached; tiny). */
-  private async activePlans(routeId: RouteId): Promise<(FarePlanCandidate & { currency: string })[]> {
+  private async activePlans(
+    routeId: RouteId,
+  ): Promise<(FarePlanCandidate & { currency: string })[]> {
     return this.cache.getOrLoad(
       `plans:${routeId}`,
       { namespace: CacheNamespace.FARE_RULE, ttlSeconds: CacheTtl.FARE_RULES },
-      async () => (await this.db.query<{ id: string; currency: string; effective_from: string | null; effective_to: string | null; weekdays: number[] | null }>(
-        `SELECT id, currency, effective_from::text AS effective_from, effective_to::text AS effective_to, weekdays
+      async () =>
+        (
+          await this.db.query<{
+            id: string;
+            currency: string;
+            effective_from: string | null;
+            effective_to: string | null;
+            weekdays: number[] | null;
+          }>(
+            `SELECT id, currency, effective_from::text AS effective_from, effective_to::text AS effective_to, weekdays
            FROM fare_plans WHERE tenant_id = $1 AND route_id = $2 AND status = 'active' AND deleted_at IS NULL`,
-        [requireTenantId(), routeId],
-        { name: 'fare.activePlans' },
-      )).map((r) => ({ id: r.id, currency: r.currency, effectiveFrom: r.effective_from, effectiveTo: r.effective_to, weekdays: r.weekdays?.map(Number) ?? null })),
+            [requireTenantId(), routeId],
+            { name: 'fare.activePlans' },
+          )
+        ).map((r) => ({
+          id: r.id,
+          currency: r.currency,
+          effectiveFrom: r.effective_from,
+          effectiveTo: r.effective_to,
+          weekdays: r.weekdays?.map(Number) ?? null,
+        })),
     );
   }
 
-  async createPlan(input: { routeId: RouteId; name: string; currency?: string; effectiveFrom?: string; effectiveTo?: string; weekdays?: number[] }): Promise<string> {
+  async createPlan(input: {
+    routeId: RouteId;
+    name: string;
+    currency?: string;
+    effectiveFrom?: string;
+    effectiveTo?: string;
+    weekdays?: number[];
+  }): Promise<string> {
     const problem = validatePlanWindow(input);
     if (problem) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: problem });
     const id = newId();
     await this.db.execute_(
       `INSERT INTO fare_plans (id, tenant_id, route_id, name, currency, effective_from, effective_to, weekdays)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [id, requireTenantId(), input.routeId, input.name, input.currency ?? 'INR', input.effectiveFrom ?? null, input.effectiveTo ?? null,
-        input.weekdays?.length ? [...new Set(input.weekdays)].sort() : null],
+      [
+        id,
+        requireTenantId(),
+        input.routeId,
+        input.name,
+        input.currency ?? 'INR',
+        input.effectiveFrom ?? null,
+        input.effectiveTo ?? null,
+        input.weekdays?.length ? [...new Set(input.weekdays)].sort() : null,
+      ],
       { name: 'fare.createPlan', primary: true },
     );
     return id;
@@ -208,21 +301,36 @@ export class FareRepository {
   }
 
   async addRule(input: {
-    farePlanId: string; fromStopId?: StopId; toStopId?: StopId; seatType: string; baseFareMinor: number; perKmMinor?: number;
+    farePlanId: string;
+    fromStopId?: StopId;
+    toStopId?: StopId;
+    seatType: string;
+    baseFareMinor: number;
+    perKmMinor?: number;
   }): Promise<void> {
     await this.db.execute_(
       `INSERT INTO fare_rules (id, tenant_id, fare_plan_id, from_stop_id, to_stop_id, seat_type, base_fare_minor, per_km_minor)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
        ON CONFLICT (fare_plan_id, from_stop_id, to_stop_id, seat_type)
        DO UPDATE SET base_fare_minor = EXCLUDED.base_fare_minor, per_km_minor = EXCLUDED.per_km_minor`,
-      [newId(), requireTenantId(), input.farePlanId, input.fromStopId ?? null, input.toStopId ?? null,
-       input.seatType, input.baseFareMinor, input.perKmMinor ?? null],
+      [
+        newId(),
+        requireTenantId(),
+        input.farePlanId,
+        input.fromStopId ?? null,
+        input.toStopId ?? null,
+        input.seatType,
+        input.baseFareMinor,
+        input.perKmMinor ?? null,
+      ],
       { name: 'fare.addRule', primary: true },
     );
     await this.cache.invalidatePrefix(CacheNamespace.FARE_RULE);
   }
 
-  async listPlans(): Promise<{ id: string; routeId: string; name: string; currency: string; status: string }[]> {
+  async listPlans(): Promise<
+    { id: string; routeId: string; name: string; currency: string; status: string }[]
+  > {
     return this.db.query(
       `SELECT id, route_id AS "routeId", name, currency, status FROM fare_plans
         WHERE tenant_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC`,
@@ -231,7 +339,16 @@ export class FareRepository {
     );
   }
 
-  async listRules(farePlanId: string): Promise<{ id: string; fromStopId: string | null; toStopId: string | null; seatType: string; baseFareMinor: number; perKmMinor: number | null }[]> {
+  async listRules(farePlanId: string): Promise<
+    {
+      id: string;
+      fromStopId: string | null;
+      toStopId: string | null;
+      seatType: string;
+      baseFareMinor: number;
+      perKmMinor: number | null;
+    }[]
+  > {
     return this.db.query(
       `SELECT id, from_stop_id AS "fromStopId", to_stop_id AS "toStopId", seat_type AS "seatType",
               base_fare_minor AS "baseFareMinor", per_km_minor AS "perKmMinor"
@@ -241,7 +358,9 @@ export class FareRepository {
     );
   }
 
-  async listPolicies(): Promise<{ id: string; routeId: string | null; name: string; gstRatePct: number }[]> {
+  async listPolicies(): Promise<
+    { id: string; routeId: string | null; name: string; gstRatePct: number }[]
+  > {
     return this.db.query(
       `SELECT id, route_id AS "routeId", name, gst_rate_pct AS "gstRatePct" FROM pricing_policies
         WHERE tenant_id = $1 ORDER BY created_at DESC`,
@@ -268,7 +387,9 @@ export class FareRepository {
     );
   }
 
-  async listSeatOverrides(farePlanId: string): Promise<{ id: string; seatNumber: string; fareMinor: number }[]> {
+  async listSeatOverrides(
+    farePlanId: string,
+  ): Promise<{ id: string; seatNumber: string; fareMinor: number }[]> {
     return this.db.query(
       `SELECT id, seat_number AS "seatNumber", fare_minor AS "fareMinor" FROM seat_fare_overrides
         WHERE tenant_id = $1 AND fare_plan_id = $2 ORDER BY seat_number`,

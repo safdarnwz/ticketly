@@ -40,7 +40,12 @@ export class WebhookRepository {
   ) {}
 
   /** Returns the plaintext secret ONCE — like an API key, it's never readable again. */
-  async register(input: { name: string; url: string; eventTypes: string[]; createdBy: string | null }): Promise<{ id: string; secret: string }> {
+  async register(input: {
+    name: string;
+    url: string;
+    eventTypes: string[];
+    createdBy: string | null;
+  }): Promise<{ id: string; secret: string }> {
     const id = newId();
     const secret = randomBytes(32).toString('hex');
     await this.db.execute_(
@@ -83,7 +88,10 @@ export class WebhookRepository {
   // ── Worker-side (cross-tenant, no ambient request context) ────────────────
 
   /** Every active webhook for a tenant that subscribes to this event type (empty event_types = all). */
-  async findActiveForTenant(tenantId: string, eventType: string): Promise<{ id: string; url: string; secret: string }[]> {
+  async findActiveForTenant(
+    tenantId: string,
+    eventType: string,
+  ): Promise<{ id: string; url: string; secret: string }[]> {
     return this.uow.run({ name: 'webhook.findActiveForTenant', bypassRls: true }, async (scope) => {
       const result = await scope.client.query<{ id: string; url: string; secret: string }>(
         `SELECT id, url, secret FROM partner_webhooks
@@ -96,14 +104,27 @@ export class WebhookRepository {
   }
 
   /** Queue a delivery — idempotent per (webhook, event) via the unique index, so an at-least-once outbox replay never double-sends. */
-  async enqueueDelivery(input: { webhookId: string; tenantId: string; eventType: string; eventId: string; payload: unknown }): Promise<string | null> {
+  async enqueueDelivery(input: {
+    webhookId: string;
+    tenantId: string;
+    eventType: string;
+    eventId: string;
+    payload: unknown;
+  }): Promise<string | null> {
     return this.uow.run({ name: 'webhook.enqueueDelivery', bypassRls: true }, async (scope) => {
       const result = await scope.client.query<{ id: string }>(
         `INSERT INTO webhook_deliveries (id, webhook_id, tenant_id, event_type, event_id, payload)
          VALUES ($1,$2,$3,$4,$5,$6)
          ON CONFLICT (webhook_id, event_id) DO NOTHING
          RETURNING id`,
-        [newId(), input.webhookId, input.tenantId, input.eventType, input.eventId, JSON.stringify(input.payload)],
+        [
+          newId(),
+          input.webhookId,
+          input.tenantId,
+          input.eventType,
+          input.eventId,
+          JSON.stringify(input.payload),
+        ],
       );
       return result.rows[0]?.id ?? null;
     });
@@ -119,7 +140,12 @@ export class WebhookRepository {
   }
 
   /** Exponential-ish backoff: 1min, 5min, 30min, 3hr, then give up (status → 'failed') after 5 attempts. */
-  async markFailed(deliveryId: string, attempts: number, error: string, responseStatus?: number): Promise<void> {
+  async markFailed(
+    deliveryId: string,
+    attempts: number,
+    error: string,
+    responseStatus?: number,
+  ): Promise<void> {
     const backoffMinutes = [1, 5, 30, 180][attempts] ?? null;
     await this.uow.run({ name: 'webhook.markFailed', bypassRls: true }, async (scope) => {
       await scope.client.query(

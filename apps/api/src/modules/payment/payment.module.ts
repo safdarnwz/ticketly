@@ -27,7 +27,17 @@ import { SettlementService } from './application/services/settlement.service';
  * Depends on booking (to confirm on capture).
  */
 @Module({
-  imports: [ConfigModule, DatabaseModule, MessagingModule, BookingModule, SchedulingModule, PricingModule, MasterDataModule, PlatformSettingsModule, IntegrationsModule],
+  imports: [
+    ConfigModule,
+    DatabaseModule,
+    MessagingModule,
+    BookingModule,
+    SchedulingModule,
+    PricingModule,
+    MasterDataModule,
+    PlatformSettingsModule,
+    IntegrationsModule,
+  ],
   controllers: [PaymentController],
   providers: [
     PaymentRepository,
@@ -43,10 +53,19 @@ import { SettlementService } from './application/services/settlement.service';
     // counts the same as the env keys; that choice is made at process start.
     {
       provide: PaymentGateway,
-      useFactory: async (config: AppConfig, razorpay: RazorpayGateway, credentials: IntegrationCredentialStore) => {
+      useFactory: async (
+        config: AppConfig,
+        razorpay: RazorpayGateway,
+        credentials: IntegrationCredentialStore,
+      ) => {
         await credentials.ready();
-        const razorpayOn = config.payment.razorpay.enabled || credentials.active('razorpay') !== null;
-        return razorpayOn ? razorpay : config.payment.testMode ? new TestGateway(config) : new MockGateway(config);
+        const razorpayOn =
+          config.payment.razorpay.enabled || credentials.active('razorpay') !== null;
+        return razorpayOn
+          ? razorpay
+          : config.payment.testMode
+            ? new TestGateway(config)
+            : new MockGateway(config);
       },
       inject: [AppConfig, RazorpayGateway, IntegrationCredentialStore],
     },

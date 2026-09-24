@@ -18,7 +18,10 @@ import { DomainError, ErrorCode } from '@kernel';
 export type ApplicationStatus = 'pending' | 'approved' | 'rejected';
 export type ReviewAction = 'approve' | 'reject' | 'hold' | 'reopen';
 
-const ACTIONS: Record<ReviewAction, { from: ApplicationStatus[]; to: ApplicationStatus; reasonRequired: boolean }> = {
+const ACTIONS: Record<
+  ReviewAction,
+  { from: ApplicationStatus[]; to: ApplicationStatus; reasonRequired: boolean }
+> = {
   approve: { from: ['pending'], to: 'approved', reasonRequired: false },
   reject: { from: ['pending'], to: 'rejected', reasonRequired: true },
   hold: { from: ['pending'], to: 'pending', reasonRequired: true },
@@ -33,18 +36,30 @@ export function canReview(from: ApplicationStatus, action: ReviewAction): boolea
   return ACTIONS[action].from.includes(from);
 }
 
-export function assertReview(from: ApplicationStatus, action: ReviewAction, reason?: string | null): void {
+export function assertReview(
+  from: ApplicationStatus,
+  action: ReviewAction,
+  reason?: string | null,
+): void {
   if (!canReview(from, action)) {
-    const hint = from === 'approved'
-      ? 'This operator is already live — suspend the operator instead.'
-      : `Allowed only from: ${ACTIONS[action].from.join(', ')}.`;
-    throw new DomainError(ErrorCode.COMMON_CONFLICT, `Cannot ${action} an application that is '${from}'. ${hint}`, {
-      details: { from, action },
-    });
+    const hint =
+      from === 'approved'
+        ? 'This operator is already live — suspend the operator instead.'
+        : `Allowed only from: ${ACTIONS[action].from.join(', ')}.`;
+    throw new DomainError(
+      ErrorCode.COMMON_CONFLICT,
+      `Cannot ${action} an application that is '${from}'. ${hint}`,
+      {
+        details: { from, action },
+      },
+    );
   }
   const r = reason?.trim() ?? '';
   if (ACTIONS[action].reasonRequired && r.length < 10) {
-    throw new DomainError(ErrorCode.COMMON_VALIDATION, `A reason of at least 10 characters is required to ${action} an application`);
+    throw new DomainError(
+      ErrorCode.COMMON_VALIDATION,
+      `A reason of at least 10 characters is required to ${action} an application`,
+    );
   }
   if (r.length > 1000) {
     throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Reason is too long (max 1000 characters)');
@@ -94,12 +109,14 @@ export function approvalBlockers(a: ApprovalCandidate): string[] {
   if (gst && pan && GSTIN.test(gst) && PAN.test(pan) && gst.slice(2, 12) !== pan) {
     out.push(`GSTIN ${gst} is not registered to PAN ${pan}`);
   }
-  if (a.panVerificationStatus === 'failed') out.push('PAN verification failed — the PAN must pass KYC before approval');
+  if (a.panVerificationStatus === 'failed')
+    out.push('PAN verification failed — the PAN must pass KYC before approval');
   if (!a.bankAccountHolder?.trim() || !a.bankAccountNumber?.trim() || !a.bankIfsc?.trim()) {
     out.push('Bank account details are incomplete (needed for settlements)');
   } else {
     if (!IFSC.test(a.bankIfsc.trim().toUpperCase())) out.push(`IFSC '${a.bankIfsc}' is not valid`);
-    if (!/^\d{9,18}$/.test(a.bankAccountNumber.trim())) out.push('Bank account number must be 9–18 digits');
+    if (!/^\d{9,18}$/.test(a.bankAccountNumber.trim()))
+      out.push('Bank account number must be 9–18 digits');
   }
   return out;
 }

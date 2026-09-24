@@ -1,9 +1,4 @@
-import {
-  addDays,
-  compareLocalDate,
-  daysBetween,
-  type LocalDate,
-} from '@kernel';
+import { addDays, compareLocalDate, daysBetween, type LocalDate } from '@kernel';
 
 /**
  * ============================================================================
@@ -79,7 +74,12 @@ export function evaluateDocument(
 
   if (doc.validFrom && compareLocalDate(doc.validFrom, today) > 0) {
     // Not yet in effect.
-    return { type: doc.type, status: 'missing', expiresOn: doc.expiresOn, daysUntilExpiry: daysBetween(today, doc.expiresOn) };
+    return {
+      type: doc.type,
+      status: 'missing',
+      expiresOn: doc.expiresOn,
+      daysUntilExpiry: daysBetween(today, doc.expiresOn),
+    };
   }
 
   const days = daysBetween(today, doc.expiresOn);
@@ -184,5 +184,9 @@ export type PermitType = 'aitp' | 'stage_carriage' | 'state_tourist_permit' | 'c
  * stage_carriage/AITP by default).
  */
 export function isPermittedForIndividualSale(permitType: PermitType | null | undefined): boolean {
-  return permitType === 'aitp' || permitType === 'stage_carriage' || permitType === 'state_tourist_permit';
+  return (
+    permitType === 'aitp' ||
+    permitType === 'stage_carriage' ||
+    permitType === 'state_tourist_permit'
+  );
 }

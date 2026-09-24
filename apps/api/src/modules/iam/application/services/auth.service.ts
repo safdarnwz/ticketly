@@ -10,7 +10,8 @@ import {
   runWithContext,
   UnauthenticatedError,
   type TenantId,
-  type UserId, type SessionId
+  type UserId,
+  type SessionId,
 } from '@kernel';
 import { Logger, Metrics } from '@observability';
 import { OtpService, PasswordHasher, TokenService } from '@security';
@@ -88,10 +89,17 @@ export class AuthService {
    * is to pick registration back up. A genuinely-verified account still
    * correctly reports as registered.
    */
-  async checkIdentity(identifier: string): Promise<{ registered: boolean; channel: 'email' | 'phone' }> {
+  async checkIdentity(
+    identifier: string,
+  ): Promise<{ registered: boolean; channel: 'email' | 'phone' }> {
     const isEmail = identifier.includes('@');
-    const user = isEmail ? await this.users.findByEmailGlobal(identifier) : await this.users.findByPhoneGlobal(identifier.trim());
-    return { registered: Boolean(user) && user!.status !== 'invited', channel: isEmail ? 'email' : 'phone' };
+    const user = isEmail
+      ? await this.users.findByEmailGlobal(identifier)
+      : await this.users.findByPhoneGlobal(identifier.trim());
+    return {
+      registered: Boolean(user) && user!.status !== 'invited',
+      channel: isEmail ? 'email' : 'phone',
+    };
   }
 
   /** Login with EITHER an email or a mobile number, plus password. */
@@ -106,10 +114,14 @@ export class AuthService {
     ip?: string;
   }): Promise<AuthTokens> {
     const isEmail = input.identifier.includes('@');
-    const user = isEmail ? await this.users.findByEmailGlobal(input.identifier) : await this.users.findByPhoneGlobal(input.identifier.trim());
+    const user = isEmail
+      ? await this.users.findByEmailGlobal(input.identifier)
+      : await this.users.findByPhoneGlobal(input.identifier.trim());
     if (!user || !user.passwordHash) {
       await this.hasher.verify(input.password, DUMMY_HASH).catch(() => false);
-      throw new UnauthenticatedError(ErrorCode.AUTH_INVALID_CREDENTIALS, { message: 'Invalid credentials' });
+      throw new UnauthenticatedError(ErrorCode.AUTH_INVALID_CREDENTIALS, {
+        message: 'Invalid credentials',
+      });
     }
 
     // Host-bound login: a tenant's staff can only sign in at their OWN
@@ -119,9 +131,14 @@ export class AuthService {
     // tenant-less customer accounts. Fails with the SAME uniform message as
     // a wrong password, so a wrong-host attempt can't be used to probe which
     // accounts exist or which tenant they belong to.
-    if (input.loginSurface && !(await this.isAllowedOnSurface(user, input.loginSurface, input.tenantId))) {
+    if (
+      input.loginSurface &&
+      !(await this.isAllowedOnSurface(user, input.loginSurface, input.tenantId))
+    ) {
       await this.hasher.verify(input.password, DUMMY_HASH).catch(() => false);
-      throw new UnauthenticatedError(ErrorCode.AUTH_INVALID_CREDENTIALS, { message: 'Invalid credentials' });
+      throw new UnauthenticatedError(ErrorCode.AUTH_INVALID_CREDENTIALS, {
+        message: 'Invalid credentials',
+      });
     }
 
     // Password verified BEFORE the account-status check, on purpose: this
@@ -137,15 +154,23 @@ export class AuthService {
     const ok = await this.hasher.verify(input.password, user.passwordHash);
     if (!ok) {
       const locked = user.recordFailedLogin();
-      await this.uow.run({ name: 'auth.recordFailure', tenantId: user.tenantId }, async () => { await this.users.update(user, user.version); });
+      await this.uow.run({ name: 'auth.recordFailure', tenantId: user.tenantId }, async () => {
+        await this.users.update(user, user.version);
+      });
       await this.alerts.onLoginFailed(user, input.ip);
-      if (locked) throw new AppError(ErrorCode.AUTH_ACCOUNT_LOCKED, 423, { message: 'Account locked after too many attempts' });
-      throw new UnauthenticatedError(ErrorCode.AUTH_INVALID_CREDENTIALS, { message: 'Invalid credentials' });
+      if (locked)
+        throw new AppError(ErrorCode.AUTH_ACCOUNT_LOCKED, 423, {
+          message: 'Account locked after too many attempts',
+        });
+      throw new UnauthenticatedError(ErrorCode.AUTH_INVALID_CREDENTIALS, {
+        message: 'Invalid credentials',
+      });
     }
     user.assertCanAuthenticate();
     await this.assertLoginPolicies(user, input.ip);
     user.recordSuccessfulLogin();
-    if (this.hasher.needsRehash(user.passwordHash)) user.setPassword(await this.hasher.hash(input.password));
+    if (this.hasher.needsRehash(user.passwordHash))
+      user.setPassword(await this.hasher.hash(input.password));
     return this.issueForUser(user, input.userAgent, input.ip, 'password');
   }
 
@@ -198,13 +223,20 @@ export class AuthService {
    * path never applies again — a genuinely-registered email/mobile still
    * correctly blocks a second registration.
    */
-  async registerCustomer(input: { fullName: string; email: string; mobile: string; password: string }): Promise<{ challengeId: string; email: string }> {
+  async registerCustomer(input: {
+    fullName: string;
+    email: string;
+    mobile: string;
+    password: string;
+  }): Promise<{ challengeId: string; email: string }> {
     const existingByEmail = await this.users.findByEmailGlobal(input.email);
     const existingByPhone = await this.users.findByPhoneGlobal(input.mobile.trim());
     const existing = existingByEmail ?? existingByPhone;
 
     if (existing && existing.status !== 'invited') {
-      throw new AppError(ErrorCode.COMMON_CONFLICT, 409, { message: 'An account with this email or mobile already exists' });
+      throw new AppError(ErrorCode.COMMON_CONFLICT, 409, {
+        message: 'An account with this email or mobile already exists',
+      });
     }
     // Both matched but as TWO DIFFERENT still-unverified rows (e.g. someone
     // typo'd their email on attempt 1, retried with a different email but
@@ -212,32 +244,63 @@ export class AuthService {
     // orphan the other. Rare, but not a case to guess at; ask them to
     // pick one identity to continue with rather than silently merging.
     if (existingByEmail && existingByPhone && existingByEmail.id !== existingByPhone.id) {
-      throw new AppError(ErrorCode.COMMON_CONFLICT, 409, { message: 'This email and mobile are tied to two different unfinished registrations — please use the email or mobile from whichever attempt you want to continue.' });
+      throw new AppError(ErrorCode.COMMON_CONFLICT, 409, {
+        message:
+          'This email and mobile are tied to two different unfinished registrations — please use the email or mobile from whichever attempt you want to continue.',
+      });
     }
 
     await this.policies.assertPasswordAcceptable(input.password);
     const passwordHash = await this.hasher.hash(input.password);
     let user: User;
     if (existing) {
-      existing.updateProfile({ fullName: input.fullName, email: input.email, phone: input.mobile.trim() });
+      existing.updateProfile({
+        fullName: input.fullName,
+        email: input.email,
+        phone: input.mobile.trim(),
+      });
       existing.setPassword(passwordHash);
       user = existing;
-      await this.uow.run({ name: 'auth.registerCustomer.reuse' }, async () => { await this.users.update(user, user.version); });
+      await this.uow.run({ name: 'auth.registerCustomer.reuse' }, async () => {
+        await this.users.update(user, user.version);
+      });
     } else {
       user = User.create(newId() as UserId, {
-        tenantId: null, kind: 'customer', fullName: input.fullName,
-        email: input.email, phone: input.mobile.trim(), passwordHash, status: 'invited',
+        tenantId: null,
+        kind: 'customer',
+        fullName: input.fullName,
+        email: input.email,
+        phone: input.mobile.trim(),
+        passwordHash,
+        status: 'invited',
       });
-      await this.uow.run({ name: 'auth.registerCustomer' }, async () => { await this.users.insert(user); });
+      await this.uow.run({ name: 'auth.registerCustomer' }, async () => {
+        await this.users.insert(user);
+      });
     }
-    const { challengeId } = await this.issueOtp({ identity: input.email, tenantId: null, purpose: 'register', name: input.fullName });
+    const { challengeId } = await this.issueOtp({
+      identity: input.email,
+      tenantId: null,
+      purpose: 'register',
+      name: input.fullName,
+    });
     return { challengeId, email: input.email };
   }
 
   /** Verify the registration Email OTP → activate the account and auto-login. */
-  async verifyRegistration(input: { email: string; code: string; userAgent?: string; ip?: string }): Promise<AuthTokens> {
+  async verifyRegistration(input: {
+    email: string;
+    code: string;
+    userAgent?: string;
+    ip?: string;
+  }): Promise<AuthTokens> {
     const user = await this.uow.run<User>({ name: 'auth.verifyRegistration' }, async (scope) => {
-      const ch = await scope.client.query<{ id: string; code_hash: string; attempts: number; max_attempts: number }>(
+      const ch = await scope.client.query<{
+        id: string;
+        code_hash: string;
+        attempts: number;
+        max_attempts: number;
+      }>(
         `SELECT id, code_hash, attempts, max_attempts FROM otp_challenges
           WHERE tenant_id IS NULL AND identity = $1 AND purpose = 'register'
             AND consumed_at IS NULL AND expires_at > now()
@@ -245,16 +308,28 @@ export class AuthService {
         [input.email],
       );
       const row = ch.rows[0];
-      if (!row) throw new AppError(ErrorCode.AUTH_OTP_INVALID, 401, { message: 'No active code; request a new one' });
-      if (row.attempts >= row.max_attempts) throw new AppError(ErrorCode.AUTH_OTP_INVALID, 429, { message: 'Too many attempts; request a new code' });
+      if (!row)
+        throw new AppError(ErrorCode.AUTH_OTP_INVALID, 401, {
+          message: 'No active code; request a new one',
+        });
+      if (row.attempts >= row.max_attempts)
+        throw new AppError(ErrorCode.AUTH_OTP_INVALID, 429, {
+          message: 'Too many attempts; request a new code',
+        });
       if (!this.otp.verify(input.code, input.email, row.code_hash)) {
-        await scope.client.query(`UPDATE otp_challenges SET attempts = attempts + 1 WHERE id = $1`, [row.id]);
+        await scope.client.query(
+          `UPDATE otp_challenges SET attempts = attempts + 1 WHERE id = $1`,
+          [row.id],
+        );
         throw new AppError(ErrorCode.AUTH_OTP_INVALID, 401, { message: 'Incorrect code' });
       }
-      await scope.client.query(`UPDATE otp_challenges SET consumed_at = now() WHERE id = $1`, [row.id]);
+      await scope.client.query(`UPDATE otp_challenges SET consumed_at = now() WHERE id = $1`, [
+        row.id,
+      ]);
 
       const found = await this.users.findByEmailGlobal(input.email);
-      if (!found) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Registration not found' });
+      if (!found)
+        throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Registration not found' });
       found.activate();
       found.recordSuccessfulLogin();
       await this.users.update(found, found.version);
@@ -264,7 +339,12 @@ export class AuthService {
   }
 
   /** Generate, store and DELIVER an OTP over the configured provider (email today). */
-  private async issueOtp(input: { identity: string; tenantId: TenantId | null; purpose: string; name?: string }): Promise<{ challengeId: string; expiresInSeconds: number }> {
+  private async issueOtp(input: {
+    identity: string;
+    tenantId: TenantId | null;
+    purpose: string;
+    name?: string;
+  }): Promise<{ challengeId: string; expiresInSeconds: number }> {
     const code = this.otp.generate(6);
     const codeHash = this.otp.hashOtp(code, input.identity);
     const ttl = 300;
@@ -277,11 +357,15 @@ export class AuthService {
       );
     });
     try {
-      await this.otpProvider.deliver(input.identity, code, { name: input.name, purpose: input.purpose });
+      await this.otpProvider.deliver(input.identity, code, {
+        name: input.name,
+        purpose: input.purpose,
+      });
     } catch (e) {
       this.log.error({ err: e, identity: input.identity }, 'OTP delivery failed');
     }
-    if (!this.config.isProduction) this.log.info({ identity: input.identity, code }, 'OTP (dev only)');
+    if (!this.config.isProduction)
+      this.log.info({ identity: input.identity, code }, 'OTP (dev only)');
     return { challengeId, expiresInSeconds: ttl };
   }
 
@@ -298,7 +382,9 @@ export class AuthService {
     // Constant-ish work whether or not the user exists: always run a hash verify.
     if (!user || !user.passwordHash) {
       await this.hasher.verify(input.password, DUMMY_HASH).catch(() => false);
-      throw new UnauthenticatedError(ErrorCode.AUTH_INVALID_CREDENTIALS, { message: 'Invalid email or password' });
+      throw new UnauthenticatedError(ErrorCode.AUTH_INVALID_CREDENTIALS, {
+        message: 'Invalid email or password',
+      });
     }
 
     user.assertCanAuthenticate();
@@ -312,9 +398,13 @@ export class AuthService {
       await this.alerts.onLoginFailed(user, input.ip);
       if (locked) {
         this.metrics.jobRuns.inc({ job: 'auth.login', outcome: 'locked' });
-        throw new AppError(ErrorCode.AUTH_ACCOUNT_LOCKED, 423, { message: 'Account locked after too many attempts' });
+        throw new AppError(ErrorCode.AUTH_ACCOUNT_LOCKED, 423, {
+          message: 'Account locked after too many attempts',
+        });
       }
-      throw new UnauthenticatedError(ErrorCode.AUTH_INVALID_CREDENTIALS, { message: 'Invalid email or password' });
+      throw new UnauthenticatedError(ErrorCode.AUTH_INVALID_CREDENTIALS, {
+        message: 'Invalid email or password',
+      });
     }
 
     await this.assertLoginPolicies(user, input.ip);
@@ -329,7 +419,11 @@ export class AuthService {
   }
 
   /** Step 1 of OTP login: create and (via events) dispatch a code. */
-  async requestOtp(input: { identity: string; tenantId: TenantId | null; purpose?: string }): Promise<{ challengeId: string; expiresInSeconds: number }> {
+  async requestOtp(input: {
+    identity: string;
+    tenantId: TenantId | null;
+    purpose?: string;
+  }): Promise<{ challengeId: string; expiresInSeconds: number }> {
     // Per-IDENTITY cooldown, separate from the controller's per-IP
     // rate-limit — an attacker with access to multiple IPs (trivial via
     // any proxy/VPN rotation) would otherwise be able to request
@@ -340,13 +434,19 @@ export class AuthService {
     // without opening this door.
     const recent = await this.uow.run<{ n: string } | null>(
       { name: 'auth.requestOtp.cooldownCheck', tenantId: input.tenantId },
-      async (scope) => (await scope.client.query<{ n: string }>(
-        `SELECT count(*) AS n FROM otp_challenges WHERE identity = $1 AND created_at > now() - interval '45 seconds'`,
-        [input.identity],
-      )).rows[0] ?? null,
+      async (scope) =>
+        (
+          await scope.client.query<{ n: string }>(
+            `SELECT count(*) AS n FROM otp_challenges WHERE identity = $1 AND created_at > now() - interval '45 seconds'`,
+            [input.identity],
+          )
+        ).rows[0] ?? null,
     );
     if (Number(recent?.n ?? 0) > 0) {
-      throw new AppError(ErrorCode.COMMON_RATE_LIMITED, 429, { message: 'Please wait before requesting another code', retryable: true });
+      throw new AppError(ErrorCode.COMMON_RATE_LIMITED, 429, {
+        message: 'Please wait before requesting another code',
+        retryable: true,
+      });
     }
 
     const code = this.otp.generate(6);
@@ -364,7 +464,8 @@ export class AuthService {
 
     // In production the code is delivered by the notification module (Part 9)
     // subscribing to this event. In dev we log it so testing is possible.
-    if (!this.config.isProduction) this.log.info({ identity: input.identity, code }, 'OTP (dev only)');
+    if (!this.config.isProduction)
+      this.log.info({ identity: input.identity, code }, 'OTP (dev only)');
 
     return { challengeId, expiresInSeconds: ttl };
   }
@@ -378,43 +479,67 @@ export class AuthService {
     userAgent?: string;
     ip?: string;
   }): Promise<AuthTokens> {
-    const user = await this.uow.run<User>({ name: 'auth.verifyOtp', tenantId: input.tenantId }, async (scope) => {
-      const challenge = await scope.client.query<{ id: string; code_hash: string; attempts: number; max_attempts: number }>(
-        `SELECT id, code_hash, attempts, max_attempts FROM otp_challenges
+    const user = await this.uow.run<User>(
+      { name: 'auth.verifyOtp', tenantId: input.tenantId },
+      async (scope) => {
+        const challenge = await scope.client.query<{
+          id: string;
+          code_hash: string;
+          attempts: number;
+          max_attempts: number;
+        }>(
+          `SELECT id, code_hash, attempts, max_attempts FROM otp_challenges
           WHERE tenant_id IS NOT DISTINCT FROM $1 AND identity = $2 AND purpose = 'login'
             AND consumed_at IS NULL AND expires_at > now()
           ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
-        [input.tenantId, input.identity],
-      );
-      const row = challenge.rows[0];
-      if (!row) throw new AppError(ErrorCode.AUTH_OTP_INVALID, 401, { message: 'No active code; request a new one' });
-      if (row.attempts >= row.max_attempts) throw new AppError(ErrorCode.AUTH_OTP_INVALID, 429, { message: 'Too many attempts; request a new code' });
+          [input.tenantId, input.identity],
+        );
+        const row = challenge.rows[0];
+        if (!row)
+          throw new AppError(ErrorCode.AUTH_OTP_INVALID, 401, {
+            message: 'No active code; request a new one',
+          });
+        if (row.attempts >= row.max_attempts)
+          throw new AppError(ErrorCode.AUTH_OTP_INVALID, 429, {
+            message: 'Too many attempts; request a new code',
+          });
 
-      if (!this.otp.verify(input.code, input.identity, row.code_hash)) {
-        await scope.client.query(`UPDATE otp_challenges SET attempts = attempts + 1 WHERE id = $1`, [row.id]);
-        throw new AppError(ErrorCode.AUTH_OTP_INVALID, 401, { message: 'Incorrect code' });
-      }
-      await scope.client.query(`UPDATE otp_challenges SET consumed_at = now() WHERE id = $1`, [row.id]);
+        if (!this.otp.verify(input.code, input.identity, row.code_hash)) {
+          await scope.client.query(
+            `UPDATE otp_challenges SET attempts = attempts + 1 WHERE id = $1`,
+            [row.id],
+          );
+          throw new AppError(ErrorCode.AUTH_OTP_INVALID, 401, { message: 'Incorrect code' });
+        }
+        await scope.client.query(`UPDATE otp_challenges SET consumed_at = now() WHERE id = $1`, [
+          row.id,
+        ]);
 
-      // Find-or-create the customer by phone/email.
-      const isEmail = input.identity.includes('@');
-      let found = isEmail ? await this.users.findByEmail(input.identity) : await this.users.findByPhone(input.identity);
-      if (!found) {
-        found = User.create(newId() as UserId, {
-          tenantId: input.tenantId,
-          kind: 'customer',
-          fullName: input.fullName?.trim() || 'Customer',
-          email: isEmail ? input.identity : null,
-          phone: isEmail ? null : input.identity,
-        } as never);
-        await this.users.insert(found);
-        // Customers get no roles by default; booking permission is granted to
-        // the anonymous/customer principal by the guard policy (Part 7).
-      }
-      found.recordSuccessfulLogin();
-      await this.users.update(found, found.version);
-      return found;
-    });
+        // Find-or-create the customer by phone/email.
+        const isEmail = input.identity.includes('@');
+        let found = isEmail
+          ? await this.users.findByEmail(input.identity)
+          : await this.users.findByPhone(input.identity);
+        if (!found) {
+          found = User.create(
+            newId() as UserId,
+            {
+              tenantId: input.tenantId,
+              kind: 'customer',
+              fullName: input.fullName?.trim() || 'Customer',
+              email: isEmail ? input.identity : null,
+              phone: isEmail ? null : input.identity,
+            } as never,
+          );
+          await this.users.insert(found);
+          // Customers get no roles by default; booking permission is granted to
+          // the anonymous/customer principal by the guard policy (Part 7).
+        }
+        found.recordSuccessfulLogin();
+        await this.users.update(found, found.version);
+        return found;
+      },
+    );
 
     return this.issueForUser(user, input.userAgent, input.ip, 'otp');
   }
@@ -430,41 +555,73 @@ export class AuthService {
    * password reset is exactly the moment to force re-login everywhere,
    * including on a device an attacker may have been using.
    */
-  async resetPasswordWithOtp(input: { identity: string; code: string; newPassword: string; tenantId: TenantId | null }): Promise<void> {
+  async resetPasswordWithOtp(input: {
+    identity: string;
+    code: string;
+    newPassword: string;
+    tenantId: TenantId | null;
+  }): Promise<void> {
     // Checked before the OTP is consumed, so a rejected password doesn't burn the code.
     await this.policies.assertPasswordAcceptable(input.newPassword);
-    const userId = await this.uow.run<UserId>({ name: 'auth.resetPassword', tenantId: input.tenantId }, async (scope) => {
-      const challenge = await scope.client.query<{ id: string; code_hash: string; attempts: number; max_attempts: number }>(
-        `SELECT id, code_hash, attempts, max_attempts FROM otp_challenges
+    const userId = await this.uow.run<UserId>(
+      { name: 'auth.resetPassword', tenantId: input.tenantId },
+      async (scope) => {
+        const challenge = await scope.client.query<{
+          id: string;
+          code_hash: string;
+          attempts: number;
+          max_attempts: number;
+        }>(
+          `SELECT id, code_hash, attempts, max_attempts FROM otp_challenges
           WHERE tenant_id IS NOT DISTINCT FROM $1 AND identity = $2 AND purpose = 'password_reset'
             AND consumed_at IS NULL AND expires_at > now()
           ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
-        [input.tenantId, input.identity],
-      );
-      const row = challenge.rows[0];
-      if (!row) throw new AppError(ErrorCode.AUTH_OTP_INVALID, 401, { message: 'No active code; request a new one' });
-      if (row.attempts >= row.max_attempts) throw new AppError(ErrorCode.AUTH_OTP_INVALID, 429, { message: 'Too many attempts; request a new code' });
+          [input.tenantId, input.identity],
+        );
+        const row = challenge.rows[0];
+        if (!row)
+          throw new AppError(ErrorCode.AUTH_OTP_INVALID, 401, {
+            message: 'No active code; request a new one',
+          });
+        if (row.attempts >= row.max_attempts)
+          throw new AppError(ErrorCode.AUTH_OTP_INVALID, 429, {
+            message: 'Too many attempts; request a new code',
+          });
 
-      if (!this.otp.verify(input.code, input.identity, row.code_hash)) {
-        await scope.client.query(`UPDATE otp_challenges SET attempts = attempts + 1 WHERE id = $1`, [row.id]);
-        throw new AppError(ErrorCode.AUTH_OTP_INVALID, 401, { message: 'Incorrect code' });
-      }
-      await scope.client.query(`UPDATE otp_challenges SET consumed_at = now() WHERE id = $1`, [row.id]);
+        if (!this.otp.verify(input.code, input.identity, row.code_hash)) {
+          await scope.client.query(
+            `UPDATE otp_challenges SET attempts = attempts + 1 WHERE id = $1`,
+            [row.id],
+          );
+          throw new AppError(ErrorCode.AUTH_OTP_INVALID, 401, { message: 'Incorrect code' });
+        }
+        await scope.client.query(`UPDATE otp_challenges SET consumed_at = now() WHERE id = $1`, [
+          row.id,
+        ]);
 
-      const isEmail = input.identity.includes('@');
-      const user = isEmail ? await this.users.findByEmail(input.identity) : await this.users.findByPhone(input.identity);
-      if (!user) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'No account found for this email/phone' });
+        const isEmail = input.identity.includes('@');
+        const user = isEmail
+          ? await this.users.findByEmail(input.identity)
+          : await this.users.findByPhone(input.identity);
+        if (!user)
+          throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, {
+            message: 'No account found for this email/phone',
+          });
 
-      user.setPassword(await this.hasher.hash(input.newPassword));
-      await this.users.update(user, user.version);
-      return user.id;
-    });
+        user.setPassword(await this.hasher.hash(input.newPassword));
+        await this.users.update(user, user.version);
+        return user.id;
+      },
+    );
 
     await this.sessions.revokeAllForUser(userId, 'password-reset');
   }
 
   /** Rotate a refresh token → new access + refresh, revoking the old session. */
-  async refresh(refreshToken: string, meta: { userAgent?: string; ip?: string }): Promise<AuthTokens> {
+  async refresh(
+    refreshToken: string,
+    meta: { userAgent?: string; ip?: string },
+  ): Promise<AuthTokens> {
     const claims = this.tokens.verifyRefresh(refreshToken);
     const session = await this.sessions.findActiveByToken(refreshToken);
 
@@ -478,16 +635,23 @@ export class AuthService {
     }
 
     return runWithContext(
-      createContext({ tenantId: session.tenantId ?? undefined, userId: session.userId, actorType: 'user' }),
+      createContext({
+        tenantId: session.tenantId ?? undefined,
+        userId: session.userId,
+        actorType: 'user',
+      }),
       async () => {
         const user = await this.users.findById(session.userId);
         if (!user) throw new UnauthenticatedError(ErrorCode.AUTH_SESSION_REVOKED);
         user.assertCanAuthenticate();
 
-        const tokens = await this.uow.run<AuthTokens>({ name: 'auth.refresh', tenantId: session.tenantId }, async () => {
-          await this.sessions.revoke(session.id, 'rotated');
-          return this.mintTokens(user, session.tenantId, meta, session.id);
-        });
+        const tokens = await this.uow.run<AuthTokens>(
+          { name: 'auth.refresh', tenantId: session.tenantId },
+          async () => {
+            await this.sessions.revoke(session.id, 'rotated');
+            return this.mintTokens(user, session.tenantId, meta, session.id);
+          },
+        );
         return tokens;
       },
     );
@@ -514,37 +678,70 @@ export class AuthService {
   private async assertLoginPolicies(user: User, ip: string | undefined): Promise<void> {
     const isPlatformStaff = user.tenantId === null && user.kind === 'staff';
     if (isPlatformStaff && !isIpAllowed(await this.policies.adminIpAllowlist(), ip)) {
-      await this.audit.record({ action: 'security.admin_ip_blocked', resourceType: 'user', resourceId: user.id, actorId: user.id, changes: { ip: ip ?? null } });
-      throw new AppError(ErrorCode.AUTH_IP_NOT_ALLOWED, 403, { message: 'Platform admin sign-in is not allowed from this network' });
+      await this.audit.record({
+        action: 'security.admin_ip_blocked',
+        resourceType: 'user',
+        resourceId: user.id,
+        actorId: user.id,
+        changes: { ip: ip ?? null },
+      });
+      throw new AppError(ErrorCode.AUTH_IP_NOT_ALLOWED, 403, {
+        message: 'Platform admin sign-in is not allowed from this network',
+      });
     }
     const policy = await this.policies.passwordPolicy();
     if (isPasswordExpired(policy, await this.users.passwordChangedAt(user.id, user.tenantId))) {
       throw new AppError(ErrorCode.AUTH_PASSWORD_EXPIRED, 403, {
         message: `Your password is older than ${policy.expiryDays} days — reset it to continue`,
-        details: { reset: 'POST /v1/auth/otp/request {purpose: "password_reset"} then POST /v1/auth/password-reset/confirm' },
+        details: {
+          reset:
+            'POST /v1/auth/otp/request {purpose: "password_reset"} then POST /v1/auth/password-reset/confirm',
+        },
       });
     }
     if (isPlatformStaff) await this.alerts.onPlatformAdminLogin(user, ip);
   }
 
-  private async issueForUser(user: User, userAgent: string | undefined, ip: string | undefined, method: string): Promise<AuthTokens> {
+  private async issueForUser(
+    user: User,
+    userAgent: string | undefined,
+    ip: string | undefined,
+    method: string,
+  ): Promise<AuthTokens> {
     const tenantId = user.tenantId;
     const tokens = await this.uow.run<AuthTokens>({ name: 'auth.issue', tenantId }, async () => {
       // Persist the login-state changes made on the aggregate.
       await this.users.update(user, user.version);
       return this.mintTokens(user, tenantId, { userAgent, ip }, null);
     });
-    await this.audit.record({ action: 'user.logged_in', resourceType: 'user', resourceId: user.id, tenantId, actorId: user.id, changes: { method } });
+    await this.audit.record({
+      action: 'user.logged_in',
+      resourceType: 'user',
+      resourceId: user.id,
+      tenantId,
+      actorId: user.id,
+      changes: { method },
+    });
     this.metrics.jobRuns.inc({ job: 'auth.login', outcome: 'ok' });
     return tokens;
   }
 
   /** Create the session row and sign both tokens. Runs inside a UoW. */
-  private async mintTokens(user: User, tenantId: TenantId | null, meta: { userAgent?: string; ip?: string }, parentId: SessionId | null): Promise<AuthTokens> {
+  private async mintTokens(
+    user: User,
+    tenantId: TenantId | null,
+    meta: { userAgent?: string; ip?: string },
+    parentId: SessionId | null,
+  ): Promise<AuthTokens> {
     const { permissions, roles } = await this.roles.resolvePermissions(user.id);
     const sessionId = newId() as SessionId;
 
-    const refresh = this.tokens.signRefresh({ sub: user.id, tid: tenantId, sid: sessionId, jti: newId() });
+    const refresh = this.tokens.signRefresh({
+      sub: user.id,
+      tid: tenantId,
+      sid: sessionId,
+      jti: newId(),
+    });
     const realSessionId = await this.sessions.create({
       userId: user.id,
       tenantId,
@@ -576,7 +773,8 @@ export class AuthService {
 
 // A fixed hash to compare against for non-existent users, so the timing of a
 // missing-user path matches the wrong-password path.
-const DUMMY_HASH = 'scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+const DUMMY_HASH =
+  'scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
 
 function permissionsHash(permissions: string[]): string {
   return createHashHex([...permissions].sort().join(','));

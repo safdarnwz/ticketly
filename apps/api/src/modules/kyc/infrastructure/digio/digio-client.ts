@@ -35,7 +35,11 @@ function authHeader(config: DigioConfig): string {
   return `Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64')}`;
 }
 
-async function digioFetch<T>(config: DigioConfig, path: string, body: Record<string, unknown>): Promise<T> {
+async function digioFetch<T>(
+  config: DigioConfig,
+  path: string,
+  body: Record<string, unknown>,
+): Promise<T> {
   const response = await fetch(`${baseUrl(config.environment)}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: authHeader(config) },
@@ -57,12 +61,21 @@ export interface PanVerificationResult {
 }
 
 /** Instant, synchronous — a genuine database match against the PAN, not just format validation. */
-export async function verifyPan(config: DigioConfig, pan: string, nameToMatch?: string): Promise<PanVerificationResult> {
-  const result = await digioFetch<{ id_no: string; full_name?: string; pan_status?: string; status?: string }>(
-    config, '/v3/client/kyc/pan/verify', { id_no: pan.trim().toUpperCase(), name: nameToMatch },
-  );
+export async function verifyPan(
+  config: DigioConfig,
+  pan: string,
+  nameToMatch?: string,
+): Promise<PanVerificationResult> {
+  const result = await digioFetch<{
+    id_no: string;
+    full_name?: string;
+    pan_status?: string;
+    status?: string;
+  }>(config, '/v3/client/kyc/pan/verify', { id_no: pan.trim().toUpperCase(), name: nameToMatch });
   return {
-    matched: (result.status ?? result.pan_status) === 'VALID' || (result.status ?? '').toUpperCase() === 'ID_EXIST',
+    matched:
+      (result.status ?? result.pan_status) === 'VALID' ||
+      (result.status ?? '').toUpperCase() === 'ID_EXIST',
     nameAtPan: result.full_name ?? null,
     panStatus: result.pan_status ?? result.status ?? null,
   };
@@ -75,10 +88,13 @@ export interface AadhaarOtpSession {
 }
 
 /** Step 1 — sends an OTP to the mobile number linked to this Aadhaar (UIDAI-side, not ours). */
-export async function generateAadhaarOtp(config: DigioConfig, aadhaarNumber: string): Promise<AadhaarOtpSession> {
-  const result = await digioFetch<{ id: string }>(
-    config, '/v2/client/kyc/aadhaar/generate_otp', { aadhaar_number: aadhaarNumber.replace(/\D/g, '') },
-  );
+export async function generateAadhaarOtp(
+  config: DigioConfig,
+  aadhaarNumber: string,
+): Promise<AadhaarOtpSession> {
+  const result = await digioFetch<{ id: string }>(config, '/v2/client/kyc/aadhaar/generate_otp', {
+    aadhaar_number: aadhaarNumber.replace(/\D/g, ''),
+  });
   return { digioRequestId: result.id };
 }
 
@@ -91,9 +107,17 @@ export interface AadhaarVerificationResult {
 }
 
 /** Step 2 — the applicant's OTP, submitted back. Digio confirms it with UIDAI and returns the demographic record. */
-export async function submitAadhaarOtp(config: DigioConfig, digioRequestId: string, otp: string): Promise<AadhaarVerificationResult> {
+export async function submitAadhaarOtp(
+  config: DigioConfig,
+  digioRequestId: string,
+  otp: string,
+): Promise<AadhaarVerificationResult> {
   const result = await digioFetch<{
-    status: string; name?: string; dob?: string; address?: string; aadhaar_number?: string;
+    status: string;
+    name?: string;
+    dob?: string;
+    address?: string;
+    aadhaar_number?: string;
   }>(config, '/v2/client/kyc/aadhaar/submit_otp', { id: digioRequestId, otp });
 
   return {
@@ -115,15 +139,26 @@ export interface BankAccountVerificationResult {
 }
 
 /** Synchronous — Digio drops (and typically reverses) a token amount into the account and confirms it landed, returning the registered account-holder name for the caller to compare against the applicant's stated name. */
-export async function verifyBankAccount(config: DigioConfig, accountNumber: string, ifsc: string): Promise<BankAccountVerificationResult> {
-  const result = await digioFetch<{ status: string; name_at_bank?: string; utr?: string; message?: string }>(
-    config, '/v3/client/bank_verification', { id_no: accountNumber.trim(), ifsc: ifsc.trim().toUpperCase() },
-  );
+export async function verifyBankAccount(
+  config: DigioConfig,
+  accountNumber: string,
+  ifsc: string,
+): Promise<BankAccountVerificationResult> {
+  const result = await digioFetch<{
+    status: string;
+    name_at_bank?: string;
+    utr?: string;
+    message?: string;
+  }>(config, '/v3/client/bank_verification', {
+    id_no: accountNumber.trim(),
+    ifsc: ifsc.trim().toUpperCase(),
+  });
   return {
     verified: result.status === 'success' || result.status === 'ACCOUNT_EXISTS',
     nameAtBank: result.name_at_bank ?? null,
     utr: result.utr ?? null,
-    failureReason: result.status === 'success' ? null : (result.message ?? 'Bank account could not be verified'),
+    failureReason:
+      result.status === 'success' ? null : (result.message ?? 'Bank account could not be verified'),
   };
 }
 

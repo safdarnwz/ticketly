@@ -9,7 +9,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 
-import type { AppConfig} from '@config';
+import type { AppConfig } from '@config';
 import { loadEnv } from '@config';
 import { Logger } from '@observability';
 

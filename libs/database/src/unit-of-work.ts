@@ -78,7 +78,10 @@ export class UnitOfWork {
    * Run `fn` inside a transaction. Joins an outer transaction as a SAVEPOINT
    * when one is already open.
    */
-  async run<T>(options: TransactionOptions, fn: (scope: TransactionScope) => Promise<T>): Promise<T> {
+  async run<T>(
+    options: TransactionOptions,
+    fn: (scope: TransactionScope) => Promise<T>,
+  ): Promise<T> {
     const existing = currentTransaction();
     if (existing) return this.runNested(existing, options, fn);
 
@@ -89,7 +92,8 @@ export class UnitOfWork {
         return await this.runRoot(options, fn);
       } catch (error) {
         const retryable = isRetryablePgError(error);
-        if (!retryable || attempt >= maxRetries) throw mapPostgresError(error, { meta: { transaction: options.name } });
+        if (!retryable || attempt >= maxRetries)
+          throw mapPostgresError(error, { meta: { transaction: options.name } });
 
         const reason = (error as { code?: string }).code ?? 'unknown';
         this.metrics.dbTransactionRetries.inc({ reason });
@@ -233,11 +237,17 @@ export class UnitOfWork {
   private observe(name: string, scope: TransactionScope, outcome: 'commit' | 'rollback'): void {
     const durationMs = Date.now() - scope.startedAt;
     this.metrics.dbQueries.inc({ operation: `tx:${name}`, target: 'primary', outcome });
-    this.metrics.dbDuration.observe({ operation: `tx:${name}`, target: 'primary' }, durationMs / 1000);
+    this.metrics.dbDuration.observe(
+      { operation: `tx:${name}`, target: 'primary' },
+      durationMs / 1000,
+    );
 
     // A long-running transaction holds locks and blocks vacuum. Surface it.
     if (durationMs > this.config.db.idleInTransactionTimeoutMs / 2) {
-      this.log.warn({ transaction: name, durationMs, outcome, events: scope.events.length }, 'long transaction');
+      this.log.warn(
+        { transaction: name, durationMs, outcome, events: scope.events.length },
+        'long transaction',
+      );
     }
   }
 }

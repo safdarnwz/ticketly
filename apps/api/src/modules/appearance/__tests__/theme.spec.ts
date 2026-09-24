@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 
 import {
-  DEFAULT_THEME, validateTheme, mergeTheme, resolveTheme, tokensToCssVars, themeToCss,
+  DEFAULT_THEME,
+  validateTheme,
+  mergeTheme,
+  resolveTheme,
+  tokensToCssVars,
+  themeToCss,
 } from '../domain/theme';
 
 describe('validateTheme', () => {
@@ -20,7 +25,10 @@ describe('validateTheme', () => {
 
 describe('mergeTheme', () => {
   it('happy: deep-merges only the overridden leaves', () => {
-    const merged = mergeTheme(DEFAULT_THEME, { colors: { primary: '#123456' }, components: { button: { height: 48 } } });
+    const merged = mergeTheme(DEFAULT_THEME, {
+      colors: { primary: '#123456' },
+      components: { button: { height: 48 } },
+    });
     expect(merged.colors.primary).toBe('#123456');
     expect(merged.colors.bg).toBe(DEFAULT_THEME.colors.bg); // untouched
     expect(merged.components.button.height).toBe(48);

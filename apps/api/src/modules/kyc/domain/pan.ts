@@ -30,11 +30,19 @@ export interface PanFormatResult {
 export function checkPanFormat(rawPan: string): PanFormatResult {
   const pan = rawPan.trim().toUpperCase();
   if (!PAN_PATTERN.test(pan)) {
-    return { wellFormed: false, holderType: null, reason: 'PAN must be 5 letters, 4 digits, 1 letter (e.g. ABCDE1234F)' };
+    return {
+      wellFormed: false,
+      holderType: null,
+      reason: 'PAN must be 5 letters, 4 digits, 1 letter (e.g. ABCDE1234F)',
+    };
   }
   const holderType = pan[3];
   if (!VALID_HOLDER_TYPES.has(holderType)) {
-    return { wellFormed: false, holderType: null, reason: `Unrecognised holder-type code '${holderType}' in 4th position` };
+    return {
+      wellFormed: false,
+      holderType: null,
+      reason: `Unrecognised holder-type code '${holderType}' in 4th position`,
+    };
   }
   return { wellFormed: true, holderType };
 }

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { assertRefundTransition, canRefundTransition, initialStatusFor, isRefundTerminal } from '../domain/refund-state';
+import {
+  assertRefundTransition,
+  canRefundTransition,
+  initialStatusFor,
+  isRefundTerminal,
+} from '../domain/refund-state';
 
 describe('refund state machine', () => {
   it('source refund flows initiated→processing→settled', () => {

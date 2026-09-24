@@ -18,9 +18,19 @@ export class AnnouncementController {
   @ApiBearerAuth('bearer')
   @RequirePermission(Permission.ALL)
   @ApiOperation({ summary: 'Create a platform-wide announcement (super-admin only)' })
-  async create(@Body() dto: { title: string; body: string; severity?: 'info' | 'warning' | 'critical'; audience?: 'operators' | 'customers' | 'all'; startsAt?: string; endsAt?: string }) {
+  async create(
+    @Body()
+    dto: {
+      title: string;
+      body: string;
+      severity?: 'info' | 'warning' | 'critical';
+      audience?: 'operators' | 'customers' | 'all';
+      startsAt?: string;
+      endsAt?: string;
+    },
+  ) {
     this.assertPlatformAdmin();
-    const id = await this.announcements.create({ ...dto, createdBy: (getUserId()) ?? null });
+    const id = await this.announcements.create({ ...dto, createdBy: getUserId() ?? null });
     return { id };
   }
 
@@ -44,7 +54,10 @@ export class AnnouncementController {
   }
 
   @Get('active/operators')
-  @ApiOperation({ summary: 'Currently-active announcements for operators — shown as a banner in the operator console' })
+  @ApiOperation({
+    summary:
+      'Currently-active announcements for operators — shown as a banner in the operator console',
+  })
   async activeForOperators() {
     return { items: await this.announcements.active('operators') };
   }
@@ -58,6 +71,9 @@ export class AnnouncementController {
 
   private assertPlatformAdmin(): void {
     const ctx = getContext();
-    if (ctx?.tenantId) throw new ForbiddenError({ message: 'Platform-admin actions require a platform (non-tenant) principal' });
+    if (ctx?.tenantId)
+      throw new ForbiddenError({
+        message: 'Platform-admin actions require a platform (non-tenant) principal',
+      });
   }
 }

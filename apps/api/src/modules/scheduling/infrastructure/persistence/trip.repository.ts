@@ -2,9 +2,16 @@ import { Injectable } from '@nestjs/common';
 
 import { DatabaseService } from '@database';
 import {
-  newId, NotFoundError, requireTenantId,
-  type LocalDate, type RouteId, type SeatLayoutId, type ServiceId, type StopId,
-  type TripId, type VehicleId,
+  newId,
+  NotFoundError,
+  requireTenantId,
+  type LocalDate,
+  type RouteId,
+  type SeatLayoutId,
+  type ServiceId,
+  type StopId,
+  type TripId,
+  type VehicleId,
 } from '@kernel';
 
 export type TripStatus = 'scheduled' | 'open' | 'departed' | 'closed' | 'cancelled';
@@ -52,9 +59,16 @@ export class TripRepository {
   constructor(private readonly db: DatabaseService) {}
 
   async insertTrip(input: {
-    serviceId: ServiceId; routeId: RouteId; vehicleId: VehicleId | null; seatLayoutId: SeatLayoutId;
-    journeyDate: LocalDate; departsAt: Date; arrivesAt: Date; stopCount: number;
-    stops: TripStopRow[]; seats: SeatInit[];
+    serviceId: ServiceId;
+    routeId: RouteId;
+    vehicleId: VehicleId | null;
+    seatLayoutId: SeatLayoutId;
+    journeyDate: LocalDate;
+    departsAt: Date;
+    arrivesAt: Date;
+    stopCount: number;
+    stops: TripStopRow[];
+    seats: SeatInit[];
     extra?: { isExtra: true; reason: string; ladiesSpecial: boolean; closedChannels: string[] };
   }): Promise<TripId> {
     const tenantId = requireTenantId();
@@ -65,9 +79,23 @@ export class TripRepository {
                           journey_date, departs_at, arrives_at, stop_count, total_seats, status,
                           is_extra, extra_reason, ladies_special, closed_channels)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'open',$12,$13,$14,$15::text[])`,
-      [tripId, tenantId, input.serviceId, input.routeId, input.vehicleId, input.seatLayoutId,
-       input.journeyDate, input.departsAt, input.arrivesAt, input.stopCount, input.seats.length,
-       input.extra?.isExtra ?? false, input.extra?.reason ?? null, input.extra?.ladiesSpecial ?? false, input.extra?.closedChannels ?? []],
+      [
+        tripId,
+        tenantId,
+        input.serviceId,
+        input.routeId,
+        input.vehicleId,
+        input.seatLayoutId,
+        input.journeyDate,
+        input.departsAt,
+        input.arrivesAt,
+        input.stopCount,
+        input.seats.length,
+        input.extra?.isExtra ?? false,
+        input.extra?.reason ?? null,
+        input.extra?.ladiesSpecial ?? false,
+        input.extra?.closedChannels ?? [],
+      ],
       { name: 'trip.insert', primary: true },
     );
 
@@ -75,7 +103,16 @@ export class TripRepository {
     const stopParams: unknown[] = [];
     const stopSql = input.stops.map((s, i) => {
       const b = i * 8;
-      stopParams.push(tripId, tenantId, s.sequence, s.stopId, s.arrivesAt, s.departsAt, s.canBoard, s.canAlight);
+      stopParams.push(
+        tripId,
+        tenantId,
+        s.sequence,
+        s.stopId,
+        s.arrivesAt,
+        s.departsAt,
+        s.canBoard,
+        s.canAlight,
+      );
       return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7},$${b + 8})`;
     });
     await this.db.execute_(
@@ -114,7 +151,11 @@ export class TripRepository {
   }
 
   /** Is this bus already running a trip that overlaps [departsAt, departsAt+durationMin] (30-min turnaround either side)? */
-  async vehicleBusyAround(vehicleId: VehicleId, departsAt: Date, durationMin: number): Promise<boolean> {
+  async vehicleBusyAround(
+    vehicleId: VehicleId,
+    departsAt: Date,
+    durationMin: number,
+  ): Promise<boolean> {
     const row = await this.db.queryOne<{ n: string }>(
       `SELECT count(*) AS n FROM trips WHERE tenant_id = $1 AND vehicle_id = $2 AND status IN ('scheduled', 'open', 'departed')
           AND departs_at - interval '30 minutes' < $3::timestamptz + make_interval(mins => $4)
@@ -147,25 +188,35 @@ export class TripRepository {
     return this.db.execute_(
       `UPDATE bookings SET hold_expires_at = now() - interval '1 second', updated_at = now()
         WHERE tenant_id = $1 AND trip_id = $2 AND status = 'held' AND hold_expires_at > now() AND ($3 OR channel <> 'phone')`,
-      [requireTenantId(), tripId, includePhoneHolds], { name: 'trip.releaseHolds', primary: true });
+      [requireTenantId(), tripId, includePhoneHolds],
+      { name: 'trip.releaseHolds', primary: true },
+    );
   }
 
   async addRemark(tripId: TripId, remark: string, by: string | null): Promise<void> {
-    await this.db.execute_(`INSERT INTO trip_remarks (tenant_id, trip_id, remark, created_by) VALUES ($1,$2,$3,$4)`,
-      [requireTenantId(), tripId, remark, by], { name: 'trip.addRemark', primary: true });
+    await this.db.execute_(
+      `INSERT INTO trip_remarks (tenant_id, trip_id, remark, created_by) VALUES ($1,$2,$3,$4)`,
+      [requireTenantId(), tripId, remark, by],
+      { name: 'trip.addRemark', primary: true },
+    );
   }
 
   async remarks(tripId: TripId): Promise<unknown[]> {
     return this.db.query(
       `SELECT r.id, r.remark, r.created_at AS "createdAt", u.full_name AS "by" FROM trip_remarks r LEFT JOIN users u ON u.id = r.created_by
-        WHERE r.tenant_id = $1 AND r.trip_id = $2 ORDER BY r.created_at DESC`, [requireTenantId(), tripId], { name: 'trip.remarks' });
+        WHERE r.tenant_id = $1 AND r.trip_id = $2 ORDER BY r.created_at DESC`,
+      [requireTenantId(), tripId],
+      { name: 'trip.remarks' },
+    );
   }
 
   /** Release an extra trip's inventory to every channel (it is created closed). */
   async openAllChannels(tripId: TripId): Promise<boolean> {
     const n = await this.db.execute_(
       `UPDATE trips SET closed_channels = '{}', updated_at = now() WHERE tenant_id = $1 AND id = $2 AND status IN ('scheduled', 'open')`,
-      [requireTenantId(), tripId], { name: 'trip.openAllChannels', primary: true });
+      [requireTenantId(), tripId],
+      { name: 'trip.openAllChannels', primary: true },
+    );
     return n > 0;
   }
 
@@ -227,7 +278,9 @@ export class TripRepository {
   }
 
   /** Upcoming trips across every service — the staff "Trips" console view (search/scheduling both work per-service; this is the cross-service operational view for cancel/stop-sales day-to-day). */
-  async listUpcoming(limit = 100): Promise<(TripRecord & { routeName: string; occupancyPct: number })[]> {
+  async listUpcoming(
+    limit = 100,
+  ): Promise<(TripRecord & { routeName: string; occupancyPct: number })[]> {
     const rows = await this.db.query<Row & { route_name: string; booked_seats: string }>(
       `SELECT t.id, t.service_id, t.route_id, t.vehicle_id, t.seat_layout_id, t.journey_date,
               t.departs_at, t.arrives_at, t.stop_count, t.total_seats, t.status,
@@ -239,7 +292,12 @@ export class TripRepository {
       [requireTenantId(), Math.min(limit, 300)],
       { name: 'trip.listUpcoming' },
     );
-    return rows.map((r) => ({ ...map(r), routeName: r.route_name, occupancyPct: r.total_seats > 0 ? Math.round((Number(r.booked_seats) / r.total_seats) * 100) : 0 }));
+    return rows.map((r) => ({
+      ...map(r),
+      routeName: r.route_name,
+      occupancyPct:
+        r.total_seats > 0 ? Math.round((Number(r.booked_seats) / r.total_seats) * 100) : 0,
+    }));
   }
 
   /** Stop sequence for a trip — used to map (fromStopId,toStopId) → leg indices. */
@@ -251,25 +309,49 @@ export class TripRepository {
       { name: 'trip.loadStops' },
     );
     return rows.map((r) => ({
-      sequence: r.sequence, stopId: r.stop_id, arrivesAt: new Date(r.arrives_at),
-      departsAt: new Date(r.departs_at), canBoard: r.can_board, canAlight: r.can_alight,
+      sequence: r.sequence,
+      stopId: r.stop_id,
+      arrivesAt: new Date(r.arrives_at),
+      departsAt: new Date(r.departs_at),
+      canBoard: r.can_board,
+      canAlight: r.can_alight,
     }));
   }
 }
 
 interface Row {
-  id: TripId; service_id: ServiceId; route_id: RouteId; vehicle_id: VehicleId | null;
-  seat_layout_id: SeatLayoutId; journey_date: LocalDate; departs_at: Date; arrives_at: Date;
-  stop_count: number; total_seats: number; status: TripStatus;
+  id: TripId;
+  service_id: ServiceId;
+  route_id: RouteId;
+  vehicle_id: VehicleId | null;
+  seat_layout_id: SeatLayoutId;
+  journey_date: LocalDate;
+  departs_at: Date;
+  arrives_at: Date;
+  stop_count: number;
+  total_seats: number;
+  status: TripStatus;
 }
 interface StopRow {
-  sequence: number; stop_id: StopId; arrives_at: string; departs_at: string; can_board: boolean; can_alight: boolean;
+  sequence: number;
+  stop_id: StopId;
+  arrives_at: string;
+  departs_at: string;
+  can_board: boolean;
+  can_alight: boolean;
 }
 function map(r: Row): TripRecord {
   return {
-    id: r.id, serviceId: r.service_id, routeId: r.route_id, vehicleId: r.vehicle_id,
-    seatLayoutId: r.seat_layout_id, journeyDate: r.journey_date,
-    departsAt: new Date(r.departs_at), arrivesAt: new Date(r.arrives_at),
-    stopCount: r.stop_count, totalSeats: r.total_seats, status: r.status,
+    id: r.id,
+    serviceId: r.service_id,
+    routeId: r.route_id,
+    vehicleId: r.vehicle_id,
+    seatLayoutId: r.seat_layout_id,
+    journeyDate: r.journey_date,
+    departsAt: new Date(r.departs_at),
+    arrivesAt: new Date(r.arrives_at),
+    stopCount: r.stop_count,
+    totalSeats: r.total_seats,
+    status: r.status,
   };
 }

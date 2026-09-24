@@ -7,8 +7,14 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
  * constant-time hash comparison verifies it. The key is shown ONCE at creation.
  */
 export function generateKey(sandbox: boolean): { key: string; prefix: string; hash: string } {
-  const prefix = randomBytes(6).toString('base64url').replace(/[^A-Za-z0-9]/g, 'x').slice(0, 8);
-  const secret = randomBytes(24).toString('base64url').replace(/[^A-Za-z0-9]/g, 'x').slice(0, 32);
+  const prefix = randomBytes(6)
+    .toString('base64url')
+    .replace(/[^A-Za-z0-9]/g, 'x')
+    .slice(0, 8);
+  const secret = randomBytes(24)
+    .toString('base64url')
+    .replace(/[^A-Za-z0-9]/g, 'x')
+    .slice(0, 32);
   const key = `gds_${sandbox ? 'test' : 'live'}_${prefix}_${secret}`;
   return { key, prefix, hash: hashKey(key) };
 }

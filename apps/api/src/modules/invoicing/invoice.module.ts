@@ -22,7 +22,14 @@ import { InvoiceService } from './application/services/invoice.service';
  * InvoiceService.emailInvoicePdf.
  */
 @Module({
-  imports: [DatabaseModule, BookingModule, MasterDataModule, IamModule, TenancyModule, PlatformSettingsModule],
+  imports: [
+    DatabaseModule,
+    BookingModule,
+    MasterDataModule,
+    IamModule,
+    TenancyModule,
+    PlatformSettingsModule,
+  ],
   controllers: [InvoiceController],
   providers: [InvoiceRepository, InvoiceService],
   exports: [InvoiceService],

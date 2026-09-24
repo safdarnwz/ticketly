@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  agentCommissionMinor, canTransition, checkFunds, commissionClawbackMinor,
-  isLowBalance, netCostMinor, signedAmount, spendableMinor, validateTerms,
+  agentCommissionMinor,
+  canTransition,
+  checkFunds,
+  commissionClawbackMinor,
+  isLowBalance,
+  netCostMinor,
+  signedAmount,
+  spendableMinor,
+  validateTerms,
 } from '../domain/agent-account';
 
 describe('agent account — signedAmount', () => {
@@ -45,28 +52,76 @@ describe('agent account — commission', () => {
 
 describe('agent account — funds check', () => {
   it('prepaid: must cover the net cost from balance alone', () => {
-    expect(checkFunds({ balanceMinor: 100000, creditLimitMinor: 0, totalMinor: 105000, commissionMinor: 5000 }).ok).toBe(true);
-    const short = checkFunds({ balanceMinor: 99999, creditLimitMinor: 0, totalMinor: 105000, commissionMinor: 5000 });
+    expect(
+      checkFunds({
+        balanceMinor: 100000,
+        creditLimitMinor: 0,
+        totalMinor: 105000,
+        commissionMinor: 5000,
+      }).ok,
+    ).toBe(true);
+    const short = checkFunds({
+      balanceMinor: 99999,
+      creditLimitMinor: 0,
+      totalMinor: 105000,
+      commissionMinor: 5000,
+    });
     expect(short).toEqual({ ok: false, shortfallMinor: 1 });
   });
   it('postpaid: may go negative down to the credit limit', () => {
     expect(spendableMinor(-40000, 50000)).toBe(10000);
-    expect(checkFunds({ balanceMinor: -40000, creditLimitMinor: 50000, totalMinor: 10500, commissionMinor: 500 }).ok).toBe(true);
-    expect(checkFunds({ balanceMinor: -40000, creditLimitMinor: 50000, totalMinor: 10600, commissionMinor: 500 }).ok).toBe(false);
+    expect(
+      checkFunds({
+        balanceMinor: -40000,
+        creditLimitMinor: 50000,
+        totalMinor: 10500,
+        commissionMinor: 500,
+      }).ok,
+    ).toBe(true);
+    expect(
+      checkFunds({
+        balanceMinor: -40000,
+        creditLimitMinor: 50000,
+        totalMinor: 10600,
+        commissionMinor: 500,
+      }).ok,
+    ).toBe(false);
   });
 });
 
 describe('agent account — refund clawback', () => {
   it('full refund reverses all commission', () => {
-    expect(commissionClawbackMinor({ commissionCreditedMinor: 5000, refundMinor: 105000, paidMinor: 105000 })).toBe(5000);
+    expect(
+      commissionClawbackMinor({
+        commissionCreditedMinor: 5000,
+        refundMinor: 105000,
+        paidMinor: 105000,
+      }),
+    ).toBe(5000);
   });
   it('partial refund reverses the same proportion', () => {
-    expect(commissionClawbackMinor({ commissionCreditedMinor: 5000, refundMinor: 52500, paidMinor: 105000 })).toBe(2500);
+    expect(
+      commissionClawbackMinor({
+        commissionCreditedMinor: 5000,
+        refundMinor: 52500,
+        paidMinor: 105000,
+      }),
+    ).toBe(2500);
   });
   it('never exceeds what was credited, never negative', () => {
-    expect(commissionClawbackMinor({ commissionCreditedMinor: 5000, refundMinor: 200000, paidMinor: 105000 })).toBe(5000);
-    expect(commissionClawbackMinor({ commissionCreditedMinor: 0, refundMinor: 1000, paidMinor: 1000 })).toBe(0);
-    expect(commissionClawbackMinor({ commissionCreditedMinor: 5000, refundMinor: 0, paidMinor: 1000 })).toBe(0);
+    expect(
+      commissionClawbackMinor({
+        commissionCreditedMinor: 5000,
+        refundMinor: 200000,
+        paidMinor: 105000,
+      }),
+    ).toBe(5000);
+    expect(
+      commissionClawbackMinor({ commissionCreditedMinor: 0, refundMinor: 1000, paidMinor: 1000 }),
+    ).toBe(0);
+    expect(
+      commissionClawbackMinor({ commissionCreditedMinor: 5000, refundMinor: 0, paidMinor: 1000 }),
+    ).toBe(0);
   });
 });
 
@@ -84,8 +139,12 @@ describe('agent account — status & terms', () => {
     expect(validateTerms({ billingMode: 'prepaid', creditLimitMinor: 0 })).toBeNull();
   });
   it('a credit limit cannot be cut below what the agent already owes', () => {
-    expect(validateTerms({ billingMode: 'postpaid', creditLimitMinor: 10000, balanceMinor: -20000 })).not.toBeNull();
-    expect(validateTerms({ billingMode: 'postpaid', creditLimitMinor: 20000, balanceMinor: -20000 })).toBeNull();
+    expect(
+      validateTerms({ billingMode: 'postpaid', creditLimitMinor: 10000, balanceMinor: -20000 }),
+    ).not.toBeNull();
+    expect(
+      validateTerms({ billingMode: 'postpaid', creditLimitMinor: 20000, balanceMinor: -20000 }),
+    ).toBeNull();
   });
   it('low-balance alert only fires when a threshold is set', () => {
     expect(isLowBalance(500, 0, 1000)).toBe(true);

@@ -4,13 +4,26 @@ import { AppError, ErrorCode } from '@kernel';
 
 import { PlatformSettingsRepository } from '../tenancy/infrastructure/persistence/platform-settings.repository';
 import {
-  agentCreditPolicyError, normaliseAgentCreditPolicy, type AgentCreditPolicy,
+  agentCreditPolicyError,
+  normaliseAgentCreditPolicy,
+  type AgentCreditPolicy,
 } from './domain/agent-credit-policy';
-import { dataRetentionErrors, normaliseDataRetention, type DataRetentionPolicy } from './domain/data-retention';
+import {
+  dataRetentionErrors,
+  normaliseDataRetention,
+  type DataRetentionPolicy,
+} from './domain/data-retention';
 import { DEFAULT_GST_SLABS, gstSlabErrors, type GstSlab } from './domain/gst-slabs';
 import { invalidAllowlistEntries } from './domain/ip-allowlist';
-import { normalisePasswordPolicy, passwordViolations, type PasswordPolicy } from './domain/password-policy';
-import { normaliseSuspiciousLoginPolicy, type SuspiciousLoginPolicy } from './domain/suspicious-login';
+import {
+  normalisePasswordPolicy,
+  passwordViolations,
+  type PasswordPolicy,
+} from './domain/password-policy';
+import {
+  normaliseSuspiciousLoginPolicy,
+  type SuspiciousLoginPolicy,
+} from './domain/suspicious-login';
 
 export const POLICY_KEYS = {
   password: 'password_policy',
@@ -34,7 +47,9 @@ export class PlatformPoliciesService {
   /* ── password policy (#27–#29) ─────────────────────────────────────── */
 
   async passwordPolicy(): Promise<PasswordPolicy> {
-    return normalisePasswordPolicy(await this.settings.get<Partial<PasswordPolicy> | null>(POLICY_KEYS.password, null));
+    return normalisePasswordPolicy(
+      await this.settings.get<Partial<PasswordPolicy> | null>(POLICY_KEYS.password, null),
+    );
   }
 
   async setPasswordPolicy(policy: PasswordPolicy, actorId: string | null): Promise<PasswordPolicy> {
@@ -61,7 +76,8 @@ export class PlatformPoliciesService {
 
   async setAdminIpAllowlist(entries: string[], actorId: string | null): Promise<string[]> {
     const invalid = invalidAllowlistEntries(entries);
-    if (invalid.length > 0) throw validation(`Not a valid IP address or CIDR range: ${invalid.join(', ')}`);
+    if (invalid.length > 0)
+      throw validation(`Not a valid IP address or CIDR range: ${invalid.join(', ')}`);
     const cleaned = [...new Set(entries.map((e) => e.trim()))];
     await this.settings.set(POLICY_KEYS.adminIpAllowlist, cleaned, actorId);
     return cleaned;
@@ -70,11 +86,20 @@ export class PlatformPoliciesService {
   /* ── suspicious login alerts (#54) ─────────────────────────────────── */
 
   async suspiciousLoginPolicy(): Promise<SuspiciousLoginPolicy> {
-    return normaliseSuspiciousLoginPolicy(await this.settings.get<Partial<SuspiciousLoginPolicy> | null>(POLICY_KEYS.suspiciousLogin, null));
+    return normaliseSuspiciousLoginPolicy(
+      await this.settings.get<Partial<SuspiciousLoginPolicy> | null>(
+        POLICY_KEYS.suspiciousLogin,
+        null,
+      ),
+    );
   }
 
-  async setSuspiciousLoginPolicy(policy: SuspiciousLoginPolicy, actorId: string | null): Promise<SuspiciousLoginPolicy> {
-    if (policy.enabled && policy.alertEmails.length === 0) throw validation('Add at least one alert email before enabling suspicious-login alerts');
+  async setSuspiciousLoginPolicy(
+    policy: SuspiciousLoginPolicy,
+    actorId: string | null,
+  ): Promise<SuspiciousLoginPolicy> {
+    if (policy.enabled && policy.alertEmails.length === 0)
+      throw validation('Add at least one alert email before enabling suspicious-login alerts');
     await this.settings.set(POLICY_KEYS.suspiciousLogin, policy, actorId);
     return policy;
   }
@@ -95,10 +120,15 @@ export class PlatformPoliciesService {
   /* ── default agent credit policy (#44) ─────────────────────────────── */
 
   async agentCreditPolicy(): Promise<AgentCreditPolicy> {
-    return normaliseAgentCreditPolicy(await this.settings.get<Partial<AgentCreditPolicy> | null>(POLICY_KEYS.agentCredit, null));
+    return normaliseAgentCreditPolicy(
+      await this.settings.get<Partial<AgentCreditPolicy> | null>(POLICY_KEYS.agentCredit, null),
+    );
   }
 
-  async setAgentCreditPolicy(policy: AgentCreditPolicy, actorId: string | null): Promise<AgentCreditPolicy> {
+  async setAgentCreditPolicy(
+    policy: AgentCreditPolicy,
+    actorId: string | null,
+  ): Promise<AgentCreditPolicy> {
     const error = agentCreditPolicyError(policy);
     if (error) throw validation(error);
     await this.settings.set(POLICY_KEYS.agentCredit, policy, actorId);
@@ -108,10 +138,15 @@ export class PlatformPoliciesService {
   /* ── data retention (#75) ──────────────────────────────────────────── */
 
   async dataRetention(): Promise<DataRetentionPolicy> {
-    return normaliseDataRetention(await this.settings.get<Partial<DataRetentionPolicy> | null>(POLICY_KEYS.dataRetention, null));
+    return normaliseDataRetention(
+      await this.settings.get<Partial<DataRetentionPolicy> | null>(POLICY_KEYS.dataRetention, null),
+    );
   }
 
-  async setDataRetention(patch: Partial<DataRetentionPolicy>, actorId: string | null): Promise<DataRetentionPolicy> {
+  async setDataRetention(
+    patch: Partial<DataRetentionPolicy>,
+    actorId: string | null,
+  ): Promise<DataRetentionPolicy> {
     const errors = dataRetentionErrors(patch);
     if (errors.length > 0) throw validation(errors.join('; '));
     const next = { ...(await this.dataRetention()), ...patch };

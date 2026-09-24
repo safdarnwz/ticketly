@@ -37,11 +37,10 @@ export class AppearanceRepository {
   }
 
   async remove(scope: string): Promise<void> {
-    await this.db.execute_(
-      `DELETE FROM appearance_settings WHERE scope = $1`,
-      [scope],
-      { name: 'appearance.remove', primary: true },
-    );
+    await this.db.execute_(`DELETE FROM appearance_settings WHERE scope = $1`, [scope], {
+      name: 'appearance.remove',
+      primary: true,
+    });
   }
 
   async listAll(): Promise<{ scope: string; theme: ThemePatch; updatedAt: string }[]> {

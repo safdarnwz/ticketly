@@ -3,8 +3,12 @@ import { Injectable } from '@nestjs/common';
 import { AppConfig } from '@config';
 import { DatabaseService, isUniqueViolation, UnitOfWork } from '@database';
 import {
-  AppError, ErrorCode, getUserId, requireTenantId,
-  type BookingId, type TripId,
+  AppError,
+  ErrorCode,
+  getUserId,
+  requireTenantId,
+  type BookingId,
+  type TripId,
 } from '@kernel';
 import { EventBus } from '@messaging';
 import { Logger, Metrics } from '@observability';
@@ -14,13 +18,29 @@ import { CouponRepository } from '../../../pricing/infrastructure/persistence/co
 import { TripRepository } from '../../../scheduling/infrastructure/persistence/trip.repository';
 import { CustomerRepository } from '../../../crm/infrastructure/persistence/customer.repository';
 import { assertTransition, isCancellable } from '../../domain/booking-state';
-import { computeRefund, DEFAULT_REFUND_POLICY, type RefundPolicy } from '../../domain/refund-policy';
+import {
+  computeRefund,
+  DEFAULT_REFUND_POLICY,
+  type RefundPolicy,
+} from '../../domain/refund-policy';
 import { generatePnr, ticketCode } from '../../domain/pnr';
 import { BookingRepository } from '../../infrastructure/persistence/booking.repository';
 import { SeatLockRepository } from '../../infrastructure/persistence/seat-lock.repository';
-import { HoldValidationError, normaliseSeat, resolveSeatFares, validateHoldSelection } from '../../domain/hold-validation';
+import {
+  HoldValidationError,
+  normaliseSeat,
+  resolveSeatFares,
+  validateHoldSelection,
+} from '../../domain/hold-validation';
 import { QuotaRuleError, validatePhoneHoldUntil } from '../../../quotas/domain/quota-rules';
-import { applyConcessions, checkBookingWindow, PassengerRuleError, validatePassengers, type Category, type Infant } from '../../domain/passenger-categories';
+import {
+  applyConcessions,
+  checkBookingWindow,
+  PassengerRuleError,
+  validatePassengers,
+  type Category,
+  type Infant,
+} from '../../domain/passenger-categories';
 import { ConcessionRepository } from '../../infrastructure/persistence/concession.repository';
 
 export interface HoldOptions {
@@ -31,7 +51,14 @@ export interface HoldOptions {
 export interface HoldRequest {
   quoteId: string;
   seatNumbers: string[];
-  passengers: { seatNumber: string; fullName: string; age?: number; gender?: string; category?: Category; idProof?: string }[];
+  passengers: {
+    seatNumber: string;
+    fullName: string;
+    age?: number;
+    gender?: string;
+    category?: Category;
+    idProof?: string;
+  }[];
   /** Lap infants (no seat), each with an adult guardian's seat. */
   infants?: Infant[];
   channel?: string;
@@ -111,113 +138,166 @@ export class BookingService {
    *   seat-lock gate (e.g. consume the caller's own seat quota) — atomic with
    *   the hold, so nobody can take the freed seat in between.
    */
-  async hold(req: HoldRequest, opts: HoldOptions = {}): Promise<{ bookingId: BookingId; pnr: string; holdExpiresAt: string; totalMinor: number }> {
+  async hold(
+    req: HoldRequest,
+    opts: HoldOptions = {},
+  ): Promise<{ bookingId: BookingId; pnr: string; holdExpiresAt: string; totalMinor: number }> {
     // Independent reads in parallel: one round-trip of latency, not two.
     const [blocked, cachedQuote] = await Promise.all([
-      req.contactPhone ? this.customers.isBlacklistedByPhone(req.contactPhone) : Promise.resolve(false),
+      req.contactPhone
+        ? this.customers.isBlacklistedByPhone(req.contactPhone)
+        : Promise.resolve(false),
       this.pricing.getQuote(req.quoteId),
     ]);
-    if (blocked) throw new AppError(ErrorCode.COMMON_VALIDATION, 403, { message: 'This account cannot make new bookings — please contact support' });
-    if (!cachedQuote) throw new AppError(ErrorCode.PRICING_QUOTE_EXPIRED, 422, { message: 'Price quote has expired; please refresh' });
+    if (blocked)
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 403, {
+        message: 'This account cannot make new bookings — please contact support',
+      });
+    if (!cachedQuote)
+      throw new AppError(ErrorCode.PRICING_QUOTE_EXPIRED, 422, {
+        message: 'Price quote has expired; please refresh',
+      });
 
     const quote = await this.quoteForSeats(cachedQuote, req);
     const fareBySeat = asHoldError(() => resolveSeatFares(quote, req.seatNumbers));
-    if (fareBySeat.kind !== 'priced') throw new AppError(ErrorCode.COMMON_INTERNAL, 500, { message: 'Seat pricing could not be resolved' });
+    if (fareBySeat.kind !== 'priced')
+      throw new AppError(ErrorCode.COMMON_INTERNAL, 500, {
+        message: 'Seat pricing could not be resolved',
+      });
 
     const trip = await this.trips.getById(quote.tripId);
     // Passenger categories & concessions — the same rules on every channel.
-    const [concessionRules, passengerPolicy, bookingWindow] = await Promise.all([this.concessions.rules(), this.concessions.policy(), this.concessions.bookingWindow()]);
+    const [concessionRules, passengerPolicy, bookingWindow] = await Promise.all([
+      this.concessions.rules(),
+      this.concessions.policy(),
+      this.concessions.bookingWindow(),
+    ]);
     // The operator's booking window applies on EVERY channel (web, agent, OTA, phone).
     const windowProblem = checkBookingWindow(trip.departsAt, bookingWindow);
-    if (windowProblem) throw new AppError(ErrorCode.INVENTORY_TRIP_CLOSED, 422, { message: windowProblem });
+    if (windowProblem)
+      throw new AppError(ErrorCode.INVENTORY_TRIP_CLOSED, 422, { message: windowProblem });
     try {
-      validatePassengers({ passengers: req.passengers, infants: req.infants ?? [], rules: concessionRules, policy: passengerPolicy, journeyDate: trip.journeyDate });
+      validatePassengers({
+        passengers: req.passengers,
+        infants: req.infants ?? [],
+        rules: concessionRules,
+        policy: passengerPolicy,
+        journeyDate: trip.journeyDate,
+      });
     } catch (e) {
-      if (e instanceof PassengerRuleError) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: e.message });
+      if (e instanceof PassengerRuleError)
+        throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: e.message });
       throw e;
     }
     const priced = applyConcessions({
-      fareBySeat: fareBySeat.fareBySeat, passengers: req.passengers, rules: concessionRules, policy: passengerPolicy, infantCount: req.infants?.length ?? 0,
-      totals: { baseMinor: quote.totalBaseMinor, discountMinor: quote.totalDiscountMinor, taxMinor: quote.totalTaxMinor, totalMinor: quote.totalMinor },
+      fareBySeat: fareBySeat.fareBySeat,
+      passengers: req.passengers,
+      rules: concessionRules,
+      policy: passengerPolicy,
+      infantCount: req.infants?.length ?? 0,
+      totals: {
+        baseMinor: quote.totalBaseMinor,
+        discountMinor: quote.totalDiscountMinor,
+        taxMinor: quote.totalTaxMinor,
+        totalMinor: quote.totalMinor,
+      },
     });
     // Channel-wise sales control: e.g. OTA sales stopped for a trip while
     // the operator's own website keeps selling.
     const family = channelFamily(req.channel);
     if ((await this.trips.closedChannels(trip.id)).includes(family)) {
-      throw new AppError(ErrorCode.INVENTORY_TRIP_CLOSED, 422, { message: 'Sales are closed for this trip on this channel' });
+      throw new AppError(ErrorCode.INVENTORY_TRIP_CLOSED, 422, {
+        message: 'Sales are closed for this trip on this channel',
+      });
     }
     const holdTtl = this.config.domain.seatHoldTtlSeconds;
     if (opts.holdUntil) {
       try {
         validatePhoneHoldUntil(opts.holdUntil, trip.departsAt);
       } catch (e) {
-        if (e instanceof QuotaRuleError) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: e.message });
+        if (e instanceof QuotaRuleError)
+          throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: e.message });
         throw e;
       }
     }
     // ONE instant: stored and returned identically.
     const holdExpiresAt = opts.holdUntil ?? new Date(Date.now() + holdTtl * 1000);
-    const userId = (getUserId() ?? null);
+    const userId = getUserId() ?? null;
 
-    return this.uow.run({ name: 'booking.hold', tenantId: requireTenantId(), isolation: 'read committed' }, async () => {
-      // The anti-double-sell gate: row-lock + bitmap + hold-overlap check.
-      if (opts.beforeLock) await opts.beforeLock(trip.id, req.seatNumbers.map((s) => s.trim()));
-      const locked = await this.seatLock.lockSeats({
-        tripId: quote.tripId,
-        seatNumbers: req.seatNumbers,
-        fromSeq: quote.fromSeq,
-        toSeq: quote.toSeq,
-        stopCount: trip.stopCount,
-        passengerGenderBySeat: Object.fromEntries(req.passengers.map((p) => [p.seatNumber, p.gender])),
-      });
-
-      // Each seat records what IT cost (seat overrides differ), so a partial
-      // cancellation refunds exactly that seat's fare.
-      const seats = locked.map((s) => ({ ...s, fareMinor: priced.fareBySeat.get(normaliseSeat(s.seatNumber)) ?? 0 }));
-
-      const pnr = await this.insertWithPnrRetry((pnr) =>
-        this.bookings.insertHeld({
-          pnr,
+    return this.uow.run(
+      { name: 'booking.hold', tenantId: requireTenantId(), isolation: 'read committed' },
+      async () => {
+        // The anti-double-sell gate: row-lock + bitmap + hold-overlap check.
+        if (opts.beforeLock)
+          await opts.beforeLock(
+            trip.id,
+            req.seatNumbers.map((s) => s.trim()),
+          );
+        const locked = await this.seatLock.lockSeats({
           tripId: quote.tripId,
-          routeId: trip.routeId,
+          seatNumbers: req.seatNumbers,
           fromSeq: quote.fromSeq,
           toSeq: quote.toSeq,
-          fromStopId: quote.fromStopId,
-          toStopId: quote.toStopId,
-          channel: req.channel ?? 'direct_web',
-          customerId: userId,
-          contactEmail: req.contactEmail,
-          contactPhone: req.contactPhone,
-          currency: quote.currency,
-          baseMinor: priced.totals.baseMinor,
-          discountMinor: priced.totals.discountMinor,
-          taxMinor: priced.totals.taxMinor,
+          stopCount: trip.stopCount,
+          passengerGenderBySeat: Object.fromEntries(
+            req.passengers.map((p) => [p.seatNumber, p.gender]),
+          ),
+        });
+
+        // Each seat records what IT cost (seat overrides differ), so a partial
+        // cancellation refunds exactly that seat's fare.
+        const seats = locked.map((s) => ({
+          ...s,
+          fareMinor: priced.fareBySeat.get(normaliseSeat(s.seatNumber)) ?? 0,
+        }));
+
+        const pnr = await this.insertWithPnrRetry((pnr) =>
+          this.bookings.insertHeld({
+            pnr,
+            tripId: quote.tripId,
+            routeId: trip.routeId,
+            fromSeq: quote.fromSeq,
+            toSeq: quote.toSeq,
+            fromStopId: quote.fromStopId,
+            toStopId: quote.toStopId,
+            channel: req.channel ?? 'direct_web',
+            customerId: userId,
+            contactEmail: req.contactEmail,
+            contactPhone: req.contactPhone,
+            currency: quote.currency,
+            baseMinor: priced.totals.baseMinor,
+            discountMinor: priced.totals.discountMinor,
+            taxMinor: priced.totals.taxMinor,
+            totalMinor: priced.totals.totalMinor,
+            couponCode: quote.couponCode,
+            quoteId: req.quoteId,
+            fareBreakup: quote.perSeat,
+            holdExpiresAt,
+            seats,
+            passengers: req.passengers,
+            infants: (req.infants ?? []).map((i) => ({
+              ...i,
+              feeMinor: passengerPolicy.infantFeeMinor,
+            })),
+          }),
+        );
+
+        this.metrics.seatHolds.inc({ outcome: 'ok' });
+        this.events.publish({
+          type: 'booking.seats_held',
+          aggregateType: 'booking',
+          aggregateId: pnr.bookingId,
+          payload: { tripId: quote.tripId, seats: req.seatNumbers, pnr: pnr.pnr },
+        });
+
+        return {
+          bookingId: pnr.bookingId,
+          pnr: pnr.pnr,
+          holdExpiresAt: holdExpiresAt.toISOString(),
           totalMinor: priced.totals.totalMinor,
-          couponCode: quote.couponCode,
-          quoteId: req.quoteId,
-          fareBreakup: quote.perSeat,
-          holdExpiresAt,
-          seats,
-          passengers: req.passengers,
-          infants: (req.infants ?? []).map((i) => ({ ...i, feeMinor: passengerPolicy.infantFeeMinor })),
-        }),
-      );
-
-      this.metrics.seatHolds.inc({ outcome: 'ok' });
-      this.events.publish({
-        type: 'booking.seats_held',
-        aggregateType: 'booking',
-        aggregateId: pnr.bookingId,
-        payload: { tripId: quote.tripId, seats: req.seatNumbers, pnr: pnr.pnr },
-      });
-
-      return {
-        bookingId: pnr.bookingId,
-        pnr: pnr.pnr,
-        holdExpiresAt: holdExpiresAt.toISOString(),
-        totalMinor: priced.totals.totalMinor,
-      };
-    });
+        };
+      },
+    );
   }
 
   /**
@@ -227,105 +307,185 @@ export class BookingService {
    * quote — seats are never held at a price that was not quoted for them.
    */
   private async quoteForSeats(
-    cached: NonNullable<Awaited<ReturnType<PricingService['getQuote']>>>, req: HoldRequest,
+    cached: NonNullable<Awaited<ReturnType<PricingService['getQuote']>>>,
+    req: HoldRequest,
   ): Promise<NonNullable<Awaited<ReturnType<PricingService['getQuote']>>>> {
     asHoldError(() => validateHoldSelection(req.seatNumbers, req.passengers, cached.seatCount));
     if (cached.seatFares.length > 0) return cached;
 
     const fresh = await this.pricing.quote({
-      tripId: cached.tripId, fromStopId: cached.fromStopId, toStopId: cached.toStopId, seatType: cached.seatType,
-      seatNumbers: req.seatNumbers, couponCode: cached.couponCode ?? undefined,
+      tripId: cached.tripId,
+      fromStopId: cached.fromStopId,
+      toStopId: cached.toStopId,
+      seatType: cached.seatType,
+      seatNumbers: req.seatNumbers,
+      couponCode: cached.couponCode ?? undefined,
     });
     if (fresh.totalMinor !== cached.totalMinor) {
       throw new AppError(ErrorCode.PRICING_QUOTE_EXPIRED, 409, {
-        message: 'The selected seats are priced differently from the quote — please confirm the new price',
-        details: { newQuoteId: fresh.quoteId, oldTotalMinor: cached.totalMinor, newTotalMinor: fresh.totalMinor },
+        message:
+          'The selected seats are priced differently from the quote — please confirm the new price',
+        details: {
+          newQuoteId: fresh.quoteId,
+          oldTotalMinor: cached.totalMinor,
+          newTotalMinor: fresh.totalMinor,
+        },
       });
     }
     const reloaded = await this.pricing.getQuote(fresh.quoteId);
-    if (!reloaded) throw new AppError(ErrorCode.PRICING_QUOTE_EXPIRED, 422, { message: 'Price quote has expired; please refresh' });
+    if (!reloaded)
+      throw new AppError(ErrorCode.PRICING_QUOTE_EXPIRED, 422, {
+        message: 'Price quote has expired; please refresh',
+      });
     return reloaded;
   }
 
   /** Phone booking: move the release time (only while still held, only for channel 'phone'). */
   async extendPhoneHold(bookingId: BookingId, holdUntil: Date): Promise<{ holdExpiresAt: string }> {
-    return this.uow.run({ name: 'booking.extendPhoneHold', tenantId: requireTenantId() }, async (scope) => {
-      const booking = await this.bookings.findForUpdate(bookingId);
-      if (!booking) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
-      const ch = (await scope.client.query<{ channel: string }>(`SELECT channel FROM bookings WHERE tenant_id = $1 AND id = $2`, [requireTenantId(), bookingId])).rows[0]?.channel;
-      if (ch !== 'phone') throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, { message: 'Only a phone booking can have its release time changed' });
-      if (booking.status !== 'held') throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, { message: `This booking is ${booking.status}, not on hold` });
-      if (booking.holdExpiresAt && booking.holdExpiresAt < new Date()) throw new AppError(ErrorCode.INVENTORY_HOLD_EXPIRED, 422, { message: 'The hold has already expired — the seats may have been released' });
-      const trip = await this.trips.getById(booking.tripId);
-      try {
-        validatePhoneHoldUntil(holdUntil, trip.departsAt);
-      } catch (e) {
-        if (e instanceof QuotaRuleError) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: e.message });
-        throw e;
-      }
-      await scope.client.query(`UPDATE bookings SET hold_expires_at = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2 AND status = 'held'`, [requireTenantId(), bookingId, holdUntil]);
-      return { holdExpiresAt: holdUntil.toISOString() };
-    });
+    return this.uow.run(
+      { name: 'booking.extendPhoneHold', tenantId: requireTenantId() },
+      async (scope) => {
+        const booking = await this.bookings.findForUpdate(bookingId);
+        if (!booking)
+          throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
+        const ch = (
+          await scope.client.query<{ channel: string }>(
+            `SELECT channel FROM bookings WHERE tenant_id = $1 AND id = $2`,
+            [requireTenantId(), bookingId],
+          )
+        ).rows[0]?.channel;
+        if (ch !== 'phone')
+          throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
+            message: 'Only a phone booking can have its release time changed',
+          });
+        if (booking.status !== 'held')
+          throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
+            message: `This booking is ${booking.status}, not on hold`,
+          });
+        if (booking.holdExpiresAt && booking.holdExpiresAt < new Date())
+          throw new AppError(ErrorCode.INVENTORY_HOLD_EXPIRED, 422, {
+            message: 'The hold has already expired — the seats may have been released',
+          });
+        const trip = await this.trips.getById(booking.tripId);
+        try {
+          validatePhoneHoldUntil(holdUntil, trip.departsAt);
+        } catch (e) {
+          if (e instanceof QuotaRuleError)
+            throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: e.message });
+          throw e;
+        }
+        await scope.client.query(
+          `UPDATE bookings SET hold_expires_at = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2 AND status = 'held'`,
+          [requireTenantId(), bookingId, holdUntil],
+        );
+        return { holdExpiresAt: holdUntil.toISOString() };
+      },
+    );
   }
 
   /** Step 2 — confirm a held booking after payment. */
-  async confirm(bookingId: BookingId, payment: { paidMinor: number; reference?: string }): Promise<{ pnr: string; tickets: { seatNumber: string; boardingCode: string }[] }> {
-    return this.uow.run({ name: 'booking.confirm', tenantId: requireTenantId(), isolation: 'read committed' }, async () => {
-      const booking = await this.bookings.findForUpdate(bookingId);
-      if (!booking) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
+  async confirm(
+    bookingId: BookingId,
+    payment: { paidMinor: number; reference?: string },
+  ): Promise<{ pnr: string; tickets: { seatNumber: string; boardingCode: string }[] }> {
+    return this.uow.run(
+      { name: 'booking.confirm', tenantId: requireTenantId(), isolation: 'read committed' },
+      async () => {
+        const booking = await this.bookings.findForUpdate(bookingId);
+        if (!booking)
+          throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
 
-      // Idempotency: a confirm on an already-confirmed booking replays cleanly.
-      if (booking.status === 'confirmed') {
+        // Idempotency: a confirm on an already-confirmed booking replays cleanly.
+        if (booking.status === 'confirmed') {
+          const seats = await this.bookings.loadSeats(bookingId);
+          return {
+            pnr: booking.pnr,
+            tickets: seats.map((s) => ({
+              seatNumber: s.seatNumber,
+              boardingCode: ticketCode(booking.pnr, s.seatNumber),
+            })),
+          };
+        }
+
+        assertTransition(booking.status, 'confirmed');
+        if (booking.holdExpiresAt && booking.holdExpiresAt < new Date()) {
+          throw new AppError(ErrorCode.INVENTORY_HOLD_EXPIRED, 422, {
+            message: 'Seat hold has expired',
+          });
+        }
+        if (payment.paidMinor < booking.totalMinor) {
+          throw new AppError(ErrorCode.PAYMENT_AMOUNT_MISMATCH, 422, {
+            message: 'Paid amount is less than the booking total',
+            details: { paid: payment.paidMinor, due: booking.totalMinor },
+          });
+        }
+
+        // Redeem the coupon atomically (throws if it hit its cap meanwhile).
+        if (booking.couponCode) await this.coupons.redeem(booking.couponCode);
+
         const seats = await this.bookings.loadSeats(bookingId);
-        return { pnr: booking.pnr, tickets: seats.map((s) => ({ seatNumber: s.seatNumber, boardingCode: ticketCode(booking.pnr, s.seatNumber) })) };
-      }
+        await this.seatLock.commitOccupancy(booking.tripId, seats);
 
-      assertTransition(booking.status, 'confirmed');
-      if (booking.holdExpiresAt && booking.holdExpiresAt < new Date()) {
-        throw new AppError(ErrorCode.INVENTORY_HOLD_EXPIRED, 422, { message: 'Seat hold has expired' });
-      }
-      if (payment.paidMinor < booking.totalMinor) {
-        throw new AppError(ErrorCode.PAYMENT_AMOUNT_MISMATCH, 422, {
-          message: 'Paid amount is less than the booking total',
-          details: { paid: payment.paidMinor, due: booking.totalMinor },
+        const tickets = seats.map((s) => ({
+          seatNumber: s.seatNumber,
+          boardingCode: ticketCode(booking.pnr, s.seatNumber),
+        }));
+        await this.bookings.issueTickets(bookingId, booking.tripId, tickets);
+        await this.bookings.setStatus(bookingId, 'confirmed', { paidMinor: payment.paidMinor });
+
+        this.metrics.bookings.inc({ outcome: 'confirmed', channel: 'direct' });
+        this.events.publish({
+          type: 'booking.confirmed',
+          aggregateType: 'booking',
+          aggregateId: bookingId,
+          payload: {
+            pnr: booking.pnr,
+            tripId: booking.tripId,
+            seats: seats.map((s) => s.seatNumber),
+            total: booking.totalMinor,
+            customerId: booking.customerId,
+            contactPhone: booking.contactPhone,
+            contactEmail: booking.contactEmail,
+          },
         });
-      }
 
-      // Redeem the coupon atomically (throws if it hit its cap meanwhile).
-      if (booking.couponCode) await this.coupons.redeem(booking.couponCode);
-
-      const seats = await this.bookings.loadSeats(bookingId);
-      await this.seatLock.commitOccupancy(booking.tripId, seats);
-
-      const tickets = seats.map((s) => ({ seatNumber: s.seatNumber, boardingCode: ticketCode(booking.pnr, s.seatNumber) }));
-      await this.bookings.issueTickets(bookingId, booking.tripId, tickets);
-      await this.bookings.setStatus(bookingId, 'confirmed', { paidMinor: payment.paidMinor });
-
-      this.metrics.bookings.inc({ outcome: 'confirmed', channel: 'direct' });
-      this.events.publish({
-        type: 'booking.confirmed',
-        aggregateType: 'booking',
-        aggregateId: bookingId,
-        payload: { pnr: booking.pnr, tripId: booking.tripId, seats: seats.map((s) => s.seatNumber), total: booking.totalMinor, customerId: booking.customerId, contactPhone: booking.contactPhone, contactEmail: booking.contactEmail },
-      });
-
-      return { pnr: booking.pnr, tickets };
-    });
+        return { pnr: booking.pnr, tickets };
+      },
+    );
   }
 
   /** Read-only: what a cancellation would refund RIGHT NOW, without actually cancelling — so a customer/staff member can see the number before committing. Same policy, same math as cancel() itself; just no mutation. */
-  async previewRefund(bookingId: BookingId): Promise<{ refundMinor: number; refundPct: number; cancellable: boolean; reason?: string }> {
+  async previewRefund(
+    bookingId: BookingId,
+  ): Promise<{ refundMinor: number; refundPct: number; cancellable: boolean; reason?: string }> {
     const booking = await this.bookings.findForUpdate(bookingId);
-    if (!booking) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
+    if (!booking)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
     if (!isCancellable(booking.status)) {
-      return { refundMinor: 0, refundPct: 0, cancellable: false, reason: `A ${booking.status} booking cannot be cancelled` };
+      return {
+        refundMinor: 0,
+        refundPct: 0,
+        cancellable: false,
+        reason: `A ${booking.status} booking cannot be cancelled`,
+      };
     }
     const trip = await this.trips.getById(booking.tripId);
     if (trip.departsAt < new Date()) {
-      return { refundMinor: 0, refundPct: 0, cancellable: false, reason: 'Trip has already departed' };
+      return {
+        refundMinor: 0,
+        refundPct: 0,
+        cancellable: false,
+        reason: 'Trip has already departed',
+      };
     }
     const refundPolicy = await this.loadRefundPolicy();
-    const refund = computeRefund(booking.paidMinor, trip.departsAt, new Date(), refundPolicy, booking.currency as never);
+    const refund = computeRefund(
+      booking.paidMinor,
+      trip.departsAt,
+      new Date(),
+      refundPolicy,
+      booking.currency as never,
+    );
     return { refundMinor: refund.refund.minor, refundPct: refund.refundPct, cancellable: true };
   }
 
@@ -347,52 +507,81 @@ export class BookingService {
    *   straight off this event's payload rather than defaulting blind.
    */
   async cancel(
-    bookingId: BookingId, reason?: string, forceFullRefund = false,
+    bookingId: BookingId,
+    reason?: string,
+    forceFullRefund = false,
     refundDestination: 'source' | 'alternate_account' = 'source',
-    altAccountDetails?: { accountHolder: string; accountNumber: string; ifsc: string; bankName?: string },
+    altAccountDetails?: {
+      accountHolder: string;
+      accountNumber: string;
+      ifsc: string;
+      bankName?: string;
+    },
   ): Promise<{ refundMinor: number; refundPct: number }> {
-    return this.uow.run({ name: 'booking.cancel', tenantId: requireTenantId(), isolation: 'read committed' }, async () => {
-      const booking = await this.bookings.findForUpdate(bookingId);
-      if (!booking) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
-      if (!isCancellable(booking.status)) {
-        throw new AppError(ErrorCode.BOOKING_NOT_CANCELLABLE, 422, { message: `A ${booking.status} booking cannot be cancelled` });
-      }
+    return this.uow.run(
+      { name: 'booking.cancel', tenantId: requireTenantId(), isolation: 'read committed' },
+      async () => {
+        const booking = await this.bookings.findForUpdate(bookingId);
+        if (!booking)
+          throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
+        if (!isCancellable(booking.status)) {
+          throw new AppError(ErrorCode.BOOKING_NOT_CANCELLABLE, 422, {
+            message: `A ${booking.status} booking cannot be cancelled`,
+          });
+        }
 
-      const trip = await this.trips.getById(booking.tripId);
-      if (trip.departsAt < new Date()) {
-        throw new AppError(ErrorCode.BOOKING_DEPARTED, 422, { message: 'Trip has already departed' });
-      }
+        const trip = await this.trips.getById(booking.tripId);
+        if (trip.departsAt < new Date()) {
+          throw new AppError(ErrorCode.BOOKING_DEPARTED, 422, {
+            message: 'Trip has already departed',
+          });
+        }
 
-      const refundPolicy = forceFullRefund ? { tiers: [{ minHoursBeforeDeparture: 0, refundPct: 100 }] } : await this.loadRefundPolicy();
-      const refund = computeRefund(booking.paidMinor, trip.departsAt, new Date(), refundPolicy, booking.currency as never);
+        const refundPolicy = forceFullRefund
+          ? { tiers: [{ minHoursBeforeDeparture: 0, refundPct: 100 }] }
+          : await this.loadRefundPolicy();
+        const refund = computeRefund(
+          booking.paidMinor,
+          trip.departsAt,
+          new Date(),
+          refundPolicy,
+          booking.currency as never,
+        );
 
-      const seats = await this.bookings.loadSeats(bookingId);
-      await this.seatLock.releaseOccupancy(booking.tripId, seats);
-      await this.bookings.setStatus(bookingId, 'cancelled');
-      const cancellationId = await this.bookings.recordCancellation({
-        bookingId,
-        reason: reason ?? null,
-        refundPct: refund.refundPct,
-        paidMinor: booking.paidMinor,
-        feeMinor: refund.fee.minor,
-        refundMinor: refund.refund.minor,
-        cancelledBy: (getUserId() ?? null),
-      });
+        const seats = await this.bookings.loadSeats(bookingId);
+        await this.seatLock.releaseOccupancy(booking.tripId, seats);
+        await this.bookings.setStatus(bookingId, 'cancelled');
+        const cancellationId = await this.bookings.recordCancellation({
+          bookingId,
+          reason: reason ?? null,
+          refundPct: refund.refundPct,
+          paidMinor: booking.paidMinor,
+          feeMinor: refund.fee.minor,
+          refundMinor: refund.refund.minor,
+          cancelledBy: getUserId() ?? null,
+        });
 
-      this.metrics.bookings.inc({ outcome: 'cancelled', channel: 'direct' });
-      this.events.publish({
-        type: 'booking.cancelled',
-        aggregateType: 'booking',
-        aggregateId: bookingId,
-        payload: {
-          cancellationId, pnr: booking.pnr, customerId: booking.customerId, refundMinor: refund.refund.minor, refundPct: refund.refundPct,
-          contactPhone: booking.contactPhone, contactEmail: booking.contactEmail,
-          refundDestination, altAccountDetails: altAccountDetails ?? null,
-        },
-      });
+        this.metrics.bookings.inc({ outcome: 'cancelled', channel: 'direct' });
+        this.events.publish({
+          type: 'booking.cancelled',
+          aggregateType: 'booking',
+          aggregateId: bookingId,
+          payload: {
+            cancellationId,
+            pnr: booking.pnr,
+            customerId: booking.customerId,
+            refundMinor: refund.refund.minor,
+            refundPct: refund.refundPct,
+            contactPhone: booking.contactPhone,
+            contactEmail: booking.contactEmail,
+            refundDestination,
+            altAccountDetails: altAccountDetails ?? null,
+          },
+        });
 
-      return { refundMinor: refund.refund.minor, refundPct: refund.refundPct };
-    });
+        return { refundMinor: refund.refund.minor, refundPct: refund.refundPct };
+      },
+    );
   }
 
   /**
@@ -410,83 +599,138 @@ export class BookingService {
    * other booking-state check would treat as invalid).
    */
   async cancelSeats(
-    bookingId: BookingId, seatNumbers: string[], reason?: string,
+    bookingId: BookingId,
+    seatNumbers: string[],
+    reason?: string,
     refundDestination: 'source' | 'alternate_account' = 'source',
-    altAccountDetails?: { accountHolder: string; accountNumber: string; ifsc: string; bankName?: string },
+    altAccountDetails?: {
+      accountHolder: string;
+      accountNumber: string;
+      ifsc: string;
+      bankName?: string;
+    },
   ): Promise<{ refundMinor: number; refundPct: number; remainingSeats: number }> {
     if (seatNumbers.length === 0) {
-      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: 'At least one seat must be specified' });
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+        message: 'At least one seat must be specified',
+      });
     }
 
-    return this.uow.run({ name: 'booking.cancelSeats', tenantId: requireTenantId(), isolation: 'read committed' }, async () => {
-      const booking = await this.bookings.findForUpdate(bookingId);
-      if (!booking) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
-      if (!isCancellable(booking.status)) {
-        throw new AppError(ErrorCode.BOOKING_NOT_CANCELLABLE, 422, { message: `A ${booking.status} booking cannot be cancelled` });
-      }
+    return this.uow.run(
+      { name: 'booking.cancelSeats', tenantId: requireTenantId(), isolation: 'read committed' },
+      async () => {
+        const booking = await this.bookings.findForUpdate(bookingId);
+        if (!booking)
+          throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
+        if (!isCancellable(booking.status)) {
+          throw new AppError(ErrorCode.BOOKING_NOT_CANCELLABLE, 422, {
+            message: `A ${booking.status} booking cannot be cancelled`,
+          });
+        }
 
-      const trip = await this.trips.getById(booking.tripId);
-      if (trip.departsAt < new Date()) {
-        throw new AppError(ErrorCode.BOOKING_DEPARTED, 422, { message: 'Trip has already departed' });
-      }
+        const trip = await this.trips.getById(booking.tripId);
+        if (trip.departsAt < new Date()) {
+          throw new AppError(ErrorCode.BOOKING_DEPARTED, 422, {
+            message: 'Trip has already departed',
+          });
+        }
 
-      const allSeats = await this.bookings.loadSeatsWithFare(bookingId);
-      const requested = new Set(seatNumbers);
-      const unknown = seatNumbers.filter((s) => !allSeats.some((seat) => seat.seatNumber === s));
-      if (unknown.length > 0) {
-        throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: `Seat(s) not on this booking: ${unknown.join(', ')}` });
-      }
+        const allSeats = await this.bookings.loadSeatsWithFare(bookingId);
+        const requested = new Set(seatNumbers);
+        const unknown = seatNumbers.filter((s) => !allSeats.some((seat) => seat.seatNumber === s));
+        if (unknown.length > 0) {
+          throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+            message: `Seat(s) not on this booking: ${unknown.join(', ')}`,
+          });
+        }
 
-      // Naming every seat on the booking IS a full cancellation — go
-      // through the real cancel() path so the booking ends up in the
-      // correct terminal state, not a confusing "confirmed, 0 seats" one.
-      if (requested.size === allSeats.length) {
-        const full = await this.cancel(bookingId, reason, false, refundDestination, altAccountDetails);
-        return { ...full, remainingSeats: 0 };
-      }
+        // Naming every seat on the booking IS a full cancellation — go
+        // through the real cancel() path so the booking ends up in the
+        // correct terminal state, not a confusing "confirmed, 0 seats" one.
+        if (requested.size === allSeats.length) {
+          const full = await this.cancel(
+            bookingId,
+            reason,
+            false,
+            refundDestination,
+            altAccountDetails,
+          );
+          return { ...full, remainingSeats: 0 };
+        }
 
-      const toCancel = allSeats.filter((s) => requested.has(s.seatNumber));
-      const toKeep = allSeats.filter((s) => !requested.has(s.seatNumber));
+        const toCancel = allSeats.filter((s) => requested.has(s.seatNumber));
+        const toKeep = allSeats.filter((s) => !requested.has(s.seatNumber));
 
-      // Each cancelled seat's OWN fare, proportioned against the booking's
-      // ORIGINAL total to carve out its share of tax — never a flat
-      // per-seat split, since fare_minor already reflects any per-seat
-      // override (premium seats, segment-specific pricing).
-      const originalFareTotal = allSeats.reduce((sum, s) => sum + s.fareMinor, 0);
-      const cancelledFareMinor = toCancel.reduce((sum, s) => sum + s.fareMinor, 0);
-      const cancelledTaxMinor = originalFareTotal > 0 ? Math.round((booking.taxMinor * cancelledFareMinor) / originalFareTotal) : 0;
-      const cancelledPaidMinor = cancelledFareMinor + cancelledTaxMinor;
+        // Each cancelled seat's OWN fare, proportioned against the booking's
+        // ORIGINAL total to carve out its share of tax — never a flat
+        // per-seat split, since fare_minor already reflects any per-seat
+        // override (premium seats, segment-specific pricing).
+        const originalFareTotal = allSeats.reduce((sum, s) => sum + s.fareMinor, 0);
+        const cancelledFareMinor = toCancel.reduce((sum, s) => sum + s.fareMinor, 0);
+        const cancelledTaxMinor =
+          originalFareTotal > 0
+            ? Math.round((booking.taxMinor * cancelledFareMinor) / originalFareTotal)
+            : 0;
+        const cancelledPaidMinor = cancelledFareMinor + cancelledTaxMinor;
 
-      const refundPolicy = await this.loadRefundPolicy();
-      const refund = computeRefund(cancelledPaidMinor, trip.departsAt, new Date(), refundPolicy, booking.currency as never);
+        const refundPolicy = await this.loadRefundPolicy();
+        const refund = computeRefund(
+          cancelledPaidMinor,
+          trip.departsAt,
+          new Date(),
+          refundPolicy,
+          booking.currency as never,
+        );
 
-      await this.seatLock.releaseOccupancy(booking.tripId, toCancel.map((s) => ({ seatNumber: s.seatNumber, legMask: s.legMask })));
-      await this.bookings.removeSeatsPartial(bookingId, seatNumbers);
-      await this.bookings.reduceTotals(bookingId, cancelledFareMinor, cancelledTaxMinor, cancelledPaidMinor);
-      const cancellationId = await this.bookings.recordCancellation({
-        bookingId,
-        reason: reason ? `${reason} (seats: ${seatNumbers.join(', ')})` : `Partial cancellation (seats: ${seatNumbers.join(', ')})`,
-        refundPct: refund.refundPct,
-        paidMinor: cancelledPaidMinor,
-        feeMinor: refund.fee.minor,
-        refundMinor: refund.refund.minor,
-        cancelledBy: (getUserId() ?? null),
-      });
+        await this.seatLock.releaseOccupancy(
+          booking.tripId,
+          toCancel.map((s) => ({ seatNumber: s.seatNumber, legMask: s.legMask })),
+        );
+        await this.bookings.removeSeatsPartial(bookingId, seatNumbers);
+        await this.bookings.reduceTotals(
+          bookingId,
+          cancelledFareMinor,
+          cancelledTaxMinor,
+          cancelledPaidMinor,
+        );
+        const cancellationId = await this.bookings.recordCancellation({
+          bookingId,
+          reason: reason
+            ? `${reason} (seats: ${seatNumbers.join(', ')})`
+            : `Partial cancellation (seats: ${seatNumbers.join(', ')})`,
+          refundPct: refund.refundPct,
+          paidMinor: cancelledPaidMinor,
+          feeMinor: refund.fee.minor,
+          refundMinor: refund.refund.minor,
+          cancelledBy: getUserId() ?? null,
+        });
 
-      this.metrics.bookings.inc({ outcome: 'partial_cancelled', channel: 'direct' });
-      this.events.publish({
-        type: 'booking.seats_cancelled',
-        aggregateType: 'booking',
-        aggregateId: bookingId,
-        payload: {
-          cancellationId, pnr: booking.pnr, seats: seatNumbers, refundMinor: refund.refund.minor, refundPct: refund.refundPct,
-          remainingSeats: toKeep.length, contactPhone: booking.contactPhone, contactEmail: booking.contactEmail,
-          refundDestination, altAccountDetails: altAccountDetails ?? null,
-        },
-      });
+        this.metrics.bookings.inc({ outcome: 'partial_cancelled', channel: 'direct' });
+        this.events.publish({
+          type: 'booking.seats_cancelled',
+          aggregateType: 'booking',
+          aggregateId: bookingId,
+          payload: {
+            cancellationId,
+            pnr: booking.pnr,
+            seats: seatNumbers,
+            refundMinor: refund.refund.minor,
+            refundPct: refund.refundPct,
+            remainingSeats: toKeep.length,
+            contactPhone: booking.contactPhone,
+            contactEmail: booking.contactEmail,
+            refundDestination,
+            altAccountDetails: altAccountDetails ?? null,
+          },
+        });
 
-      return { refundMinor: refund.refund.minor, refundPct: refund.refundPct, remainingSeats: toKeep.length };
-    });
+        return {
+          refundMinor: refund.refund.minor,
+          refundPct: refund.refundPct,
+          remainingSeats: toKeep.length,
+        };
+      },
+    );
   }
 
   /**
@@ -506,8 +750,9 @@ export class BookingService {
     for (let i = 0; i < attempts; i += 1) {
       const pnr = generatePnr();
       try {
-        const bookingId = await this.uow.run({ name: 'booking.pnrAttempt', tenantId: requireTenantId() }, async () =>
-          insert(pnr),
+        const bookingId = await this.uow.run(
+          { name: 'booking.pnrAttempt', tenantId: requireTenantId() },
+          async () => insert(pnr),
         );
         return { bookingId, pnr };
       } catch (error) {
@@ -518,7 +763,9 @@ export class BookingService {
         throw error;
       }
     }
-    throw new AppError(ErrorCode.COMMON_INTERNAL, 500, { message: 'Could not allocate a unique PNR' });
+    throw new AppError(ErrorCode.COMMON_INTERNAL, 500, {
+      message: 'Could not allocate a unique PNR',
+    });
   }
 }
 
@@ -527,13 +774,16 @@ function asHoldError<T>(fn: () => T): T {
   try {
     return fn();
   } catch (e) {
-    if (e instanceof HoldValidationError) throw new AppError(ErrorCode.COMMON_VALIDATION, 400, { message: e.message });
+    if (e instanceof HoldValidationError)
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 400, { message: e.message });
     throw e;
   }
 }
 
 /** Every channel string maps to one of the controllable channel families. */
-export function channelFamily(channel: string | undefined): 'direct_web' | 'agent' | 'ota' | 'phone' {
+export function channelFamily(
+  channel: string | undefined,
+): 'direct_web' | 'agent' | 'ota' | 'phone' {
   if (channel === 'agent' || channel === 'phone' || channel === 'ota') return channel;
   if (channel?.startsWith('gds:') || channel === 'partner') return 'ota';
   return 'direct_web';

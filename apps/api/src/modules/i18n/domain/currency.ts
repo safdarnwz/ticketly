@@ -17,13 +17,24 @@ import { DomainError, ErrorCode } from '@kernel';
  */
 
 const MINOR_SCALE: Record<string, number> = {
-  INR: 2, USD: 2, EUR: 2, GBP: 2, AED: 2, SGD: 2, AUD: 2, CAD: 2,
-  JPY: 0, KWD: 3, BHD: 3, OMR: 3,
+  INR: 2,
+  USD: 2,
+  EUR: 2,
+  GBP: 2,
+  AED: 2,
+  SGD: 2,
+  AUD: 2,
+  CAD: 2,
+  JPY: 0,
+  KWD: 3,
+  BHD: 3,
+  OMR: 3,
 };
 
 export function minorScale(currency: string): number {
   const s = MINOR_SCALE[currency.toUpperCase()];
-  if (s === undefined) throw new DomainError(ErrorCode.COMMON_VALIDATION, `Unknown currency '${currency}'`);
+  if (s === undefined)
+    throw new DomainError(ErrorCode.COMMON_VALIDATION, `Unknown currency '${currency}'`);
   return s;
 }
 
@@ -32,8 +43,14 @@ export function minorScale(currency: string): number {
  * `rateMicros` (units of `to` per 1 unit of `from`, × 1e6). Half-up rounding on
  * the final minor unit.
  */
-export function convertMinor(amountMinor: number, from: string, to: string, rateMicros: number): number {
-  if (!Number.isInteger(amountMinor)) throw new DomainError(ErrorCode.COMMON_VALIDATION, 'amountMinor must be an integer');
+export function convertMinor(
+  amountMinor: number,
+  from: string,
+  to: string,
+  rateMicros: number,
+): number {
+  if (!Number.isInteger(amountMinor))
+    throw new DomainError(ErrorCode.COMMON_VALIDATION, 'amountMinor must be an integer');
   if (rateMicros <= 0) throw new DomainError(ErrorCode.COMMON_VALIDATION, 'rate must be positive');
   const fromScale = minorScale(from);
   const toScale = minorScale(to);
@@ -57,7 +74,15 @@ function roundedDiv(num: bigint, den: bigint): bigint {
 }
 
 const SYMBOL: Record<string, string> = {
-  INR: '₹', USD: '$', EUR: '€', GBP: '£', JPY: '¥', AED: 'د.إ', SGD: 'S$', AUD: 'A$', CAD: 'C$',
+  INR: '₹',
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  JPY: '¥',
+  AED: 'د.إ',
+  SGD: 'S$',
+  AUD: 'A$',
+  CAD: 'C$',
 };
 
 /**
@@ -65,7 +90,11 @@ const SYMBOL: Record<string, string> = {
  * 'in' for the Indian system (1,23,456) or 'western' (123,456). Deterministic
  * (no Intl dependency) so output is stable across environments and testable.
  */
-export function formatMoney(amountMinor: number, currency: string, grouping: 'western' | 'in' = 'western'): string {
+export function formatMoney(
+  amountMinor: number,
+  currency: string,
+  grouping: 'western' | 'in' = 'western',
+): string {
   const scale = minorScale(currency);
   const neg = amountMinor < 0;
   const abs = Math.abs(amountMinor);

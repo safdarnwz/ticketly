@@ -40,7 +40,10 @@ export function currentTransaction(): TransactionScope | undefined {
   return storage.getStore();
 }
 
-export function runInTransactionScope<T>(scope: TransactionScope, fn: () => Promise<T>): Promise<T> {
+export function runInTransactionScope<T>(
+  scope: TransactionScope,
+  fn: () => Promise<T>,
+): Promise<T> {
   return storage.run(scope, fn);
 }
 

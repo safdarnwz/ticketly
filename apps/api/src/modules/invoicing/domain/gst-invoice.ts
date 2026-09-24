@@ -62,7 +62,8 @@ export function computeGstInvoice(input: {
   let igst = 0;
 
   for (const line of input.lines) {
-    if (line.taxableMinor < 0) throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Taxable value cannot be negative');
+    if (line.taxableMinor < 0)
+      throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Taxable value cannot be negative');
     taxableMinor += line.taxableMinor;
     const lineTax = Money.of(line.taxableMinor, currency).percent(line.gstRatePct).minor;
     if (input.interState) {

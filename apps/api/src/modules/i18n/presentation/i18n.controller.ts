@@ -28,7 +28,11 @@ export class I18nController {
   @Get('convert')
   @Public()
   @ApiOperation({ summary: 'Convert an amount (minor units) between currencies' })
-  async convert(@Query('amountMinor') amountMinor: string, @Query('from') from: string, @Query('to') to: string) {
+  async convert(
+    @Query('amountMinor') amountMinor: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
     return this.i18n.convert(Number(amountMinor), from, to);
   }
 
@@ -38,7 +42,9 @@ export class I18nController {
   @RequirePermission(Permission.ALL)
   @RequirePlatformAdmin()
   @ApiOperation({ summary: 'Create/update a translation string' })
-  async upsertTranslation(@Body(zodBody(TranslationSchema)) dto: z.infer<typeof TranslationSchema>) {
+  async upsertTranslation(
+    @Body(zodBody(TranslationSchema)) dto: z.infer<typeof TranslationSchema>,
+  ) {
     await this.i18n.upsertTranslation(dto.locale, dto.key, dto.value);
     return { ok: true };
   }

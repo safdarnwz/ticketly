@@ -94,7 +94,12 @@ export function expandRecurrence(
   // Merge one-off additions that fall inside the window and aren't already there.
   const existing = new Set(result);
   for (const extra of rule.additions ?? []) {
-    if (!existing.has(extra) && compareLocalDate(extra, from) >= 0 && compareLocalDate(extra, to) <= 0 && !exceptions.has(extra)) {
+    if (
+      !existing.has(extra) &&
+      compareLocalDate(extra, from) >= 0 &&
+      compareLocalDate(extra, to) <= 0 &&
+      !exceptions.has(extra)
+    ) {
       result.push(extra);
     }
   }
@@ -134,7 +139,10 @@ function validateRule(rule: RecurrenceRule): void {
   if (rule.frequency === 'weekly') {
     const days = rule.weekdays ?? [];
     if (days.length === 0) {
-      throw new DomainError(ErrorCode.COMMON_VALIDATION, 'A weekly service must specify at least one weekday');
+      throw new DomainError(
+        ErrorCode.COMMON_VALIDATION,
+        'A weekly service must specify at least one weekday',
+      );
     }
     if (days.some((d) => d < 1 || d > 7)) {
       throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Weekdays must be ISO 1..7 (Mon..Sun)');

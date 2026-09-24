@@ -29,7 +29,13 @@ import { Msg91WhatsAppProvider } from './infrastructure/providers/msg91-whatsapp
  * matters more here than almost anywhere else.
  */
 @Module({
-  imports: [ConfigModule, DatabaseModule, ObservabilityModule, PlatformSettingsModule, IntegrationsModule],
+  imports: [
+    ConfigModule,
+    DatabaseModule,
+    ObservabilityModule,
+    PlatformSettingsModule,
+    IntegrationsModule,
+  ],
   controllers: [NotificationController],
   providers: [
     NotificationService,

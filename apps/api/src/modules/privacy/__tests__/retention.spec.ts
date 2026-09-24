@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 
 import {
-  retentionDeadlineMs, isDueForPurge, redactPii, erasureActionFor, DEFAULT_PII_FIELDS,
+  retentionDeadlineMs,
+  isDueForPurge,
+  redactPii,
+  erasureActionFor,
+  DEFAULT_PII_FIELDS,
   type RetentionPolicy,
 } from '../domain/retention';
 
@@ -44,8 +48,16 @@ describe('redactPii', () => {
 
 describe('erasureActionFor', () => {
   it('anonymises financial categories, deletes the rest', () => {
-    const fin: RetentionPolicy = { category: 'invoices', retentionDays: 2920, anonymiseInsteadOfDelete: true };
-    const prof: RetentionPolicy = { category: 'profile', retentionDays: 0, anonymiseInsteadOfDelete: false };
+    const fin: RetentionPolicy = {
+      category: 'invoices',
+      retentionDays: 2920,
+      anonymiseInsteadOfDelete: true,
+    };
+    const prof: RetentionPolicy = {
+      category: 'profile',
+      retentionDays: 0,
+      anonymiseInsteadOfDelete: false,
+    };
     expect(erasureActionFor(fin)).toBe('anonymise');
     expect(erasureActionFor(prof)).toBe('delete');
   });

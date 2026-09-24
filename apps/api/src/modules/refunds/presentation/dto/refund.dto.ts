@@ -7,17 +7,20 @@ export const AltAccountDetailsSchema = z.object({
   bankName: z.string().max(120).optional(),
 });
 
-export const InitiateRefundSchema = z.object({
-  bookingId: z.string().uuid(),
-  amountMinor: z.number().int().min(1),
-  // Defaults to 'source' — the ORIGINAL payment method — unless the
-  // customer explicitly chooses to receive the refund into a different
-  // account, in which case altAccountDetails is required.
-  destination: z.enum(['source', 'alternate_account']).default('source'),
-  altAccountDetails: AltAccountDetailsSchema.optional(),
-}).refine((v) => v.destination !== 'alternate_account' || !!v.altAccountDetails, {
-  message: 'Account details are required when refunding to an alternate account', path: ['altAccountDetails'],
-});
+export const InitiateRefundSchema = z
+  .object({
+    bookingId: z.string().uuid(),
+    amountMinor: z.number().int().min(1),
+    // Defaults to 'source' — the ORIGINAL payment method — unless the
+    // customer explicitly chooses to receive the refund into a different
+    // account, in which case altAccountDetails is required.
+    destination: z.enum(['source', 'alternate_account']).default('source'),
+    altAccountDetails: AltAccountDetailsSchema.optional(),
+  })
+  .refine((v) => v.destination !== 'alternate_account' || !!v.altAccountDetails, {
+    message: 'Account details are required when refunding to an alternate account',
+    path: ['altAccountDetails'],
+  });
 export type InitiateRefundDto = z.infer<typeof InitiateRefundSchema>;
 
 export const ReconcileRefundSchema = z.object({

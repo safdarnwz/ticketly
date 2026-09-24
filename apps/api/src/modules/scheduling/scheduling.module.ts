@@ -20,7 +20,14 @@ import { TripRepository } from './infrastructure/persistence/trip.repository';
  * repositories that search (Part 6) and booking (Part 7) build on.
  */
 @Module({
-  imports: [ConfigModule, DatabaseModule, CacheModule, MessagingModule, MasterDataModule, FleetModule],
+  imports: [
+    ConfigModule,
+    DatabaseModule,
+    CacheModule,
+    MessagingModule,
+    MasterDataModule,
+    FleetModule,
+  ],
   controllers: [SchedulingController],
   providers: [
     ServiceRepository,

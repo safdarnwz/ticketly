@@ -4,7 +4,9 @@ import { attempt, combine, err, ok } from '../result';
 
 describe('Result', () => {
   it('maps and chains on Ok', () => {
-    const r = ok(2).map((n) => n * 3).andThen((n) => ok(n + 1));
+    const r = ok(2)
+      .map((n) => n * 3)
+      .andThen((n) => ok(n + 1));
     expect(r.unwrap()).toBe(7);
   });
 

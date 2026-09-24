@@ -3,7 +3,12 @@ import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '@database';
 import { newId, requireTenantId, type AgentId, type BookingId, type UserId } from '@kernel';
 
-import { signedAmount, type AgentLedgerKind, type AgentStatus, type BillingMode } from '../../domain/agent-account';
+import {
+  signedAmount,
+  type AgentLedgerKind,
+  type AgentStatus,
+  type BillingMode,
+} from '../../domain/agent-account';
 import type { Slab } from '../../domain/commission-slabs';
 
 export interface Agent {
@@ -85,10 +90,27 @@ export class AgentRepository {
                            address, city, branch_id, status, billing_mode, commission_pct, credit_limit_minor,
                            low_balance_alert_minor, payment_terms_days)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
-      [id, requireTenantId(), input.userId, input.code, input.name, input.contactName ?? null, input.contactPhone,
-        input.contactEmail ?? null, input.gstin ?? null, input.pan ?? null, input.address ?? null, input.city ?? null,
-        input.branchId ?? null, input.status, input.billingMode, input.commissionPct, input.creditLimitMinor,
-        input.lowBalanceAlertMinor, input.paymentTermsDays],
+      [
+        id,
+        requireTenantId(),
+        input.userId,
+        input.code,
+        input.name,
+        input.contactName ?? null,
+        input.contactPhone,
+        input.contactEmail ?? null,
+        input.gstin ?? null,
+        input.pan ?? null,
+        input.address ?? null,
+        input.city ?? null,
+        input.branchId ?? null,
+        input.status,
+        input.billingMode,
+        input.commissionPct,
+        input.creditLimitMinor,
+        input.lowBalanceAlertMinor,
+        input.paymentTermsDays,
+      ],
       { name: 'agent.create', primary: true },
     );
     return id;
@@ -144,9 +166,28 @@ export class AgentRepository {
     return row ? map(row) : null;
   }
 
-  async update(id: AgentId, input: Partial<Pick<CreateAgentInput,
-    'name' | 'contactName' | 'contactPhone' | 'contactEmail' | 'gstin' | 'pan' | 'address' | 'city' | 'branchId'
-    | 'billingMode' | 'commissionPct' | 'creditLimitMinor' | 'lowBalanceAlertMinor' | 'paymentTermsDays'>>): Promise<void> {
+  async update(
+    id: AgentId,
+    input: Partial<
+      Pick<
+        CreateAgentInput,
+        | 'name'
+        | 'contactName'
+        | 'contactPhone'
+        | 'contactEmail'
+        | 'gstin'
+        | 'pan'
+        | 'address'
+        | 'city'
+        | 'branchId'
+        | 'billingMode'
+        | 'commissionPct'
+        | 'creditLimitMinor'
+        | 'lowBalanceAlertMinor'
+        | 'paymentTermsDays'
+      >
+    >,
+  ): Promise<void> {
     await this.db.execute_(
       `UPDATE agents SET
          name = coalesce($3, name), contact_name = coalesce($4, contact_name),
@@ -158,10 +199,24 @@ export class AgentRepository {
          low_balance_alert_minor = coalesce($15, low_balance_alert_minor),
          payment_terms_days = coalesce($16, payment_terms_days)
        WHERE tenant_id = $1 AND id = $2`,
-      [requireTenantId(), id, input.name ?? null, input.contactName ?? null, input.contactPhone ?? null,
-        input.contactEmail ?? null, input.gstin ?? null, input.pan ?? null, input.address ?? null, input.city ?? null,
-        input.branchId ?? null, input.billingMode ?? null, input.commissionPct ?? null, input.creditLimitMinor ?? null,
-        input.lowBalanceAlertMinor ?? null, input.paymentTermsDays ?? null],
+      [
+        requireTenantId(),
+        id,
+        input.name ?? null,
+        input.contactName ?? null,
+        input.contactPhone ?? null,
+        input.contactEmail ?? null,
+        input.gstin ?? null,
+        input.pan ?? null,
+        input.address ?? null,
+        input.city ?? null,
+        input.branchId ?? null,
+        input.billingMode ?? null,
+        input.commissionPct ?? null,
+        input.creditLimitMinor ?? null,
+        input.lowBalanceAlertMinor ?? null,
+        input.paymentTermsDays ?? null,
+      ],
       { name: 'agent.update', primary: true },
     );
   }
@@ -180,8 +235,13 @@ export class AgentRepository {
    * `{ applied: false }` if that exact line already exists.
    */
   async post(input: {
-    agentId: AgentId; kind: AgentLedgerKind; magnitudeMinor: number; bookingId?: BookingId | null;
-    reference?: string | null; note?: string | null; createdBy?: UserId | null;
+    agentId: AgentId;
+    kind: AgentLedgerKind;
+    magnitudeMinor: number;
+    bookingId?: BookingId | null;
+    reference?: string | null;
+    note?: string | null;
+    createdBy?: UserId | null;
   }): Promise<{ applied: boolean; balanceAfterMinor: number | null }> {
     const amount = signedAmount(input.kind, input.magnitudeMinor);
     const tenantId = requireTenantId();
@@ -191,8 +251,17 @@ export class AgentRepository {
        VALUES ($1,$2,$3,$4,$5,0,$6,$7,$8,$9)
        ON CONFLICT (agent_id, kind, reference) WHERE reference IS NOT NULL DO NOTHING
        RETURNING id`,
-      [id, tenantId, input.agentId, input.kind, amount, input.bookingId ?? null, input.reference ?? null,
-        input.note ?? null, input.createdBy ?? null],
+      [
+        id,
+        tenantId,
+        input.agentId,
+        input.kind,
+        amount,
+        input.bookingId ?? null,
+        input.reference ?? null,
+        input.note ?? null,
+        input.createdBy ?? null,
+      ],
       { name: 'agent.ledger.insert', primary: true },
     );
     if (!inserted) return { applied: false, balanceAfterMinor: null };
@@ -211,7 +280,10 @@ export class AgentRepository {
     return { applied: true, balanceAfterMinor: balanceAfter };
   }
 
-  async ledger(agentId: AgentId, opts: { from?: string; to?: string; limit?: number } = {}): Promise<AgentLedgerRow[]> {
+  async ledger(
+    agentId: AgentId,
+    opts: { from?: string; to?: string; limit?: number } = {},
+  ): Promise<AgentLedgerRow[]> {
     const rows = await this.db.query<LedgerRowRaw>(
       `SELECT l.id, l.kind, l.amount_minor, l.balance_after_minor, l.booking_id, b.pnr, l.reference, l.note, l.created_at
          FROM agent_ledger l
@@ -221,18 +293,38 @@ export class AgentRepository {
           AND ($4::date IS NULL OR l.created_at < ($4::date + 1))
         ORDER BY l.created_at DESC, l.id DESC
         LIMIT $5`,
-      [requireTenantId(), agentId, opts.from ?? null, opts.to ?? null, Math.min(opts.limit ?? 200, 1000)],
+      [
+        requireTenantId(),
+        agentId,
+        opts.from ?? null,
+        opts.to ?? null,
+        Math.min(opts.limit ?? 200, 1000),
+      ],
       { name: 'agent.ledger.list' },
     );
     return rows.map((r) => ({
-      id: r.id, kind: r.kind, amountMinor: Number(r.amount_minor), balanceAfterMinor: Number(r.balance_after_minor),
-      bookingId: r.booking_id, pnr: r.pnr, reference: r.reference, note: r.note, createdAt: r.created_at,
+      id: r.id,
+      kind: r.kind,
+      amountMinor: Number(r.amount_minor),
+      balanceAfterMinor: Number(r.balance_after_minor),
+      bookingId: r.booking_id,
+      pnr: r.pnr,
+      reference: r.reference,
+      note: r.note,
+      createdAt: r.created_at,
     }));
   }
 
   /** Period statement: opening/closing balance and totals by kind. */
-  async statement(agentId: AgentId, from: string, to: string): Promise<{
-    openingMinor: number; closingMinor: number; totals: Record<string, number>; bookings: number;
+  async statement(
+    agentId: AgentId,
+    from: string,
+    to: string,
+  ): Promise<{
+    openingMinor: number;
+    closingMinor: number;
+    totals: Record<string, number>;
+    bookings: number;
   }> {
     const tenantId = requireTenantId();
     const opening = await this.db.queryOne<{ bal: string }>(
@@ -261,7 +353,10 @@ export class AgentRepository {
    * commission is still un-reversed. Proportions must use the original sale,
    * never the booking's current (already reduced) totals.
    */
-  async saleFigures(agentId: AgentId, bookingId: BookingId): Promise<{ saleMinor: number; commissionMinor: number; remainingCommissionMinor: number }> {
+  async saleFigures(
+    agentId: AgentId,
+    bookingId: BookingId,
+  ): Promise<{ saleMinor: number; commissionMinor: number; remainingCommissionMinor: number }> {
     const row = await this.db.queryOne<{ sale: string; commission: string; remaining: string }>(
       `SELECT coalesce(-sum(amount_minor) FILTER (WHERE kind = 'booking_debit'), 0)
               - coalesce(sum(amount_minor) FILTER (WHERE kind = 'booking_reversal'), 0) AS sale,
@@ -271,7 +366,11 @@ export class AgentRepository {
       [requireTenantId(), agentId, bookingId],
       { name: 'agent.saleFigures', primary: true },
     );
-    return { saleMinor: Number(row?.sale ?? 0), commissionMinor: Number(row?.commission ?? 0), remainingCommissionMinor: Math.max(0, Number(row?.remaining ?? 0)) };
+    return {
+      saleMinor: Number(row?.sale ?? 0),
+      commissionMinor: Number(row?.commission ?? 0),
+      remainingCommissionMinor: Math.max(0, Number(row?.remaining ?? 0)),
+    };
   }
 
   /** The agent's own slab table and the operator's default table. */
@@ -282,8 +381,14 @@ export class AgentRepository {
       [requireTenantId(), agentId],
       { name: 'agent.slabs', primary: true },
     );
-    const map = (r: { min: string; pct: string }): Slab => ({ minMonthlySalesMinor: Number(r.min), commissionPct: Number(r.pct) });
-    return { agent: agentId ? rows.filter((r) => r.agent_id === agentId).map(map) : [], operator: rows.filter((r) => r.agent_id === null).map(map) };
+    const map = (r: { min: string; pct: string }): Slab => ({
+      minMonthlySalesMinor: Number(r.min),
+      commissionPct: Number(r.pct),
+    });
+    return {
+      agent: agentId ? rows.filter((r) => r.agent_id === agentId).map(map) : [],
+      operator: rows.filter((r) => r.agent_id === null).map(map),
+    };
   }
 
   /** Replace a slab table (agentId null = operator default). Empty = remove it. Caller's transaction. */
@@ -291,13 +396,21 @@ export class AgentRepository {
     const tenantId = requireTenantId();
     await this.db.execute_(
       `DELETE FROM agent_commission_slabs WHERE tenant_id = $1 AND agent_id IS NOT DISTINCT FROM $2`,
-      [tenantId, agentId], { name: 'agent.slabs.clear', primary: true });
+      [tenantId, agentId],
+      { name: 'agent.slabs.clear', primary: true },
+    );
     if (slabs.length === 0) return;
     await this.db.execute_(
       `INSERT INTO agent_commission_slabs (tenant_id, agent_id, min_monthly_sales_minor, commission_pct)
        SELECT $1, $2, s.min, s.pct FROM unnest($3::bigint[], $4::numeric[]) AS s(min, pct)`,
-      [tenantId, agentId, slabs.map((s) => s.minMonthlySalesMinor), slabs.map((s) => s.commissionPct)],
-      { name: 'agent.slabs.insert', primary: true });
+      [
+        tenantId,
+        agentId,
+        slabs.map((s) => s.minMonthlySalesMinor),
+        slabs.map((s) => s.commissionPct),
+      ],
+      { name: 'agent.slabs.insert', primary: true },
+    );
   }
 
   /**
@@ -344,7 +457,10 @@ export class AgentRepository {
     return (row?.agent_id ?? null) as AgentId | null;
   }
 
-  async bookings(agentId: AgentId, opts: { status?: string; limit?: number } = {}): Promise<unknown[]> {
+  async bookings(
+    agentId: AgentId,
+    opts: { status?: string; limit?: number } = {},
+  ): Promise<unknown[]> {
     return this.db.query(
       `SELECT b.id, b.pnr, b.status, b.total_minor AS "totalMinor", b.currency, b.seat_count AS "seatCount",
               b.contact_phone AS "contactPhone", b.created_at AS "createdAt",
@@ -362,8 +478,15 @@ export class AgentRepository {
   }
 
   /** Sales + commission per agent for the operator's dashboard. */
-  async summary(): Promise<{ agentId: string; bookings: number; salesMinor: number; commissionMinor: number }[]> {
-    const rows = await this.db.query<{ agent_id: string; bookings: string; sales: string; commission: string }>(
+  async summary(): Promise<
+    { agentId: string; bookings: number; salesMinor: number; commissionMinor: number }[]
+  > {
+    const rows = await this.db.query<{
+      agent_id: string;
+      bookings: string;
+      sales: string;
+      commission: string;
+    }>(
       `SELECT agent_id,
               count(DISTINCT booking_id) FILTER (WHERE kind = 'booking_debit') AS bookings,
               coalesce(-sum(amount_minor) FILTER (WHERE kind = 'booking_debit'), 0)
@@ -373,29 +496,73 @@ export class AgentRepository {
       [requireTenantId()],
       { name: 'agent.summary' },
     );
-    return rows.map((r) => ({ agentId: r.agent_id, bookings: Number(r.bookings), salesMinor: Number(r.sales), commissionMinor: Number(r.commission) }));
+    return rows.map((r) => ({
+      agentId: r.agent_id,
+      bookings: Number(r.bookings),
+      salesMinor: Number(r.sales),
+      commissionMinor: Number(r.commission),
+    }));
   }
 }
 
 interface AgentRow {
-  id: AgentId; user_id: UserId; code: string; name: string; contact_name: string | null; contact_phone: string;
-  contact_email: string | null; gstin: string | null; pan: string | null; address: string | null; city: string | null;
-  branch_id: string | null; status: AgentStatus; status_reason: string | null; billing_mode: BillingMode;
-  commission_pct: string; credit_limit_minor: string; balance_minor: string; low_balance_alert_minor: string;
-  payment_terms_days: number; created_at: Date;
+  id: AgentId;
+  user_id: UserId;
+  code: string;
+  name: string;
+  contact_name: string | null;
+  contact_phone: string;
+  contact_email: string | null;
+  gstin: string | null;
+  pan: string | null;
+  address: string | null;
+  city: string | null;
+  branch_id: string | null;
+  status: AgentStatus;
+  status_reason: string | null;
+  billing_mode: BillingMode;
+  commission_pct: string;
+  credit_limit_minor: string;
+  balance_minor: string;
+  low_balance_alert_minor: string;
+  payment_terms_days: number;
+  created_at: Date;
 }
 
 interface LedgerRowRaw {
-  id: string; kind: AgentLedgerKind; amount_minor: string; balance_after_minor: string; booking_id: string | null;
-  pnr: string | null; reference: string | null; note: string | null; created_at: Date;
+  id: string;
+  kind: AgentLedgerKind;
+  amount_minor: string;
+  balance_after_minor: string;
+  booking_id: string | null;
+  pnr: string | null;
+  reference: string | null;
+  note: string | null;
+  created_at: Date;
 }
 
 function map(r: AgentRow): Agent {
   return {
-    id: r.id, userId: r.user_id, code: r.code, name: r.name, contactName: r.contact_name, contactPhone: r.contact_phone,
-    contactEmail: r.contact_email, gstin: r.gstin, pan: r.pan, address: r.address, city: r.city, branchId: r.branch_id,
-    status: r.status, statusReason: r.status_reason, billingMode: r.billing_mode, commissionPct: Number(r.commission_pct),
-    creditLimitMinor: Number(r.credit_limit_minor), balanceMinor: Number(r.balance_minor),
-    lowBalanceAlertMinor: Number(r.low_balance_alert_minor), paymentTermsDays: r.payment_terms_days, createdAt: r.created_at,
+    id: r.id,
+    userId: r.user_id,
+    code: r.code,
+    name: r.name,
+    contactName: r.contact_name,
+    contactPhone: r.contact_phone,
+    contactEmail: r.contact_email,
+    gstin: r.gstin,
+    pan: r.pan,
+    address: r.address,
+    city: r.city,
+    branchId: r.branch_id,
+    status: r.status,
+    statusReason: r.status_reason,
+    billingMode: r.billing_mode,
+    commissionPct: Number(r.commission_pct),
+    creditLimitMinor: Number(r.credit_limit_minor),
+    balanceMinor: Number(r.balance_minor),
+    lowBalanceAlertMinor: Number(r.low_balance_alert_minor),
+    paymentTermsDays: r.payment_terms_days,
+    createdAt: r.created_at,
   };
 }

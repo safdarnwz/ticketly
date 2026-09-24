@@ -43,7 +43,8 @@ const SIGN: Record<Exclude<AgentLedgerKind, 'adjustment'>, 1 | -1> = {
 
 /** Signed ledger amount for a kind + an unsigned magnitude. */
 export function signedAmount(kind: AgentLedgerKind, magnitudeMinor: number): number {
-  if (!Number.isInteger(magnitudeMinor)) throw new Error('Amount must be an integer number of minor units');
+  if (!Number.isInteger(magnitudeMinor))
+    throw new Error('Amount must be an integer number of minor units');
   if (kind === 'adjustment') return magnitudeMinor;
   if (magnitudeMinor <= 0) throw new Error(`A ${kind} must be a positive amount`);
   return SIGN[kind] * magnitudeMinor;
@@ -78,11 +79,16 @@ export interface FundsCheck {
 }
 
 export function checkFunds(input: {
-  balanceMinor: number; creditLimitMinor: number; totalMinor: number; commissionMinor: number;
+  balanceMinor: number;
+  creditLimitMinor: number;
+  totalMinor: number;
+  commissionMinor: number;
 }): FundsCheck {
   const need = netCostMinor(input.totalMinor, input.commissionMinor);
   const have = spendableMinor(input.balanceMinor, input.creditLimitMinor);
-  return have >= need ? { ok: true, shortfallMinor: 0 } : { ok: false, shortfallMinor: need - have };
+  return have >= need
+    ? { ok: true, shortfallMinor: 0 }
+    : { ok: false, shortfallMinor: need - have };
 }
 
 /**
@@ -92,9 +98,12 @@ export function checkFunds(input: {
  * ticket that was not ultimately sold. Never more than was credited.
  */
 export function commissionClawbackMinor(input: {
-  commissionCreditedMinor: number; refundMinor: number; paidMinor: number;
+  commissionCreditedMinor: number;
+  refundMinor: number;
+  paidMinor: number;
 }): number {
-  if (input.commissionCreditedMinor <= 0 || input.refundMinor <= 0 || input.paidMinor <= 0) return 0;
+  if (input.commissionCreditedMinor <= 0 || input.refundMinor <= 0 || input.paidMinor <= 0)
+    return 0;
   if (input.refundMinor >= input.paidMinor) return input.commissionCreditedMinor;
   return Math.min(
     input.commissionCreditedMinor,
@@ -103,7 +112,11 @@ export function commissionClawbackMinor(input: {
 }
 
 /** A balance at or below the alert threshold (only meaningful when a threshold is set). */
-export function isLowBalance(balanceMinor: number, creditLimitMinor: number, alertMinor: number): boolean {
+export function isLowBalance(
+  balanceMinor: number,
+  creditLimitMinor: number,
+  alertMinor: number,
+): boolean {
   return alertMinor > 0 && spendableMinor(balanceMinor, creditLimitMinor) <= alertMinor;
 }
 
@@ -126,9 +139,14 @@ export function canTransition(from: AgentStatus, to: AgentStatus): boolean {
  * Billing-mode / credit-limit invariants (mirrors the DB CHECKs so the API
  * returns a clear 422 instead of a constraint-violation).
  */
-export function validateTerms(input: { billingMode: BillingMode; creditLimitMinor: number; balanceMinor?: number }): string | null {
+export function validateTerms(input: {
+  billingMode: BillingMode;
+  creditLimitMinor: number;
+  balanceMinor?: number;
+}): string | null {
   if (input.creditLimitMinor < 0) return 'Credit limit cannot be negative';
-  if (input.billingMode === 'prepaid' && input.creditLimitMinor !== 0) return 'A prepaid agent cannot have a credit limit';
+  if (input.billingMode === 'prepaid' && input.creditLimitMinor !== 0)
+    return 'A prepaid agent cannot have a credit limit';
   const balance = input.balanceMinor ?? 0;
   if (balance + input.creditLimitMinor < 0) {
     return 'The agent already owes more than this credit limit — collect payment first or keep a higher limit';

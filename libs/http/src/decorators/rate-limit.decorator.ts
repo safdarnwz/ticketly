@@ -10,5 +10,9 @@ export interface RateLimitSpec {
 }
 
 /** Route-specific limit on top of the global tenant/IP limits. */
-export const RateLimit = (limit: number, windowMs = 60_000, scope: RateLimitSpec['scope'] = 'ip'): MethodDecorator =>
+export const RateLimit = (
+  limit: number,
+  windowMs = 60_000,
+  scope: RateLimitSpec['scope'] = 'ip',
+): MethodDecorator =>
   SetMetadata(RATE_LIMIT_KEY, { limit, windowMs, scope } satisfies RateLimitSpec);

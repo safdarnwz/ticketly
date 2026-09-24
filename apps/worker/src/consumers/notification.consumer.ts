@@ -24,7 +24,15 @@ export class NotificationConsumer implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    for (const type of ['booking.confirmed', 'booking.cancelled', 'booking.seats_cancelled', 'trip.delayed', 'refund.settled', 'connection.at_risk', 'connection.broken']) {
+    for (const type of [
+      'booking.confirmed',
+      'booking.cancelled',
+      'booking.seats_cancelled',
+      'trip.delayed',
+      'refund.settled',
+      'connection.at_risk',
+      'connection.broken',
+    ]) {
       this.dispatcher.register(this.handlerFor(type));
     }
     this.dispatcher.register(this.twelveHourReminderHandler());
@@ -50,15 +58,37 @@ export class NotificationConsumer implements OnModuleInit {
       eventType: 'incident.critical',
       handle: async (event: DomainEvent) => {
         if (!event.tenantId) return;
-        const t = await this.db.queryOne<{ contact_phone: string | null; contact_email: string | null }>(
-          `SELECT contact_phone, contact_email FROM tenants WHERE id = $1`, [event.tenantId], { name: 'notify.emergencyContacts', primary: true });
+        const t = await this.db.queryOne<{
+          contact_phone: string | null;
+          contact_email: string | null;
+        }>(`SELECT contact_phone, contact_email FROM tenants WHERE id = $1`, [event.tenantId], {
+          name: 'notify.emergencyContacts',
+          primary: true,
+        });
         if (!t?.contact_phone && !t?.contact_email) return;
-        const p = event.payload as { lat?: number | null; lng?: number | null; type?: string; tripId?: string; description?: string };
-        const location = p.lat != null && p.lng != null ? `https://maps.google.com/?q=${p.lat},${p.lng}` : 'not shared';
+        const p = event.payload as {
+          lat?: number | null;
+          lng?: number | null;
+          type?: string;
+          tripId?: string;
+          description?: string;
+        };
+        const location =
+          p.lat != null && p.lng != null
+            ? `https://maps.google.com/?q=${p.lat},${p.lng}`
+            : 'not shared';
         await this.notifications.notify({
-          tenantId: event.tenantId, eventId: event.eventId, eventType: 'incident.critical',
+          tenantId: event.tenantId,
+          eventId: event.eventId,
+          eventType: 'incident.critical',
           recipients: { sms: t.contact_phone ?? undefined, email: t.contact_email ?? undefined },
-          data: { type: (p.type ?? 'sos').toUpperCase(), tripId: p.tripId ?? '—', time: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }), location, description: p.description ?? '' },
+          data: {
+            type: (p.type ?? 'sos').toUpperCase(),
+            tripId: p.tripId ?? '—',
+            time: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+            location,
+            description: p.description ?? '',
+          },
         });
       },
     };
@@ -69,12 +99,27 @@ export class NotificationConsumer implements OnModuleInit {
       eventType: 'waitlist.seats_available',
       handle: async (event: DomainEvent) => {
         if (!event.tenantId) return;
-        const p = event.payload as { contactPhone?: string; contactEmail?: string; seatCount?: number; routeName?: string; journeyDate?: string; bookUrl?: string };
+        const p = event.payload as {
+          contactPhone?: string;
+          contactEmail?: string;
+          seatCount?: number;
+          routeName?: string;
+          journeyDate?: string;
+          bookUrl?: string;
+        };
         const recipients = { sms: p.contactPhone ?? undefined, email: p.contactEmail ?? undefined };
         if (!recipients.sms && !recipients.email) return;
         await this.notifications.notify({
-          tenantId: event.tenantId, eventId: event.eventId, eventType: 'waitlist.seats_available', recipients,
-          data: { seatCount: p.seatCount ?? '', routeName: p.routeName, journeyDate: p.journeyDate, bookUrl: p.bookUrl },
+          tenantId: event.tenantId,
+          eventId: event.eventId,
+          eventType: 'waitlist.seats_available',
+          recipients,
+          data: {
+            seatCount: p.seatCount ?? '',
+            routeName: p.routeName,
+            journeyDate: p.journeyDate,
+            bookUrl: p.bookUrl,
+          },
         });
       },
     };
@@ -86,18 +131,30 @@ export class NotificationConsumer implements OnModuleInit {
       handle: async (event: DomainEvent) => {
         if (!event.tenantId) return;
         const p = event.payload as Record<string, unknown>;
-        const recipients = { sms: (p.contactPhone as string) ?? undefined, whatsapp: (p.contactPhone as string) ?? undefined, email: (p.contactEmail as string) ?? undefined };
+        const recipients = {
+          sms: (p.contactPhone as string) ?? undefined,
+          whatsapp: (p.contactPhone as string) ?? undefined,
+          email: (p.contactEmail as string) ?? undefined,
+        };
         if (!recipients.sms && !recipients.email) return;
-        const passengers = Array.isArray(p.passengers) ? p.passengers as { seat: string; name: string }[] : [];
+        const passengers = Array.isArray(p.passengers)
+          ? (p.passengers as { seat: string; name: string }[])
+          : [];
         await this.notifications.notify({
-          tenantId: event.tenantId, eventId: event.eventId, eventType: 'trip.reminder.12h',
+          tenantId: event.tenantId,
+          eventId: event.eventId,
+          eventType: 'trip.reminder.12h',
           recipients,
           data: {
             pnr: p.pnr as string,
             fromStopName: p.fromStopName as string,
             toStopName: p.toStopName as string,
-            boardingAt: p.boardingAt ? new Date(p.boardingAt as string).toLocaleString('en-IN') : undefined,
-            droppingAt: p.droppingAt ? new Date(p.droppingAt as string).toLocaleString('en-IN') : undefined,
+            boardingAt: p.boardingAt
+              ? new Date(p.boardingAt as string).toLocaleString('en-IN')
+              : undefined,
+            droppingAt: p.droppingAt
+              ? new Date(p.droppingAt as string).toLocaleString('en-IN')
+              : undefined,
             passengerNames: passengers.map((x) => `${x.name} (${x.seat})`).join(', '),
           },
         });
@@ -111,13 +168,19 @@ export class NotificationConsumer implements OnModuleInit {
       handle: async (event: DomainEvent) => {
         if (!event.tenantId) return;
         const p = event.payload as Record<string, unknown>;
-        const recipients = { sms: (p.contactPhone as string) ?? undefined, whatsapp: (p.contactPhone as string) ?? undefined, email: (p.contactEmail as string) ?? undefined };
+        const recipients = {
+          sms: (p.contactPhone as string) ?? undefined,
+          whatsapp: (p.contactPhone as string) ?? undefined,
+          email: (p.contactEmail as string) ?? undefined,
+        };
         if (!recipients.sms && !recipients.email) return;
         const pickup = (p.pickup as Record<string, unknown>) ?? {};
         const driver = p.driver as { name: string; phone: string | null } | null;
         const attendant = p.attendant as { name: string; phone: string | null } | null;
         await this.notifications.notify({
-          tenantId: event.tenantId, eventId: event.eventId, eventType: 'trip.reminder.4h',
+          tenantId: event.tenantId,
+          eventId: event.eventId,
+          eventType: 'trip.reminder.4h',
           recipients,
           data: {
             pnr: p.pnr as string,
@@ -160,7 +223,9 @@ export class NotificationConsumer implements OnModuleInit {
           data: {
             pnr: payload.pnr as string,
             refund: payload.refundMinor ? `₹${Number(payload.refundMinor) / 100}` : undefined,
-            seats: Array.isArray(payload.seats) ? (payload.seats as string[]).join(', ') : undefined,
+            seats: Array.isArray(payload.seats)
+              ? (payload.seats as string[]).join(', ')
+              : undefined,
             delayMinutes: payload.delayMinutes as number | undefined,
             marginMinutes: payload.marginMinutes as number | undefined,
           },

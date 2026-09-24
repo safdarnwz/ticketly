@@ -67,7 +67,9 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     this.every(300_000, 'reporting-refresh', () => this.refreshReports());
     this.every(60_000, 'webhook-retry', () => this.retryWebhooks());
     this.every(600_000, 'trip-reminders', () => this.tripReminders.run().then(() => undefined));
-    this.every(300_000, 'connection-risk-monitor', () => this.connectionMonitor.run().then(() => undefined));
+    this.every(300_000, 'connection-risk-monitor', () =>
+      this.connectionMonitor.run().then(() => undefined),
+    );
     // Checked hourly rather than once at boot: a worker that restarts at any
     // time of day must still catch Monday/Thursday whenever it next runs,
     // and payoutWindowFor + SettlementService.generate are both idempotent
@@ -165,7 +167,10 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
           // and this UPDATE, the row is no longer 'held' and this correctly
           // becomes a no-op (0 rows affected) instead of silently flipping
           // an already-CONFIRMED, already-PAID booking back to 'expired'.
-          await client.query(`UPDATE bookings SET status = 'expired', updated_at = now() WHERE id = $1 AND status = 'held'`, [booking.id]);
+          await client.query(
+            `UPDATE bookings SET status = 'expired', updated_at = now() WHERE id = $1 AND status = 'held'`,
+            [booking.id],
+          );
           await client.query('COMMIT');
         } catch (error) {
           await client.query('ROLLBACK').catch(() => undefined);
@@ -179,24 +184,40 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   private async requeueFailedOutbox(): Promise<void> {
     const n = await this.db.execute_(
       `UPDATE outbox_events SET status = 'pending' WHERE status = 'failed' AND available_at <= now()`,
-      [], { name: 'sched.requeueOutbox', primary: true },
+      [],
+      { name: 'sched.requeueOutbox', primary: true },
     );
     if (n > 0) this.log.debug({ n }, 'requeued failed outbox events');
   }
 
   private async maintainPartitions(): Promise<void> {
-    await this.db.query('SELECT ensure_outbox_partitions(3)', [], { name: 'sched.outboxParts', primary: true });
-    await this.db.query('SELECT ensure_audit_partitions(3)', [], { name: 'sched.auditParts', primary: true });
-    await this.db.query('SELECT ensure_gps_partitions(3)', [], { name: 'sched.gpsParts', primary: true });
+    await this.db.query('SELECT ensure_outbox_partitions(3)', [], {
+      name: 'sched.outboxParts',
+      primary: true,
+    });
+    await this.db.query('SELECT ensure_audit_partitions(3)', [], {
+      name: 'sched.auditParts',
+      primary: true,
+    });
+    await this.db.query('SELECT ensure_gps_partitions(3)', [], {
+      name: 'sched.gpsParts',
+      primary: true,
+    });
   }
 
   private async refreshReports(): Promise<void> {
     // CONCURRENTLY refresh keeps the dashboards current without blocking reads.
-    await this.db.query('SELECT refresh_reporting_views()', [], { name: 'sched.refreshReports', primary: true });
+    await this.db.query('SELECT refresh_reporting_views()', [], {
+      name: 'sched.refreshReports',
+      primary: true,
+    });
   }
 
   private async purgeIdempotency(): Promise<void> {
-    const n = await this.db.execute_(`SELECT purge_expired_idempotency_keys(5000)`, [], { name: 'sched.purgeIdem', primary: true });
+    const n = await this.db.execute_(`SELECT purge_expired_idempotency_keys(5000)`, [], {
+      name: 'sched.purgeIdem',
+      primary: true,
+    });
     if (n > 0) this.log.debug({ n }, 'purged idempotency keys');
   }
 

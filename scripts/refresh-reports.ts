@@ -13,7 +13,14 @@ import { loadEnv } from '@config';
 
 async function main(): Promise<void> {
   const env = loadEnv();
-  const pool = new Pool({ host: env.DB_HOST, port: env.DB_PORT, database: env.DB_NAME, user: env.DB_USER, password: env.DB_PASSWORD, max: 1 });
+  const pool = new Pool({
+    host: env.DB_HOST,
+    port: env.DB_PORT,
+    database: env.DB_NAME,
+    user: env.DB_USER,
+    password: env.DB_PASSWORD,
+    max: 1,
+  });
   const client = await pool.connect();
   try {
     await client.query('SELECT refresh_reporting_views()');

@@ -64,7 +64,8 @@ export class TripReminderScheduler {
 
   private async sweep(opts: {
     column: 'reminder_12h_sent_at' | 'reminder_4h_sent_at';
-    windowStart: string; windowEnd: string;
+    windowStart: string;
+    windowEnd: string;
     build: (ctx: { bookingId: string }) => Promise<Record<string, unknown> | null>;
   }): Promise<number> {
     // Cross-tenant sweep — bypassRls is ONLY valid inside a UnitOfWork scope,
@@ -73,9 +74,11 @@ export class TripReminderScheduler {
     // transaction to find EVERY operator's due bookings in one query, then
     // processes each tenant's under its own bound context below (same as
     // PayoutScheduler's pattern).
-    const due = await this.uow.run({ name: `tripReminder.due.${opts.column}`, bypassRls: true }, async (scope) =>
-      scope.client.query<{ tenant_id: string; booking_id: string }>(
-        `SELECT b.tenant_id, b.id AS booking_id
+    const due = await this.uow.run(
+      { name: `tripReminder.due.${opts.column}`, bypassRls: true },
+      async (scope) =>
+        scope.client.query<{ tenant_id: string; booking_id: string }>(
+          `SELECT b.tenant_id, b.id AS booking_id
            FROM bookings b
            JOIN trips t ON t.tenant_id = b.tenant_id AND t.id = b.trip_id
            JOIN route_stops board_rs ON board_rs.tenant_id = b.tenant_id
@@ -85,42 +88,63 @@ export class TripReminderScheduler {
             AND t.status IN ('open','closed')
             AND (t.departs_at + (board_rs.depart_offset_min || ' minutes')::interval)
                 BETWEEN now() + interval '${opts.windowStart}' AND now() + interval '${opts.windowEnd}'`,
-      ),
+        ),
     );
 
     let notified = 0;
     for (const row of due.rows) {
       try {
-        await runInNewContext({ tenantId: row.tenant_id as TenantId, actorType: 'system' }, async () => {
-          const payload = await opts.build({ bookingId: row.booking_id });
-          if (!payload) return; // booking vanished between the sweep and here
-          // Event + "sent" flag in ONE transaction: publish() throws outside a
-          // transaction (so no reminder was ever sent before), and doing both
-          // atomically means a reminder is marked sent iff it was really
-          // queued. The IS NULL guard stops a concurrent sweep double-sending.
-          await this.uow.run({ name: `tripReminder.send.${opts.column}`, tenantId: row.tenant_id as TenantId }, async (scope) => {
-            const claimed = await scope.client.query(
-              `UPDATE bookings SET ${opts.column} = now() WHERE tenant_id = $1 AND id = $2 AND ${opts.column} IS NULL RETURNING id`,
-              [requireTenantId(), row.booking_id],
+        await runInNewContext(
+          { tenantId: row.tenant_id as TenantId, actorType: 'system' },
+          async () => {
+            const payload = await opts.build({ bookingId: row.booking_id });
+            if (!payload) return; // booking vanished between the sweep and here
+            // Event + "sent" flag in ONE transaction: publish() throws outside a
+            // transaction (so no reminder was ever sent before), and doing both
+            // atomically means a reminder is marked sent iff it was really
+            // queued. The IS NULL guard stops a concurrent sweep double-sending.
+            await this.uow.run(
+              { name: `tripReminder.send.${opts.column}`, tenantId: row.tenant_id as TenantId },
+              async (scope) => {
+                const claimed = await scope.client.query(
+                  `UPDATE bookings SET ${opts.column} = now() WHERE tenant_id = $1 AND id = $2 AND ${opts.column} IS NULL RETURNING id`,
+                  [requireTenantId(), row.booking_id],
+                );
+                if (claimed.rowCount === 0) return;
+                this.events.publish({
+                  type: `trip.reminder.${payload.stage}`,
+                  aggregateType: 'trip',
+                  aggregateId: payload.tripId as string,
+                  payload: payload as unknown as Json,
+                });
+              },
             );
-            if (claimed.rowCount === 0) return;
-            this.events.publish({ type: `trip.reminder.${payload.stage}`, aggregateType: 'trip', aggregateId: payload.tripId as string, payload: payload as unknown as Json });
-          });
-        });
+          },
+        );
         notified += 1;
       } catch (err) {
-        this.log.error({ err, bookingId: row.booking_id, tenantId: row.tenant_id, stage: opts.column }, 'trip reminder failed for this booking — will retry next sweep since the flag is only set on success');
+        this.log.error(
+          { err, bookingId: row.booking_id, tenantId: row.tenant_id, stage: opts.column },
+          'trip reminder failed for this booking — will retry next sweep since the flag is only set on success',
+        );
       }
     }
-    if (due.rows.length > 0) this.log.info({ stage: opts.column, due: due.rows.length, notified }, 'trip reminders sent');
+    if (due.rows.length > 0)
+      this.log.info({ stage: opts.column, due: due.rows.length, notified }, 'trip reminders sent');
     return notified;
   }
 
   /** 12h: the full "here's your trip" picture — no live-tracking link, the bus isn't running yet. */
   private async buildTwelveHourPayload(bookingId: string): Promise<Record<string, unknown> | null> {
     const booking = await this.db.queryOne<{
-      pnr: string; trip_id: string; contact_phone: string | null; contact_email: string | null;
-      from_stop_name: string; to_stop_name: string; boarding_at: Date; dropping_at: Date;
+      pnr: string;
+      trip_id: string;
+      contact_phone: string | null;
+      contact_email: string | null;
+      from_stop_name: string;
+      to_stop_name: string;
+      boarding_at: Date;
+      dropping_at: Date;
     }>(
       `SELECT b.pnr, b.trip_id, b.contact_phone, b.contact_email,
               fs.name AS from_stop_name, ts.name AS to_stop_name,
@@ -145,21 +169,35 @@ export class TripReminderScheduler {
     );
 
     return {
-      stage: '12h', pnr: booking.pnr, tripId: booking.trip_id,
-      contactPhone: booking.contact_phone, contactEmail: booking.contact_email,
+      stage: '12h',
+      pnr: booking.pnr,
+      tripId: booking.trip_id,
+      contactPhone: booking.contact_phone,
+      contactEmail: booking.contact_email,
       passengers: passengers.map((p) => ({ seat: p.seat_number, name: p.full_name })),
-      fromStopName: booking.from_stop_name, toStopName: booking.to_stop_name,
-      boardingAt: booking.boarding_at, droppingAt: booking.dropping_at,
+      fromStopName: booking.from_stop_name,
+      toStopName: booking.to_stop_name,
+      boardingAt: booking.boarding_at,
+      droppingAt: booking.dropping_at,
     };
   }
 
   /** 4h: the operational details needed to physically board — pickup location, driver/attendant, bus number. NO GPS link, per spec. */
   private async buildFourHourPayload(bookingId: string): Promise<Record<string, unknown> | null> {
     const booking = await this.db.queryOne<{
-      pnr: string; trip_id: string; contact_phone: string | null; contact_email: string | null;
-      from_stop_name: string; landmark: string | null; address: string | null;
-      latitude: number | null; longitude: number | null; stop_contact_phone: string | null;
-      registration_no: string | null; boarding_at: Date; arrives_at: Date;
+      pnr: string;
+      trip_id: string;
+      contact_phone: string | null;
+      contact_email: string | null;
+      from_stop_name: string;
+      landmark: string | null;
+      address: string | null;
+      latitude: number | null;
+      longitude: number | null;
+      stop_contact_phone: string | null;
+      registration_no: string | null;
+      boarding_at: Date;
+      arrives_at: Date;
     }>(
       `SELECT b.pnr, b.trip_id, b.contact_phone, b.contact_email,
               fs.name AS from_stop_name, fs.landmark, fs.address, fs.latitude, fs.longitude, fs.contact_phone AS stop_contact_phone,
@@ -182,7 +220,12 @@ export class TripReminderScheduler {
     // operator platforms send it: a short, dedicated "track your bus"
     // text a passenger can tap right when they need it, not buried inside
     // a longer ticket message they may have archived hours ago.
-    const trackingToken = this.tracking.issueTrackingToken(bookingId, booking.trip_id, booking.pnr, booking.arrives_at);
+    const trackingToken = this.tracking.issueTrackingToken(
+      bookingId,
+      booking.trip_id,
+      booking.pnr,
+      booking.arrives_at,
+    );
     const trackingUrl = this.tracking.buildTrackingUrl(trackingToken);
 
     // ALL drivers + attendants on duty for this trip — a long overnight
@@ -203,14 +246,24 @@ export class TripReminderScheduler {
     );
     const drivers = crewRows.filter((c) => c.role === 'driver');
     const attendants = crewRows.filter((c) => c.role === 'conductor' || c.role === 'attendant');
-    const fmtCrew = (list: typeof crewRows) => list.length > 0 ? list.map((c) => `${c.full_name} (${c.phone ?? 'no phone on file'})`).join(', ') : 'Not yet assigned';
+    const fmtCrew = (list: typeof crewRows) =>
+      list.length > 0
+        ? list.map((c) => `${c.full_name} (${c.phone ?? 'no phone on file'})`).join(', ')
+        : 'Not yet assigned';
 
     return {
-      stage: '4h', pnr: booking.pnr, tripId: booking.trip_id,
-      contactPhone: booking.contact_phone, contactEmail: booking.contact_email,
+      stage: '4h',
+      pnr: booking.pnr,
+      tripId: booking.trip_id,
+      contactPhone: booking.contact_phone,
+      contactEmail: booking.contact_email,
       pickup: {
-        stopName: booking.from_stop_name, landmark: booking.landmark, address: booking.address,
-        latitude: booking.latitude, longitude: booking.longitude, stopContactPhone: booking.stop_contact_phone,
+        stopName: booking.from_stop_name,
+        landmark: booking.landmark,
+        address: booking.address,
+        latitude: booking.latitude,
+        longitude: booking.longitude,
+        stopContactPhone: booking.stop_contact_phone,
       },
       boardingAt: booking.boarding_at,
       busNumber: booking.registration_no,
@@ -218,7 +271,9 @@ export class TripReminderScheduler {
       // FIRST driver/attendant, if any) — new templates should prefer
       // driversList/attendantsList below, which never drop a co-driver.
       driver: drivers[0] ? { name: drivers[0].full_name, phone: drivers[0].phone } : null,
-      attendant: attendants[0] ? { name: attendants[0].full_name, phone: attendants[0].phone } : null,
+      attendant: attendants[0]
+        ? { name: attendants[0].full_name, phone: attendants[0].phone }
+        : null,
       driversList: fmtCrew(drivers),
       attendantsList: fmtCrew(attendants),
       trackingUrl,

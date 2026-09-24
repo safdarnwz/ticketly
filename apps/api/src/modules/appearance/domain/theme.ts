@@ -22,21 +22,43 @@ import { DomainError, ErrorCode } from '@kernel';
 export type ThemeMode = 'light' | 'dark';
 
 export interface ColorTokens {
-  primary: string; primaryFg: string;
-  secondary: string; secondaryFg: string;
+  primary: string;
+  primaryFg: string;
+  secondary: string;
+  secondaryFg: string;
   accent: string;
-  bg: string; surface: string; surfaceMuted: string;
+  bg: string;
+  surface: string;
+  surfaceMuted: string;
   border: string;
-  text: string; textMuted: string;
-  success: string; warning: string; danger: string; info: string;
+  text: string;
+  textMuted: string;
+  success: string;
+  warning: string;
+  danger: string;
+  info: string;
 }
 
-export interface RadiusTokens { sm: number; md: number; lg: number; xl: number; pill: number; }
-export interface ShadowTokens { sm: string; md: string; lg: string; }
+export interface RadiusTokens {
+  sm: number;
+  md: number;
+  lg: number;
+  xl: number;
+  pill: number;
+}
+export interface ShadowTokens {
+  sm: string;
+  md: string;
+  lg: string;
+}
 export interface FontTokens {
-  family: string; familyHeading: string;
-  sizeBase: number; scale: number;
-  weightNormal: number; weightMedium: number; weightBold: number;
+  family: string;
+  familyHeading: string;
+  sizeBase: number;
+  scale: number;
+  weightNormal: number;
+  weightMedium: number;
+  weightBold: number;
 }
 export interface ComponentTokens {
   button: { height: number; paddingX: number; radius: number; fontWeight: number };
@@ -67,13 +89,21 @@ export const DEFAULT_THEME: Theme = {
     // of modern tools: near-black primary, a single crimson accent, and calm
     // neutral grays on white. No gradients, no glass, no gold — flat surfaces
     // separated by hairline borders. Light on ink, restrained on colour.
-    primary: '#000000', primaryFg: '#FFFFFF',
-    secondary: '#000000', secondaryFg: '#FFFFFF',
+    primary: '#000000',
+    primaryFg: '#FFFFFF',
+    secondary: '#000000',
+    secondaryFg: '#FFFFFF',
     accent: '#CB2957',
-    bg: '#FFFFFF', surface: '#FFFFFF', surfaceMuted: '#EEEEEE',
+    bg: '#FFFFFF',
+    surface: '#FFFFFF',
+    surfaceMuted: '#EEEEEE',
     border: '#DDDDDD',
-    text: '#000000', textMuted: '#6E6E6E',
-    success: '#16A34A', warning: '#D97706', danger: '#DC2626', info: '#3F72AF',
+    text: '#000000',
+    textMuted: '#6E6E6E',
+    success: '#16A34A',
+    warning: '#D97706',
+    danger: '#DC2626',
+    info: '#3F72AF',
   },
   radius: { sm: 6, md: 8, lg: 12, xl: 16, pill: 999 },
   shadow: {
@@ -84,10 +114,15 @@ export const DEFAULT_THEME: Theme = {
   },
   font: {
     // A standard, neutral system sans (ChatGPT-like). Light default weight.
-    family: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    familyHeading: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    sizeBase: 15, scale: 1.2,
-    weightNormal: 400, weightMedium: 500, weightBold: 600,
+    family:
+      "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    familyHeading:
+      "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    sizeBase: 15,
+    scale: 1.2,
+    weightNormal: 400,
+    weightMedium: 500,
+    weightBold: 600,
   },
   spacingUnit: 4,
   components: {
@@ -103,12 +138,18 @@ const HEX = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
 function assertHex(name: string, value: string): void {
   if (typeof value !== 'string' || !HEX.test(value)) {
-    throw new DomainError(ErrorCode.COMMON_VALIDATION, `Colour '${name}' must be a hex value, got '${value}'`);
+    throw new DomainError(
+      ErrorCode.COMMON_VALIDATION,
+      `Colour '${name}' must be a hex value, got '${value}'`,
+    );
   }
 }
 function assertRange(name: string, value: number, min: number, max: number): void {
   if (typeof value !== 'number' || Number.isNaN(value) || value < min || value > max) {
-    throw new DomainError(ErrorCode.COMMON_VALIDATION, `'${name}' must be a number in [${min}, ${max}], got ${value}`);
+    throw new DomainError(
+      ErrorCode.COMMON_VALIDATION,
+      `'${name}' must be a number in [${min}, ${max}], got ${value}`,
+    );
   }
 }
 
@@ -117,8 +158,10 @@ export function validateTheme(theme: Theme): void {
   if (theme.mode !== 'light' && theme.mode !== 'dark') {
     throw new DomainError(ErrorCode.COMMON_VALIDATION, `mode must be 'light' or 'dark'`);
   }
-  for (const [k, v] of Object.entries(theme.colors) as [string, string][]) assertHex(`colors.${k}`, v);
-  for (const [k, v] of Object.entries(theme.radius) as [string, number][]) assertRange(`radius.${k}`, v, 0, 9999);
+  for (const [k, v] of Object.entries(theme.colors) as [string, string][])
+    assertHex(`colors.${k}`, v);
+  for (const [k, v] of Object.entries(theme.radius) as [string, number][])
+    assertRange(`radius.${k}`, v, 0, 9999);
   assertRange('font.sizeBase', theme.font.sizeBase, 10, 24);
   assertRange('font.scale', theme.font.scale, 1, 2);
   assertRange('spacingUnit', theme.spacingUnit, 2, 16);
@@ -134,7 +177,10 @@ function isObject(v: unknown): v is Record<string, unknown> {
 export function mergeTheme(base: Theme, patch: ThemePatch): Theme {
   return deepMerge(base as unknown as Record<string, unknown>, patch) as unknown as Theme;
 }
-function deepMerge(base: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
+function deepMerge(
+  base: Record<string, unknown>,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
   const out: Record<string, unknown> = { ...base };
   for (const [k, v] of Object.entries(patch)) {
     if (v === undefined) continue;
@@ -157,9 +203,11 @@ export function resolveTheme(platformPatch: ThemePatch = {}, rolePatch: ThemePat
 /** Flatten a theme into the `--yb-*` CSS-variable map the frontend consumes. */
 export function tokensToCssVars(theme: Theme): Record<string, string> {
   const vars: Record<string, string> = {};
-  for (const [k, v] of Object.entries(theme.colors) as [string, string][]) vars[`--yb-color-${kebab(k)}`] = v;
+  for (const [k, v] of Object.entries(theme.colors) as [string, string][])
+    vars[`--yb-color-${kebab(k)}`] = v;
   for (const [k, v] of Object.entries(theme.radius)) vars[`--yb-radius-${k}`] = `${v}px`;
-  for (const [k, v] of Object.entries(theme.shadow) as [string, string][]) vars[`--yb-shadow-${k}`] = v;
+  for (const [k, v] of Object.entries(theme.shadow) as [string, string][])
+    vars[`--yb-shadow-${k}`] = v;
   vars['--yb-font-family'] = theme.font.family;
   vars['--yb-font-family-heading'] = theme.font.familyHeading;
   vars['--yb-font-size-base'] = `${theme.font.sizeBase}px`;
@@ -188,7 +236,9 @@ export function tokensToCssVars(theme: Theme): Record<string, string> {
 
 /** Render the effective theme as a ready-to-inject `:root { … }` stylesheet. */
 export function themeToCss(theme: Theme): string {
-  const body = Object.entries(tokensToCssVars(theme)).map(([k, v]) => `  ${k}: ${v};`).join('\n');
+  const body = Object.entries(tokensToCssVars(theme))
+    .map(([k, v]) => `  ${k}: ${v};`)
+    .join('\n');
   return `:root{\n${body}\n}`;
 }
 

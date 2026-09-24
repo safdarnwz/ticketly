@@ -12,9 +12,14 @@ export interface AgentCreditPolicy {
   maxCreditLimitMinor: number | null;
 }
 
-export const DEFAULT_AGENT_CREDIT_POLICY: AgentCreditPolicy = { defaultCreditLimitMinor: 0, maxCreditLimitMinor: null };
+export const DEFAULT_AGENT_CREDIT_POLICY: AgentCreditPolicy = {
+  defaultCreditLimitMinor: 0,
+  maxCreditLimitMinor: null,
+};
 
-export function normaliseAgentCreditPolicy(stored: Partial<AgentCreditPolicy> | null | undefined): AgentCreditPolicy {
+export function normaliseAgentCreditPolicy(
+  stored: Partial<AgentCreditPolicy> | null | undefined,
+): AgentCreditPolicy {
   return { ...DEFAULT_AGENT_CREDIT_POLICY, ...(stored ?? {}) };
 }
 
@@ -34,7 +39,10 @@ export function resolveAgentCreditLimit(
   if (billingMode === 'prepaid') return { ok: true, creditLimitMinor: 0 };
   const limit = requestedMinor ?? policy.defaultCreditLimitMinor;
   if (policy.maxCreditLimitMinor !== null && limit > policy.maxCreditLimitMinor) {
-    return { ok: false, error: `Credit limit cannot exceed the platform maximum of ₹${(policy.maxCreditLimitMinor / 100).toFixed(2)}` };
+    return {
+      ok: false,
+      error: `Credit limit cannot exceed the platform maximum of ₹${(policy.maxCreditLimitMinor / 100).toFixed(2)}`,
+    };
   }
   return { ok: true, creditLimitMinor: limit };
 }

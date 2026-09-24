@@ -19,7 +19,7 @@ import { DomainError, ErrorCode } from '@kernel';
  */
 
 export interface TicketTokenPayload {
-  v: number;          // schema version
+  v: number; // schema version
   bookingId: string;
   pnr: string;
   tripId: string;
@@ -29,7 +29,11 @@ export interface TicketTokenPayload {
 }
 
 function b64urlEncode(s: string): string {
-  return Buffer.from(s, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return Buffer.from(s, 'utf8')
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
 function b64urlDecode(s: string): string {
   const pad = s.length % 4 === 0 ? '' : '='.repeat(4 - (s.length % 4));
@@ -40,8 +44,13 @@ function b64urlDecode(s: string): string {
 export function signingInput(payload: TicketTokenPayload): string {
   // Stable key order → the same payload always yields the same signing input.
   const ordered = {
-    v: payload.v, bookingId: payload.bookingId, pnr: payload.pnr, tripId: payload.tripId,
-    seat: payload.seat, issuedAtMs: payload.issuedAtMs, expiresAtMs: payload.expiresAtMs,
+    v: payload.v,
+    bookingId: payload.bookingId,
+    pnr: payload.pnr,
+    tripId: payload.tripId,
+    seat: payload.seat,
+    issuedAtMs: payload.issuedAtMs,
+    expiresAtMs: payload.expiresAtMs,
   };
   return b64urlEncode(JSON.stringify(ordered));
 }
@@ -51,7 +60,11 @@ export function encodeToken(payloadPart: string, signaturePart: string): string 
   return `${payloadPart}.${signaturePart}`;
 }
 
-export function decodeToken(token: string): { payloadPart: string; signaturePart: string; payload: TicketTokenPayload } {
+export function decodeToken(token: string): {
+  payloadPart: string;
+  signaturePart: string;
+  payload: TicketTokenPayload;
+} {
   const parts = token.split('.');
   if (parts.length !== 2 || !parts[0] || !parts[1]) {
     throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Malformed ticket token');
@@ -85,7 +98,11 @@ export function constantTimeEqual(a: string, b: string): boolean {
  * expiry. Returns the payload if valid; throws otherwise. The caller computes
  * `expectedSignature = HMAC(decoded.payloadPart, key)`.
  */
-export function verifyToken(token: string, expectedSignature: string, nowMs: number): TicketTokenPayload {
+export function verifyToken(
+  token: string,
+  expectedSignature: string,
+  nowMs: number,
+): TicketTokenPayload {
   const decoded = decodeToken(token);
   if (!constantTimeEqual(decoded.signaturePart, expectedSignature)) {
     throw new DomainError(ErrorCode.COMMON_FORBIDDEN, 'Ticket signature does not verify');
@@ -123,11 +140,22 @@ export interface BookingQrPayload {
 }
 
 export function bookingQrSigningInput(payload: BookingQrPayload): string {
-  const ordered = { v: payload.v, bookingId: payload.bookingId, pnr: payload.pnr, tripId: payload.tripId, issuedAtMs: payload.issuedAtMs, expiresAtMs: payload.expiresAtMs };
+  const ordered = {
+    v: payload.v,
+    bookingId: payload.bookingId,
+    pnr: payload.pnr,
+    tripId: payload.tripId,
+    issuedAtMs: payload.issuedAtMs,
+    expiresAtMs: payload.expiresAtMs,
+  };
   return b64urlEncode(JSON.stringify(ordered));
 }
 
-export function decodeBookingQrToken(token: string): { payloadPart: string; signaturePart: string; payload: BookingQrPayload } {
+export function decodeBookingQrToken(token: string): {
+  payloadPart: string;
+  signaturePart: string;
+  payload: BookingQrPayload;
+} {
   const parts = token.split('.');
   if (parts.length !== 2 || !parts[0] || !parts[1]) {
     throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Malformed booking QR token');
@@ -144,7 +172,11 @@ export function decodeBookingQrToken(token: string): { payloadPart: string; sign
   return { payloadPart: parts[0], signaturePart: parts[1], payload };
 }
 
-export function verifyBookingQrToken(token: string, expectedSignature: string, nowMs: number): BookingQrPayload {
+export function verifyBookingQrToken(
+  token: string,
+  expectedSignature: string,
+  nowMs: number,
+): BookingQrPayload {
   const decoded = decodeBookingQrToken(token);
   if (!constantTimeEqual(decoded.signaturePart, expectedSignature)) {
     throw new DomainError(ErrorCode.COMMON_FORBIDDEN, 'Booking QR signature does not verify');

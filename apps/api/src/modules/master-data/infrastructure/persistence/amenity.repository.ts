@@ -25,7 +25,12 @@ export class AmenityRepository {
   }
 
   async list(): Promise<Amenity[]> {
-    const rows = await this.db.query<{ id: AmenityId; code: string; name: string; icon: string | null }>(
+    const rows = await this.db.query<{
+      id: AmenityId;
+      code: string;
+      name: string;
+      icon: string | null;
+    }>(
       `SELECT id, code, name, icon FROM amenities WHERE tenant_id = $1 AND is_active = true ORDER BY name`,
       [requireTenantId()],
       { name: 'amenity.list' },
@@ -46,7 +51,13 @@ export class AmenityRepository {
   async forVehicleIds(vehicleIds: readonly string[]): Promise<Map<string, Amenity[]>> {
     const result = new Map<string, Amenity[]>();
     if (vehicleIds.length === 0) return result;
-    const rows = await this.db.query<{ vehicle_id: string; id: AmenityId; code: string; name: string; icon: string | null }>(
+    const rows = await this.db.query<{
+      vehicle_id: string;
+      id: AmenityId;
+      code: string;
+      name: string;
+      icon: string | null;
+    }>(
       `SELECT v.id AS vehicle_id, a.id, a.code, a.name, a.icon
          FROM vehicles v
          JOIN vehicle_types vt ON vt.id = v.vehicle_type_id

@@ -23,7 +23,10 @@ export class LogProviderFactory {
       channel,
       name: 'log',
       async send(req: SendRequest): Promise<SendResult> {
-        log.info({ to: req.recipient, subject: req.subject }, `[${channel}] ${req.body.slice(0, 120)}`);
+        log.info(
+          { to: req.recipient, subject: req.subject },
+          `[${channel}] ${req.body.slice(0, 120)}`,
+        );
         return { ok: true, providerRef: `log_${Date.now()}` };
       },
     };

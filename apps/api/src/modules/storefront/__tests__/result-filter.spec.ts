@@ -13,8 +13,22 @@ const mk = (o: Partial<FilterableTrip>): FilterableTrip => ({
 
 describe('matchesFilter', () => {
   it('happy: passes a trip meeting every constraint', () => {
-    const t = mk({ fromPriceMinor: 40000, operatorRating: 4.5, seatTypes: ['sleeper'], amenities: ['wifi', 'charging'] });
-    expect(matchesFilter(t, { minPriceMinor: 30000, maxPriceMinor: 50000, minRating: 4, seatTypes: ['sleeper'], amenities: ['wifi'], minSeats: 2 })).toBe(true);
+    const t = mk({
+      fromPriceMinor: 40000,
+      operatorRating: 4.5,
+      seatTypes: ['sleeper'],
+      amenities: ['wifi', 'charging'],
+    });
+    expect(
+      matchesFilter(t, {
+        minPriceMinor: 30000,
+        maxPriceMinor: 50000,
+        minRating: 4,
+        seatTypes: ['sleeper'],
+        amenities: ['wifi'],
+        minSeats: 2,
+      }),
+    ).toBe(true);
   });
 
   it('positive: price band filters correctly on both edges', () => {
@@ -47,9 +61,27 @@ describe('matchesFilter', () => {
 
 describe('filterAndSort', () => {
   const trips = [
-    mk({ tripId: 'a', departsAt: '2026-09-01T12:00:00Z', fromPriceMinor: 60000, durationMin: 300, operatorRating: 3 } as never),
-    mk({ tripId: 'b', departsAt: '2026-09-01T06:00:00Z', fromPriceMinor: 40000, durationMin: 420, operatorRating: 5 } as never),
-    mk({ tripId: 'c', departsAt: '2026-09-01T09:00:00Z', fromPriceMinor: 40000, durationMin: 360, operatorRating: 4 } as never),
+    mk({
+      tripId: 'a',
+      departsAt: '2026-09-01T12:00:00Z',
+      fromPriceMinor: 60000,
+      durationMin: 300,
+      operatorRating: 3,
+    } as never),
+    mk({
+      tripId: 'b',
+      departsAt: '2026-09-01T06:00:00Z',
+      fromPriceMinor: 40000,
+      durationMin: 420,
+      operatorRating: 5,
+    } as never),
+    mk({
+      tripId: 'c',
+      departsAt: '2026-09-01T09:00:00Z',
+      fromPriceMinor: 40000,
+      durationMin: 360,
+      operatorRating: 4,
+    } as never),
   ];
 
   it('happy: sorts by price ascending, stable on ties (input order preserved)', () => {

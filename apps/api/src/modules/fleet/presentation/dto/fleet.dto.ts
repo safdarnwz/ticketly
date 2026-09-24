@@ -27,29 +27,41 @@ export const CreateVehicleSchema = z.object({
 export type CreateVehicleDto = z.infer<typeof CreateVehicleSchema>;
 
 /** registrationNo is accepted ONLY so a changed value can be refused with a clear message; it is never applied. */
-export const UpdateVehicleSchema = z.object({ registrationNo: z.string().optional(), ...vehicleDetails });
+export const UpdateVehicleSchema = z.object({
+  registrationNo: z.string().optional(),
+  ...vehicleDetails,
+});
 export type UpdateVehicleDto = z.infer<typeof UpdateVehicleSchema>;
 
-export const UploadDocumentSchema = z.object({
-  docType: z.string().trim().min(2).max(40),
-  documentNo: z.string().trim().max(60).optional(),
-  validFrom: localDate.optional(),
-  expiresOn: localDate,
-  issuer: z.string().trim().max(120).optional(),
-  fileName: z.string().max(200).optional(),
-  /** Preferred: the id returned by POST /fleet/vehicles/:id/documents/file (raw upload). */
-  fileId: z.string().uuid().optional(),
-  /** Legacy: base64 / data URL in the JSON body (max 5 MB file). */
-  contentBase64: z.string().min(8).max(7_100_000).optional(),
-}).refine((d) => !!d.fileId !== !!d.contentBase64, { message: 'Provide exactly one of fileId or contentBase64' });
+export const UploadDocumentSchema = z
+  .object({
+    docType: z.string().trim().min(2).max(40),
+    documentNo: z.string().trim().max(60).optional(),
+    validFrom: localDate.optional(),
+    expiresOn: localDate,
+    issuer: z.string().trim().max(120).optional(),
+    fileName: z.string().max(200).optional(),
+    /** Preferred: the id returned by POST /fleet/vehicles/:id/documents/file (raw upload). */
+    fileId: z.string().uuid().optional(),
+    /** Legacy: base64 / data URL in the JSON body (max 5 MB file). */
+    contentBase64: z.string().min(8).max(7_100_000).optional(),
+  })
+  .refine((d) => !!d.fileId !== !!d.contentBase64, {
+    message: 'Provide exactly one of fileId or contentBase64',
+  });
 export type UploadDocumentDto = z.infer<typeof UploadDocumentSchema>;
 /** @deprecated kept for older clients — same shape as UploadDocumentSchema. */
 export const UpsertDocumentSchema = UploadDocumentSchema;
 export type UpsertDocumentDto = UploadDocumentDto;
 
-export const ReasonSchema = z.object({ reason: z.string().trim().min(10, 'Please give a reason of at least 10 characters').max(1000) });
+export const ReasonSchema = z.object({
+  reason: z.string().trim().min(10, 'Please give a reason of at least 10 characters').max(1000),
+});
 export type ReasonDto = z.infer<typeof ReasonSchema>;
-export const OptionalNoteSchema = z.object({ reason: z.string().trim().max(1000).optional() }).optional().default({});
+export const OptionalNoteSchema = z
+  .object({ reason: z.string().trim().max(1000).optional() })
+  .optional()
+  .default({});
 export type OptionalNoteDto = z.infer<typeof OptionalNoteSchema>;
 
 export const CreateCrewSchema = z.object({
@@ -62,16 +74,22 @@ export const CreateCrewSchema = z.object({
 });
 export type CreateCrewDto = z.infer<typeof CreateCrewSchema>;
 
-export const AssignDutySchema = z.object({
-  crewId: uuid,
-  tripId: uuid.optional(),
-  startsAt: z.string().datetime(),
-  endsAt: z.string().datetime(),
-  drivingMinutes: z.number().int().min(0).max(1440),
-  /** Manager approval to break rest/driving/length rules (e.g. emergency double duty). Never allows an overlap. */
-  overrideReason: z.string().trim().min(10).max(300).optional(),
-}).refine((d) => Date.parse(d.endsAt) > Date.parse(d.startsAt), { message: 'Duty end must be after its start' })
-  .refine((d) => d.drivingMinutes <= (Date.parse(d.endsAt) - Date.parse(d.startsAt)) / 60_000, { message: 'Driving minutes cannot exceed the duty length' });
+export const AssignDutySchema = z
+  .object({
+    crewId: uuid,
+    tripId: uuid.optional(),
+    startsAt: z.string().datetime(),
+    endsAt: z.string().datetime(),
+    drivingMinutes: z.number().int().min(0).max(1440),
+    /** Manager approval to break rest/driving/length rules (e.g. emergency double duty). Never allows an overlap. */
+    overrideReason: z.string().trim().min(10).max(300).optional(),
+  })
+  .refine((d) => Date.parse(d.endsAt) > Date.parse(d.startsAt), {
+    message: 'Duty end must be after its start',
+  })
+  .refine((d) => d.drivingMinutes <= (Date.parse(d.endsAt) - Date.parse(d.startsAt)) / 60_000, {
+    message: 'Driving minutes cannot exceed the duty length',
+  });
 export type AssignDutyDto = z.infer<typeof AssignDutySchema>;
 
 export const AttendanceSchema = z.object({ status: z.enum(['present', 'absent']) });

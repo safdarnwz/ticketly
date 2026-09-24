@@ -40,7 +40,9 @@ export class PayoutScheduler {
     this.log = logger.forContext('PayoutScheduler');
   }
 
-  async runIfDue(now: Date = new Date()): Promise<{ ran: boolean; tenants: number; failures: number }> {
+  async runIfDue(
+    now: Date = new Date(),
+  ): Promise<{ ran: boolean; tenants: number; failures: number }> {
     const window = payoutWindowFor(now);
     if (!window) return { ran: false, tenants: 0, failures: 0 };
 
@@ -53,14 +55,19 @@ export class PayoutScheduler {
         // request, so there's no ambient context to extend (runAsTenant
         // would throw); runInNewContext creates one from scratch, scoped to
         // just this tenant and this async call.
-        const result = await runInNewContext(
-          { tenantId, actorType: 'system' },
-          () => this.settlement.runPayout(window.periodFrom, window.periodTo),
+        const result = await runInNewContext({ tenantId, actorType: 'system' }, () =>
+          this.settlement.runPayout(window.periodFrom, window.periodTo),
         );
-        this.log.info({ tenantId, ...result, periodFrom: window.periodFrom, periodTo: window.periodTo }, 'payout settled');
+        this.log.info(
+          { tenantId, ...result, periodFrom: window.periodFrom, periodTo: window.periodTo },
+          'payout settled',
+        );
       } catch (err) {
         failures += 1;
-        this.log.error({ tenantId, err, periodFrom: window.periodFrom, periodTo: window.periodTo }, 'payout failed for operator — will retry on next scheduled run');
+        this.log.error(
+          { tenantId, err, periodFrom: window.periodFrom, periodTo: window.periodTo },
+          'payout failed for operator — will retry on next scheduled run',
+        );
       }
     }
 

@@ -16,9 +16,12 @@ import { EventDispatcher, type EventHandler } from '../dispatcher/event-dispatch
 @Injectable()
 export class WebhookConsumer implements OnModuleInit {
   private static readonly EVENT_TYPES = [
-    'booking.confirmed', 'booking.cancelled',
-    'trip.delayed', 'trip.departed',
-    'payment.captured', 'refund.settled',
+    'booking.confirmed',
+    'booking.cancelled',
+    'trip.delayed',
+    'trip.departed',
+    'payment.captured',
+    'refund.settled',
   ];
 
   constructor(

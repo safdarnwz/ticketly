@@ -31,7 +31,11 @@ export class DepartureControlRepository {
       { name: 'dcs.tripCounts', primary: true },
     );
     if (!row) return null;
-    return { totalSeats: Number(row.total), confirmedSeats: Number(row.confirmed), boardedSeats: Number(row.boarded) };
+    return {
+      totalSeats: Number(row.total),
+      confirmedSeats: Number(row.confirmed),
+      boardedSeats: Number(row.boarded),
+    };
   }
 
   async findChart(tripId: TripId): Promise<unknown> {
@@ -48,9 +52,18 @@ export class DepartureControlRepository {
   }
 
   async insertChart(input: {
-    tripId: TripId; totalSeats: number; confirmedSeats: number; boardedSeats: number; noShowSeats: number;
-    vacantSeats: number; spotSalesCount: number; cashDeclaredMinor: number; cashExpectedMinor: number;
-    cashVarianceMinor: number; reconciled: boolean; chartedBy: UserId | null;
+    tripId: TripId;
+    totalSeats: number;
+    confirmedSeats: number;
+    boardedSeats: number;
+    noShowSeats: number;
+    vacantSeats: number;
+    spotSalesCount: number;
+    cashDeclaredMinor: number;
+    cashExpectedMinor: number;
+    cashVarianceMinor: number;
+    reconciled: boolean;
+    chartedBy: UserId | null;
   }): Promise<string> {
     const scope = currentTransaction();
     const id = newId();
@@ -58,15 +71,30 @@ export class DepartureControlRepository {
         (id, tenant_id, trip_id, total_seats, confirmed_seats, boarded_seats, no_show_seats, vacant_seats,
          spot_sales_count, cash_declared_minor, cash_expected_minor, cash_variance_minor, reconciled, charted_by)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`;
-    const params = [id, requireTenantId(), input.tripId, input.totalSeats, input.confirmedSeats, input.boardedSeats,
-      input.noShowSeats, input.vacantSeats, input.spotSalesCount, input.cashDeclaredMinor, input.cashExpectedMinor,
-      input.cashVarianceMinor, input.reconciled, input.chartedBy];
+    const params = [
+      id,
+      requireTenantId(),
+      input.tripId,
+      input.totalSeats,
+      input.confirmedSeats,
+      input.boardedSeats,
+      input.noShowSeats,
+      input.vacantSeats,
+      input.spotSalesCount,
+      input.cashDeclaredMinor,
+      input.cashExpectedMinor,
+      input.cashVarianceMinor,
+      input.reconciled,
+      input.chartedBy,
+    ];
     try {
       if (scope) await scope.client.query(sql, params);
       else await this.db.execute_(sql, params, { name: 'dcs.insertChart', primary: true });
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new AppError(ErrorCode.DCS_ALREADY_CHARTED, 409, { message: 'This trip has already been charted' });
+        throw new AppError(ErrorCode.DCS_ALREADY_CHARTED, 409, {
+          message: 'This trip has already been charted',
+        });
       }
       throw error;
     }

@@ -68,8 +68,17 @@ export class InventoryRepository {
   }
 
   /** Per-seat availability for the seat-map render. */
-  async seatAvailability(tripId: TripId, fromSeq: number, toSeq: number): Promise<SeatAvailability[]> {
-    const rows = await this.db.query<{ seat_number: string; seat_type: string; ladies_only: boolean; available: boolean }>(
+  async seatAvailability(
+    tripId: TripId,
+    fromSeq: number,
+    toSeq: number,
+  ): Promise<SeatAvailability[]> {
+    const rows = await this.db.query<{
+      seat_number: string;
+      seat_type: string;
+      ladies_only: boolean;
+      available: boolean;
+    }>(
       `SELECT seat_number, seat_type, ladies_only,
               (is_bookable AND ((occupied_legs | blocked_legs) & segment_mask($3, $4)) = 0) AS available
          FROM trip_seats
@@ -79,26 +88,44 @@ export class InventoryRepository {
       { name: 'inventory.seatAvailability' },
     );
     return rows.map((r) => ({
-      seatNumber: r.seat_number, seatType: r.seat_type, ladiesOnly: r.ladies_only, available: r.available,
+      seatNumber: r.seat_number,
+      seatType: r.seat_type,
+      ladiesOnly: r.ladies_only,
+      available: r.available,
     }));
   }
 
   /** Seat number → seat type (and bookability) for the given seats of a trip. */
-  async seatTypes(tripId: TripId, seatNumbers: string[]): Promise<Map<string, { seatType: string; bookable: boolean }>> {
+  async seatTypes(
+    tripId: TripId,
+    seatNumbers: string[],
+  ): Promise<Map<string, { seatType: string; bookable: boolean }>> {
     if (seatNumbers.length === 0) return new Map();
-    const rows = await this.db.query<{ seat_number: string; seat_type: string; is_bookable: boolean }>(
+    const rows = await this.db.query<{
+      seat_number: string;
+      seat_type: string;
+      is_bookable: boolean;
+    }>(
       `SELECT seat_number, seat_type, is_bookable FROM trip_seats WHERE tenant_id = $1 AND trip_id = $2 AND seat_number = ANY($3::text[])`,
       [requireTenantId(), tripId, seatNumbers],
       { name: 'inventory.seatTypes' },
     );
-    return new Map(rows.map((r) => [r.seat_number, { seatType: r.seat_type, bookable: r.is_bookable }]));
+    return new Map(
+      rows.map((r) => [r.seat_number, { seatType: r.seat_type, bookable: r.is_bookable }]),
+    );
   }
 
   /**
    * Block or unblock a set of seats on a segment (operator quota / hold).
    * Uses the same bitmap: block ORs the mask into `blocked_legs`.
    */
-  async blockSeats(tripId: TripId, seatNumbers: string[], fromSeq: number, toSeq: number, block: boolean): Promise<number> {
+  async blockSeats(
+    tripId: TripId,
+    seatNumbers: string[],
+    fromSeq: number,
+    toSeq: number,
+    block: boolean,
+  ): Promise<number> {
     if (seatNumbers.length === 0) return 0;
     const op = block ? `blocked_legs | segment_mask($3,$4)` : `blocked_legs & ~segment_mask($3,$4)`;
     return this.db.execute_(
@@ -110,15 +137,25 @@ export class InventoryRepository {
   }
 
   /** Map a (fromStopId, toStopId) pair to leg sequence indices for a trip. */
-  async resolveSegment(tripId: TripId, fromStopId: StopId, toStopId: StopId): Promise<{ fromSeq: number; toSeq: number } | null> {
-    const rows = await this.db.query<{ stop_id: StopId; sequence: number; can_board: boolean; can_alight: boolean }>(
+  async resolveSegment(
+    tripId: TripId,
+    fromStopId: StopId,
+    toStopId: StopId,
+  ): Promise<{ fromSeq: number; toSeq: number } | null> {
+    const rows = await this.db.query<{
+      stop_id: StopId;
+      sequence: number;
+      can_board: boolean;
+      can_alight: boolean;
+    }>(
       `SELECT stop_id, sequence, can_board, can_alight FROM trip_stops WHERE trip_id = $1 ORDER BY sequence`,
       [tripId],
       { name: 'inventory.resolveSegment' },
     );
     const from = rows.find((r) => r.stop_id === fromStopId);
     const to = rows.find((r) => r.stop_id === toStopId);
-    if (!from || !to || from.sequence >= to.sequence || !from.can_board || !to.can_alight) return null;
+    if (!from || !to || from.sequence >= to.sequence || !from.can_board || !to.can_alight)
+      return null;
     return { fromSeq: from.sequence, toSeq: to.sequence };
   }
 }

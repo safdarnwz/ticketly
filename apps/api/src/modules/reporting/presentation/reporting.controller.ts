@@ -20,7 +20,10 @@ export class ReportingController {
 
   @Get('summary')
   @RequirePermission(Permission.REPORT_READ)
-  @ApiOperation({ summary: "This operator's own dashboard numbers — total/today bookings, total/today cancellations, revenue" })
+  @ApiOperation({
+    summary:
+      "This operator's own dashboard numbers — total/today bookings, total/today cancellations, revenue",
+  })
   async summary() {
     return this.bookings.statsForTenant(requireTenantId());
   }

@@ -7,8 +7,13 @@
  * A rejected item rejects the whole call (like Promise.all) — callers that
  * want per-item isolation catch inside `fn`.
  */
-export async function mapWithConcurrency<T, R>(items: readonly T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
-  if (!Number.isInteger(limit) || limit < 1) throw new Error('mapWithConcurrency: limit must be a positive integer');
+export async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  if (!Number.isInteger(limit) || limit < 1)
+    throw new Error('mapWithConcurrency: limit must be a positive integer');
   const out = new Array<R>(items.length);
   let next = 0;
   const worker = async (): Promise<void> => {

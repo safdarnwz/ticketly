@@ -20,7 +20,8 @@ import { join, relative } from 'node:path';
 
 const ROOT = join(__dirname, '..', 'apps', 'api', 'src', 'modules');
 const BASELINE = join(__dirname, 'boundaries.baseline.json');
-const DEEP = /from '((?:\.\.\/)+)([a-z-]+)\/(domain|application|infrastructure|presentation)[^']*'/g;
+const DEEP =
+  /from '((?:\.\.\/)+)([a-z-]+)\/(domain|application|infrastructure|presentation)[^']*'/g;
 
 function files(dir: string): string[] {
   return readdirSync(dir).flatMap((n) => {
@@ -39,7 +40,9 @@ for (const f of files(ROOT)) {
   }
 }
 
-const baseline: string[] = existsSync(BASELINE) ? (JSON.parse(readFileSync(BASELINE, 'utf8')) as string[]) : [];
+const baseline: string[] = existsSync(BASELINE)
+  ? (JSON.parse(readFileSync(BASELINE, 'utf8')) as string[])
+  : [];
 if (process.argv.includes('--update') || !existsSync(BASELINE)) {
   writeFileSync(BASELINE, JSON.stringify([...found].sort(), null, 2) + '\n');
   console.log(`baseline written: ${found.size} known cross-module deep imports`);
@@ -48,9 +51,13 @@ if (process.argv.includes('--update') || !existsSync(BASELINE)) {
 const known = new Set(baseline);
 const added = [...found].filter((v) => !known.has(v));
 if (added.length) {
-  console.error(`✖ ${added.length} NEW cross-module deep import(s) — import through the module's index.ts or a shared lib instead:`);
+  console.error(
+    `✖ ${added.length} NEW cross-module deep import(s) — import through the module's index.ts or a shared lib instead:`,
+  );
   for (const v of added) console.error(`   ${v}`);
   process.exit(1);
 }
 const fixed = baseline.filter((v) => !found.has(v)).length;
-console.log(`✓ boundaries OK — ${found.size} legacy deep imports remaining${fixed ? ` (${fixed} fixed; run with --update to lock in the progress)` : ''}`);
+console.log(
+  `✓ boundaries OK — ${found.size} legacy deep imports remaining${fixed ? ` (${fixed} fixed; run with --update to lock in the progress)` : ''}`,
+);

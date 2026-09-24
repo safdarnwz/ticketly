@@ -24,17 +24,26 @@ export const DEFAULT_SUSPICIOUS_LOGIN_POLICY: SuspiciousLoginPolicy = {
   alertEmails: [],
 };
 
-export function normaliseSuspiciousLoginPolicy(stored: Partial<SuspiciousLoginPolicy> | null | undefined): SuspiciousLoginPolicy {
+export function normaliseSuspiciousLoginPolicy(
+  stored: Partial<SuspiciousLoginPolicy> | null | undefined,
+): SuspiciousLoginPolicy {
   return { ...DEFAULT_SUSPICIOUS_LOGIN_POLICY, ...(stored ?? {}) };
 }
 
 /** Alert exactly when the count CROSSES the threshold, not on every later failure. */
-export function shouldAlertOnFailures(policy: SuspiciousLoginPolicy, failuresInWindow: number): boolean {
+export function shouldAlertOnFailures(
+  policy: SuspiciousLoginPolicy,
+  failuresInWindow: number,
+): boolean {
   return policy.enabled && failuresInWindow === policy.failedAttemptsThreshold;
 }
 
 /** A first-ever login has no history to compare against — not suspicious. */
-export function shouldAlertOnNewIp(policy: SuspiciousLoginPolicy, ip: string | null | undefined, recentIps: string[]): boolean {
+export function shouldAlertOnNewIp(
+  policy: SuspiciousLoginPolicy,
+  ip: string | null | undefined,
+  recentIps: string[],
+): boolean {
   if (!policy.enabled || !policy.alertOnNewAdminIp || !ip || recentIps.length === 0) return false;
   return !recentIps.includes(ip);
 }

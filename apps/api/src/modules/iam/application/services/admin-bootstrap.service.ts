@@ -42,7 +42,11 @@ export class AdminBootstrapService implements OnApplicationBootstrap {
   }
 
   async onApplicationBootstrap(): Promise<void> {
-    const { superAdminEmail: email, superAdminPassword: password, superAdminName } = this.config.bootstrap;
+    const {
+      superAdminEmail: email,
+      superAdminPassword: password,
+      superAdminName,
+    } = this.config.bootstrap;
     if (!email || !password) return;
 
     await runWithContext(createContext({ actorType: 'system' }), async () => {
@@ -55,10 +59,17 @@ export class AdminBootstrapService implements OnApplicationBootstrap {
         } else {
           const hash = await this.hasher.hash(password);
           const admin = User.create(newId() as UserId, {
-            tenantId: null, kind: 'staff', fullName: superAdminName,
-            email, phone: null, passwordHash: hash, status: 'active',
+            tenantId: null,
+            kind: 'staff',
+            fullName: superAdminName,
+            email,
+            phone: null,
+            passwordHash: hash,
+            status: 'active',
           });
-          await this.uow.run({ name: 'bootstrap.superAdmin' }, async () => { await this.users.insert(admin); });
+          await this.uow.run({ name: 'bootstrap.superAdmin' }, async () => {
+            await this.users.insert(admin);
+          });
           userId = admin.id;
           this.log.info({ email }, 'Super admin user created from environment');
         }

@@ -42,7 +42,10 @@ export class TrackingController {
 
   @Public()
   @Get('token/:token')
-  @ApiOperation({ summary: "A passenger's live bus location by their signed, PNR-tied tracking link — sent with the e-ticket, no login required" })
+  @ApiOperation({
+    summary:
+      "A passenger's live bus location by their signed, PNR-tied tracking link — sent with the e-ticket, no login required",
+  })
   async liveByToken(@Param('token') token: string) {
     return this.tracking.getLiveLocationByToken(token);
   }

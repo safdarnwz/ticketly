@@ -22,20 +22,32 @@ export interface TestApp {
   asOperator(): TestApp;
   close(): Promise<void>;
   fixtures: {
-    originCityId: string; destCityId: string; journeyDate: string;
-    tripId: string; fromStopId: string; toStopId: string; bookingId: string;
+    originCityId: string;
+    destCityId: string;
+    journeyDate: string;
+    tripId: string;
+    fromStopId: string;
+    toStopId: string;
+    bookingId: string;
   };
 }
 
 export async function bootstrapTestApp(): Promise<TestApp> {
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter(), { logger: false });
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter(), {
+    logger: false,
+  });
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
 
   const fixtures = await seedFixtures(app);
   let token = fixtures.customerToken;
 
-  const call = async (method: string, path: string, body?: unknown, opts?: { idempotencyKey?: string }): Promise<HttpResult> => {
+  const call = async (
+    method: string,
+    path: string,
+    body?: unknown,
+    opts?: { idempotencyKey?: string },
+  ): Promise<HttpResult> => {
     const res = await app.inject({
       method: method as never,
       url: path,
@@ -52,7 +64,10 @@ export async function bootstrapTestApp(): Promise<TestApp> {
   const api: TestApp = {
     post: (p, b, o) => call('POST', p, b, o),
     get: (p) => call('GET', p),
-    asOperator: () => { token = fixtures.operatorToken; return api; },
+    asOperator: () => {
+      token = fixtures.operatorToken;
+      return api;
+    },
     close: () => app.close(),
     fixtures: fixtures.public,
   };

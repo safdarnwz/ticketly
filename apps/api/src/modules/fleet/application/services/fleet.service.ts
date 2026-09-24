@@ -20,9 +20,7 @@ import { VehicleRepository } from '../../infrastructure/persistence/vehicle.repo
  */
 @Injectable()
 export class FleetService {
-  constructor(
-    private readonly vehicles: VehicleRepository,
-  ) {}
+  constructor(private readonly vehicles: VehicleRepository) {}
 
   async compliance(vehicleId: VehicleId, today?: LocalDate): Promise<FleetComplianceResult> {
     await this.vehicles.getById(vehicleId); // 404 if not this tenant's

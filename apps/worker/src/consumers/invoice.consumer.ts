@@ -33,7 +33,10 @@ export class InvoiceConsumer implements OnModuleInit {
         // controller's manual path is for reissue/reference only) produced
         // documents missing one of the required fields on every invoice.
         const gst = await this.tenants.getGstDetails(event.tenantId);
-        const result = await this.invoices.issueForBooking(event.aggregateId as BookingId, gst?.gstin ?? undefined);
+        const result = await this.invoices.issueForBooking(
+          event.aggregateId as BookingId,
+          gst?.gstin ?? undefined,
+        );
         if (result) {
           try {
             // Best-effort — attaching/emailing the PDF must never undo an
@@ -41,7 +44,9 @@ export class InvoiceConsumer implements OnModuleInit {
             // customer doesn't get the PDF copy, not that the invoice
             // itself (which the ledger and any future audit need) fails.
             await this.invoices.emailInvoicePdf(event.aggregateId as BookingId);
-          } catch { /* logged inside emailInvoicePdf's own call chain via the mailer; swallow here */ }
+          } catch {
+            /* logged inside emailInvoicePdf's own call chain via the mailer; swallow here */
+          }
         }
       },
     });

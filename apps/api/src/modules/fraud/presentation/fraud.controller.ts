@@ -36,7 +36,11 @@ export class FraudController {
   @RequirePlatformAdmin()
   @ApiOperation({ summary: 'Score a booking/payment attempt for risk' })
   async assess(@Body(zodBody(AssessSchema)) dto: z.infer<typeof AssessSchema>) {
-    return this.fraud.assess({ signals: dto.signals, bookingId: dto.bookingId as BookingId | undefined, customerId: dto.customerId as UserId | undefined });
+    return this.fraud.assess({
+      signals: dto.signals,
+      bookingId: dto.bookingId as BookingId | undefined,
+      customerId: dto.customerId as UserId | undefined,
+    });
   }
 
   @Get('review-queue')

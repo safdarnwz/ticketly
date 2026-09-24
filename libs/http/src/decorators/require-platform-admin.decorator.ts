@@ -13,4 +13,5 @@ export const REQUIRE_PLATFORM_ADMIN_KEY = 'iam:platformAdmin';
  * Without this, a tenant `owner` (who legitimately holds `*` within their
  * own tenant) could reach a route meant only for Ticketly's own staff.
  */
-export const RequirePlatformAdmin = (): MethodDecorator & ClassDecorator => SetMetadata(REQUIRE_PLATFORM_ADMIN_KEY, true);
+export const RequirePlatformAdmin = (): MethodDecorator & ClassDecorator =>
+  SetMetadata(REQUIRE_PLATFORM_ADMIN_KEY, true);

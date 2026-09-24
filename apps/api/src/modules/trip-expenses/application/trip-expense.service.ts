@@ -4,7 +4,15 @@ import { UnitOfWork } from '@database';
 import { AppError, ErrorCode, getUserId, newId, requireTenantId, type TripId } from '@kernel';
 
 import { FileService } from '../../files/application/file.service';
-import { ExpenseRuleError, computePnl, sumPnl, validateExpense, type ExpenseCategory, type Pnl, type PnlInput } from '../domain/pnl';
+import {
+  ExpenseRuleError,
+  computePnl,
+  sumPnl,
+  validateExpense,
+  type ExpenseCategory,
+  type Pnl,
+  type PnlInput,
+} from '../domain/pnl';
 
 const MAX_REPORT_DAYS = 92;
 
@@ -53,8 +61,20 @@ SELECT t.id AS trip_id, t.route_id, t.vehicle_id, t.journey_date::text AS journe
  ORDER BY t.departs_at`;
 
 interface PnlRow {
-  trip_id: string; route_id: string; vehicle_id: string | null; journey_date: string; status: string; route_name: string; registration_no: string | null;
-  total_seats: number; sales: string; gst: string; commission: string; commission_gst: string; expenses: string; seats: string;
+  trip_id: string;
+  route_id: string;
+  vehicle_id: string | null;
+  journey_date: string;
+  status: string;
+  route_name: string;
+  registration_no: string | null;
+  total_seats: number;
+  sales: string;
+  gst: string;
+  commission: string;
+  commission_gst: string;
+  expenses: string;
+  seats: string;
 }
 
 export interface TripExpenseRow {
@@ -72,89 +92,206 @@ export interface TripExpenseRow {
 
 @Injectable()
 export class TripExpenseService {
-  constructor(private readonly uow: UnitOfWork, private readonly files: FileService) {}
+  constructor(
+    private readonly uow: UnitOfWork,
+    private readonly files: FileService,
+  ) {}
 
-  async add(tripId: TripId, input: { category: ExpenseCategory; amountMinor: number; note?: string; receiptFileId?: string }) {
+  async add(
+    tripId: TripId,
+    input: {
+      category: ExpenseCategory;
+      amountMinor: number;
+      note?: string;
+      receiptFileId?: string;
+    },
+  ) {
     const tenantId = requireTenantId();
     return this.uow.run({ name: 'expense.add', tenantId }, async (scope) => {
-      const trip = (await scope.client.query<{ status: string; departs_at: Date }>(`SELECT status::text AS status, departs_at FROM trips WHERE tenant_id = $1 AND id = $2`, [tenantId, tripId])).rows[0];
+      const trip = (
+        await scope.client.query<{ status: string; departs_at: Date }>(
+          `SELECT status::text AS status, departs_at FROM trips WHERE tenant_id = $1 AND id = $2`,
+          [tenantId, tripId],
+        )
+      ).rows[0];
       if (!trip) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Trip not found' });
       try {
         validateExpense({ ...input, tripStatus: trip.status, tripDepartsAt: trip.departs_at });
       } catch (e) {
-        if (e instanceof ExpenseRuleError) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: e.message });
+        if (e instanceof ExpenseRuleError)
+          throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: e.message });
         throw e;
       }
-      if (input.receiptFileId) await this.files.requireForPurpose(input.receiptFileId, 'expense_receipt');
+      if (input.receiptFileId)
+        await this.files.requireForPurpose(input.receiptFileId, 'expense_receipt');
       const id = newId();
       await scope.client.query(
         `INSERT INTO trip_expenses (id, tenant_id, trip_id, category, amount_minor, note, receipt_file_id, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [id, tenantId, tripId, input.category, input.amountMinor, input.note?.trim() || null, input.receiptFileId ?? null, getUserId() ?? null]);
+        [
+          id,
+          tenantId,
+          tripId,
+          input.category,
+          input.amountMinor,
+          input.note?.trim() || null,
+          input.receiptFileId ?? null,
+          getUserId() ?? null,
+        ],
+      );
       return { id };
     });
   }
 
   async uploadReceipt(tripId: TripId, bytes: Buffer, fileName?: string) {
-    const f = await this.files.upload({ purpose: 'expense_receipt', bytes, fileName, sub: ['trips', String(tripId), 'receipts'] });
+    const f = await this.files.upload({
+      purpose: 'expense_receipt',
+      bytes,
+      fileName,
+      sub: ['trips', String(tripId), 'receipts'],
+    });
     return { fileId: f.id, fileName: f.fileName };
   }
 
   async void(tripId: TripId, expenseId: string, reason: string) {
-    if ((reason?.trim().length ?? 0) < 5) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: 'Give a reason (at least 5 characters) for voiding' });
+    if ((reason?.trim().length ?? 0) < 5)
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+        message: 'Give a reason (at least 5 characters) for voiding',
+      });
     const tenantId = requireTenantId();
     return this.uow.run({ name: 'expense.void', tenantId }, async (scope) => {
       const res = await scope.client.query(
         `UPDATE trip_expenses SET voided_at = now(), void_reason = $4, voided_by = $5
           WHERE tenant_id = $1 AND trip_id = $2 AND id = $3 AND voided_at IS NULL RETURNING id`,
-        [tenantId, tripId, expenseId, reason.trim(), getUserId() ?? null]);
-      if (res.rowCount === 0) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Expense not found or already voided' });
+        [tenantId, tripId, expenseId, reason.trim(), getUserId() ?? null],
+      );
+      if (res.rowCount === 0)
+        throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, {
+          message: 'Expense not found or already voided',
+        });
       return { ok: true };
     });
   }
 
   async list(tripId: TripId, includeVoided = false): Promise<TripExpenseRow[]> {
-    return this.uow.run({ name: 'expense.list', tenantId: requireTenantId(), readOnly: true }, async (scope) => (await scope.client.query<TripExpenseRow>(
-      `SELECT x.id, x.category, x.amount_minor::bigint AS "amountMinor", x.note, x.receipt_file_id AS "receiptFileId", x.incurred_at AS "incurredAt",
+    return this.uow.run(
+      { name: 'expense.list', tenantId: requireTenantId(), readOnly: true },
+      async (scope) =>
+        (
+          await scope.client.query<TripExpenseRow>(
+            `SELECT x.id, x.category, x.amount_minor::bigint AS "amountMinor", x.note, x.receipt_file_id AS "receiptFileId", x.incurred_at AS "incurredAt",
               x.voided_at AS "voidedAt", x.void_reason AS "voidReason", u.full_name AS "createdBy"
          FROM trip_expenses x LEFT JOIN users u ON u.id = x.created_by
         WHERE x.tenant_id = $1 AND x.trip_id = $2 AND ($3::boolean OR x.voided_at IS NULL)
-        ORDER BY x.incurred_at DESC`, [requireTenantId(), tripId, includeVoided])).rows);
+        ORDER BY x.incurred_at DESC`,
+            [requireTenantId(), tripId, includeVoided],
+          )
+        ).rows,
+    );
   }
 
-  async tripPnl(tripId: TripId): Promise<Pnl & { tripId: string; routeName: string; registrationNo: string | null; journeyDate: string }> {
+  async tripPnl(
+    tripId: TripId,
+  ): Promise<
+    Pnl & { tripId: string; routeName: string; registrationNo: string | null; journeyDate: string }
+  > {
     const rows = await this.pnlRows({ tripId });
-    if (!rows.length) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Trip not found' });
+    if (!rows.length)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Trip not found' });
     const r = rows[0];
-    return { tripId: r.trip_id, routeName: r.route_name, registrationNo: r.registration_no, journeyDate: r.journey_date, ...computePnl(toInput(r)) };
+    return {
+      tripId: r.trip_id,
+      routeName: r.route_name,
+      registrationNo: r.registration_no,
+      journeyDate: r.journey_date,
+      ...computePnl(toInput(r)),
+    };
   }
 
   /** P&L over a period, grouped by trip, route or bus, plus the overall total. */
-  async report(input: { from: string; to: string; groupBy: 'trip' | 'route' | 'vehicle'; routeId?: string; vehicleId?: string }) {
+  async report(input: {
+    from: string;
+    to: string;
+    groupBy: 'trip' | 'route' | 'vehicle';
+    routeId?: string;
+    vehicleId?: string;
+  }) {
     const days = (Date.parse(input.to) - Date.parse(input.from)) / 86_400_000;
-    if (Number.isNaN(days) || days < 0) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: '"from" must be a date on or before "to"' });
-    if (days > MAX_REPORT_DAYS) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: `A report can cover at most ${MAX_REPORT_DAYS} days` });
-    const rows = await this.pnlRows({ from: input.from, to: input.to, routeId: input.routeId, vehicleId: input.vehicleId });
-    const key = (r: PnlRow) => (input.groupBy === 'trip' ? r.trip_id : input.groupBy === 'route' ? r.route_id : r.vehicle_id ?? 'unassigned');
-    const label = (r: PnlRow) => (input.groupBy === 'trip' ? `${r.route_name} · ${r.journey_date}` : input.groupBy === 'route' ? r.route_name : r.registration_no ?? 'No bus assigned');
+    if (Number.isNaN(days) || days < 0)
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+        message: '"from" must be a date on or before "to"',
+      });
+    if (days > MAX_REPORT_DAYS)
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+        message: `A report can cover at most ${MAX_REPORT_DAYS} days`,
+      });
+    const rows = await this.pnlRows({
+      from: input.from,
+      to: input.to,
+      routeId: input.routeId,
+      vehicleId: input.vehicleId,
+    });
+    const key = (r: PnlRow) =>
+      input.groupBy === 'trip'
+        ? r.trip_id
+        : input.groupBy === 'route'
+          ? r.route_id
+          : (r.vehicle_id ?? 'unassigned');
+    const label = (r: PnlRow) =>
+      input.groupBy === 'trip'
+        ? `${r.route_name} · ${r.journey_date}`
+        : input.groupBy === 'route'
+          ? r.route_name
+          : (r.registration_no ?? 'No bus assigned');
     const groups = new Map<string, { label: string; trips: number; rows: PnlInput[] }>();
     for (const r of rows) {
       const g = groups.get(key(r)) ?? { label: label(r), trips: 0, rows: [] };
-      g.trips += 1; g.rows.push(toInput(r)); groups.set(key(r), g);
+      g.trips += 1;
+      g.rows.push(toInput(r));
+      groups.set(key(r), g);
     }
-    const items = [...groups.entries()].map(([id, g]) => ({ id, label: g.label, trips: g.trips, ...sumPnl(g.rows) }))
+    const items = [...groups.entries()]
+      .map(([id, g]) => ({ id, label: g.label, trips: g.trips, ...sumPnl(g.rows) }))
       .sort((a, b) => a.profitMinor - b.profitMinor); // worst first: what needs attention
-    return { period: { from: input.from, to: input.to }, groupBy: input.groupBy, items, total: { trips: rows.length, ...sumPnl(rows.map(toInput)) } };
+    return {
+      period: { from: input.from, to: input.to },
+      groupBy: input.groupBy,
+      items,
+      total: { trips: rows.length, ...sumPnl(rows.map(toInput)) },
+    };
   }
 
-  private async pnlRows(f: { tripId?: string; from?: string; to?: string; routeId?: string; vehicleId?: string }): Promise<PnlRow[]> {
-    return this.uow.run({ name: 'expense.pnl', tenantId: requireTenantId(), readOnly: true }, async (scope) => (await scope.client.query<PnlRow>(PNL_SQL,
-      [requireTenantId(), f.tripId ?? null, f.from ?? null, f.to ?? null, f.routeId ?? null, f.vehicleId ?? null])).rows);
+  private async pnlRows(f: {
+    tripId?: string;
+    from?: string;
+    to?: string;
+    routeId?: string;
+    vehicleId?: string;
+  }): Promise<PnlRow[]> {
+    return this.uow.run(
+      { name: 'expense.pnl', tenantId: requireTenantId(), readOnly: true },
+      async (scope) =>
+        (
+          await scope.client.query<PnlRow>(PNL_SQL, [
+            requireTenantId(),
+            f.tripId ?? null,
+            f.from ?? null,
+            f.to ?? null,
+            f.routeId ?? null,
+            f.vehicleId ?? null,
+          ])
+        ).rows,
+    );
   }
 }
 
 function toInput(r: PnlRow): PnlInput {
   return {
-    salesMinor: Number(r.sales), gstMinor: Number(r.gst), commissionMinor: Number(r.commission), commissionGstMinor: Number(r.commission_gst),
-    expensesMinor: Number(r.expenses), seatsSold: Number(r.seats), seatsTotal: Number(r.total_seats),
+    salesMinor: Number(r.sales),
+    gstMinor: Number(r.gst),
+    commissionMinor: Number(r.commission),
+    commissionGstMinor: Number(r.commission_gst),
+    expensesMinor: Number(r.expenses),
+    seatsSold: Number(r.seats),
+    seatsTotal: Number(r.total_seats),
   };
 }

@@ -93,49 +93,49 @@ import { KycModule } from './modules/kyc/kyc.module';
 
     // ── feature modules ───────────────────────────────────────────────────
     TenancyModule, // Part 2 — operators, plans, provisioning
-    IamModule,     // Part 2 — auth, users, roles, sessions, api keys, audit
+    IamModule, // Part 2 — auth, users, roles, sessions, api keys, audit
     MasterDataModule, // Part 3 — geography, stops, seat layouts, vehicle types, routes
-    FleetModule,      // Part 4 — vehicles, documents, maintenance, crew, duty roster
+    FleetModule, // Part 4 — vehicles, documents, maintenance, crew, duty roster
     SchedulingModule, // Part 5 — services, trips, segment-wise inventory
-    PricingModule,    // Part 6 — fare plans, dynamic pricing, coupons, quotes
-    SearchModule,     // Part 6 — sub-10ms trip search
+    PricingModule, // Part 6 — fare plans, dynamic pricing, coupons, quotes
+    SearchModule, // Part 6 — sub-10ms trip search
     PromotionsModule, // Sponsored-listings ("Prio" badge) — super-admin rate card + operator purchase
-    BookingModule,    // Part 7 — hold/confirm/cancel, PNR, tickets, refunds
-    PaymentModule,    // Part 8 — payments, double-entry ledger, settlements
+    BookingModule, // Part 7 — hold/confirm/cancel, PNR, tickets, refunds
+    PaymentModule, // Part 8 — payments, double-entry ledger, settlements
     NotificationModule, // Part 9 — templates + delivery engine
-    TrackingModule,   // Part 9 — GPS ingestion, live position & ETA
-    CrewAppModule,    // Part 9 — manifest, boarding scan, trip start/stop
-    ReportingModule,  // Part 10 — materialized-view analytics & exports
+    TrackingModule, // Part 9 — GPS ingestion, live position & ETA
+    CrewAppModule, // Part 9 — manifest, boarding scan, trip start/stop
+    ReportingModule, // Part 10 — materialized-view analytics & exports
     DistributionModule, // Part 10 — OTA/channel-partner API
     AmendmentsModule, // Part 11 — reschedule, seat-change
-    AncillaryModule,  // Add-on services (insurance, meals, luggage) — loyalty points, referrals, and wallet were all removed from the product
+    AncillaryModule, // Add-on services (insurance, meals, luggage) — loyalty points, referrals, and wallet were all removed from the product
     DepartureControlModule, // Part 13 — trip chart + closeout reconciliation
-    RefundModule,     // Part 13 — refund lifecycle (source/alternate-account, gateway reconcile)
-    InvoiceModule,    // Part 13 — GST tax invoices + credit notes (gapless numbering)
+    RefundModule, // Part 13 — refund lifecycle (source/alternate-account, gateway reconcile)
+    InvoiceModule, // Part 13 — GST tax invoices + credit notes (gapless numbering)
     StorefrontModule, // Part 14 — filtered search, round-trip, connecting journeys
-    ReviewModule,     // Part 14 — verified-traveller reviews & ratings
-    SupportModule,    // Part 14 — support tickets + message thread
-    CmsModule,        // Part 14 — content pages, banners, promotional offers
-    FraudModule,      // Part 14 — booking risk scoring + review queue
-    TicketsModule,    // Part 15 — signed QR boarding tokens + printable e-ticket
-    RealtimeModule,   // Part 15 — live seat availability over SSE
-    I18nModule,       // Part 15 — translations + multi-currency conversion
-    PrivacyModule,    // Part 15 — DPDP consent + right-to-be-forgotten erasure
+    ReviewModule, // Part 14 — verified-traveller reviews & ratings
+    SupportModule, // Part 14 — support tickets + message thread
+    CmsModule, // Part 14 — content pages, banners, promotional offers
+    FraudModule, // Part 14 — booking risk scoring + review queue
+    TicketsModule, // Part 15 — signed QR boarding tokens + printable e-ticket
+    RealtimeModule, // Part 15 — live seat availability over SSE
+    I18nModule, // Part 15 — translations + multi-currency conversion
+    PrivacyModule, // Part 15 — DPDP consent + right-to-be-forgotten erasure
     AppearanceModule, // Global Settings → Appearance (per-tenant/role design system)
     OnboardingModule, // Operator onboarding (Become an Operator) + super-admin review
-    BranchesModule,   // multi-branch/counter locations
-    AgentsModule,     // B2B agent network (GDS distribution)
-    QuotasModule,     // seat allocations for agents / branches
+    BranchesModule, // multi-branch/counter locations
+    AgentsModule, // B2B agent network (GDS distribution)
+    QuotasModule, // seat allocations for agents / branches
     TripVehicleModule, // change the bus of a trip (re-seating)
     TripExpensesModule, // trip expenses + P&L
-    DemandModule,     // waitlist + occupancy forecast
-    GdsModule,        // platform GDS: OTAs / multi-operator agents
-    IncidentsModule,  // incidents, SOS, lost & found, shift notes, dispatch reports
-    CrmModule,        // customer search, profile, blacklist, preferences
+    DemandModule, // waitlist + occupancy forecast
+    GdsModule, // platform GDS: OTAs / multi-operator agents
+    IncidentsModule, // incidents, SOS, lost & found, shift notes, dispatch reports
+    CrmModule, // customer search, profile, blacklist, preferences
     AnnouncementsModule, // platform-wide broadcast banners
-    LegalModule,      // Terms/Privacy/Refund-Policy/Grievance-Officer pages (Consumer Protection E-Commerce Rules 2020, IT Rules 2021)
+    LegalModule, // Terms/Privacy/Refund-Policy/Grievance-Officer pages (Consumer Protection E-Commerce Rules 2020, IT Rules 2021)
     ConnectionsModule, // cross-operator connecting-journey search + booking (e.g. Delhi -> Kolkata -> Bhubaneswar)
-    KycModule,        // PAN format-check + DigiLocker document verification for operator onboarding
+    KycModule, // PAN format-check + DigiLocker document verification for operator onboarding
   ],
 })
 export class AppModule {}

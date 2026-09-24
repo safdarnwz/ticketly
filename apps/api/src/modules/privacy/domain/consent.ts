@@ -18,10 +18,10 @@ import { DomainError, ErrorCode } from '@kernel';
  */
 
 export type ConsentPurpose =
-  | 'transactional'   // necessary: booking, ticketing, payment, refunds
-  | 'marketing'       // promotional email/SMS/push
+  | 'transactional' // necessary: booking, ticketing, payment, refunds
+  | 'marketing' // promotional email/SMS/push
   | 'personalization' // recommendations, saved preferences
-  | 'analytics'       // product analytics
+  | 'analytics' // product analytics
   | 'third_party_share';
 
 /** Purposes that are a legitimate use of the service and need no opt-in. */
@@ -57,7 +57,10 @@ export function isProcessingAllowed(purpose: ConsentPurpose, events: ConsentEven
  */
 export function recordConsent(events: ConsentEvent[], change: ConsentEvent): ConsentEvent[] {
   if (NECESSARY.has(change.purpose) && !change.granted) {
-    throw new DomainError(ErrorCode.COMMON_VALIDATION, `'${change.purpose}' is a necessary purpose and cannot be withdrawn`);
+    throw new DomainError(
+      ErrorCode.COMMON_VALIDATION,
+      `'${change.purpose}' is a necessary purpose and cannot be withdrawn`,
+    );
   }
   if (!Number.isFinite(change.atMs) || change.atMs <= 0) {
     throw new DomainError(ErrorCode.COMMON_VALIDATION, 'consent event needs a valid timestamp');

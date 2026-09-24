@@ -37,7 +37,11 @@ export interface UserProps {
  * aggregate means no code path can forget to apply it.
  */
 export class User extends AggregateRoot<UserId> {
-  private constructor(id: UserId, private props: UserProps, version: number) {
+  private constructor(
+    id: UserId,
+    private props: UserProps,
+    version: number,
+  ) {
     super(id);
     this._version = version;
   }
@@ -46,15 +50,18 @@ export class User extends AggregateRoot<UserId> {
     return new User(id, props, version);
   }
 
-  static create(id: UserId, input: {
-    tenantId: TenantId | null;
-    kind: UserKind;
-    fullName: string;
-    email?: string | null;
-    phone?: string | null;
-    passwordHash?: string | null;
-    status?: UserStatus;
-  }): User {
+  static create(
+    id: UserId,
+    input: {
+      tenantId: TenantId | null;
+      kind: UserKind;
+      fullName: string;
+      email?: string | null;
+      phone?: string | null;
+      passwordHash?: string | null;
+      status?: UserStatus;
+    },
+  ): User {
     const user = new User(
       id,
       {
@@ -112,7 +119,10 @@ export class User extends AggregateRoot<UserId> {
       throw new DomainError(ErrorCode.AUTH_ACCOUNT_LOCKED, 'This account is disabled');
     }
     if (this.props.status === 'locked' && this.props.lockedUntil && this.props.lockedUntil > now) {
-      throw new DomainError(ErrorCode.AUTH_ACCOUNT_LOCKED, 'Account is temporarily locked; try again later');
+      throw new DomainError(
+        ErrorCode.AUTH_ACCOUNT_LOCKED,
+        'Account is temporarily locked; try again later',
+      );
     }
     // A lock that has expired auto-unlocks on the next attempt.
     if (this.props.status === 'locked' && this.props.lockedUntil && this.props.lockedUntil <= now) {
@@ -125,7 +135,13 @@ export class User extends AggregateRoot<UserId> {
   setPassword(hash: string): void {
     this.props.passwordHash = hash;
     this.record(
-      createEvent({ type: 'user.password_changed', aggregateType: 'user', aggregateId: this.id, tenantId: this.props.tenantId ?? undefined, payload: {} }),
+      createEvent({
+        type: 'user.password_changed',
+        aggregateType: 'user',
+        aggregateId: this.id,
+        tenantId: this.props.tenantId ?? undefined,
+        payload: {},
+      }),
     );
   }
 
@@ -142,7 +158,9 @@ export class User extends AggregateRoot<UserId> {
     this.props.failedLogins = 0;
     this.props.lockedUntil = null;
   }
-  updateProfile(patch: Partial<Pick<UserProps, 'fullName' | 'email' | 'phone' | 'metadata'>>): void {
+  updateProfile(
+    patch: Partial<Pick<UserProps, 'fullName' | 'email' | 'phone' | 'metadata'>>,
+  ): void {
     Object.assign(this.props, patch);
   }
 

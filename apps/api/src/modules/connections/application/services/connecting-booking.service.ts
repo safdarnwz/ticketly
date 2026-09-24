@@ -9,8 +9,18 @@ import { PaymentService } from '../../../payment/application/services/payment.se
 import { TicketService } from '../../../tickets/application/services/ticket.service';
 
 export interface HoldConnectionInput {
-  leg1: { tenantId: string; quoteId: string; seatNumbers: string[]; passengers: { seatNumber: string; fullName: string; age?: number; gender?: string }[] };
-  leg2: { tenantId: string; quoteId: string; seatNumbers: string[]; passengers: { seatNumber: string; fullName: string; age?: number; gender?: string }[] };
+  leg1: {
+    tenantId: string;
+    quoteId: string;
+    seatNumbers: string[];
+    passengers: { seatNumber: string; fullName: string; age?: number; gender?: string }[];
+  };
+  leg2: {
+    tenantId: string;
+    quoteId: string;
+    seatNumbers: string[];
+    passengers: { seatNumber: string; fullName: string; age?: number; gender?: string }[];
+  };
   contactPhone: string;
   contactEmail?: string;
   customerId?: string;
@@ -58,7 +68,9 @@ export class ConnectingBookingService {
       // travelling together should book the SAME number of seats on both
       // legs — a booking with 3 seats on leg1 and 1 on leg2 is almost
       // certainly a mistake, not an intentional split journey.
-      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: 'Both legs of a connecting journey must have the same number of seats' });
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+        message: 'Both legs of a connecting journey must have the same number of seats',
+      });
     }
 
     // Leg1: hold within ITS tenant's own bound context. BookingService is
@@ -66,11 +78,16 @@ export class ConnectingBookingService {
     // the ambient tenant via requireTenantId() internally, which is what
     // runInNewContext binds here; the same instance is reused for leg2
     // below under a DIFFERENT bound tenant.
-    const leg1Hold = await runInNewContext({ tenantId: input.leg1.tenantId as TenantId, actorType: 'system' }, () =>
-      this.bookings.hold({
-        quoteId: input.leg1.quoteId, seatNumbers: input.leg1.seatNumbers, passengers: input.leg1.passengers,
-        contactPhone: input.contactPhone, contactEmail: input.contactEmail,
-      }),
+    const leg1Hold = await runInNewContext(
+      { tenantId: input.leg1.tenantId as TenantId, actorType: 'system' },
+      () =>
+        this.bookings.hold({
+          quoteId: input.leg1.quoteId,
+          seatNumbers: input.leg1.seatNumbers,
+          passengers: input.leg1.passengers,
+          contactPhone: input.contactPhone,
+          contactEmail: input.contactEmail,
+        }),
     );
 
     // Leg2: hold within ITS OWN (possibly different) tenant's context. If
@@ -80,17 +97,29 @@ export class ConnectingBookingService {
     // a clean "leg 2 unavailable" error, not a mystery held booking.
     let leg2Hold: { bookingId: string; pnr: string; holdExpiresAt: string; totalMinor: number };
     try {
-      leg2Hold = await runInNewContext({ tenantId: input.leg2.tenantId as TenantId, actorType: 'system' }, () =>
-        this.bookings.hold({
-          quoteId: input.leg2.quoteId, seatNumbers: input.leg2.seatNumbers, passengers: input.leg2.passengers,
-          contactPhone: input.contactPhone, contactEmail: input.contactEmail,
-        }),
+      leg2Hold = await runInNewContext(
+        { tenantId: input.leg2.tenantId as TenantId, actorType: 'system' },
+        () =>
+          this.bookings.hold({
+            quoteId: input.leg2.quoteId,
+            seatNumbers: input.leg2.seatNumbers,
+            passengers: input.leg2.passengers,
+            contactPhone: input.contactPhone,
+            contactEmail: input.contactEmail,
+          }),
       );
     } catch (err) {
-      await runInNewContext({ tenantId: input.leg1.tenantId as TenantId, actorType: 'system' }, () =>
-        this.bookings.cancel(leg1Hold.bookingId as never, 'connecting-journey: leg 2 unavailable').catch(() => undefined),
+      await runInNewContext(
+        { tenantId: input.leg1.tenantId as TenantId, actorType: 'system' },
+        () =>
+          this.bookings
+            .cancel(leg1Hold.bookingId as never, 'connecting-journey: leg 2 unavailable')
+            .catch(() => undefined),
       );
-      throw new AppError(ErrorCode.COMMON_CONFLICT, 409, { message: 'The second leg of this connection is no longer available — please search again', cause: err as Error });
+      throw new AppError(ErrorCode.COMMON_CONFLICT, 409, {
+        message: 'The second leg of this connection is no longer available — please search again',
+        cause: err as Error,
+      });
     }
 
     // The link record itself is platform-level (no tenant context needed) —
@@ -103,8 +132,19 @@ export class ConnectingBookingService {
          VALUES ($1,$2,$3,$4,$5,$6,
                  (SELECT dest_city_id FROM routes WHERE id = (SELECT route_id FROM bookings WHERE tenant_id = $3 AND id = $4)),
                  $7)`,
-        [connectionId, input.customerId ?? null, input.leg1.tenantId, leg1Hold.bookingId, input.leg2.tenantId, leg2Hold.bookingId,
-         Math.round((new Date(leg2Hold.holdExpiresAt).getTime() - new Date(leg1Hold.holdExpiresAt).getTime()) / 60_000)],
+        [
+          connectionId,
+          input.customerId ?? null,
+          input.leg1.tenantId,
+          leg1Hold.bookingId,
+          input.leg2.tenantId,
+          leg2Hold.bookingId,
+          Math.round(
+            (new Date(leg2Hold.holdExpiresAt).getTime() -
+              new Date(leg1Hold.holdExpiresAt).getTime()) /
+              60_000,
+          ),
+        ],
       );
     });
 
@@ -121,7 +161,9 @@ export class ConnectingBookingService {
    * leg independently — cancelling does not force one operator's refund
    * percentage onto the other's booking.
    */
-  async cancelConnection(connectionId: string): Promise<{ leg1RefundMinor: number; leg2RefundMinor: number }> {
+  async cancelConnection(
+    connectionId: string,
+  ): Promise<{ leg1RefundMinor: number; leg2RefundMinor: number }> {
     const link = await this.loadLink(connectionId);
 
     let leg1Refund = { refundMinor: 0, refundPct: 0 };
@@ -130,37 +172,78 @@ export class ConnectingBookingService {
     let leg2Failed = false;
 
     try {
-      leg1Refund = await runInNewContext({ tenantId: link.leg1_tenant_id as TenantId, actorType: 'system' }, () =>
-        this.bookings.cancel(link.leg1_booking_id as never, 'connecting-journey cancelled by customer'));
-    } catch { leg1Failed = true; }
+      leg1Refund = await runInNewContext(
+        { tenantId: link.leg1_tenant_id as TenantId, actorType: 'system' },
+        () =>
+          this.bookings.cancel(
+            link.leg1_booking_id as never,
+            'connecting-journey cancelled by customer',
+          ),
+      );
+    } catch {
+      leg1Failed = true;
+    }
 
     try {
-      leg2Refund = await runInNewContext({ tenantId: link.leg2_tenant_id as TenantId, actorType: 'system' }, () =>
-        this.bookings.cancel(link.leg2_booking_id as never, 'connecting-journey cancelled by customer'));
-    } catch { leg2Failed = true; }
+      leg2Refund = await runInNewContext(
+        { tenantId: link.leg2_tenant_id as TenantId, actorType: 'system' },
+        () =>
+          this.bookings.cancel(
+            link.leg2_booking_id as never,
+            'connecting-journey cancelled by customer',
+          ),
+      );
+    } catch {
+      leg2Failed = true;
+    }
 
     // Best-effort status: reflects what ACTUALLY got cancelled, not what
     // was requested — if leg1 was already cancelled/departed and only
     // leg2 succeeds here, the link should say so accurately rather than
     // claiming a clean "both_cancelled" that didn't really happen.
-    const status = leg1Failed && leg2Failed ? 'active' : leg1Failed ? 'leg2_cancelled' : leg2Failed ? 'leg1_cancelled' : 'both_cancelled';
+    const status =
+      leg1Failed && leg2Failed
+        ? 'active'
+        : leg1Failed
+          ? 'leg2_cancelled'
+          : leg2Failed
+            ? 'leg1_cancelled'
+            : 'both_cancelled';
     await this.uow.run({ name: 'connections.updateStatus', bypassRls: true }, async (scope) => {
-      await scope.client.query(`UPDATE journey_connections SET status = $2, updated_at = now() WHERE id = $1`, [connectionId, status]);
+      await scope.client.query(
+        `UPDATE journey_connections SET status = $2, updated_at = now() WHERE id = $1`,
+        [connectionId, status],
+      );
     });
 
     return { leg1RefundMinor: leg1Refund.refundMinor, leg2RefundMinor: leg2Refund.refundMinor };
   }
 
   private async loadLink(connectionId: string): Promise<{
-    leg1_tenant_id: string; leg1_booking_id: string; leg2_tenant_id: string; leg2_booking_id: string; status: string;
+    leg1_tenant_id: string;
+    leg1_booking_id: string;
+    leg2_tenant_id: string;
+    leg2_booking_id: string;
+    status: string;
   }> {
-    const link = await this.uow.run({ name: 'connections.load', bypassRls: true }, async (scope) => {
-      const row = await scope.client.query<{
-        leg1_tenant_id: string; leg1_booking_id: string; leg2_tenant_id: string; leg2_booking_id: string; status: string;
-      }>(`SELECT leg1_tenant_id, leg1_booking_id, leg2_tenant_id, leg2_booking_id, status FROM journey_connections WHERE id = $1`, [connectionId]);
-      return row.rows[0] ?? null;
-    });
-    if (!link) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Connection not found' });
+    const link = await this.uow.run(
+      { name: 'connections.load', bypassRls: true },
+      async (scope) => {
+        const row = await scope.client.query<{
+          leg1_tenant_id: string;
+          leg1_booking_id: string;
+          leg2_tenant_id: string;
+          leg2_booking_id: string;
+          status: string;
+        }>(
+          `SELECT leg1_tenant_id, leg1_booking_id, leg2_tenant_id, leg2_booking_id, status FROM journey_connections WHERE id = $1`,
+          [connectionId],
+        );
+        return row.rows[0] ?? null;
+      },
+    );
+    if (!link)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Connection not found' });
     return link;
   }
 
@@ -188,51 +271,79 @@ export class ConnectingBookingService {
    *    confirm call) -> short-circuits to returning the existing tickets
    *    rather than attempting to charge an already-paid booking again.
    */
-  async confirmConnection(connectionId: string, leg1Instrument: unknown, leg2Instrument: unknown): Promise<{
+  async confirmConnection(
+    connectionId: string,
+    leg1Instrument: unknown,
+    leg2Instrument: unknown,
+  ): Promise<{
     leg1: { status: string; pnr?: string; ticketHtmlUrl?: string };
     leg2: { status: string; pnr?: string; ticketHtmlUrl?: string; error?: string };
   }> {
     const link = await this.loadLink(connectionId);
 
-    const leg1Booking = await runInNewContext({ tenantId: link.leg1_tenant_id as TenantId, actorType: 'system' }, () =>
-      this.bookingRepo.findForUpdate(link.leg1_booking_id as never));
-    if (!leg1Booking) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Leg 1 booking not found' });
+    const leg1Booking = await runInNewContext(
+      { tenantId: link.leg1_tenant_id as TenantId, actorType: 'system' },
+      () => this.bookingRepo.findForUpdate(link.leg1_booking_id as never),
+    );
+    if (!leg1Booking)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Leg 1 booking not found' });
 
     if (leg1Booking.status === 'held') {
-      await runInNewContext({ tenantId: link.leg1_tenant_id as TenantId, actorType: 'system' }, () =>
-        this.payments.chargeTest(link.leg1_booking_id as never, leg1Instrument as never));
+      await runInNewContext(
+        { tenantId: link.leg1_tenant_id as TenantId, actorType: 'system' },
+        () => this.payments.chargeTest(link.leg1_booking_id as never, leg1Instrument as never),
+      );
       // leg1 succeeding is the ONLY thing that must happen before leg2 is
       // even attempted — a connecting journey where leg1 couldn't be paid
       // for has no reason to charge leg2 at all.
     } else if (leg1Booking.status !== 'confirmed') {
-      throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, { message: `Leg 1 is ${leg1Booking.status} and cannot be paid for` });
+      throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
+        message: `Leg 1 is ${leg1Booking.status} and cannot be paid for`,
+      });
     }
 
-    const leg2Booking = await runInNewContext({ tenantId: link.leg2_tenant_id as TenantId, actorType: 'system' }, () =>
-      this.bookingRepo.findForUpdate(link.leg2_booking_id as never));
-    if (!leg2Booking) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Leg 2 booking not found' });
+    const leg2Booking = await runInNewContext(
+      { tenantId: link.leg2_tenant_id as TenantId, actorType: 'system' },
+      () => this.bookingRepo.findForUpdate(link.leg2_booking_id as never),
+    );
+    if (!leg2Booking)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Leg 2 booking not found' });
 
     let leg2Result: { status: string; pnr?: string; ticketHtmlUrl?: string; error?: string };
     if (leg2Booking.status === 'confirmed') {
       leg2Result = { status: 'confirmed', pnr: leg2Booking.pnr };
     } else if (leg2Booking.status !== 'held') {
-      leg2Result = { status: leg2Booking.status, error: `Leg 2 is ${leg2Booking.status} — it can no longer be paid for. Leg 1 remains confirmed; contact support about leg 2.` };
+      leg2Result = {
+        status: leg2Booking.status,
+        error: `Leg 2 is ${leg2Booking.status} — it can no longer be paid for. Leg 1 remains confirmed; contact support about leg 2.`,
+      };
     } else {
       try {
-        await runInNewContext({ tenantId: link.leg2_tenant_id as TenantId, actorType: 'system' }, () =>
-          this.payments.chargeTest(link.leg2_booking_id as never, leg2Instrument as never));
+        await runInNewContext(
+          { tenantId: link.leg2_tenant_id as TenantId, actorType: 'system' },
+          () => this.payments.chargeTest(link.leg2_booking_id as never, leg2Instrument as never),
+        );
         leg2Result = { status: 'confirmed', pnr: leg2Booking.pnr };
       } catch (err) {
-        leg2Result = { status: 'payment_failed', error: (err as Error).message ?? 'Leg 2 payment failed. Leg 1 is confirmed — you can retry leg 2 separately.' };
+        leg2Result = {
+          status: 'payment_failed',
+          error:
+            (err as Error).message ??
+            'Leg 2 payment failed. Leg 1 is confirmed — you can retry leg 2 separately.',
+        };
       }
     }
 
     await this.uow.run({ name: 'connections.markConfirmed', bypassRls: true }, async (scope) => {
-      await scope.client.query(`UPDATE journey_connections SET updated_at = now() WHERE id = $1`, [connectionId]);
+      await scope.client.query(`UPDATE journey_connections SET updated_at = now() WHERE id = $1`, [
+        connectionId,
+      ]);
     });
 
-    const leg1Ticket = await runInNewContext({ tenantId: link.leg1_tenant_id as TenantId, actorType: 'system' }, () =>
-      this.tickets.issueForBooking(link.leg1_booking_id as never).catch(() => null));
+    const leg1Ticket = await runInNewContext(
+      { tenantId: link.leg1_tenant_id as TenantId, actorType: 'system' },
+      () => this.tickets.issueForBooking(link.leg1_booking_id as never).catch(() => null),
+    );
 
     return {
       leg1: { status: 'confirmed', pnr: leg1Ticket?.pnr },
@@ -242,22 +353,41 @@ export class ConnectingBookingService {
 
   /** Both legs' confirmed status + PNRs — the "here are your two tickets" view once payment for both has gone through. */
   async getConnectionDetails(connectionId: string): Promise<{
-    connectionId: string; status: string;
+    connectionId: string;
+    status: string;
     leg1: { bookingId: string; tenantId: string; status: string; pnr: string };
     leg2: { bookingId: string; tenantId: string; status: string; pnr: string };
   }> {
     const link = await this.loadLink(connectionId);
 
-    const leg1 = await runInNewContext({ tenantId: link.leg1_tenant_id as TenantId, actorType: 'system' }, () =>
-      this.bookingRepo.findForUpdate(link.leg1_booking_id as never));
-    const leg2 = await runInNewContext({ tenantId: link.leg2_tenant_id as TenantId, actorType: 'system' }, () =>
-      this.bookingRepo.findForUpdate(link.leg2_booking_id as never));
-    if (!leg1 || !leg2) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'One or both legs of this connection could not be found' });
+    const leg1 = await runInNewContext(
+      { tenantId: link.leg1_tenant_id as TenantId, actorType: 'system' },
+      () => this.bookingRepo.findForUpdate(link.leg1_booking_id as never),
+    );
+    const leg2 = await runInNewContext(
+      { tenantId: link.leg2_tenant_id as TenantId, actorType: 'system' },
+      () => this.bookingRepo.findForUpdate(link.leg2_booking_id as never),
+    );
+    if (!leg1 || !leg2)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, {
+        message: 'One or both legs of this connection could not be found',
+      });
 
     return {
-      connectionId, status: link.status,
-      leg1: { bookingId: link.leg1_booking_id, tenantId: link.leg1_tenant_id, status: leg1.status, pnr: leg1.pnr },
-      leg2: { bookingId: link.leg2_booking_id, tenantId: link.leg2_tenant_id, status: leg2.status, pnr: leg2.pnr },
+      connectionId,
+      status: link.status,
+      leg1: {
+        bookingId: link.leg1_booking_id,
+        tenantId: link.leg1_tenant_id,
+        status: leg1.status,
+        pnr: leg1.pnr,
+      },
+      leg2: {
+        bookingId: link.leg2_booking_id,
+        tenantId: link.leg2_tenant_id,
+        status: leg2.status,
+        pnr: leg2.pnr,
+      },
     };
   }
 }

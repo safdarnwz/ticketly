@@ -18,7 +18,15 @@ import { TicketController } from './presentation/ticket.controller';
  * the signing key is derived from the platform secret via @security.
  */
 @Module({
-  imports: [ConfigModule, SecurityModule, BookingModule, SchedulingModule, MasterDataModule, TenancyModule, TrackingModule],
+  imports: [
+    ConfigModule,
+    SecurityModule,
+    BookingModule,
+    SchedulingModule,
+    MasterDataModule,
+    TenancyModule,
+    TrackingModule,
+  ],
   controllers: [TicketController],
   providers: [TicketService],
   exports: [TicketService],

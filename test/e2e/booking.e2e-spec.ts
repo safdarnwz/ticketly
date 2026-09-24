@@ -37,16 +37,23 @@ describe('booking flow (e2e)', () => {
     });
     expect(quote.status).toBe(200);
 
-    const hold = await app.post('/v1/bookings/hold', {
-      quoteId: quote.body.quoteId,
-      seatNumbers: ['A1'],
-      passengers: [{ seatNumber: 'A1', fullName: 'E2E Traveller', age: 30 }],
-    }, { idempotencyKey: 'e2e-hold-1' });
+    const hold = await app.post(
+      '/v1/bookings/hold',
+      {
+        quoteId: quote.body.quoteId,
+        seatNumbers: ['A1'],
+        passengers: [{ seatNumber: 'A1', fullName: 'E2E Traveller', age: 30 }],
+      },
+      { idempotencyKey: 'e2e-hold-1' },
+    );
     expect(hold.status).toBe(201);
     expect(hold.body.pnr).toBeDefined();
 
-    const confirm = await app.post(`/v1/bookings/${hold.body.bookingId}/confirm`,
-      { paidMinor: hold.body.totalMinor, reference: 'e2e-pay-1' }, { idempotencyKey: 'e2e-confirm-1' });
+    const confirm = await app.post(
+      `/v1/bookings/${hold.body.bookingId}/confirm`,
+      { paidMinor: hold.body.totalMinor, reference: 'e2e-pay-1' },
+      { idempotencyKey: 'e2e-confirm-1' },
+    );
     expect(confirm.status).toBe(200);
 
     const tickets = await app.get(`/v1/bookings/${hold.body.bookingId}/tickets`);
@@ -54,25 +61,39 @@ describe('booking flow (e2e)', () => {
     expect(tickets.body.tickets[0].boardingToken).toContain('.');
 
     // The gate verifies the signed token.
-    const verify = await app.post('/v1/tickets/verify', { token: tickets.body.tickets[0].boardingToken });
+    const verify = await app.post('/v1/tickets/verify', {
+      token: tickets.body.tickets[0].boardingToken,
+    });
     expect(verify.body.valid).toBe(true);
   });
 
   it('a second hold on the same seat/segment is refused (anti-double-sell)', async () => {
     const quote = await app.post('/v1/pricing/quote', {
-      tripId: app.fixtures.tripId, seatNumbers: ['A2'],
-      fromStopId: app.fixtures.fromStopId, toStopId: app.fixtures.toStopId,
+      tripId: app.fixtures.tripId,
+      seatNumbers: ['A2'],
+      fromStopId: app.fixtures.fromStopId,
+      toStopId: app.fixtures.toStopId,
     });
-    const first = await app.post('/v1/bookings/hold', {
-      quoteId: quote.body.quoteId, seatNumbers: ['A2'],
-      passengers: [{ seatNumber: 'A2', fullName: 'First' }],
-    }, { idempotencyKey: 'e2e-a2-1' });
+    const first = await app.post(
+      '/v1/bookings/hold',
+      {
+        quoteId: quote.body.quoteId,
+        seatNumbers: ['A2'],
+        passengers: [{ seatNumber: 'A2', fullName: 'First' }],
+      },
+      { idempotencyKey: 'e2e-a2-1' },
+    );
     expect(first.status).toBe(201);
 
-    const second = await app.post('/v1/bookings/hold', {
-      quoteId: quote.body.quoteId, seatNumbers: ['A2'],
-      passengers: [{ seatNumber: 'A2', fullName: 'Second' }],
-    }, { idempotencyKey: 'e2e-a2-2' });
+    const second = await app.post(
+      '/v1/bookings/hold',
+      {
+        quoteId: quote.body.quoteId,
+        seatNumbers: ['A2'],
+        passengers: [{ seatNumber: 'A2', fullName: 'Second' }],
+      },
+      { idempotencyKey: 'e2e-a2-2' },
+    );
     expect(second.status).toBe(422); // INVENTORY.SEAT_UNAVAILABLE
   });
 });

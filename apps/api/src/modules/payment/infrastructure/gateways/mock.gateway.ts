@@ -6,7 +6,11 @@ import { AppConfig } from '@config';
 
 import { PaymentGateway } from './gateway.interface';
 import type {
-  CreateIntentRequest, CreateIntentResult, RefundRequest, RefundResult, WebhookVerification,
+  CreateIntentRequest,
+  CreateIntentResult,
+  RefundRequest,
+  RefundResult,
+  WebhookVerification,
 } from './gateway.interface';
 
 /**
@@ -38,7 +42,12 @@ export class MockGateway extends PaymentGateway {
     const gatewayOrderId = `mock_order_${req.intentId}`;
     return {
       gatewayOrderId,
-      clientPayload: { orderId: gatewayOrderId, amount: req.amountMinor, currency: req.currency, key: 'mock_key' },
+      clientPayload: {
+        orderId: gatewayOrderId,
+        amount: req.amountMinor,
+        currency: req.currency,
+        key: 'mock_key',
+      },
       status: 'created',
     };
   }
@@ -56,7 +65,12 @@ export class MockGateway extends PaymentGateway {
 
     try {
       const payload = JSON.parse(rawBody.toString('utf8')) as {
-        type: string; order_id: string; payment_id: string; intent_id?: string; amount: number; status: string;
+        type: string;
+        order_id: string;
+        payment_id: string;
+        intent_id?: string;
+        amount: number;
+        status: string;
       };
       return {
         valid: true,

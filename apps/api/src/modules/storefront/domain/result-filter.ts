@@ -17,8 +17,8 @@ import { DomainError, ErrorCode } from '@kernel';
  */
 
 export interface FilterableTrip {
-  departsAt: string;   // ISO 8601
-  arrivesAt: string;   // ISO 8601
+  departsAt: string; // ISO 8601
+  arrivesAt: string; // ISO 8601
   durationMin: number;
   fromPriceMinor: number;
   availableSeats: number;
@@ -54,15 +54,20 @@ function minuteOfDay(iso: string): number | null {
 
 function parseHhMm(hhmm: string): number {
   const m = /^(\d{2}):(\d{2})$/.exec(hhmm);
-  if (!m) throw new DomainError(ErrorCode.COMMON_VALIDATION, `Invalid time '${hhmm}', expected HH:mm`);
-  const h = Number(m[1]); const min = Number(m[2]);
-  if (h > 23 || min > 59) throw new DomainError(ErrorCode.COMMON_VALIDATION, `Invalid time '${hhmm}'`);
+  if (!m)
+    throw new DomainError(ErrorCode.COMMON_VALIDATION, `Invalid time '${hhmm}', expected HH:mm`);
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59)
+    throw new DomainError(ErrorCode.COMMON_VALIDATION, `Invalid time '${hhmm}'`);
   return h * 60 + min;
 }
 
 export function matchesFilter<T extends FilterableTrip>(trip: T, filter: TripFilter): boolean {
-  if (filter.minPriceMinor !== undefined && trip.fromPriceMinor < filter.minPriceMinor) return false;
-  if (filter.maxPriceMinor !== undefined && trip.fromPriceMinor > filter.maxPriceMinor) return false;
+  if (filter.minPriceMinor !== undefined && trip.fromPriceMinor < filter.minPriceMinor)
+    return false;
+  if (filter.maxPriceMinor !== undefined && trip.fromPriceMinor > filter.maxPriceMinor)
+    return false;
   if (filter.minSeats !== undefined && trip.availableSeats < filter.minSeats) return false;
   if (filter.minRating !== undefined && (trip.operatorRating ?? 0) < filter.minRating) return false;
 
@@ -86,10 +91,14 @@ export function matchesFilter<T extends FilterableTrip>(trip: T, filter: TripFil
 
 function sortValue(trip: FilterableTrip, key: SortKey): number {
   switch (key) {
-    case 'price': return trip.fromPriceMinor;
-    case 'departure': return minuteOfDay(trip.departsAt) ?? Number.MAX_SAFE_INTEGER;
-    case 'duration': return trip.durationMin;
-    case 'rating': return trip.operatorRating ?? 0;
+    case 'price':
+      return trip.fromPriceMinor;
+    case 'departure':
+      return minuteOfDay(trip.departsAt) ?? Number.MAX_SAFE_INTEGER;
+    case 'duration':
+      return trip.durationMin;
+    case 'rating':
+      return trip.operatorRating ?? 0;
   }
 }
 

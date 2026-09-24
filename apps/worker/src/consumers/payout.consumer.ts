@@ -36,16 +36,29 @@ export class PayoutConsumer implements OnModuleInit {
     return {
       eventType: 'settlement.finalised',
       handle: async (event: DomainEvent) => {
-        const payload = event.payload as { tenantId: string; settlementId: string; amountMinor: number; currency: string };
+        const payload = event.payload as {
+          tenantId: string;
+          settlementId: string;
+          amountMinor: number;
+          currency: string;
+        };
         try {
-          await this.payouts.createFromSettlement(payload.tenantId, payload.settlementId, payload.amountMinor, payload.currency);
+          await this.payouts.createFromSettlement(
+            payload.tenantId,
+            payload.settlementId,
+            payload.amountMinor,
+            payload.currency,
+          );
         } catch (err) {
           // Most likely cause: operator has no bank details on file yet.
           // Logged loudly rather than thrown — throwing would make the
           // outbox retry forever for an operator who simply hasn't set up
           // their bank account, which never resolves itself. Ops needs to
           // follow up with the operator; the settlement itself still stands.
-          this.log.error({ err, ...payload }, 'could not create payout instruction — operator likely missing bank details');
+          this.log.error(
+            { err, ...payload },
+            'could not create payout instruction — operator likely missing bank details',
+          );
         }
       },
     };

@@ -93,7 +93,9 @@ export function addDays(date: LocalDate, days: number): LocalDate {
 
 /** Whole days from `a` to `b` (b - a). Negative when b is earlier. */
 export function daysBetween(a: LocalDate, b: LocalDate): number {
-  return Math.round((localDateToUtcMidnight(b).getTime() - localDateToUtcMidnight(a).getTime()) / MS_PER_DAY);
+  return Math.round(
+    (localDateToUtcMidnight(b).getTime() - localDateToUtcMidnight(a).getTime()) / MS_PER_DAY,
+  );
 }
 
 export function compareLocalDate(a: LocalDate, b: LocalDate): -1 | 0 | 1 {
@@ -150,7 +152,10 @@ export function formatMinuteOfDay(minute: MinuteOfDay | number): string {
  * calendar days were crossed. This is how arrival times and `dayOffset` on
  * route stops are computed.
  */
-export function addMinutes(minute: MinuteOfDay | number, delta: number): {
+export function addMinutes(
+  minute: MinuteOfDay | number,
+  delta: number,
+): {
   minute: MinuteOfDay;
   dayOffset: number;
 } {

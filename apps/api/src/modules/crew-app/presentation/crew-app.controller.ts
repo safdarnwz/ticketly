@@ -36,7 +36,10 @@ export class CrewAppController {
   @Post('trips/:id/status')
   @RequirePermission(Permission.TRIP_OPERATE)
   @ApiOperation({ summary: 'Start (depart) or close a trip' })
-  async status(@Param('id') id: string, @Body(zodBody(TripStatusSchema)) dto: z.infer<typeof TripStatusSchema>) {
+  async status(
+    @Param('id') id: string,
+    @Body(zodBody(TripStatusSchema)) dto: z.infer<typeof TripStatusSchema>,
+  ) {
     await this.crew.setTripStatus(id as TripId, dto.status);
     return { ok: true };
   }

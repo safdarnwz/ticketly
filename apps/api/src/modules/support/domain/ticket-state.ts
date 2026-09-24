@@ -32,9 +32,13 @@ export function canTicketTransition(from: TicketStatus, to: TicketStatus): boole
 export function assertTicketTransition(from: TicketStatus, to: TicketStatus): void {
   if (from === to) return; // a no-op transition is harmless (idempotent status set)
   if (!canTicketTransition(from, to)) {
-    throw new DomainError(ErrorCode.SUPPORT_INVALID_TRANSITION, `A ticket cannot move from '${from}' to '${to}'`, {
-      details: { from, to },
-    });
+    throw new DomainError(
+      ErrorCode.SUPPORT_INVALID_TRANSITION,
+      `A ticket cannot move from '${from}' to '${to}'`,
+      {
+        details: { from, to },
+      },
+    );
   }
 }
 
@@ -48,7 +52,10 @@ export function isTicketClosed(status: TicketStatus): boolean {
  * an open ticket moves it to pending (waiting on the customer). Returns the same
  * status when no move is warranted.
  */
-export function statusAfterMessage(current: TicketStatus, authorKind: 'customer' | 'agent' | 'system'): TicketStatus {
+export function statusAfterMessage(
+  current: TicketStatus,
+  authorKind: 'customer' | 'agent' | 'system',
+): TicketStatus {
   if (current === 'closed') return 'closed';
   if (authorKind === 'customer') return 'open'; // any customer reply → needs an agent again
   if (authorKind === 'agent') return current === 'open' ? 'pending' : current; // agent picks up an open ticket → pending

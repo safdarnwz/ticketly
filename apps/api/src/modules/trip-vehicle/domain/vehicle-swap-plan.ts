@@ -15,21 +15,46 @@
  * Ladies-only: a seat is never moved INTO a ladies-only seat — a passenger's
  * gender is not re-validated here, so we never risk placing a man there.
  */
-export interface CurrentSeat { seatNumber: string; seatType: string; occupied: bigint; blocked: bigint; ladiesOnly: boolean }
-export interface LayoutSeat { number: string; type: string; bookable: boolean; ladiesOnly: boolean }
+export interface CurrentSeat {
+  seatNumber: string;
+  seatType: string;
+  occupied: bigint;
+  blocked: bigint;
+  ladiesOnly: boolean;
+}
+export interface LayoutSeat {
+  number: string;
+  type: string;
+  bookable: boolean;
+  ladiesOnly: boolean;
+}
 
-export interface SeatMove { from: string; to: string; seatType: string }
+export interface SeatMove {
+  from: string;
+  to: string;
+  seatType: string;
+}
 export interface VehicleSwapPlan {
-  newSeats: { seatNumber: string; seatType: string; bookable: boolean; ladiesOnly: boolean; occupied: bigint; blocked: bigint }[];
+  newSeats: {
+    seatNumber: string;
+    seatType: string;
+    bookable: boolean;
+    ladiesOnly: boolean;
+    occupied: bigint;
+    blocked: bigint;
+  }[];
   kept: string[];
   moves: SeatMove[];
   blockers: string[];
 }
 
-const natural = (a: string, b: string) => a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' });
+const natural = (a: string, b: string) =>
+  a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' });
 
 export function planVehicleSwap(current: CurrentSeat[], layout: LayoutSeat[]): VehicleSwapPlan {
-  const inUse = current.filter((s) => s.occupied !== 0n || s.blocked !== 0n).sort((a, b) => natural(a.seatNumber, b.seatNumber));
+  const inUse = current
+    .filter((s) => s.occupied !== 0n || s.blocked !== 0n)
+    .sort((a, b) => natural(a.seatNumber, b.seatNumber));
   const byNumber = new Map(layout.map((l) => [l.number, l]));
   const taken = new Set<string>();
   const target = new Map<string, CurrentSeat>(); // new seat number → carried old seat
@@ -50,7 +75,9 @@ export function planVehicleSwap(current: CurrentSeat[], layout: LayoutSeat[]): V
     }
   }
   // Pass 2: move the rest to the first free seat of the same type.
-  const free = layout.filter((l) => l.bookable && !l.ladiesOnly).sort((a, b) => natural(a.number, b.number));
+  const free = layout
+    .filter((l) => l.bookable && !l.ladiesOnly)
+    .sort((a, b) => natural(a.number, b.number));
   for (const s of needMove) {
     const dest = free.find((l) => !taken.has(l.number) && l.type === s.seatType);
     if (!dest) {
@@ -65,15 +92,26 @@ export function planVehicleSwap(current: CurrentSeat[], layout: LayoutSeat[]): V
   const newSeats = layout.map((l) => {
     const carried = target.get(l.number);
     return {
-      seatNumber: l.number, seatType: l.type, bookable: l.bookable, ladiesOnly: l.ladiesOnly,
-      occupied: carried?.occupied ?? 0n, blocked: carried?.blocked ?? 0n,
+      seatNumber: l.number,
+      seatType: l.type,
+      bookable: l.bookable,
+      ladiesOnly: l.ladiesOnly,
+      occupied: carried?.occupied ?? 0n,
+      blocked: carried?.blocked ?? 0n,
     };
   });
   return { newSeats, kept, moves, blockers };
 }
 
 /** Two trips conflict if their time windows (with a turnaround buffer) overlap. */
-export function windowsOverlap(a: { departsAt: Date; arrivesAt: Date }, b: { departsAt: Date; arrivesAt: Date }, bufferMinutes = 30): boolean {
+export function windowsOverlap(
+  a: { departsAt: Date; arrivesAt: Date },
+  b: { departsAt: Date; arrivesAt: Date },
+  bufferMinutes = 30,
+): boolean {
   const pad = bufferMinutes * 60_000;
-  return a.departsAt.getTime() - pad < b.arrivesAt.getTime() && b.departsAt.getTime() - pad < a.arrivesAt.getTime();
+  return (
+    a.departsAt.getTime() - pad < b.arrivesAt.getTime() &&
+    b.departsAt.getTime() - pad < a.arrivesAt.getTime()
+  );
 }

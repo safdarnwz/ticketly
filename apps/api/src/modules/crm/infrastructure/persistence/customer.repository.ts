@@ -83,7 +83,12 @@ export class CustomerRepository {
   async setBlacklist(customerId: UserId, blacklisted: boolean, reason?: string): Promise<void> {
     await this.db.execute_(
       `UPDATE users SET blacklisted_at = $3, blacklist_reason = $4 WHERE tenant_id = $1 AND id = $2`,
-      [requireTenantId(), customerId, blacklisted ? new Date() : null, blacklisted ? (reason ?? null) : null],
+      [
+        requireTenantId(),
+        customerId,
+        blacklisted ? new Date() : null,
+        blacklisted ? (reason ?? null) : null,
+      ],
       { name: 'customer.setBlacklist', primary: true },
     );
   }
@@ -117,17 +122,28 @@ export class CustomerRepository {
 
   private map(r: Row): CustomerProfile {
     return {
-      id: r.id, fullName: r.full_name,
-      email: this.encryptor.decrypt(r.email), phone: this.encryptor.decrypt(r.phone),
-      blacklistedAt: r.blacklisted_at, blacklistReason: r.blacklist_reason, preferences: r.preferences ?? {},
-      totalBookings: Number(r.total_bookings), totalSpentMinor: Number(r.total_spent_minor),
+      id: r.id,
+      fullName: r.full_name,
+      email: this.encryptor.decrypt(r.email),
+      phone: this.encryptor.decrypt(r.phone),
+      blacklistedAt: r.blacklisted_at,
+      blacklistReason: r.blacklist_reason,
+      preferences: r.preferences ?? {},
+      totalBookings: Number(r.total_bookings),
+      totalSpentMinor: Number(r.total_spent_minor),
       isFrequentTraveller: Number(r.total_bookings) >= FREQUENT_TRAVELLER_THRESHOLD,
     };
   }
 }
 
 interface Row {
-  id: string; full_name: string | null; email: string | null; phone: string | null;
-  blacklisted_at: string | null; blacklist_reason: string | null; preferences: Record<string, unknown>;
-  total_bookings: string; total_spent_minor: string;
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  phone: string | null;
+  blacklisted_at: string | null;
+  blacklist_reason: string | null;
+  preferences: Record<string, unknown>;
+  total_bookings: string;
+  total_spent_minor: string;
 }

@@ -33,7 +33,11 @@ const SELECT_COLUMNS = `id, operator_application_id AS "operatorApplicationId", 
 export class KycRepository {
   constructor(private readonly db: DatabaseService) {}
 
-  async create(input: { operatorApplicationId: string; documentType: KycDocumentType; provider: string }): Promise<string> {
+  async create(input: {
+    operatorApplicationId: string;
+    documentType: KycDocumentType;
+    provider: string;
+  }): Promise<string> {
     const id = newId();
     await this.db.execute_(
       `INSERT INTO kyc_verifications (id, operator_application_id, document_type, provider, status)
@@ -53,10 +57,24 @@ export class KycRepository {
     );
   }
 
-  async markVerified(id: string, input: { verifiedName: string; maskedNumber: string; ifsc?: string; providerReference?: string }): Promise<void> {
+  async markVerified(
+    id: string,
+    input: {
+      verifiedName: string;
+      maskedNumber: string;
+      ifsc?: string;
+      providerReference?: string;
+    },
+  ): Promise<void> {
     await this.db.execute_(
       `UPDATE kyc_verifications SET status = 'verified', verified_name = $2, masked_number = $3, ifsc = coalesce($4, ifsc), provider_reference = coalesce($5, provider_reference), verified_at = now() WHERE id = $1`,
-      [id, input.verifiedName, input.maskedNumber, input.ifsc ?? null, input.providerReference ?? null],
+      [
+        id,
+        input.verifiedName,
+        input.maskedNumber,
+        input.ifsc ?? null,
+        input.providerReference ?? null,
+      ],
       { name: 'kyc.markVerified', primary: true },
     );
   }
@@ -85,8 +103,17 @@ export class KycRepository {
     );
   }
 
-  async updateApplicationStatus(operatorApplicationId: string, documentType: KycDocumentType, status: KycVerificationStatus): Promise<void> {
-    const column = documentType === 'pan' ? 'pan_verification_status' : documentType === 'aadhaar' ? 'aadhaar_verification_status' : 'bank_account_verification_status';
+  async updateApplicationStatus(
+    operatorApplicationId: string,
+    documentType: KycDocumentType,
+    status: KycVerificationStatus,
+  ): Promise<void> {
+    const column =
+      documentType === 'pan'
+        ? 'pan_verification_status'
+        : documentType === 'aadhaar'
+          ? 'aadhaar_verification_status'
+          : 'bank_account_verification_status';
     await this.db.execute_(
       `UPDATE operator_applications SET ${column} = $2 WHERE id = $1`,
       [operatorApplicationId, status],

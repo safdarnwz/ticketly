@@ -1,7 +1,16 @@
 import { Injectable } from '@nestjs/common';
 
 import { DatabaseService, isUniqueViolation } from '@database';
-import { AppError, ErrorCode, newId, requireTenantId, type BookingId, type RouteId, type TripId, type UserId } from '@kernel';
+import {
+  AppError,
+  ErrorCode,
+  newId,
+  requireTenantId,
+  type BookingId,
+  type RouteId,
+  type TripId,
+  type UserId,
+} from '@kernel';
 
 export interface ReviewRow {
   id: string;
@@ -22,21 +31,39 @@ export class ReviewRepository {
   constructor(private readonly db: DatabaseService) {}
 
   async insert(input: {
-    bookingId: BookingId; customerId: UserId | null; routeId: RouteId | null; tripId: TripId | null;
-    rating: number; title?: string; body?: string; verified: boolean;
+    bookingId: BookingId;
+    customerId: UserId | null;
+    routeId: RouteId | null;
+    tripId: TripId | null;
+    rating: number;
+    title?: string;
+    body?: string;
+    verified: boolean;
   }): Promise<string> {
     const id = newId();
     try {
       await this.db.execute_(
         `INSERT INTO reviews (id, tenant_id, booking_id, customer_id, route_id, trip_id, rating, title, body, verified)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-        [id, requireTenantId(), input.bookingId, input.customerId, input.routeId, input.tripId,
-         input.rating, input.title ?? null, input.body ?? null, input.verified],
+        [
+          id,
+          requireTenantId(),
+          input.bookingId,
+          input.customerId,
+          input.routeId,
+          input.tripId,
+          input.rating,
+          input.title ?? null,
+          input.body ?? null,
+          input.verified,
+        ],
         { name: 'review.insert', primary: true },
       );
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new AppError(ErrorCode.REVIEW_ALREADY_EXISTS, 409, { message: 'This booking has already been reviewed' });
+        throw new AppError(ErrorCode.REVIEW_ALREADY_EXISTS, 409, {
+          message: 'This booking has already been reviewed',
+        });
       }
       throw error;
     }

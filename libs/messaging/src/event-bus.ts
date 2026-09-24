@@ -1,13 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { recordEvent } from '@database';
-import {
-  createEvent,
-  getContext,
-  type DomainEvent,
-  type Json,
-  type TenantId,
-} from '@kernel';
+import { createEvent, getContext, type DomainEvent, type Json, type TenantId } from '@kernel';
 import { Logger } from '@observability';
 
 /**

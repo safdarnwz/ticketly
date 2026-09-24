@@ -17,11 +17,13 @@
  * Per-seat fares come from the quote itself, never from an equal split of
  * the total — partial cancellations refund each seat by what it cost.
  */
-export interface HoldPassenger { seatNumber: string; fullName: string }
+export interface HoldPassenger {
+  seatNumber: string;
+  fullName: string;
+}
 
 export type SeatFareResolution =
-  | { kind: 'priced'; fareBySeat: Map<string, number> }
-  | { kind: 'needs_seat_quote' };
+  { kind: 'priced'; fareBySeat: Map<string, number> } | { kind: 'needs_seat_quote' };
 
 export class HoldValidationError extends Error {
   constructor(message: string) {
@@ -35,26 +37,38 @@ export function normaliseSeat(seat: string): string {
   return String(seat ?? '').trim();
 }
 
-export function validateHoldSelection(seatNumbers: string[], passengers: HoldPassenger[], quoteSeatCount: number): void {
-  if (!Array.isArray(seatNumbers) || seatNumbers.length === 0) throw new HoldValidationError('Select at least one seat');
+export function validateHoldSelection(
+  seatNumbers: string[],
+  passengers: HoldPassenger[],
+  quoteSeatCount: number,
+): void {
+  if (!Array.isArray(seatNumbers) || seatNumbers.length === 0)
+    throw new HoldValidationError('Select at least one seat');
   const seats = seatNumbers.map(normaliseSeat);
   if (seats.some((s) => s === '')) throw new HoldValidationError('Seat numbers cannot be blank');
   const dup = seats.find((s, i) => seats.indexOf(s) !== i);
   if (dup) throw new HoldValidationError(`Seat ${dup} was selected more than once`);
   if (seats.length !== quoteSeatCount) {
-    throw new HoldValidationError(`Quote is for ${quoteSeatCount} seat(s) but ${seats.length} were selected`);
+    throw new HoldValidationError(
+      `Quote is for ${quoteSeatCount} seat(s) but ${seats.length} were selected`,
+    );
   }
   if (!Array.isArray(passengers) || passengers.length !== seats.length) {
-    throw new HoldValidationError(`Enter exactly one passenger per seat (${seats.length} seat(s), ${passengers?.length ?? 0} passenger(s))`);
+    throw new HoldValidationError(
+      `Enter exactly one passenger per seat (${seats.length} seat(s), ${passengers?.length ?? 0} passenger(s))`,
+    );
   }
   const selected = new Set(seats);
   const taken = new Set<string>();
   for (const p of passengers) {
     const seat = normaliseSeat(p.seatNumber);
-    if (!selected.has(seat)) throw new HoldValidationError(`Passenger references unknown seat ${p.seatNumber}`);
-    if (taken.has(seat)) throw new HoldValidationError(`Two passengers are assigned to seat ${seat}`);
+    if (!selected.has(seat))
+      throw new HoldValidationError(`Passenger references unknown seat ${p.seatNumber}`);
+    if (taken.has(seat))
+      throw new HoldValidationError(`Two passengers are assigned to seat ${seat}`);
     taken.add(seat);
-    if (!p.fullName?.trim()) throw new HoldValidationError(`Passenger name is required for seat ${seat}`);
+    if (!p.fullName?.trim())
+      throw new HoldValidationError(`Passenger name is required for seat ${seat}`);
   }
 }
 
@@ -69,14 +83,19 @@ export function resolveSeatFares(
   seatNumbers: string[],
 ): SeatFareResolution {
   if (!quote.seatFares || quote.seatFares.length === 0) return { kind: 'needs_seat_quote' };
-  const fareBySeat = new Map(quote.seatFares.map((f) => [normaliseSeat(f.seatNumber), f.totalMinor]));
+  const fareBySeat = new Map(
+    quote.seatFares.map((f) => [normaliseSeat(f.seatNumber), f.totalMinor]),
+  );
   const chosen = seatNumbers.map(normaliseSeat);
   const mismatch = chosen.filter((s) => !fareBySeat.has(s));
   if (mismatch.length || fareBySeat.size !== chosen.length) {
-    throw new HoldValidationError(`The price quote was for seats ${[...fareBySeat.keys()].join(', ')}, not ${chosen.join(', ')} — please refresh the price`);
+    throw new HoldValidationError(
+      `The price quote was for seats ${[...fareBySeat.keys()].join(', ')}, not ${chosen.join(', ')} — please refresh the price`,
+    );
   }
   const sum = [...fareBySeat.values()].reduce((a, b) => a + b, 0);
-  if (sum !== quote.totalMinor) throw new HoldValidationError('Price quote is inconsistent — please refresh the price');
+  if (sum !== quote.totalMinor)
+    throw new HoldValidationError('Price quote is inconsistent — please refresh the price');
   return { kind: 'priced', fareBySeat };
 }
 

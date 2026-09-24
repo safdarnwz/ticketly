@@ -6,7 +6,12 @@ import { ApiStandardErrors, RequirePermission, zodBody } from '@http';
 import { type BranchId } from '@kernel';
 
 import { BranchRepository } from '../infrastructure/persistence/branch.repository';
-import { CreateBranchSchema, type CreateBranchDto, UpdateBranchSchema, type UpdateBranchDto } from './dto/branch.dto';
+import {
+  CreateBranchSchema,
+  type CreateBranchDto,
+  UpdateBranchSchema,
+  type UpdateBranchDto,
+} from './dto/branch.dto';
 
 @ApiTags('branches')
 @ApiBearerAuth('bearer')

@@ -47,7 +47,13 @@ import { SmsOtpProvider } from './infrastructure/otp/sms-otp.provider';
  */
 @Module({
   imports: [DatabaseModule, CacheModule, SecurityModule, TenancyModule, IntegrationsModule],
-  controllers: [AuthController, UserController, RoleController, ApiKeyController, MaintenanceController],
+  controllers: [
+    AuthController,
+    UserController,
+    RoleController,
+    ApiKeyController,
+    MaintenanceController,
+  ],
   providers: [
     StaffAccessService,
     UserRepository,

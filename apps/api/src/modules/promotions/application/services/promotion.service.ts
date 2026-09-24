@@ -3,8 +3,17 @@ import { Injectable } from '@nestjs/common';
 import { UnitOfWork } from '@database';
 import { AppError, ErrorCode, newId, requireTenantId, todayIn, type RouteId } from '@kernel';
 
-import { PromotionRepository, type PromotionPricingRule, type RoutePromotion } from '../../infrastructure/persistence/promotion.repository';
-import { validateDateRange, dateRangeToWindow, computeBucketPrice, type PromotionBillingCycle } from '../../domain/promotion-pricing';
+import {
+  PromotionRepository,
+  type PromotionPricingRule,
+  type RoutePromotion,
+} from '../../infrastructure/persistence/promotion.repository';
+import {
+  validateDateRange,
+  dateRangeToWindow,
+  computeBucketPrice,
+  type PromotionBillingCycle,
+} from '../../domain/promotion-pricing';
 import { RouteRepository } from '../../../master-data/infrastructure/persistence/route.repository';
 
 @Injectable()
@@ -20,9 +29,18 @@ export class PromotionService {
     return this.promotions.currentRates();
   }
 
-  async setRate(input: { billingCycle: PromotionBillingCycle; isMultiRoute: boolean; priceMinor: number }, actorUserId: string | null): Promise<void> {
-    if (input.priceMinor < 0) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: 'Price cannot be negative' });
-    await this.promotions.setRate(input.billingCycle, input.isMultiRoute, input.priceMinor, actorUserId);
+  async setRate(
+    input: { billingCycle: PromotionBillingCycle; isMultiRoute: boolean; priceMinor: number },
+    actorUserId: string | null,
+  ): Promise<void> {
+    if (input.priceMinor < 0)
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: 'Price cannot be negative' });
+    await this.promotions.setRate(
+      input.billingCycle,
+      input.isMultiRoute,
+      input.priceMinor,
+      actorUserId,
+    );
   }
 
   // ── Operator: purchase ─────────────────────────────────────────────────
@@ -46,9 +64,23 @@ export class PromotionService {
    * platform charges, so there is deliberately nothing new for the
    * operator to reconcile against a different bill.
    */
-  async purchase(input: { routeIds: RouteId[]; startDate: string; endDate: string; autoRenew: boolean }): Promise<{ groupId: string; promotionIds: string[]; totalMinor: number; currency: string; days: number }> {
+  async purchase(input: {
+    routeIds: RouteId[];
+    startDate: string;
+    endDate: string;
+    autoRenew: boolean;
+  }): Promise<{
+    groupId: string;
+    promotionIds: string[];
+    totalMinor: number;
+    currency: string;
+    days: number;
+  }> {
     const tenantId = requireTenantId();
-    if (input.routeIds.length === 0) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: 'Select at least one route to promote' });
+    if (input.routeIds.length === 0)
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+        message: 'Select at least one route to promote',
+      });
     const uniqueRouteIds = [...new Set(input.routeIds)];
     const isMultiRoute = uniqueRouteIds.length > 1;
 
@@ -66,7 +98,10 @@ export class PromotionService {
     // authorization check that has to happen before anything else here.
     for (const routeId of uniqueRouteIds) {
       const owned = await this.routes.findById(routeId);
-      if (!owned) throw new AppError(ErrorCode.COMMON_FORBIDDEN, 403, { message: `Route ${routeId} does not belong to your fleet` });
+      if (!owned)
+        throw new AppError(ErrorCode.COMMON_FORBIDDEN, 403, {
+          message: `Route ${routeId} does not belong to your fleet`,
+        });
     }
 
     // All three buckets needed together for the decomposition — a rate
@@ -77,11 +112,15 @@ export class PromotionService {
       this.promotions.rateFor('monthly', isMultiRoute),
     ]);
     if (!dailyRate || !weeklyRate || !monthlyRate) {
-      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Pricing is not fully configured for this plan yet — contact the platform' });
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, {
+        message: 'Pricing is not fully configured for this plan yet — contact the platform',
+      });
     }
     const currency = dailyRate.currency;
     const { totalMinor: perRouteMinor } = computeBucketPrice(days, {
-      dailyRateMinor: dailyRate.priceMinor, weeklyRateMinor: weeklyRate.priceMinor, monthlyRateMinor: monthlyRate.priceMinor,
+      dailyRateMinor: dailyRate.priceMinor,
+      weeklyRateMinor: weeklyRate.priceMinor,
+      monthlyRateMinor: monthlyRate.priceMinor,
     });
 
     const groupId = newId();
@@ -103,15 +142,22 @@ export class PromotionService {
           [tenantId, routeId, window.startsAt, window.endsAt],
         );
         if (overlap.rows[0]) {
-          throw new AppError(ErrorCode.COMMON_CONFLICT, 409, { message: `Route ${routeId} already has a promotion overlapping these dates` });
+          throw new AppError(ErrorCode.COMMON_CONFLICT, 409, {
+            message: `Route ${routeId} already has a promotion overlapping these dates`,
+          });
         }
       }
 
       const promotionIds: string[] = [];
       for (const routeId of uniqueRouteIds) {
         const id = await this.promotions.create({
-          routeId, groupId, priceMinor: perRouteMinor,
-          currency, startsAt: window.startsAt, endsAt: window.endsAt, autoRenew: input.autoRenew,
+          routeId,
+          groupId,
+          priceMinor: perRouteMinor,
+          currency,
+          startsAt: window.startsAt,
+          endsAt: window.endsAt,
+          autoRenew: input.autoRenew,
         });
         promotionIds.push(id);
       }
@@ -125,7 +171,13 @@ export class PromotionService {
       const chargeRow = await scope.client.query<{ id: string }>(
         `INSERT INTO platform_charges (id, tenant_id, kind, amount_minor, currency, status, description)
          VALUES ($1,$2,'route_promotion',$3,$4,'pending',$5) RETURNING id`,
-        [newId(), tenantId, totalMinor, currency, `Route promotion — ${days} day(s), ${input.startDate} to ${input.endDate}, ${uniqueRouteIds.length} route${uniqueRouteIds.length > 1 ? 's' : ''}`],
+        [
+          newId(),
+          tenantId,
+          totalMinor,
+          currency,
+          `Route promotion — ${days} day(s), ${input.startDate} to ${input.endDate}, ${uniqueRouteIds.length} route${uniqueRouteIds.length > 1 ? 's' : ''}`,
+        ],
       );
       const platformChargeId = chargeRow.rows[0].id;
 
@@ -138,7 +190,10 @@ export class PromotionService {
       // search (see SearchService.activePromotionsForRoutes' own
       // starts_at <= now check) — no separate "scheduled" status needed.
       for (const id of promotionIds) {
-        await scope.client.query(`UPDATE route_promotions SET status = 'active', platform_charge_id = $2, version = version + 1 WHERE id = $1`, [id, platformChargeId]);
+        await scope.client.query(
+          `UPDATE route_promotions SET status = 'active', platform_charge_id = $2, version = version + 1 WHERE id = $1`,
+          [id, platformChargeId],
+        );
       }
 
       return { groupId, promotionIds, totalMinor, currency, days };
@@ -173,14 +228,26 @@ export class PromotionService {
   async cancel(id: string): Promise<{ adjustedMinor: number }> {
     const tenantId = requireTenantId();
     return this.uow.run({ name: 'promotion.cancel', tenantId }, async (scope) => {
-      const row = await scope.client.query<{ id: string; status: string; price_minor: string; starts_at: Date; ends_at: Date; billing_cycle: PromotionBillingCycle | null; version: number; platform_charge_id: string | null }>(
+      const row = await scope.client.query<{
+        id: string;
+        status: string;
+        price_minor: string;
+        starts_at: Date;
+        ends_at: Date;
+        billing_cycle: PromotionBillingCycle | null;
+        version: number;
+        platform_charge_id: string | null;
+      }>(
         `SELECT id, status, price_minor, starts_at, ends_at, billing_cycle, version, platform_charge_id FROM route_promotions WHERE tenant_id = $1 AND id = $2 FOR UPDATE`,
         [tenantId, id],
       );
       const promo = row.rows[0];
-      if (!promo) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Promotion not found' });
+      if (!promo)
+        throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Promotion not found' });
       if (promo.status !== 'active' && promo.status !== 'pending_payment') {
-        throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, { message: 'This promotion is already cancelled or has ended' });
+        throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
+          message: 'This promotion is already cancelled or has ended',
+        });
       }
 
       let adjustedMinor = 0;
@@ -191,7 +258,9 @@ export class PromotionService {
         // mixed-bucket purchase (e.g. "1 week + 5 days"), and even for a
         // single-bucket purchase the ACTUAL window is the authoritative
         // source, never a label that could in principle drift from it.
-        const totalDays = Math.round((promo.ends_at.getTime() - promo.starts_at.getTime()) / 86_400_000);
+        const totalDays = Math.round(
+          (promo.ends_at.getTime() - promo.starts_at.getTime()) / 86_400_000,
+        );
         // Calendar-midnight (IST) day-boundary — deliberately NOT anchored
         // to this promotion's own starts_at clock-time, to stay consistent
         // with every other daily/settlement boundary on the platform
@@ -207,7 +276,10 @@ export class PromotionService {
         // exact cancel-instant. Cancelling at 12:01am and at 11:59pm on
         // the same calendar day charge identically for today.
         const startOfTomorrow = new Date(todayIn() + 'T00:00:00+05:30').getTime() + 86_400_000;
-        const effectiveCancelAt = Math.min(Math.max(now.getTime(), startOfTomorrow), promo.ends_at.getTime());
+        const effectiveCancelAt = Math.min(
+          Math.max(now.getTime(), startOfTomorrow),
+          promo.ends_at.getTime(),
+        );
 
         const unusedMs = Math.max(0, promo.ends_at.getTime() - effectiveCancelAt);
         const unusedFullDays = Math.round(unusedMs / 86_400_000);
@@ -234,7 +306,12 @@ export class PromotionService {
             await scope.client.query(
               `INSERT INTO platform_charges (id, tenant_id, kind, amount_minor, status, description)
                VALUES ($1,$2,'route_promotion_adjustment',$3,'pending',$4)`,
-              [newId(), tenantId, -unusedMinor, `Promotion ${id} cancelled early — ${unusedFullDays} unused full day(s) credited against your next settlement`],
+              [
+                newId(),
+                tenantId,
+                -unusedMinor,
+                `Promotion ${id} cancelled early — ${unusedFullDays} unused full day(s) credited against your next settlement`,
+              ],
             );
             adjustedMinor = unusedMinor;
           }
@@ -258,12 +335,18 @@ export class PromotionService {
    */
   async pause(id: string): Promise<{ status: 'paused' }> {
     const promo = await this.promotions.findForUpdate(id);
-    if (!promo) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Promotion not found' });
+    if (!promo)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Promotion not found' });
     if (promo.status !== 'active') {
-      throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, { message: 'Only an active promotion can be paused' });
+      throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
+        message: 'Only an active promotion can be paused',
+      });
     }
     const ok = await this.promotions.pause(id, promo.version);
-    if (!ok) throw new AppError(ErrorCode.COMMON_CONFLICT, 409, { message: 'Promotion was modified concurrently — please retry' });
+    if (!ok)
+      throw new AppError(ErrorCode.COMMON_CONFLICT, 409, {
+        message: 'Promotion was modified concurrently — please retry',
+      });
     return { status: 'paused' };
   }
 
@@ -275,12 +358,18 @@ export class PromotionService {
    */
   async resume(id: string): Promise<{ status: 'active'; endsAt: Date }> {
     const promo = await this.promotions.findForUpdate(id);
-    if (!promo) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Promotion not found' });
+    if (!promo)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Promotion not found' });
     if (promo.status !== 'paused') {
-      throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, { message: 'Only a paused promotion can be resumed' });
+      throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
+        message: 'Only a paused promotion can be resumed',
+      });
     }
     const resumed = await this.promotions.resume(id, promo.version);
-    if (!resumed) throw new AppError(ErrorCode.COMMON_CONFLICT, 409, { message: 'Promotion was modified concurrently — please retry' });
+    if (!resumed)
+      throw new AppError(ErrorCode.COMMON_CONFLICT, 409, {
+        message: 'Promotion was modified concurrently — please retry',
+      });
     return { status: 'active', endsAt: resumed.endsAt };
   }
 }

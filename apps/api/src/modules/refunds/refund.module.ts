@@ -26,7 +26,14 @@ import { RefundService } from './application/services/refund.service';
  * the ledger).
  */
 @Module({
-  imports: [DatabaseModule, MessagingModule, BookingModule, PaymentModule, AgentLedgerModule, GdsLedgerModule],
+  imports: [
+    DatabaseModule,
+    MessagingModule,
+    BookingModule,
+    PaymentModule,
+    AgentLedgerModule,
+    GdsLedgerModule,
+  ],
   controllers: [RefundController],
   providers: [RefundRepository, RefundService],
   exports: [RefundService, RefundRepository],

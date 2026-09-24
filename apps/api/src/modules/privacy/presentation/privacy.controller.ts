@@ -8,7 +8,13 @@ import { ApiStandardErrors, RequirePermission, RequirePlatformAdmin, zodBody } f
 import { PrivacyService } from '../application/services/privacy.service';
 
 const ConsentSchema = z.object({
-  purpose: z.enum(['transactional', 'marketing', 'personalization', 'analytics', 'third_party_share']),
+  purpose: z.enum([
+    'transactional',
+    'marketing',
+    'personalization',
+    'analytics',
+    'third_party_share',
+  ]),
   granted: z.boolean(),
 });
 

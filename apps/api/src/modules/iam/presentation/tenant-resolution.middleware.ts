@@ -78,7 +78,11 @@ export class TenantResolutionMiddleware implements NestMiddleware {
     // already says which domain it is.
     if (!this.isProduction) {
       const debugSurface = single(request.headers['x-debug-surface']);
-      if (debugSurface === 'customer' || debugSurface === 'superAdmin' || debugSurface === 'tenantAdmin') {
+      if (
+        debugSurface === 'customer' ||
+        debugSurface === 'superAdmin' ||
+        debugSurface === 'tenantAdmin'
+      ) {
         ctx.extra.authSurface = debugSurface;
       }
     }
@@ -124,7 +128,9 @@ export class TenantResolutionMiddleware implements NestMiddleware {
    * super-admin login wouldn't already allow, so treating it as an alias
    * everywhere (not just non-production) is safe.
    */
-  private surfaceForHost(host: string | undefined): 'customer' | 'superAdmin' | 'tenantAdmin' | 'unresolved' {
+  private surfaceForHost(
+    host: string | undefined,
+  ): 'customer' | 'superAdmin' | 'tenantAdmin' | 'unresolved' {
     if (!host) return 'unresolved';
     for (const base of [this.baseDomain, 'localhost']) {
       if (host === base || host === `www.${base}`) return 'customer';
@@ -147,7 +153,10 @@ export class TenantResolutionMiddleware implements NestMiddleware {
     for (const base of [this.baseDomain, 'localhost']) {
       const tenantConsoleSuffix = `.${base}`;
       if (host.startsWith(tenantConsolePrefix) && host.endsWith(tenantConsoleSuffix)) {
-        const slug = host.slice(tenantConsolePrefix.length, host.length - tenantConsoleSuffix.length);
+        const slug = host.slice(
+          tenantConsolePrefix.length,
+          host.length - tenantConsoleSuffix.length,
+        );
         // Guard against "app..ticketly.com" or a slug that itself contains a
         // dot reaching back into "app" / the base domain — treat as unresolved.
         if (!slug || slug.includes('.')) return null;

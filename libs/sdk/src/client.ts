@@ -73,7 +73,12 @@ export class TicketlyClient {
     this.token = token;
   }
 
-  private async request<T>(method: string, path: string, body?: unknown, idempotencyKey?: string): Promise<T> {
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    idempotencyKey?: string,
+  ): Promise<T> {
     const headers: Record<string, string> = { accept: 'application/json' };
     if (body !== undefined) headers['content-type'] = 'application/json';
     if (this.token) headers.authorization = `Bearer ${this.token}`;
@@ -90,14 +95,26 @@ export class TicketlyClient {
     const json = text ? (JSON.parse(text) as unknown) : undefined;
     if (!res.ok) {
       const e = (json ?? {}) as Partial<ApiError>;
-      throw new TicketlyApiError({ code: e.code ?? 'COMMON.INTERNAL_ERROR', message: e.message ?? res.statusText, details: e.details, status: res.status });
+      throw new TicketlyApiError({
+        code: e.code ?? 'COMMON.INTERNAL_ERROR',
+        message: e.message ?? res.statusText,
+        details: e.details,
+        status: res.status,
+      });
     }
     return json as T;
   }
 
   // ── Auth ────────────────────────────────────────────────────────────────
-  async login(email: string, password: string): Promise<{ accessToken: string; refreshToken: string }> {
-    const out = await this.request<{ accessToken: string; refreshToken: string }>('POST', '/v1/auth/login', { email, password });
+  async login(
+    email: string,
+    password: string,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const out = await this.request<{ accessToken: string; refreshToken: string }>(
+      'POST',
+      '/v1/auth/login',
+      { email, password },
+    );
     this.token = out.accessToken;
     return out;
   }
@@ -108,10 +125,17 @@ export class TicketlyClient {
   }
 
   // ── Booking ────────────────────────────────────────────────────────────────
-  hold(req: HoldRequest, idempotencyKey: string): Promise<{ bookingId: string; pnr: string; holdExpiresAt: string; totalMinor: number }> {
+  hold(
+    req: HoldRequest,
+    idempotencyKey: string,
+  ): Promise<{ bookingId: string; pnr: string; holdExpiresAt: string; totalMinor: number }> {
     return this.request('POST', '/v1/bookings/hold', req, idempotencyKey);
   }
-  confirm(bookingId: string, payment: { paidMinor: number; reference?: string }, idempotencyKey: string): Promise<unknown> {
+  confirm(
+    bookingId: string,
+    payment: { paidMinor: number; reference?: string },
+    idempotencyKey: string,
+  ): Promise<unknown> {
     return this.request('POST', `/v1/bookings/${bookingId}/confirm`, payment, idempotencyKey);
   }
   cancel(bookingId: string, reason?: string): Promise<{ refundMinor: number; refundPct: number }> {
@@ -119,7 +143,9 @@ export class TicketlyClient {
   }
 
   // ── Tickets ────────────────────────────────────────────────────────────────
-  ticketTokens(bookingId: string): Promise<{ pnr: string; tickets: { seat: string; boardingToken: string }[] }> {
+  ticketTokens(
+    bookingId: string,
+  ): Promise<{ pnr: string; tickets: { seat: string; boardingToken: string }[] }> {
     return this.request('GET', `/v1/bookings/${bookingId}/tickets`);
   }
   verifyTicket(token: string): Promise<{ valid: boolean; payload: unknown }> {
@@ -127,7 +153,11 @@ export class TicketlyClient {
   }
 
   // ── i18n / currency ─────────────────────────────────────────────────────────
-  convert(amountMinor: number, from: string, to: string): Promise<{ amountMinor: number; formatted: string }> {
+  convert(
+    amountMinor: number,
+    from: string,
+    to: string,
+  ): Promise<{ amountMinor: number; formatted: string }> {
     return this.request('GET', `/v1/i18n/convert?amountMinor=${amountMinor}&from=${from}&to=${to}`);
   }
 

@@ -6,9 +6,11 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe('mapWithConcurrency', () => {
   it('never exceeds the limit and preserves order', async () => {
-    let inFlight = 0; let peak = 0;
+    let inFlight = 0;
+    let peak = 0;
     const out = await mapWithConcurrency([5, 1, 4, 2, 3, 0], 2, async (x) => {
-      inFlight++; peak = Math.max(peak, inFlight);
+      inFlight++;
+      peak = Math.max(peak, inFlight);
       await sleep(x);
       inFlight--;
       return x * 10;
@@ -22,6 +24,11 @@ describe('mapWithConcurrency', () => {
   });
   it('negative: invalid limit throws; a failing item rejects the call', async () => {
     await expect(mapWithConcurrency([1], 0, async (x) => x)).rejects.toThrow(/limit/);
-    await expect(mapWithConcurrency([1, 2], 2, async (x) => { if (x === 2) throw new Error('boom'); return x; })).rejects.toThrow(/boom/);
+    await expect(
+      mapWithConcurrency([1, 2], 2, async (x) => {
+        if (x === 2) throw new Error('boom');
+        return x;
+      }),
+    ).rejects.toThrow(/boom/);
   });
 });

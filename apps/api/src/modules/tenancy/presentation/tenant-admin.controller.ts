@@ -11,8 +11,10 @@ import { AuditService } from '../../iam/application/services/audit.service';
 import { BookingRepository } from '../../booking/infrastructure/persistence/booking.repository';
 import { PayoutRepository } from '../infrastructure/persistence/payout.repository';
 import {
-  ProvisionTenantSchema, type ProvisionTenantDto,
-  SuspendTenantSchema, type SuspendTenantDto,
+  ProvisionTenantSchema,
+  type ProvisionTenantDto,
+  SuspendTenantSchema,
+  type SuspendTenantDto,
 } from './dto/tenant.dto';
 import { PlanRepository } from '../infrastructure/persistence/plan.repository';
 import { TenantContextService } from '../application/services/tenant-context.service';
@@ -21,12 +23,21 @@ import { TenantProvisioningService } from '../application/services/tenant-provis
 import { TenantRepository } from '../infrastructure/persistence/tenant.repository';
 
 const PlanSchema = z.object({
-  code: z.string().trim().toLowerCase().regex(/^[a-z0-9][a-z0-9-]{1,30}$/),
+  code: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9][a-z0-9-]{1,30}$/),
   name: z.string().trim().min(2).max(80),
   monthlyPrice: z.number().int().nonnegative(),
   currency: z.string().length(3).default('INR'),
   features: z.record(z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]{1,40}$/), z.boolean()).default({}),
-  quotas: z.record(z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]{1,40}$/), z.number().int().nonnegative().nullable()).default({}),
+  quotas: z
+    .record(
+      z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]{1,40}$/),
+      z.number().int().nonnegative().nullable(),
+    )
+    .default({}),
   sortOrder: z.number().int().min(0).max(1000).default(0),
 });
 
@@ -62,12 +73,17 @@ export class TenantAdminController {
     this.assertPlatformAdmin();
     const rows = await this.tenants.list();
     const baseDomain = new URL(this.config.app.publicBaseUrl).hostname;
-    return { items: rows.map((t) => ({ ...t, consoleUrl: `https://app.${t.slug}.${baseDomain}` })) };
+    return {
+      items: rows.map((t) => ({ ...t, consoleUrl: `https://app.${t.slug}.${baseDomain}` })),
+    };
   }
 
   @Get(':id/stats')
   @RequirePermission(Permission.ALL)
-  @ApiOperation({ summary: "One operator's booking numbers — total/today bookings, total/today cancellations, revenue" })
+  @ApiOperation({
+    summary:
+      "One operator's booking numbers — total/today bookings, total/today cancellations, revenue",
+  })
   async stats(@Param('id') id: string) {
     this.assertPlatformAdmin();
     return this.bookings.statsForTenant(id);
@@ -88,7 +104,10 @@ export class TenantAdminController {
   @Post(':id/suspend')
   @RequirePermission(Permission.ALL)
   @ApiOperation({ summary: 'Suspend an operator' })
-  async suspend(@Param('id') id: string, @Body(zodBody(SuspendTenantSchema)) dto: SuspendTenantDto) {
+  async suspend(
+    @Param('id') id: string,
+    @Body(zodBody(SuspendTenantSchema)) dto: SuspendTenantDto,
+  ) {
     this.assertPlatformAdmin();
     await this.provisioning.suspend(id as TenantId, dto.reason);
     return { ok: true };
@@ -117,16 +136,26 @@ export class TenantAdminController {
   async createPlan(@Body(zodBody(PlanSchema)) dto: z.infer<typeof PlanSchema>) {
     this.assertPlatformAdmin();
     const id = await this.plans.create({
-      code: dto.code, name: dto.name, monthlyPrice: dto.monthlyPrice, currency: dto.currency ?? 'INR',
-      features: dto.features ?? {}, quotas: dto.quotas ?? {}, sortOrder: dto.sortOrder ?? 0,
+      code: dto.code,
+      name: dto.name,
+      monthlyPrice: dto.monthlyPrice,
+      currency: dto.currency ?? 'INR',
+      features: dto.features ?? {},
+      quotas: dto.quotas ?? {},
+      sortOrder: dto.sortOrder ?? 0,
     });
     return { id };
   }
 
   @Post('plans/:id/toggle-active')
   @RequirePermission(Permission.ALL)
-  @ApiOperation({ summary: 'Activate/deactivate a plan (existing tenants keep it; new signups no longer see it)' })
-  async togglePlanActive(@Param('id') id: string, @Body(zodBody(z.object({ isActive: z.boolean() }))) dto: { isActive: boolean }) {
+  @ApiOperation({
+    summary: 'Activate/deactivate a plan (existing tenants keep it; new signups no longer see it)',
+  })
+  async togglePlanActive(
+    @Param('id') id: string,
+    @Body(zodBody(z.object({ isActive: z.boolean() }))) dto: { isActive: boolean },
+  ) {
     this.assertPlatformAdmin();
     await this.plans.setActive(id, dto.isActive);
     return { ok: true };
@@ -135,7 +164,10 @@ export class TenantAdminController {
   @Post(':id/plan')
   @RequirePermission(Permission.ALL)
   @ApiOperation({ summary: "Change an operator's plan" })
-  async changePlan(@Param('id') id: string, @Body(zodBody(z.object({ planId: z.string().uuid() }))) dto: { planId: string }) {
+  async changePlan(
+    @Param('id') id: string,
+    @Body(zodBody(z.object({ planId: z.string().uuid() }))) dto: { planId: string },
+  ) {
     this.assertPlatformAdmin();
     await this.tenants.changePlan(id, dto.planId);
     await this.tenantContext.invalidate(id as TenantId);
@@ -144,10 +176,18 @@ export class TenantAdminController {
 
   @Put(':id/features/:feature')
   @RequirePermission(Permission.ALL)
-  @ApiOperation({ summary: 'Enable (true) / disable (false) a feature for ONE operator, or clear the override (null) to follow its plan' })
-  async setFeature(@Param('id') id: string, @Param('feature') feature: string, @Body(zodBody(z.object({ enabled: z.boolean().nullable() }))) dto: { enabled: boolean | null }) {
+  @ApiOperation({
+    summary:
+      'Enable (true) / disable (false) a feature for ONE operator, or clear the override (null) to follow its plan',
+  })
+  async setFeature(
+    @Param('id') id: string,
+    @Param('feature') feature: string,
+    @Body(zodBody(z.object({ enabled: z.boolean().nullable() }))) dto: { enabled: boolean | null },
+  ) {
     this.assertPlatformAdmin();
-    if (!/^[a-zA-Z][a-zA-Z0-9_]{1,40}$/.test(feature)) throw new BadRequestError('Invalid feature key');
+    if (!/^[a-zA-Z][a-zA-Z0-9_]{1,40}$/.test(feature))
+      throw new BadRequestError('Invalid feature key');
     await this.tenants.setFeatureOverride(id, feature, dto.enabled);
     await this.tenantContext.invalidate(id as TenantId);
     return { ok: true, feature, enabled: dto.enabled };
@@ -155,10 +195,14 @@ export class TenantAdminController {
 
   @Post('features/:feature/rollback')
   @RequirePermission(Permission.ALL)
-  @ApiOperation({ summary: 'Global rollback: remove this feature override from EVERY operator (all follow their plan again)' })
+  @ApiOperation({
+    summary:
+      'Global rollback: remove this feature override from EVERY operator (all follow their plan again)',
+  })
   async rollbackFeature(@Param('feature') feature: string) {
     this.assertPlatformAdmin();
-    if (!/^[a-zA-Z][a-zA-Z0-9_]{1,40}$/.test(feature)) throw new BadRequestError('Invalid feature key');
+    if (!/^[a-zA-Z][a-zA-Z0-9_]{1,40}$/.test(feature))
+      throw new BadRequestError('Invalid feature key');
     const ids = await this.tenants.clearFeatureEverywhere(feature);
     await Promise.all(ids.map((t) => this.tenantContext.invalidate(t as TenantId)));
     return { ok: true, operatorsAffected: ids.length };
@@ -166,17 +210,29 @@ export class TenantAdminController {
 
   @Get('analytics')
   @RequirePermission(Permission.ALL)
-  @ApiOperation({ summary: 'Platform-wide numbers across EVERY operator — bookings, revenue, operator counts, 14-day trend' })
+  @ApiOperation({
+    summary:
+      'Platform-wide numbers across EVERY operator — bookings, revenue, operator counts, 14-day trend',
+  })
   async analytics() {
     this.assertPlatformAdmin();
-    const [bookings, operators] = await Promise.all([this.bookings.platformStats(), this.tenants.countsByStatus()]);
+    const [bookings, operators] = await Promise.all([
+      this.bookings.platformStats(),
+      this.tenants.countsByStatus(),
+    ]);
     return { ...bookings, operators };
   }
 
   @Get('audit-log')
   @RequirePermission(Permission.ALL)
-  @ApiOperation({ summary: 'Cross-tenant audit trail — who did what, when (security/money-significant actions)' })
-  async auditLog(@Query('tenantId') tenantId?: string, @Query('action') action?: string, @Query('resourceType') resourceType?: string) {
+  @ApiOperation({
+    summary: 'Cross-tenant audit trail — who did what, when (security/money-significant actions)',
+  })
+  async auditLog(
+    @Query('tenantId') tenantId?: string,
+    @Query('action') action?: string,
+    @Query('resourceType') resourceType?: string,
+  ) {
     this.assertPlatformAdmin();
     return { entries: await this.audit.list({ tenantId, action, resourceType }) };
   }
@@ -192,10 +248,20 @@ export class TenantAdminController {
    */
   @Get('platform-settings')
   @RequirePermission(Permission.ALL)
-  @ApiOperation({ summary: 'Platform-wide defaults: commission %, per-bus one-time fee, ticket GST rate, commission GST rate, SMS/WhatsApp fees' })
+  @ApiOperation({
+    summary:
+      'Platform-wide defaults: commission %, per-bus one-time fee, ticket GST rate, commission GST rate, SMS/WhatsApp fees',
+  })
   async platformSettingsGet() {
     this.assertPlatformAdmin();
-    const [defaultCommissionPercent, perBusFeeMinor, gstRatePercent, commissionGstRatePercent, smsFeeMinor, whatsappFeeMinor] = await Promise.all([
+    const [
+      defaultCommissionPercent,
+      perBusFeeMinor,
+      gstRatePercent,
+      commissionGstRatePercent,
+      smsFeeMinor,
+      whatsappFeeMinor,
+    ] = await Promise.all([
       this.platformSettings.defaultCommissionPercent(),
       this.platformSettings.perBusFeeMinor(),
       this.platformSettings.gstRatePercent(),
@@ -203,24 +269,55 @@ export class TenantAdminController {
       this.platformSettings.smsFeeMinor(),
       this.platformSettings.whatsappFeeMinor(),
     ]);
-    return { defaultCommissionPercent, perBusFeeMinor, gstRatePercent, commissionGstRatePercent, smsFeeMinor, whatsappFeeMinor };
+    return {
+      defaultCommissionPercent,
+      perBusFeeMinor,
+      gstRatePercent,
+      commissionGstRatePercent,
+      smsFeeMinor,
+      whatsappFeeMinor,
+    };
   }
 
   @Post('platform-settings')
   @RequirePermission(Permission.ALL)
-  @ApiOperation({ summary: 'Update platform-wide defaults (effective immediately for anything not already overridden)' })
-  async platformSettingsSet(@Body() dto: {
-    defaultCommissionPercent?: number; perBusFeeMinor?: number; gstRatePercent?: number;
-    commissionGstRatePercent?: number; smsFeeMinor?: number; whatsappFeeMinor?: number;
-  }) {
+  @ApiOperation({
+    summary:
+      'Update platform-wide defaults (effective immediately for anything not already overridden)',
+  })
+  async platformSettingsSet(
+    @Body()
+    dto: {
+      defaultCommissionPercent?: number;
+      perBusFeeMinor?: number;
+      gstRatePercent?: number;
+      commissionGstRatePercent?: number;
+      smsFeeMinor?: number;
+      whatsappFeeMinor?: number;
+    },
+  ) {
     this.assertPlatformAdmin();
     const actorId = getContext()?.userId ?? null;
-    if (dto.defaultCommissionPercent !== undefined) await this.platformSettings.set('default_commission_percent', dto.defaultCommissionPercent, actorId);
-    if (dto.perBusFeeMinor !== undefined) await this.platformSettings.set('per_bus_fee_minor', dto.perBusFeeMinor, actorId);
-    if (dto.gstRatePercent !== undefined) await this.platformSettings.set('gst_rate_pct', dto.gstRatePercent, actorId);
-    if (dto.commissionGstRatePercent !== undefined) await this.platformSettings.set('commission_gst_rate_pct', dto.commissionGstRatePercent, actorId);
-    if (dto.smsFeeMinor !== undefined) await this.platformSettings.set('sms_fee_minor', dto.smsFeeMinor, actorId);
-    if (dto.whatsappFeeMinor !== undefined) await this.platformSettings.set('whatsapp_fee_minor', dto.whatsappFeeMinor, actorId);
+    if (dto.defaultCommissionPercent !== undefined)
+      await this.platformSettings.set(
+        'default_commission_percent',
+        dto.defaultCommissionPercent,
+        actorId,
+      );
+    if (dto.perBusFeeMinor !== undefined)
+      await this.platformSettings.set('per_bus_fee_minor', dto.perBusFeeMinor, actorId);
+    if (dto.gstRatePercent !== undefined)
+      await this.platformSettings.set('gst_rate_pct', dto.gstRatePercent, actorId);
+    if (dto.commissionGstRatePercent !== undefined)
+      await this.platformSettings.set(
+        'commission_gst_rate_pct',
+        dto.commissionGstRatePercent,
+        actorId,
+      );
+    if (dto.smsFeeMinor !== undefined)
+      await this.platformSettings.set('sms_fee_minor', dto.smsFeeMinor, actorId);
+    if (dto.whatsappFeeMinor !== undefined)
+      await this.platformSettings.set('whatsapp_fee_minor', dto.whatsappFeeMinor, actorId);
     return { ok: true };
   }
 
@@ -250,7 +347,9 @@ export class TenantAdminController {
 
   @Post('payouts/bank-file')
   @RequirePermission(Permission.ALL)
-  @ApiOperation({ summary: 'Generate a bank bulk-upload CSV for every pending payout, and mark them in-batch' })
+  @ApiOperation({
+    summary: 'Generate a bank bulk-upload CSV for every pending payout, and mark them in-batch',
+  })
   async generateBankFile() {
     this.assertPlatformAdmin();
     const pending = await this.payouts.listPending();
@@ -268,7 +367,10 @@ export class TenantAdminController {
         csvEscape(`Ticketly payout ${p.settlementId.slice(0, 8)}`),
       ].join(','),
     );
-    await this.payouts.markInBatch(pending.map((p) => p.id), batchId);
+    await this.payouts.markInBatch(
+      pending.map((p) => p.id),
+      batchId,
+    );
 
     return {
       csv: [header, ...rows].join('\n'),
@@ -298,7 +400,10 @@ export class TenantAdminController {
 
   @Post('payouts/:id/mark-failed')
   @RequirePermission(Permission.ALL)
-  @ApiOperation({ summary: 'Mark a payout as failed/bounced (e.g. wrong account) — the operator needs to fix their bank details and the settlement re-instructed' })
+  @ApiOperation({
+    summary:
+      'Mark a payout as failed/bounced (e.g. wrong account) — the operator needs to fix their bank details and the settlement re-instructed',
+  })
   async markPayoutFailed(@Param('id') id: string, @Body() dto: { reason: string }) {
     this.assertPlatformAdmin();
     await this.payouts.markFailed(id, dto.reason);
@@ -321,7 +426,10 @@ export class TenantAdminController {
 
   @Post('bank-changes/:id/approve')
   @RequirePermission(Permission.ALL)
-  @ApiOperation({ summary: "Approve a bank-account change — becomes the operator's active payout account immediately" })
+  @ApiOperation({
+    summary:
+      "Approve a bank-account change — becomes the operator's active payout account immediately",
+  })
   async approveBankChange(@Param('id') id: string) {
     this.assertPlatformAdmin();
     await this.payouts.approveBankChange(id, getContext()?.userId ?? null);
@@ -345,7 +453,9 @@ export class TenantAdminController {
   private assertPlatformAdmin(): void {
     const ctx = getContext();
     if (ctx?.tenantId) {
-      throw new ForbiddenError({ message: 'Platform-admin actions require a platform (non-tenant) principal' });
+      throw new ForbiddenError({
+        message: 'Platform-admin actions require a platform (non-tenant) principal',
+      });
     }
   }
 }

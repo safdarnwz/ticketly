@@ -17,18 +17,22 @@ export interface AuthPrincipal {
  * than re-parsing the request, so it is consistent with what every other layer
  * sees and works identically in background jobs.
  */
-export const CurrentUser = createParamDecorator((_data: unknown, _ctx: ExecutionContext): AuthPrincipal => {
-  const context = getContext();
-  return {
-    userId: (context?.userId ?? null),
-    tenantId: (context?.tenantId ?? null),
-    actorType: context?.actorType ?? 'anonymous',
-    permissions: context?.permissions ?? new Set(),
-    roles: (context?.extra?.roles as string[]) ?? [],
-  };
-});
+export const CurrentUser = createParamDecorator(
+  (_data: unknown, _ctx: ExecutionContext): AuthPrincipal => {
+    const context = getContext();
+    return {
+      userId: context?.userId ?? null,
+      tenantId: context?.tenantId ?? null,
+      actorType: context?.actorType ?? 'anonymous',
+      permissions: context?.permissions ?? new Set(),
+      roles: (context?.extra?.roles as string[]) ?? [],
+    };
+  },
+);
 
 /** `@CurrentTenant()` — inject the resolved tenant id (throws if absent upstream). */
-export const CurrentTenant = createParamDecorator((_data: unknown, _ctx: ExecutionContext): TenantId | null => {
-  return (getContext()?.tenantId ?? null);
-});
+export const CurrentTenant = createParamDecorator(
+  (_data: unknown, _ctx: ExecutionContext): TenantId | null => {
+    return getContext()?.tenantId ?? null;
+  },
+);

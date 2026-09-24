@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  assertTransition, canTransition, holdsInventory, isCancellable, isTerminal,
+  assertTransition,
+  canTransition,
+  holdsInventory,
+  isCancellable,
+  isTerminal,
   type BookingStatus,
 } from '../domain/booking-state';
 
@@ -43,8 +47,12 @@ describe('booking state machine — illegal transitions', () => {
 
 describe('booking state machine — predicates', () => {
   it('identifies terminal states', () => {
-    (['completed', 'cancelled', 'expired', 'failed'] as BookingStatus[]).forEach((s) => expect(isTerminal(s)).toBe(true));
-    (['pending', 'held', 'confirmed'] as BookingStatus[]).forEach((s) => expect(isTerminal(s)).toBe(false));
+    (['completed', 'cancelled', 'expired', 'failed'] as BookingStatus[]).forEach((s) =>
+      expect(isTerminal(s)).toBe(true),
+    );
+    (['pending', 'held', 'confirmed'] as BookingStatus[]).forEach((s) =>
+      expect(isTerminal(s)).toBe(false),
+    );
   });
 
   it('identifies inventory-holding states', () => {

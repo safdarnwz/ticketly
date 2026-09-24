@@ -106,7 +106,9 @@ export class SeatMap {
       seen.add(seat.number);
 
       if (seat.type === 'crew' && seat.bookable !== false) {
-        fail(`Seat '${seat.number}' is a crew/driver cell — it must be marked non-bookable, it can never be sold as a ticket`);
+        fail(
+          `Seat '${seat.number}' is a crew/driver cell — it must be marked non-bookable, it can never be sold as a ticket`,
+        );
       }
 
       if (seat.deck < 0 || seat.deck >= decks) {
@@ -127,7 +129,9 @@ export class SeatMap {
         for (let c = seat.column; c < seat.column + colSpan; c += 1) {
           const cell = `${seat.deck}:${r}:${c}`;
           if (occupied.has(cell)) {
-            fail(`Seat '${seat.number}' overlaps another seat at cell (deck ${seat.deck}, row ${r}, col ${c})`);
+            fail(
+              `Seat '${seat.number}' overlaps another seat at cell (deck ${seat.deck}, row ${r}, col ${c})`,
+            );
           }
           occupied.add(cell);
         }
@@ -147,9 +151,7 @@ export class SeatMap {
 
   /** All bookable seat numbers, in a stable order — used to size inventory. */
   bookableSeatNumbers(): string[] {
-    return this.props.seats
-      .filter((s) => s.bookable !== false)
-      .map((s) => s.number);
+    return this.props.seats.filter((s) => s.bookable !== false).map((s) => s.number);
   }
 
   isBookable(seatNumber: string): boolean {

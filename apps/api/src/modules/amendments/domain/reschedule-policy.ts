@@ -36,9 +36,9 @@ export interface ReschedulePolicy {
 
 export const DEFAULT_RESCHEDULE_POLICY: ReschedulePolicy = {
   tiers: [
-    { minHoursBeforeDeparture: 24, feeMinor: 5000 },   // ₹50
-    { minHoursBeforeDeparture: 6, feeMinor: 10000 },   // ₹100
-    { minHoursBeforeDeparture: 2, feeMinor: 15000 },   // ₹150
+    { minHoursBeforeDeparture: 24, feeMinor: 5000 }, // ₹50
+    { minHoursBeforeDeparture: 6, feeMinor: 10000 }, // ₹100
+    { minHoursBeforeDeparture: 2, feeMinor: 15000 }, // ₹150
   ],
   cutoffHours: 2,
   maxReschedules: 2,
@@ -71,10 +71,16 @@ export function quoteReschedule(input: {
   const hoursToDeparture = (input.originalDepartureAt.getTime() - input.now.getTime()) / 3_600_000;
 
   if (input.timesRescheduled >= policy.maxReschedules) {
-    return deny(currency, `This ticket has already been rescheduled ${policy.maxReschedules} time(s)`);
+    return deny(
+      currency,
+      `This ticket has already been rescheduled ${policy.maxReschedules} time(s)`,
+    );
   }
   if (hoursToDeparture < policy.cutoffHours) {
-    return deny(currency, `Rescheduling is not permitted within ${policy.cutoffHours}h of departure`);
+    return deny(
+      currency,
+      `Rescheduling is not permitted within ${policy.cutoffHours}h of departure`,
+    );
   }
 
   const tier = [...policy.tiers]
@@ -101,12 +107,20 @@ export function quoteReschedule(input: {
     feeMinor,
     amountDueMinor: amountDue.minor,
     refundDueMinor: refundDue.minor,
-    reason: fareDifference >= 0
-      ? `Pay fare difference ${diff.format()} + reschedule fee ${fee.format()}`
-      : `New trip is cheaper; ${refundDue.isPositive() ? `refund ${refundDue.format()}` : `fee ${fee.format()} applies`}`,
+    reason:
+      fareDifference >= 0
+        ? `Pay fare difference ${diff.format()} + reschedule fee ${fee.format()}`
+        : `New trip is cheaper; ${refundDue.isPositive() ? `refund ${refundDue.format()}` : `fee ${fee.format()} applies`}`,
   };
 }
 
 function deny(_currency: CurrencyCode, reason: string): RescheduleQuote {
-  return { allowed: false, fareDifferenceMinor: 0, feeMinor: 0, amountDueMinor: 0, refundDueMinor: 0, reason };
+  return {
+    allowed: false,
+    fareDifferenceMinor: 0,
+    feeMinor: 0,
+    amountDueMinor: 0,
+    refundDueMinor: 0,
+    reason,
+  };
 }

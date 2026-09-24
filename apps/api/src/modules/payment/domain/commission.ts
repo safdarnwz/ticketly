@@ -50,9 +50,9 @@ export function computeCommission(input: {
       commission = Money.of((input.config.flatMinor ?? 0) * input.seatCount, currency);
       break;
     case 'percent_plus':
-      commission = net.percent(input.config.percent ?? 0).plus(
-        Money.of((input.config.flatMinor ?? 0) * input.seatCount, currency),
-      );
+      commission = net
+        .percent(input.config.percent ?? 0)
+        .plus(Money.of((input.config.flatMinor ?? 0) * input.seatCount, currency));
       break;
     default:
       commission = Money.zero(currency);

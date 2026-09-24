@@ -5,7 +5,11 @@ import { AppError, ErrorCode, getContext } from '@kernel';
 
 import { PlatformSettingsRepository } from '../../../tenancy/infrastructure/persistence/platform-settings.repository';
 
-export interface MaintenanceState { enabled: boolean; message?: string; until?: string | null }
+export interface MaintenanceState {
+  enabled: boolean;
+  message?: string;
+  until?: string | null;
+}
 export const MAINTENANCE_KEY = 'maintenance_mode';
 
 /**
@@ -27,7 +31,12 @@ export class MaintenanceGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<FastifyRequest>();
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return true;
     const url = req.url ?? '';
-    if (/\/payments\/(webhook|callback|verify)/.test(url) || /\/admin\/platform\/maintenance/.test(url) || /\/auth\//.test(url)) return true;
+    if (
+      /\/payments\/(webhook|callback|verify)/.test(url) ||
+      /\/admin\/platform\/maintenance/.test(url) ||
+      /\/auth\//.test(url)
+    )
+      return true;
 
     const state = await this.state();
     if (!state.enabled) return true;
@@ -35,9 +44,13 @@ export class MaintenanceGuard implements CanActivate {
     if (ctx?.userId && !ctx.tenantId) return true; // platform admin
 
     const until = state.until ? Date.parse(state.until) : NaN;
-    const retryAfter = Number.isFinite(until) ? Math.max(60, Math.round((until - Date.now()) / 1000)) : 300;
+    const retryAfter = Number.isFinite(until)
+      ? Math.max(60, Math.round((until - Date.now()) / 1000))
+      : 300;
     throw new AppError(ErrorCode.COMMON_INTERNAL, 503, {
-      message: state.message?.trim() || 'Ticketly is under scheduled maintenance. Bookings resume shortly — please try again in a few minutes.',
+      message:
+        state.message?.trim() ||
+        'Ticketly is under scheduled maintenance. Bookings resume shortly — please try again in a few minutes.',
       retryable: true,
       retryAfterSeconds: retryAfter,
       details: { maintenance: true, until: state.until ?? null },
@@ -51,7 +64,9 @@ export class MaintenanceGuard implements CanActivate {
 
   private async state(): Promise<MaintenanceState> {
     if (this.cached && Date.now() - this.cached.at < 10_000) return this.cached.state;
-    const state = await this.settings.get<MaintenanceState>(MAINTENANCE_KEY, { enabled: false }).catch(() => ({ enabled: false }));
+    const state = await this.settings
+      .get<MaintenanceState>(MAINTENANCE_KEY, { enabled: false })
+      .catch(() => ({ enabled: false }));
     this.cached = { state, at: Date.now() };
     return state;
   }

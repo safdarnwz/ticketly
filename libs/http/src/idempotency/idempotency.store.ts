@@ -58,7 +58,15 @@ export class IdempotencyStore {
        VALUES ($1, $2, $3, $4, $5, $6, 'in_progress', now() + make_interval(secs => $7))
        ON CONFLICT (key, tenant_id) DO NOTHING
        RETURNING key`,
-      [input.key, input.tenantId, input.userId, input.fingerprint, input.method, input.path, input.ttlSeconds],
+      [
+        input.key,
+        input.tenantId,
+        input.userId,
+        input.fingerprint,
+        input.method,
+        input.path,
+        input.ttlSeconds,
+      ],
       { name: 'idempotency.claim', primary: true },
     );
 

@@ -7,16 +7,24 @@ import { type CityId, type LocalDate } from '@kernel';
 
 import { StorefrontService } from '../application/services/storefront.service';
 
-const FilterSchema = z.object({
-  minPriceMinor: z.number().int().min(0).optional(),
-  maxPriceMinor: z.number().int().min(0).optional(),
-  departAfter: z.string().regex(/^\d{2}:\d{2}$/).optional(),
-  departBefore: z.string().regex(/^\d{2}:\d{2}$/).optional(),
-  seatTypes: z.array(z.string()).optional(),
-  amenities: z.array(z.string()).optional(),
-  minRating: z.number().min(0).max(5).optional(),
-  minSeats: z.number().int().min(1).optional(),
-}).optional();
+const FilterSchema = z
+  .object({
+    minPriceMinor: z.number().int().min(0).optional(),
+    maxPriceMinor: z.number().int().min(0).optional(),
+    departAfter: z
+      .string()
+      .regex(/^\d{2}:\d{2}$/)
+      .optional(),
+    departBefore: z
+      .string()
+      .regex(/^\d{2}:\d{2}$/)
+      .optional(),
+    seatTypes: z.array(z.string()).optional(),
+    amenities: z.array(z.string()).optional(),
+    minRating: z.number().min(0).max(5).optional(),
+    minSeats: z.number().int().min(1).optional(),
+  })
+  .optional();
 
 const SearchSchema = z.object({
   originCityId: z.string().uuid(),

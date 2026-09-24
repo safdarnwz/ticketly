@@ -1,12 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { CacheNamespace, CacheService, CacheTtl } from '@cache';
-import {
-  AppError,
-  ErrorCode,
-  NotFoundError,
-  type TenantId,
-} from '@kernel';
+import { AppError, ErrorCode, NotFoundError, type TenantId } from '@kernel';
 
 import { PlanRepository } from '../../infrastructure/persistence/plan.repository';
 import { isFeatureAllowed, quotaExceeded, resolveEntitlements } from '../../domain/entitlements';
@@ -37,7 +32,10 @@ export interface TenantProfile {
 }
 
 /** JSON-safe form of TenantProfile, as stored in the L1/L2 cache. */
-type CachedProfile = Omit<TenantProfile, 'features' | 'disabled'> & { features: string[]; disabled: string[] };
+type CachedProfile = Omit<TenantProfile, 'features' | 'disabled'> & {
+  features: string[];
+  disabled: string[];
+};
 
 /** Tolerates entries cached by an older build (a Set that became {}). */
 function asList(v: unknown): string[] {
@@ -63,7 +61,12 @@ export class TenantContextService {
       async () => this.buildProfile(tenantId),
     );
     if (!cached) throw new NotFoundError('Operator', tenantId);
-    return { ...cached, features: new Set(asList(cached.features)), disabled: new Set(asList(cached.disabled)), quotas: cached.quotas ?? {} };
+    return {
+      ...cached,
+      features: new Set(asList(cached.features)),
+      disabled: new Set(asList(cached.disabled)),
+      quotas: cached.quotas ?? {},
+    };
   }
 
   /** Assert the tenant can be served right now; throws for suspended/closed. */
@@ -98,7 +101,12 @@ export class TenantContextService {
   }
 
   /** Plan quota check before creating one more of something. No plan or a null quota = unlimited. */
-  async assertQuota(tenantId: TenantId, key: string, currentCount: number, label: string): Promise<void> {
+  async assertQuota(
+    tenantId: TenantId,
+    key: string,
+    currentCount: number,
+    label: string,
+  ): Promise<void> {
     const profile = await this.getProfile(tenantId);
     const limit = quotaExceeded(profile.quotas, key, currentCount);
     if (limit !== null) {
@@ -126,7 +134,11 @@ export class TenantContextService {
 
     // Effective features = plan features ∪ per-tenant overrides.
     // An override of `false` explicitly disables a plan feature.
-    const { features, disabled, quotas } = resolveEntitlements(plan?.features, snap.featureOverrides, plan?.quotas);
+    const { features, disabled, quotas } = resolveEntitlements(
+      plan?.features,
+      snap.featureOverrides,
+      plan?.quotas,
+    );
 
     return {
       tenantId,

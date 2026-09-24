@@ -24,7 +24,15 @@ import { SearchService } from './application/services/search.service';
  * DatabaseModule/MasterDataModule, neither of which cycles back here.
  */
 @Module({
-  imports: [DatabaseModule, CacheModule, MasterDataModule, SchedulingModule, PricingModule, TenancyModule, PromotionsModule],
+  imports: [
+    DatabaseModule,
+    CacheModule,
+    MasterDataModule,
+    SchedulingModule,
+    PricingModule,
+    TenancyModule,
+    PromotionsModule,
+  ],
   controllers: [SearchController],
   providers: [SearchService],
   exports: [SearchService],

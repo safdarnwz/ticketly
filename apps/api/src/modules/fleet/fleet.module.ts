@@ -26,7 +26,20 @@ import { VehicleAdminController } from './presentation/vehicle-admin.controller'
 @Module({
   imports: [DatabaseModule, MessagingModule, PlatformSettingsModule, FilesModule],
   controllers: [FleetController, VehicleAdminController],
-  providers: [VehicleRepository, CrewRepository, FleetLogsRepository, FleetService, CrewService, VehicleVerificationService],
-  exports: [VehicleRepository, CrewRepository, FleetService, CrewService, VehicleVerificationService],
+  providers: [
+    VehicleRepository,
+    CrewRepository,
+    FleetLogsRepository,
+    FleetService,
+    CrewService,
+    VehicleVerificationService,
+  ],
+  exports: [
+    VehicleRepository,
+    CrewRepository,
+    FleetService,
+    CrewService,
+    VehicleVerificationService,
+  ],
 })
 export class FleetModule {}

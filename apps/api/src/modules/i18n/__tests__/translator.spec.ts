@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { translate, resolveLocaleChain, hasTranslation, type Catalogs } from '../domain/translator';
 
 const catalogs: Catalogs = {
-  en: { 'ticket.subject': 'Your ticket {pnr}', 'greeting': 'Hello' },
+  en: { 'ticket.subject': 'Your ticket {pnr}', greeting: 'Hello' },
   hi: { 'ticket.subject': 'आपका टिकट {pnr}' },
   'hi-IN': { greeting: 'नमस्ते' },
 };

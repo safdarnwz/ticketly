@@ -3,18 +3,26 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { FastifyRequest } from 'fastify';
 
 import { ApiStandardErrors, Public, RateLimit, zodBody } from '@http';
-import { getContext} from '@kernel';
+import { getContext } from '@kernel';
 
 import { CurrentUser, type AuthPrincipal } from './decorators/current-user.decorator';
 import {
-  CheckIdentitySchema, type CheckIdentityDto,
-  LoginSchema, type LoginDto,
-  RefreshSchema, type RefreshDto,
-  RegisterCustomerSchema, type RegisterCustomerDto,
-  RequestOtpSchema, type RequestOtpDto,
-  ResetPasswordSchema, type ResetPasswordDto,
-  VerifyOtpSchema, type VerifyOtpDto,
-  VerifyRegistrationSchema, type VerifyRegistrationDto,
+  CheckIdentitySchema,
+  type CheckIdentityDto,
+  LoginSchema,
+  type LoginDto,
+  RefreshSchema,
+  type RefreshDto,
+  RegisterCustomerSchema,
+  type RegisterCustomerDto,
+  RequestOtpSchema,
+  type RequestOtpDto,
+  ResetPasswordSchema,
+  type ResetPasswordDto,
+  VerifyOtpSchema,
+  type VerifyOtpDto,
+  VerifyRegistrationSchema,
+  type VerifyRegistrationDto,
 } from './dto/auth.dto';
 import { AuthService } from '../application/services/auth.service';
 
@@ -39,8 +47,9 @@ export class AuthController {
     return this.auth.passwordLogin({
       identifier: (dto.identifier ?? dto.email) as string,
       password: dto.password,
-      tenantId: (ctx?.tenantId ?? null),
-      loginSurface: ctx?.extra?.authSurface as 'customer' | 'superAdmin' | 'tenantAdmin' | 'unresolved' | undefined,
+      tenantId: ctx?.tenantId ?? null,
+      loginSurface: ctx?.extra?.authSurface as
+        'customer' | 'superAdmin' | 'tenantAdmin' | 'unresolved' | undefined,
       userAgent: ctx?.userAgent,
       ip: req.ip,
     });
@@ -69,9 +78,17 @@ export class AuthController {
   @HttpCode(200)
   @RateLimit(10, 60_000, 'ip')
   @ApiOperation({ summary: 'Verify the registration Email OTP → activate + auto-login' })
-  async verifyRegistration(@Body(zodBody(VerifyRegistrationSchema)) dto: VerifyRegistrationDto, @Req() req: FastifyRequest) {
+  async verifyRegistration(
+    @Body(zodBody(VerifyRegistrationSchema)) dto: VerifyRegistrationDto,
+    @Req() req: FastifyRequest,
+  ) {
     const ctx = getContext();
-    return this.auth.verifyRegistration({ email: dto.email, code: dto.code, userAgent: ctx?.userAgent, ip: req.ip });
+    return this.auth.verifyRegistration({
+      email: dto.email,
+      code: dto.code,
+      userAgent: ctx?.userAgent,
+      ip: req.ip,
+    });
   }
 
   @Public()
@@ -81,7 +98,11 @@ export class AuthController {
   @ApiOperation({ summary: 'Request a one-time code (customer login)' })
   async requestOtp(@Body(zodBody(RequestOtpSchema)) dto: RequestOtpDto) {
     const ctx = getContext();
-    return this.auth.requestOtp({ identity: dto.identity, purpose: dto.purpose, tenantId: (ctx?.tenantId ?? null) });
+    return this.auth.requestOtp({
+      identity: dto.identity,
+      purpose: dto.purpose,
+      tenantId: ctx?.tenantId ?? null,
+    });
   }
 
   @Public()
@@ -95,7 +116,7 @@ export class AuthController {
       identity: dto.identity,
       code: dto.code,
       fullName: dto.fullName,
-      tenantId: (ctx?.tenantId ?? null),
+      tenantId: ctx?.tenantId ?? null,
       userAgent: ctx?.userAgent,
       ip: req.ip,
     });
@@ -105,12 +126,17 @@ export class AuthController {
   @Post('password-reset/confirm')
   @HttpCode(200)
   @RateLimit(10, 60_000, 'ip')
-  @ApiOperation({ summary: "Reset a forgotten password — request the code first via otp/request with purpose='password_reset'" })
+  @ApiOperation({
+    summary:
+      "Reset a forgotten password — request the code first via otp/request with purpose='password_reset'",
+  })
   async resetPassword(@Body(zodBody(ResetPasswordSchema)) dto: ResetPasswordDto) {
     const ctx = getContext();
     await this.auth.resetPasswordWithOtp({
-      identity: dto.identity, code: dto.code, newPassword: dto.newPassword,
-      tenantId: (ctx?.tenantId ?? null),
+      identity: dto.identity,
+      code: dto.code,
+      newPassword: dto.newPassword,
+      tenantId: ctx?.tenantId ?? null,
     });
     return { ok: true };
   }

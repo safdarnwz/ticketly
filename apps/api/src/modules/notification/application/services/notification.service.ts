@@ -43,7 +43,11 @@ export class NotificationService {
     recipients: Partial<Record<Channel, string>>;
     data: Record<string, string | number | undefined>;
   }): Promise<void> {
-    const templates = await this.db.query<{ channel: Channel; subject: string | null; body: string }>(
+    const templates = await this.db.query<{
+      channel: Channel;
+      subject: string | null;
+      body: string;
+    }>(
       `SELECT channel, subject, body FROM notification_templates
         WHERE tenant_id = $1 AND event_type = $2 AND is_active = true`,
       [input.tenantId, input.eventType],
@@ -91,7 +95,10 @@ export class NotificationService {
 
       const provider = this.providers.forChannel(template.channel);
       const result = await provider.send({
-        channel: template.channel, recipient, subject: subject ?? undefined, body,
+        channel: template.channel,
+        recipient,
+        subject: subject ?? undefined,
+        body,
         fromName: template.channel === 'email' ? tenantRow?.display_name : undefined,
       });
 
@@ -101,9 +108,19 @@ export class NotificationService {
         { name: 'notify.logUpdate', primary: true },
       );
       if (!result.ok) {
-        this.log.warn({ tenantId: input.tenantId, channel: template.channel, provider: provider.name, error: result.error }, 'notification send failed; the outbox will retry');
+        this.log.warn(
+          {
+            tenantId: input.tenantId,
+            channel: template.channel,
+            provider: provider.name,
+            error: result.error,
+          },
+          'notification send failed; the outbox will retry',
+        );
         // Throw so the outbox retries the whole event (and this de-dupes on retry).
-        throw new Error(`Notification via ${template.channel} failed: ${result.error ?? 'unknown'}`);
+        throw new Error(
+          `Notification via ${template.channel} failed: ${result.error ?? 'unknown'}`,
+        );
       }
 
       // Bill the operator ONLY for a message that actually sent — never a
@@ -114,13 +131,20 @@ export class NotificationService {
       // we're past it, but a duplicate dispatch of the same event is still
       // possible) can never double-bill for the same message.
       if (template.channel === 'sms' || template.channel === 'whatsapp') {
-        await this.platformSettings.chargeNotification(input.tenantId, template.channel, inserted.id);
+        await this.platformSettings.chargeNotification(
+          input.tenantId,
+          template.channel,
+          inserted.id,
+        );
       }
     }
   }
 
   /** Seed default templates for a tenant (called at provisioning). */
-  async seedDefaults(tenantId: TenantId, defaults: { eventType: string; channel: string; subject?: string; body: string }[]): Promise<void> {
+  async seedDefaults(
+    tenantId: TenantId,
+    defaults: { eventType: string; channel: string; subject?: string; body: string }[],
+  ): Promise<void> {
     for (const t of defaults) {
       await this.db.execute_(
         `INSERT INTO notification_templates (id, tenant_id, event_type, channel, subject, body)

@@ -49,6 +49,13 @@ export function translate(
 }
 
 /** True when a key exists in any locale of the chain (for coverage checks). */
-export function hasTranslation(catalogs: Catalogs, locale: string, key: string, fallback = 'en'): boolean {
-  return resolveLocaleChain(locale, fallback).some((loc) => typeof catalogs[loc]?.[key] === 'string');
+export function hasTranslation(
+  catalogs: Catalogs,
+  locale: string,
+  key: string,
+  fallback = 'en',
+): boolean {
+  return resolveLocaleChain(locale, fallback).some(
+    (loc) => typeof catalogs[loc]?.[key] === 'string',
+  );
 }

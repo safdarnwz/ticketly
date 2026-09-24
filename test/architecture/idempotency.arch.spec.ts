@@ -19,7 +19,9 @@ const GUARDED_MODULES = ['booking', 'payment', 'distribution', 'gds', 'agents', 
 const GUARDED_CONTROLLERS = GUARDED_MODULES.flatMap((m) => {
   const dir = join('apps/api/src/modules', m, 'presentation');
   try {
-    return readdirSync(dir).filter((f) => f.endsWith('.controller.ts') || f.endsWith('.controllers.ts')).map((f) => join(dir, f));
+    return readdirSync(dir)
+      .filter((f) => f.endsWith('.controller.ts') || f.endsWith('.controllers.ts'))
+      .map((f) => join(dir, f));
   } catch {
     return []; // module merged away / renamed — nothing to scan
   }
@@ -38,22 +40,37 @@ const GUARDED_CONTROLLERS = GUARDED_MODULES.flatMap((m) => {
 // The genuine double-charge/double-book surfaces — hold, extend-hold, confirm,
 // cancel, intent, receipts — are NOT exempt and must carry @Idempotent().
 const EXEMPT = new Set([
-  'webhook', 'catalogue', 'byPnr', 'trialBalance',
-  'search', 'search_', 'quote', 'setCommission', 'generateSettlement', 'finaliseSettlement',
-  'stopSales', 'resumeSales', 'markNoShow', 'status', 'setStatus', 'registerWebhook', 'issueKey',
+  'webhook',
+  'catalogue',
+  'byPnr',
+  'trialBalance',
+  'search',
+  'search_',
+  'quote',
+  'setCommission',
+  'generateSettlement',
+  'finaliseSettlement',
+  'stopSales',
+  'resumeSales',
+  'markNoShow',
+  'status',
+  'setStatus',
+  'registerWebhook',
+  'issueKey',
 ]);
 
 /** The handler name: the first line after the route decorator that is a method signature. */
 function handlerName(block: string): string {
   for (const line of block.split('\n')) {
     const m = /^\s*(?:async\s+)?(\w+)\s*\(/.exec(line);
-    if (m && !line.trim().startsWith('@')) return m[1]!;
+    if (m && !line.trim().startsWith('@')) return m[1];
   }
   return 'unknown';
 }
 
 describe('architecture: idempotency on money/inventory endpoints', () => {
-  it('finds the controllers it guards', () => expect(GUARDED_CONTROLLERS.length).toBeGreaterThan(3));
+  it('finds the controllers it guards', () =>
+    expect(GUARDED_CONTROLLERS.length).toBeGreaterThan(3));
 
   for (const file of GUARDED_CONTROLLERS) {
     it(`${file} — every mutating handler is @Idempotent()`, () => {

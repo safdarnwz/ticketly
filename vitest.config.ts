@@ -6,7 +6,12 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['libs/**/*.spec.ts', 'apps/**/*.spec.ts', 'test/unit/**/*.spec.ts', 'test/architecture/**/*.spec.ts'],
+    include: [
+      'libs/**/*.spec.ts',
+      'apps/**/*.spec.ts',
+      'test/unit/**/*.spec.ts',
+      'test/architecture/**/*.spec.ts',
+    ],
     exclude: ['**/*.e2e-spec.ts', 'node_modules', 'dist'],
     coverage: {
       provider: 'v8',

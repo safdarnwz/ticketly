@@ -22,8 +22,16 @@ export function pageSchema(itemRef: string): Record<string, unknown> {
     properties: {
       items: { type: 'array', items: { $ref: itemRef } },
       hasMore: { type: 'boolean' },
-      nextCursor: { type: 'string', nullable: true, description: 'Pass as ?cursor= to fetch the next page' },
-      totalCount: { type: 'integer', nullable: true, description: 'Only present when explicitly requested' },
+      nextCursor: {
+        type: 'string',
+        nullable: true,
+        description: 'Pass as ?cursor= to fetch the next page',
+      },
+      totalCount: {
+        type: 'integer',
+        nullable: true,
+        description: 'Only present when explicitly requested',
+      },
     },
   };
 }

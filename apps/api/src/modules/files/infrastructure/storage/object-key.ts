@@ -13,17 +13,35 @@ export const FOLDERS = ['branding', 'vehicles', 'kyc', 'crew', 'documents', 'mis
 export type Folder = (typeof FOLDERS)[number];
 
 export function sanitiseSegment(raw: string, { lower = false }: { lower?: boolean } = {}): string {
-  let s = String(raw ?? '').normalize('NFKD').replace(/[^\x20-\x7e]/g, '');
+  let s = String(raw ?? '')
+    .normalize('NFKD')
+    .replace(/[^\x20-\x7e]/g, '');
   if (lower) s = s.toLowerCase();
-  s = s.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/-+/g, '-').replace(/-+\./g, '.').replace(/^[-.]+|[-.]+$/g, '');
-  if (s === '' || s === '.' || s === '..') throw new Error(`Invalid storage path segment: '${raw}'`);
+  s = s
+    .replace(/[^A-Za-z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/-+\./g, '.')
+    .replace(/^[-.]+|[-.]+$/g, '');
+  if (s === '' || s === '.' || s === '..')
+    throw new Error(`Invalid storage path segment: '${raw}'`);
   return s.slice(0, 120);
 }
 
-export function buildObjectKey(input: { prefix?: string; tenantSlug: string; folder: Folder; sub?: string[]; fileName: string }): string {
+export function buildObjectKey(input: {
+  prefix?: string;
+  tenantSlug: string;
+  folder: Folder;
+  sub?: string[];
+  fileName: string;
+}): string {
   if (!FOLDERS.includes(input.folder)) throw new Error(`Unknown storage folder '${input.folder}'`);
   const parts = [
-    ...(input.prefix ? input.prefix.split('/').filter(Boolean).map((p) => sanitiseSegment(p, { lower: true })) : []),
+    ...(input.prefix
+      ? input.prefix
+          .split('/')
+          .filter(Boolean)
+          .map((p) => sanitiseSegment(p, { lower: true }))
+      : []),
     sanitiseSegment(input.tenantSlug, { lower: true }),
     input.folder,
     ...(input.sub ?? []).map((p) => sanitiseSegment(p)),
@@ -36,5 +54,13 @@ export function buildObjectKey(input: { prefix?: string; tenantSlug: string; fol
 
 /** Encode a key for use in a URL path: each segment encoded, '/' kept. */
 export function encodeKeyForUrl(key: string): string {
-  return key.split('/').map((seg) => encodeURIComponent(seg).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)).join('/');
+  return key
+    .split('/')
+    .map((seg) =>
+      encodeURIComponent(seg).replace(
+        /[!'()*]/g,
+        (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+      ),
+    )
+    .join('/');
 }

@@ -33,7 +33,8 @@ export function splitRefundClawback(captured: CapturedSplit, refundMinor: number
   if (refundMinor < 0) {
     throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Refund amount cannot be negative');
   }
-  const totalCaptured = captured.commissionMinor + captured.commissionGstMinor + captured.operatorShareMinor;
+  const totalCaptured =
+    captured.commissionMinor + captured.commissionGstMinor + captured.operatorShareMinor;
   if (refundMinor > totalCaptured) {
     throw new DomainError(ErrorCode.REFUND_NOT_ALLOWED, 'Refund exceeds the captured amount', {
       details: { refundMinor, totalCaptured },
@@ -52,5 +53,9 @@ export function splitRefundClawback(captured: CapturedSplit, refundMinor: number
   }
   const operatorClawback = refundMinor - commissionClawback - commissionGstClawback;
 
-  return { commissionClawbackMinor: commissionClawback, commissionGstClawbackMinor: commissionGstClawback, operatorClawbackMinor: operatorClawback };
+  return {
+    commissionClawbackMinor: commissionClawback,
+    commissionGstClawbackMinor: commissionGstClawback,
+    operatorClawbackMinor: operatorClawback,
+  };
 }

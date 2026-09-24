@@ -34,9 +34,7 @@ export function haversineMeters(a: GeoPoint, b: GeoPoint): number {
   const dLng = toRad(b.lng - a.lng);
   const lat1 = toRad(a.lat);
   const lat2 = toRad(b.lat);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
   return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
@@ -49,7 +47,11 @@ export function isWithin(point: GeoPoint, center: GeoPoint, radiusM: number): bo
  * ETA in seconds to cover `remainingRoadDistanceM` at `speedKmph`.
  * Falls back to a floor speed so a stopped bus doesn't yield an infinite ETA.
  */
-export function etaSeconds(remainingRoadDistanceM: number, speedKmph: number, floorKmph = 15): number {
+export function etaSeconds(
+  remainingRoadDistanceM: number,
+  speedKmph: number,
+  floorKmph = 15,
+): number {
   if (remainingRoadDistanceM <= 0) return 0;
   const effectiveKmph = Math.max(speedKmph, floorKmph);
   const mps = (effectiveKmph * 1000) / 3600;
@@ -66,7 +68,7 @@ export function bearingDegrees(a: GeoPoint, b: GeoPoint): number {
   const lat2 = toRad(b.lat);
   const y = Math.sin(dLng) * Math.cos(lat2);
   const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
-  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }
 
 /**

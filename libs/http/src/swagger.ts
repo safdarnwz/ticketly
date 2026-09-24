@@ -25,7 +25,7 @@ export function setupSwagger(app: INestApplication, config: AppConfig): void {
         '### Conventions',
         '- All identifiers are UUID v7.',
         '- Money is transported as integer minor units plus a currency code.',
-        '- Journey dates are `YYYY-MM-DD` in the *origin stop\'s* local calendar.',
+        "- Journey dates are `YYYY-MM-DD` in the *origin stop's* local calendar.",
         '- Timestamps are RFC 3339 UTC.',
         '- Collections use keyset pagination (`?cursor=`); there is no `?page=`.',
         '- Errors follow RFC 9457 `application/problem+json`; branch on `code`.',
@@ -34,11 +34,21 @@ export function setupSwagger(app: INestApplication, config: AppConfig): void {
     )
     .setVersion(config.app.version)
     .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', description: 'Operator console / customer app access token' },
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Operator console / customer app access token',
+      },
       'bearer',
     )
     .addApiKey(
-      { type: 'apiKey', name: 'X-Api-Key', in: 'header', description: 'Server-to-server key for OTA / channel partners' },
+      {
+        type: 'apiKey',
+        name: 'X-Api-Key',
+        in: 'header',
+        description: 'Server-to-server key for OTA / channel partners',
+      },
       'apiKey',
     )
     .addGlobalParameters({

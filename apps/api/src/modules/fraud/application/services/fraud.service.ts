@@ -17,7 +17,11 @@ import { FraudRepository } from '../../infrastructure/persistence/fraud.reposito
 export class FraudService {
   constructor(private readonly repo: FraudRepository) {}
 
-  async assess(input: { signals: RiskSignals; bookingId?: BookingId; customerId?: UserId }): Promise<RiskResult & { assessmentId: string }> {
+  async assess(input: {
+    signals: RiskSignals;
+    bookingId?: BookingId;
+    customerId?: UserId;
+  }): Promise<RiskResult & { assessmentId: string }> {
     const result = scoreRisk(input.signals);
     const assessmentId = await this.repo.insert({
       bookingId: input.bookingId ?? null,

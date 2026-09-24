@@ -3,15 +3,28 @@ import { Injectable } from '@nestjs/common';
 import { CacheNamespace, CacheService, CacheTtl } from '@cache';
 import { UnitOfWork } from '@database';
 import {
-  daysBetween, getTenantId, mapWithConcurrency, runAsTenant, todayIn,
-  type CityId, type LocalDate, type RouteId, type StopId, type TenantId, type TripId, type VehicleId,
+  daysBetween,
+  getTenantId,
+  mapWithConcurrency,
+  runAsTenant,
+  todayIn,
+  type CityId,
+  type LocalDate,
+  type RouteId,
+  type StopId,
+  type TenantId,
+  type TripId,
+  type VehicleId,
 } from '@kernel';
 import { Logger, Metrics } from '@observability';
 
 import { TenantRepository } from '../../../tenancy/infrastructure/persistence/tenant.repository';
 import { PricingEngine } from '../../../pricing/domain/pricing-engine';
 import { FareRepository } from '../../../pricing/infrastructure/persistence/fare.repository';
-import { AmenityRepository, type Amenity } from '../../../master-data/infrastructure/persistence/amenity.repository';
+import {
+  AmenityRepository,
+  type Amenity,
+} from '../../../master-data/infrastructure/persistence/amenity.repository';
 import { PromotionRepository } from '../../../promotions/infrastructure/persistence/promotion.repository';
 import { bubblePromotedToTop } from '../../../promotions/domain/promotion-pricing';
 import { InventoryRepository } from '../../../scheduling/infrastructure/persistence/inventory.repository';
@@ -139,8 +152,15 @@ export class SearchService {
       // stale-while-revalidate: once warm, a popular search is ALWAYS served
       // from memory; an expired entry is refreshed in the background (one
       // refresh per key, single-flight) instead of making a customer wait.
-      { namespace: CacheNamespace.SEARCH, ttlSeconds: CacheTtl.SEARCH_RESULTS, staleWhileRevalidateSeconds: SEARCH_STALE_SECONDS },
-      async () => (boundTenantId ? this.computeForTenant(input, boundTenantId) : this.computeAcrossTenants(input)),
+      {
+        namespace: CacheNamespace.SEARCH,
+        ttlSeconds: CacheTtl.SEARCH_RESULTS,
+        staleWhileRevalidateSeconds: SEARCH_STALE_SECONDS,
+      },
+      async () =>
+        boundTenantId
+          ? this.computeForTenant(input, boundTenantId)
+          : this.computeAcrossTenants(input),
     );
 
     this.metrics.searchRequests.inc({ cached: 'served' });
@@ -168,8 +188,13 @@ export class SearchService {
     const rotationBucket = new Date().toISOString().slice(0, 13); // 'YYYY-MM-DDTHH'
     const MAX_PROMOTED_SLOTS = 3;
 
-    return bubblePromotedToTop(results, promotedRouteIds, MAX_PROMOTED_SLOTS, rotationBucket, purchasedAtByRoute)
-      .map((r) => ({ ...r, isPromoted: promotedRouteIds.has(r.routeId) }));
+    return bubblePromotedToTop(
+      results,
+      promotedRouteIds,
+      MAX_PROMOTED_SLOTS,
+      rotationBucket,
+      purchasedAtByRoute,
+    ).map((r) => ({ ...r, isPromoted: promotedRouteIds.has(r.routeId) }));
   }
 
   /**
@@ -187,7 +212,10 @@ export class SearchService {
     const perTenant = await mapWithConcurrency(tenantIds, FANOUT_CONCURRENCY, (tenantId) =>
       runAsTenant(tenantId, () => this.computeForTenant(input, tenantId)).catch((err: unknown) => {
         this.metrics.searchRequests.inc({ cached: 'tenant_error' });
-        this.log.error({ tenantId, err: err instanceof Error ? err.message : String(err) }, 'search failed for one operator — skipped');
+        this.log.error(
+          { tenantId, err: err instanceof Error ? err.message : String(err) },
+          'search failed for one operator — skipped',
+        );
         return [] as SearchResult[];
       }),
     );
@@ -199,17 +227,20 @@ export class SearchService {
 
   /** Active operators with at least one published route for this O/D (RLS bypassed: returns ids only). */
   private async tenantsServingOd(originCityId: CityId, destCityId: CityId): Promise<TenantId[]> {
-    return this.uow.run({ name: 'search.tenantsServingOd', bypassRls: true, readOnly: true }, async (scope) => {
-      const res = await scope.client.query<{ tenant_id: TenantId }>(
-        `SELECT DISTINCT r.tenant_id
+    return this.uow.run(
+      { name: 'search.tenantsServingOd', bypassRls: true, readOnly: true },
+      async (scope) => {
+        const res = await scope.client.query<{ tenant_id: TenantId }>(
+          `SELECT DISTINCT r.tenant_id
            FROM routes r
            JOIN tenants t ON t.id = r.tenant_id AND t.status = 'active' AND t.deleted_at IS NULL
           WHERE r.origin_city_id = $1 AND r.dest_city_id = $2
             AND r.status = 'published' AND r.deleted_at IS NULL`,
-        [originCityId, destCityId],
-      );
-      return res.rows.map((r) => r.tenant_id);
-    });
+          [originCityId, destCityId],
+        );
+        return res.rows.map((r) => r.tenant_id);
+      },
+    );
   }
 
   private async computeForTenant(
@@ -248,9 +279,10 @@ export class SearchService {
       const segByTrip = new Map<TripId, { fromSeq: number; toSeq: number }>();
       for (const trip of trips) {
         // Default to whole-trip (first→last) when explicit stops aren't given.
-        const seg = input.fromStopId && input.toStopId
-          ? await this.inventory.resolveSegment(trip.id, input.fromStopId, input.toStopId)
-          : { fromSeq: 0, toSeq: trip.stopCount - 1 };
+        const seg =
+          input.fromStopId && input.toStopId
+            ? await this.inventory.resolveSegment(trip.id, input.fromStopId, input.toStopId)
+            : { fromSeq: 0, toSeq: trip.stopCount - 1 };
         if (seg) segByTrip.set(trip.id, seg);
       }
 
@@ -282,7 +314,10 @@ export class SearchService {
           journeyDate: input.journeyDate,
         });
         const baseFareMinor = fare?.baseFareMinor ?? 0;
-        const occupancyPct = trip.totalSeats > 0 ? Math.round(((trip.totalSeats - available) / trip.totalSeats) * 100) : 0;
+        const occupancyPct =
+          trip.totalSeats > 0
+            ? Math.round(((trip.totalSeats - available) / trip.totalSeats) * 100)
+            : 0;
 
         const breakup = PricingEngine.price({
           currency: (fare?.currency ?? 'INR') as never,

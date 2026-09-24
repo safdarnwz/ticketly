@@ -18,7 +18,14 @@ import { PlatformSettingsModule } from '../platform-settings/platform-settings.m
  * pure (domain/application-status.ts).
  */
 @Module({
-  imports: [DatabaseModule, SecurityModule, IamModule, NotificationModule, FilesModule, PlatformSettingsModule],
+  imports: [
+    DatabaseModule,
+    SecurityModule,
+    IamModule,
+    NotificationModule,
+    FilesModule,
+    PlatformSettingsModule,
+  ],
   controllers: [OnboardingController],
   providers: [OperatorApplicationRepository, OnboardingService],
   exports: [OnboardingService],

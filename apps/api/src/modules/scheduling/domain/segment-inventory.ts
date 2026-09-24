@@ -46,14 +46,20 @@ import { DomainError, ErrorCode } from '@kernel';
 export const MAX_LEGS = 62; // fits a signed 63-bit Postgres bigint with headroom
 
 export class SegmentMap {
-  private constructor(readonly stopCount: number, readonly legCount: number) {}
+  private constructor(
+    readonly stopCount: number,
+    readonly legCount: number,
+  ) {}
 
   static forStops(stopCount: number): SegmentMap {
     if (stopCount < 2) {
       throw new DomainError(ErrorCode.INVENTORY_SEGMENT_INVALID, 'A trip needs at least 2 stops');
     }
     if (stopCount - 1 > MAX_LEGS) {
-      throw new DomainError(ErrorCode.INVENTORY_SEGMENT_INVALID, `Routes with more than ${MAX_LEGS + 1} stops are not supported by the bitmap inventory model`);
+      throw new DomainError(
+        ErrorCode.INVENTORY_SEGMENT_INVALID,
+        `Routes with more than ${MAX_LEGS + 1} stops are not supported by the bitmap inventory model`,
+      );
     }
     return new SegmentMap(stopCount, stopCount - 1);
   }
@@ -84,7 +90,10 @@ export class SegmentMap {
   occupy(occupied: bigint, fromSeq: number, toSeq: number): bigint {
     const mask = this.segmentMask(fromSeq, toSeq);
     if ((occupied & mask) !== 0n) {
-      throw new DomainError(ErrorCode.INVENTORY_SEAT_UNAVAILABLE, 'Seat is already occupied on part of this segment');
+      throw new DomainError(
+        ErrorCode.INVENTORY_SEAT_UNAVAILABLE,
+        'Seat is already occupied on part of this segment',
+      );
     }
     return occupied | mask;
   }

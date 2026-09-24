@@ -18,8 +18,18 @@ export class CmsService {
     return new Date().toISOString();
   }
 
-  upsertPage(input: { slug: string; title: string; body: string; status?: 'draft' | 'published' }): Promise<string> {
-    return this.repo.upsertPage({ slug: input.slug, title: input.title, body: input.body, status: input.status ?? 'draft' });
+  upsertPage(input: {
+    slug: string;
+    title: string;
+    body: string;
+    status?: 'draft' | 'published';
+  }): Promise<string> {
+    return this.repo.upsertPage({
+      slug: input.slug,
+      title: input.title,
+      body: input.body,
+      status: input.status ?? 'draft',
+    });
   }
 
   async getPage(slug: string): Promise<unknown> {
@@ -32,13 +42,32 @@ export class CmsService {
     return this.repo.listActiveBanners(this.now());
   }
 
-  createBanner(input: { title: string; imageUrl?: string; imageFileId?: string; linkUrl?: string; sortOrder?: number; activeFrom?: string; activeTo?: string }): Promise<string> {
+  createBanner(input: {
+    title: string;
+    imageUrl?: string;
+    imageFileId?: string;
+    linkUrl?: string;
+    sortOrder?: number;
+    activeFrom?: string;
+    activeTo?: string;
+  }): Promise<string> {
     return this.repo.insertBanner({ ...input, sortOrder: input.sortOrder ?? 0 });
   }
 
-  upsertOffer(input: { code: string; title: string; description?: string; couponCode?: string; bannerUrl?: string; bannerFileId?: string; validFrom: string; validTo: string }): Promise<string> {
+  upsertOffer(input: {
+    code: string;
+    title: string;
+    description?: string;
+    couponCode?: string;
+    bannerUrl?: string;
+    bannerFileId?: string;
+    validFrom: string;
+    validTo: string;
+  }): Promise<string> {
     if (new Date(input.validTo).getTime() <= new Date(input.validFrom).getTime()) {
-      throw new AppError(ErrorCode.OFFER_INVALID_WINDOW, 422, { message: 'Offer validTo must be after validFrom' });
+      throw new AppError(ErrorCode.OFFER_INVALID_WINDOW, 422, {
+        message: 'Offer validTo must be after validFrom',
+      });
     }
     return this.repo.upsertOffer(input);
   }

@@ -64,7 +64,9 @@ describe('SeatMap — happy path', () => {
 
 describe('SeatMap — negative & edge cases', () => {
   it('rejects an empty layout', () => {
-    expect(() => SeatMap.create({ decks: 1, rows: 1, columns: 1, seats: [] })).toThrow(/at least one seat/);
+    expect(() => SeatMap.create({ decks: 1, rows: 1, columns: 1, seats: [] })).toThrow(
+      /at least one seat/,
+    );
   });
 
   it('rejects duplicate seat numbers', () => {
@@ -109,12 +111,21 @@ describe('SeatMap — negative & edge cases', () => {
   });
 
   it('rejects more than 2 decks and zero rows', () => {
-    expect(() => SeatMap.create({ decks: 3, rows: 1, columns: 1, seats: validSeater().seats })).toThrow(/1 or 2 decks/);
-    expect(() => SeatMap.create({ decks: 1, rows: 0, columns: 1, seats: validSeater().seats })).toThrow(/rows must be/);
+    expect(() =>
+      SeatMap.create({ decks: 3, rows: 1, columns: 1, seats: validSeater().seats }),
+    ).toThrow(/1 or 2 decks/);
+    expect(() =>
+      SeatMap.create({ decks: 1, rows: 0, columns: 1, seats: validSeater().seats }),
+    ).toThrow(/rows must be/);
   });
 
   it('edge: a single-seat minibus layout is valid', () => {
-    const map = SeatMap.create({ decks: 1, rows: 1, columns: 1, seats: [{ number: '1', deck: 0, row: 0, column: 0, type: 'seater' }] });
+    const map = SeatMap.create({
+      decks: 1,
+      rows: 1,
+      columns: 1,
+      seats: [{ number: '1', deck: 0, row: 0, column: 0, type: 'seater' }],
+    });
     expect(map.seatCount).toBe(1);
   });
 

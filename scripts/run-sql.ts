@@ -23,7 +23,14 @@ async function main(): Promise<void> {
   }
   const env = loadEnv();
   const sql = readFileSync(resolve(file), 'utf8');
-  const pool = new Pool({ host: env.DB_HOST, port: env.DB_PORT, database: env.DB_NAME, user: env.DB_USER, password: env.DB_PASSWORD, max: 1 });
+  const pool = new Pool({
+    host: env.DB_HOST,
+    port: env.DB_PORT,
+    database: env.DB_NAME,
+    user: env.DB_USER,
+    password: env.DB_PASSWORD,
+    max: 1,
+  });
   const client = await pool.connect();
   try {
     process.stdout.write(`→ running ${file}\n`);

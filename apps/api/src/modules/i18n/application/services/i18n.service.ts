@@ -22,19 +22,28 @@ export class I18nService {
 
   constructor(private readonly repo: I18nRepository) {}
 
-  async translate(locale: string, key: string, vars: Record<string, string | number> = {}): Promise<string> {
+  async translate(
+    locale: string,
+    key: string,
+    vars: Record<string, string | number> = {},
+  ): Promise<string> {
     const locales = resolveLocaleChain(locale, this.fallback);
     const catalogs: Catalogs = {};
     for (const loc of locales) catalogs[loc] = await this.repo.loadCatalog(loc);
     return translate(catalogs, locale, key, vars, this.fallback);
   }
 
-  async convert(amountMinor: number, from: string, to: string): Promise<{ amountMinor: number; formatted: string }> {
+  async convert(
+    amountMinor: number,
+    from: string,
+    to: string,
+  ): Promise<{ amountMinor: number; formatted: string }> {
     const f = from.toUpperCase();
     const t = to.toUpperCase();
     if (f === t) return { amountMinor, formatted: formatMoney(amountMinor, t) };
     const rate = await this.repo.latestRateMicros(f, t);
-    if (rate === null) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: `No FX rate for ${f}→${t}` });
+    if (rate === null)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: `No FX rate for ${f}→${t}` });
     const converted = convertMinor(amountMinor, f, t, rate);
     return { amountMinor: converted, formatted: formatMoney(converted, t) };
   }

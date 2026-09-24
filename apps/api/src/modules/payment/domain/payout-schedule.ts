@@ -32,14 +32,14 @@ export function payoutWindowFor(today: Date): PayoutWindow | null {
     // Thursday → settle this week's Monday through Wednesday.
     return {
       periodFrom: toLocalDate(addDays(today, -3)), // Monday
-      periodTo: toLocalDate(addDays(today, -1)),   // Wednesday
+      periodTo: toLocalDate(addDays(today, -1)), // Wednesday
     };
   }
   if (dow === 1) {
     // Monday → settle last week's Thursday through Sunday.
     return {
       periodFrom: toLocalDate(addDays(today, -4)), // last Thursday
-      periodTo: toLocalDate(addDays(today, -1)),   // yesterday, Sunday
+      periodTo: toLocalDate(addDays(today, -1)), // yesterday, Sunday
     };
   }
   return null;

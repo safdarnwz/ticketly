@@ -19,20 +19,39 @@ export interface Announcement {
 export class AnnouncementRepository {
   constructor(private readonly db: DatabaseService) {}
 
-  async create(input: { title: string; body: string; severity?: 'info' | 'warning' | 'critical'; audience?: 'operators' | 'customers' | 'all'; startsAt?: string; endsAt?: string; createdBy?: UserId | null }): Promise<string> {
+  async create(input: {
+    title: string;
+    body: string;
+    severity?: 'info' | 'warning' | 'critical';
+    audience?: 'operators' | 'customers' | 'all';
+    startsAt?: string;
+    endsAt?: string;
+    createdBy?: UserId | null;
+  }): Promise<string> {
     const id = newId();
     await this.db.execute_(
       `INSERT INTO announcements (id, title, body, severity, audience, starts_at, ends_at, created_by)
        VALUES ($1,$2,$3,$4,$5,coalesce($6,now()),$7,$8)`,
-      [id, input.title, input.body, input.severity ?? 'info', input.audience ?? 'operators',
-       input.startsAt ?? null, input.endsAt ?? null, input.createdBy ?? null],
+      [
+        id,
+        input.title,
+        input.body,
+        input.severity ?? 'info',
+        input.audience ?? 'operators',
+        input.startsAt ?? null,
+        input.endsAt ?? null,
+        input.createdBy ?? null,
+      ],
       { name: 'announcement.create', primary: true },
     );
     return id;
   }
 
   async delete(id: string): Promise<void> {
-    await this.db.execute_(`DELETE FROM announcements WHERE id = $1`, [id], { name: 'announcement.delete', primary: true });
+    await this.db.execute_(`DELETE FROM announcements WHERE id = $1`, [id], {
+      name: 'announcement.delete',
+      primary: true,
+    });
   }
 
   async listAll(): Promise<Announcement[]> {
@@ -58,9 +77,24 @@ export class AnnouncementRepository {
 }
 
 interface Row {
-  id: string; title: string; body: string; severity: Announcement['severity']; audience: Announcement['audience'];
-  starts_at: Date; ends_at: Date | null; created_at: Date;
+  id: string;
+  title: string;
+  body: string;
+  severity: Announcement['severity'];
+  audience: Announcement['audience'];
+  starts_at: Date;
+  ends_at: Date | null;
+  created_at: Date;
 }
 function map(r: Row): Announcement {
-  return { id: r.id, title: r.title, body: r.body, severity: r.severity, audience: r.audience, startsAt: r.starts_at, endsAt: r.ends_at, createdAt: r.created_at };
+  return {
+    id: r.id,
+    title: r.title,
+    body: r.body,
+    severity: r.severity,
+    audience: r.audience,
+    startsAt: r.starts_at,
+    endsAt: r.ends_at,
+    createdAt: r.created_at,
+  };
 }

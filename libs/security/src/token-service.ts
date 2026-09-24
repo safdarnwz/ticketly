@@ -77,7 +77,9 @@ export class TokenService {
   verifyAccess(token: string): AccessTokenClaims {
     const claims = this.verify(token);
     if (claims.typ !== 'access') {
-      throw new UnauthenticatedError(ErrorCode.AUTH_TOKEN_INVALID, { message: 'Expected an access token' });
+      throw new UnauthenticatedError(ErrorCode.AUTH_TOKEN_INVALID, {
+        message: 'Expected an access token',
+      });
     }
     return claims;
   }
@@ -85,14 +87,19 @@ export class TokenService {
   verifyRefresh(token: string): RefreshTokenClaims {
     const claims = this.verify(token);
     if (claims.typ !== 'refresh') {
-      throw new UnauthenticatedError(ErrorCode.AUTH_TOKEN_INVALID, { message: 'Expected a refresh token' });
+      throw new UnauthenticatedError(ErrorCode.AUTH_TOKEN_INVALID, {
+        message: 'Expected a refresh token',
+      });
     }
     return claims;
   }
 
   /* ── internals ────────────────────────────────────────────────────────*/
 
-  private sign(payload: Record<string, unknown>, ttlSeconds: number): { token: string; expiresAt: Date } {
+  private sign(
+    payload: Record<string, unknown>,
+    ttlSeconds: number,
+  ): { token: string; expiresAt: Date } {
     const now = Math.floor(Date.now() / 1000);
     const exp = now + ttlSeconds;
     const fullPayload = {
@@ -119,7 +126,9 @@ export class TokenService {
     // "alg: none" and algorithm-confusion attacks.
     const decodedHeader = safeJsonParse(header);
     if (!decodedHeader || decodedHeader.alg !== 'HS256' || decodedHeader.typ !== 'JWT') {
-      throw new UnauthenticatedError(ErrorCode.AUTH_TOKEN_INVALID, { message: 'Unsupported token algorithm' });
+      throw new UnauthenticatedError(ErrorCode.AUTH_TOKEN_INVALID, {
+        message: 'Unsupported token algorithm',
+      });
     }
 
     // Accept the current secret OR the previous one (rotation window).
@@ -131,20 +140,32 @@ export class TokenService {
         : false);
 
     if (!validSignature) {
-      throw new UnauthenticatedError(ErrorCode.AUTH_TOKEN_INVALID, { message: 'Invalid token signature' });
+      throw new UnauthenticatedError(ErrorCode.AUTH_TOKEN_INVALID, {
+        message: 'Invalid token signature',
+      });
     }
 
-    const claims = safeJsonParse(body) as unknown as (AccessTokenClaims | RefreshTokenClaims) | null;
+    const claims = safeJsonParse(body) as unknown as
+      (AccessTokenClaims | RefreshTokenClaims) | null;
     if (!claims) {
-      throw new UnauthenticatedError(ErrorCode.AUTH_TOKEN_INVALID, { message: 'Malformed token payload' });
+      throw new UnauthenticatedError(ErrorCode.AUTH_TOKEN_INVALID, {
+        message: 'Malformed token payload',
+      });
     }
 
     const now = Math.floor(Date.now() / 1000);
     if (claims.exp && claims.exp < now) {
-      throw new UnauthenticatedError(ErrorCode.AUTH_TOKEN_EXPIRED, { message: 'Token has expired' });
+      throw new UnauthenticatedError(ErrorCode.AUTH_TOKEN_EXPIRED, {
+        message: 'Token has expired',
+      });
     }
-    if (claims.iss !== this.config.security.issuer || claims.aud !== this.config.security.audience) {
-      throw new UnauthenticatedError(ErrorCode.AUTH_TOKEN_INVALID, { message: 'Token issuer/audience mismatch' });
+    if (
+      claims.iss !== this.config.security.issuer ||
+      claims.aud !== this.config.security.audience
+    ) {
+      throw new UnauthenticatedError(ErrorCode.AUTH_TOKEN_INVALID, {
+        message: 'Token issuer/audience mismatch',
+      });
     }
     return claims;
   }

@@ -8,13 +8,21 @@ import { type BookingId, type StopId, type TripId } from '@kernel';
 
 import { AmendmentService } from '../application/services/amendment.service';
 import {
-  RescheduleSchema, type RescheduleDto,
-  SeatChangeSchema, type SeatChangeDto,
+  RescheduleSchema,
+  type RescheduleDto,
+  SeatChangeSchema,
+  type SeatChangeDto,
 } from './dto/amendments.dto';
 
-const NameCorrectionSchema = z.object({ seatNumber: z.string().trim().min(1), fullName: z.string().trim().min(2).max(120) });
-const PointChangeSchema = z.object({ fromStopId: z.string().uuid().optional(), toStopId: z.string().uuid().optional() })
-  .refine((d) => d.fromStopId || d.toStopId, { message: 'Choose a new boarding and/or dropping point' });
+const NameCorrectionSchema = z.object({
+  seatNumber: z.string().trim().min(1),
+  fullName: z.string().trim().min(2).max(120),
+});
+const PointChangeSchema = z
+  .object({ fromStopId: z.string().uuid().optional(), toStopId: z.string().uuid().optional() })
+  .refine((d) => d.fromStopId || d.toStopId, {
+    message: 'Choose a new boarding and/or dropping point',
+  });
 
 @ApiTags('amendments')
 @ApiBearerAuth('bearer')
@@ -51,8 +59,14 @@ export class AmendmentsController {
   @HttpCode(200)
   @Idempotent()
   @RequirePermission(Permission.BOOKING_RESCHEDULE)
-  @ApiOperation({ summary: 'Change boarding and/or dropping point on the same trip (same fare stage; until 60 min before boarding)' })
-  async changePoints(@Param('id') id: string, @Body(zodBody(PointChangeSchema)) dto: z.infer<typeof PointChangeSchema>) {
+  @ApiOperation({
+    summary:
+      'Change boarding and/or dropping point on the same trip (same fare stage; until 60 min before boarding)',
+  })
+  async changePoints(
+    @Param('id') id: string,
+    @Body(zodBody(PointChangeSchema)) dto: z.infer<typeof PointChangeSchema>,
+  ) {
     return this.amendments.changePoints(id as BookingId, dto);
   }
 
@@ -60,8 +74,13 @@ export class AmendmentsController {
   @HttpCode(200)
   @Idempotent()
   @RequirePermission(Permission.BOOKING_RESCHEDULE)
-  @ApiOperation({ summary: 'Correct a passenger name spelling (small edit only — a different person is refused)' })
-  async correctName(@Param('id') id: string, @Body(zodBody(NameCorrectionSchema)) dto: z.infer<typeof NameCorrectionSchema>) {
+  @ApiOperation({
+    summary: 'Correct a passenger name spelling (small edit only — a different person is refused)',
+  })
+  async correctName(
+    @Param('id') id: string,
+    @Body(zodBody(NameCorrectionSchema)) dto: z.infer<typeof NameCorrectionSchema>,
+  ) {
     return this.amendments.correctName(id as BookingId, dto.seatNumber, dto.fullName);
   }
 }

@@ -31,25 +31,51 @@ export interface RoutePromotion {
 
 @Injectable()
 export class PromotionRepository {
-  constructor(private readonly db: DatabaseService, private readonly uow: UnitOfWork) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly uow: UnitOfWork,
+  ) {}
 
   /** The CURRENTLY-effective rate card — super-admin's pricing.module, not tenant-scoped (one rate card for the whole platform). */
   async currentRates(): Promise<PromotionPricingRule[]> {
-    const rows = await this.db.query<{ id: string; billing_cycle: PromotionBillingCycle; is_multi_route: boolean; price_minor: string; currency: string }>(
+    const rows = await this.db.query<{
+      id: string;
+      billing_cycle: PromotionBillingCycle;
+      is_multi_route: boolean;
+      price_minor: string;
+      currency: string;
+    }>(
       `SELECT id, billing_cycle, is_multi_route, price_minor, currency FROM promotion_pricing_rules WHERE effective_to IS NULL ORDER BY billing_cycle, is_multi_route`,
       [],
       { name: 'promotion.currentRates' },
     );
-    return rows.map((r) => ({ id: r.id, billingCycle: r.billing_cycle, isMultiRoute: r.is_multi_route, priceMinor: Number(r.price_minor), currency: r.currency }));
+    return rows.map((r) => ({
+      id: r.id,
+      billingCycle: r.billing_cycle,
+      isMultiRoute: r.is_multi_route,
+      priceMinor: Number(r.price_minor),
+      currency: r.currency,
+    }));
   }
 
-  async rateFor(billingCycle: PromotionBillingCycle, isMultiRoute: boolean): Promise<PromotionPricingRule | null> {
+  async rateFor(
+    billingCycle: PromotionBillingCycle,
+    isMultiRoute: boolean,
+  ): Promise<PromotionPricingRule | null> {
     const row = await this.db.queryOne<{ id: string; price_minor: string; currency: string }>(
       `SELECT id, price_minor, currency FROM promotion_pricing_rules WHERE billing_cycle = $1 AND is_multi_route = $2 AND effective_to IS NULL`,
       [billingCycle, isMultiRoute],
       { name: 'promotion.rateFor' },
     );
-    return row ? { id: row.id, billingCycle, isMultiRoute, priceMinor: Number(row.price_minor), currency: row.currency } : null;
+    return row
+      ? {
+          id: row.id,
+          billingCycle,
+          isMultiRoute,
+          priceMinor: Number(row.price_minor),
+          currency: row.currency,
+        }
+      : null;
   }
 
   /**
@@ -58,7 +84,12 @@ export class PromotionRepository {
    * every historical price a promotion was actually purchased at remains
    * explainable later (a billing dispute, an old invoice line item).
    */
-  async setRate(billingCycle: PromotionBillingCycle, isMultiRoute: boolean, priceMinor: number, actorUserId: string | null): Promise<void> {
+  async setRate(
+    billingCycle: PromotionBillingCycle,
+    isMultiRoute: boolean,
+    priceMinor: number,
+    actorUserId: string | null,
+  ): Promise<void> {
     await this.uow.run({ name: 'promotion.setRate' }, async (scope) => {
       await scope.client.query(
         `UPDATE promotion_pricing_rules SET effective_to = now() WHERE billing_cycle = $1 AND is_multi_route = $2 AND effective_to IS NULL`,
@@ -82,25 +113,50 @@ export class PromotionRepository {
    * where most searches actually happen. Cached upstream; this is the
    * cache-miss path.
    */
-  async activePromotionsForRoutes(routeIds: readonly string[], now: Date): Promise<RoutePromotion[]> {
+  async activePromotionsForRoutes(
+    routeIds: readonly string[],
+    now: Date,
+  ): Promise<RoutePromotion[]> {
     if (routeIds.length === 0) return [];
-    const result = await this.uow.run({ name: 'promotion.activeForRoutes', bypassRls: true }, async (scope) =>
-      scope.client.query<Row>(
-        `SELECT id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, status, auto_renew, created_at, version
+    const result = await this.uow.run(
+      { name: 'promotion.activeForRoutes', bypassRls: true },
+      async (scope) =>
+        scope.client.query<Row>(
+          `SELECT id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, status, auto_renew, created_at, version
            FROM route_promotions
           WHERE route_id = ANY($1::uuid[]) AND status = 'active' AND starts_at <= $2 AND ends_at > $2`,
-        [routeIds, now],
-      ),
+          [routeIds, now],
+        ),
     );
     return result.rows.map(map);
   }
 
-  async create(input: { routeId: RouteId; groupId: string; billingCycle?: PromotionBillingCycle | null; priceMinor: number; currency: string; startsAt: Date; endsAt: Date; autoRenew: boolean }): Promise<string> {
+  async create(input: {
+    routeId: RouteId;
+    groupId: string;
+    billingCycle?: PromotionBillingCycle | null;
+    priceMinor: number;
+    currency: string;
+    startsAt: Date;
+    endsAt: Date;
+    autoRenew: boolean;
+  }): Promise<string> {
     const id = newId();
     await this.db.execute_(
       `INSERT INTO route_promotions (id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, auto_renew, status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending_payment')`,
-      [id, requireTenantId(), input.routeId, input.groupId, input.billingCycle ?? null, input.priceMinor, input.currency, input.startsAt, input.endsAt, input.autoRenew],
+      [
+        id,
+        requireTenantId(),
+        input.routeId,
+        input.groupId,
+        input.billingCycle ?? null,
+        input.priceMinor,
+        input.currency,
+        input.startsAt,
+        input.endsAt,
+        input.autoRenew,
+      ],
       { name: 'promotion.create', primary: true },
     );
     return id;
@@ -109,7 +165,10 @@ export class PromotionRepository {
   async listForTenant(status?: string): Promise<RoutePromotion[]> {
     const params: unknown[] = [requireTenantId()];
     let where = 'tenant_id = $1';
-    if (status) { params.push(status); where += ` AND status = $${params.length}`; }
+    if (status) {
+      params.push(status);
+      where += ` AND status = $${params.length}`;
+    }
     const rows = await this.db.query<Row>(
       `SELECT id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, status, auto_renew, created_at, version
          FROM route_promotions WHERE ${where} ORDER BY created_at DESC`,
@@ -199,13 +258,34 @@ export class PromotionRepository {
 }
 
 interface Row {
-  id: string; tenant_id: TenantId; route_id: RouteId; group_id: string; billing_cycle: PromotionBillingCycle | null;
-  price_minor: string; currency: string; starts_at: Date; ends_at: Date; status: RoutePromotion['status']; auto_renew: boolean; created_at: Date; version: number;
+  id: string;
+  tenant_id: TenantId;
+  route_id: RouteId;
+  group_id: string;
+  billing_cycle: PromotionBillingCycle | null;
+  price_minor: string;
+  currency: string;
+  starts_at: Date;
+  ends_at: Date;
+  status: RoutePromotion['status'];
+  auto_renew: boolean;
+  created_at: Date;
+  version: number;
 }
 function map(r: Row): RoutePromotion {
   return {
-    id: r.id, tenantId: r.tenant_id, routeId: r.route_id, groupId: r.group_id, billingCycle: r.billing_cycle,
-    priceMinor: Number(r.price_minor), currency: r.currency, startsAt: r.starts_at, endsAt: r.ends_at,
-    status: r.status, autoRenew: r.auto_renew, createdAt: r.created_at, version: r.version,
+    id: r.id,
+    tenantId: r.tenant_id,
+    routeId: r.route_id,
+    groupId: r.group_id,
+    billingCycle: r.billing_cycle,
+    priceMinor: Number(r.price_minor),
+    currency: r.currency,
+    startsAt: r.starts_at,
+    endsAt: r.ends_at,
+    status: r.status,
+    autoRenew: r.auto_renew,
+    createdAt: r.created_at,
+    version: r.version,
   };
 }

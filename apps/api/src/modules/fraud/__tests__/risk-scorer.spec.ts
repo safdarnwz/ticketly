@@ -39,10 +39,18 @@ describe('scoreRisk', () => {
   });
 
   it('positive: a classic fraud pattern is denied and score caps at 100', () => {
-    const r = scoreRisk(clean({
-      accountAgeDays: 0, bookingsLast24h: 12, amountMinor: 2000000, seatCount: 10,
-      emailDisposable: true, paymentMethodNew: true, billingCountryMismatch: true, nightBooking: true,
-    }));
+    const r = scoreRisk(
+      clean({
+        accountAgeDays: 0,
+        bookingsLast24h: 12,
+        amountMinor: 2000000,
+        seatCount: 10,
+        emailDisposable: true,
+        paymentMethodNew: true,
+        billingCountryMismatch: true,
+        nightBooking: true,
+      }),
+    );
     // 20+30+20+15+20+10+20+5 = 140 → capped 100
     expect(r.score).toBe(100);
     expect(r.band).toBe('high');

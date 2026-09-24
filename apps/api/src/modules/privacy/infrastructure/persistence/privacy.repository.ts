@@ -18,7 +18,12 @@ import type { ConsentEvent, ConsentPurpose } from '../../domain/consent';
 export class PrivacyRepository {
   constructor(private readonly db: DatabaseService) {}
 
-  async appendConsent(customerId: UserId, purpose: ConsentPurpose, granted: boolean, atMs: number): Promise<void> {
+  async appendConsent(
+    customerId: UserId,
+    purpose: ConsentPurpose,
+    granted: boolean,
+    atMs: number,
+  ): Promise<void> {
     await this.db.execute_(
       `INSERT INTO consents (id, customer_id, purpose, granted, created_at)
        VALUES ($1,$2,$3,$4, to_timestamp($5 / 1000.0))`,
@@ -47,7 +52,9 @@ export class PrivacyRepository {
     return id;
   }
 
-  async findErasureRequest(id: string): Promise<{ id: string; customerId: string; status: string } | null> {
+  async findErasureRequest(
+    id: string,
+  ): Promise<{ id: string; customerId: string; status: string } | null> {
     return this.db.queryOne(
       `SELECT id, customer_id AS "customerId", status FROM erasure_requests WHERE id = $1`,
       [id],
@@ -58,7 +65,10 @@ export class PrivacyRepository {
   async listErasureRequests(status?: string): Promise<unknown[]> {
     const params: unknown[] = [];
     let where = '1=1';
-    if (status) { params.push(status); where = `status = $${params.length}`; }
+    if (status) {
+      params.push(status);
+      where = `status = $${params.length}`;
+    }
     return this.db.query(
       `SELECT id, customer_id AS "customerId", status, requested_at AS "requestedAt", processed_at AS "processedAt"
          FROM erasure_requests WHERE ${where} ORDER BY requested_at DESC LIMIT 200`,
@@ -76,8 +86,12 @@ export class PrivacyRepository {
     const scope = currentTransaction();
     const run = scope
       ? (sql: string, p: unknown[]) => scope.client.query(sql, p)
-      : (sql: string, p: unknown[]) => this.db.execute_(sql, p, { name: 'privacy.anonymise', primary: true });
-    await run(`UPDATE bookings SET contact_email = NULL, contact_phone = NULL WHERE customer_id = $1`, [customerId]);
+      : (sql: string, p: unknown[]) =>
+          this.db.execute_(sql, p, { name: 'privacy.anonymise', primary: true });
+    await run(
+      `UPDATE bookings SET contact_email = NULL, contact_phone = NULL WHERE customer_id = $1`,
+      [customerId],
+    );
     await run(
       `UPDATE passengers p SET full_name = '[redacted]'
          FROM bookings b WHERE p.booking_id = b.id AND b.customer_id = $1`,

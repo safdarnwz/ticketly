@@ -51,13 +51,19 @@ export async function configureApp(app: NestFastifyApplication, config: AppConfi
   // — no base64 inflation, no multipart parser. 5 MB (+ slack) is the hard
   // ceiling for any file (videos are not accepted at all); each purpose may
   // apply a smaller limit in FileService.upload.
-  instance.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: 5 * 1024 * 1024 + 1024 },
-    (_req: unknown, body: Buffer, done: (err: Error | null, body?: Buffer) => void) => done(null, body));
+  instance.addContentTypeParser(
+    'application/octet-stream',
+    { parseAs: 'buffer', bodyLimit: 5 * 1024 * 1024 + 1024 },
+    (_req: unknown, body: Buffer, done: (err: Error | null, body?: Buffer) => void) =>
+      done(null, body),
+  );
 
   await app.register(helmet as never, {
     contentSecurityPolicy: false, // this is a JSON API; CSP belongs on the web app
     crossOriginEmbedderPolicy: false,
-    hsts: config.isProduction ? { maxAge: 31_536_000, includeSubDomains: true, preload: true } : false,
+    hsts: config.isProduction
+      ? { maxAge: 31_536_000, includeSubDomains: true, preload: true }
+      : false,
   });
 
   await app.register(cors as never, {
@@ -112,15 +118,23 @@ export async function configureApp(app: NestFastifyApplication, config: AppConfi
       message: 'Server is under heavy load, please retry shortly',
       retryAfter: 5,
       exposeStatusRoute: false,
-      pressureHandler: (_req: FastifyRequest, reply: FastifyReply, type: string, value: number | undefined) => {
-        void reply.status(503).header('Retry-After', '5').send({
-          type: 'about:blank',
-          title: 'Service temporarily overloaded',
-          status: 503,
-          code: 'COMMON.SERVICE_UNAVAILABLE',
-          detail: `Backpressure triggered by ${type} (${String(value)})`,
-          retryable: true,
-        });
+      pressureHandler: (
+        _req: FastifyRequest,
+        reply: FastifyReply,
+        type: string,
+        value: number | undefined,
+      ) => {
+        void reply
+          .status(503)
+          .header('Retry-After', '5')
+          .send({
+            type: 'about:blank',
+            title: 'Service temporarily overloaded',
+            status: 503,
+            code: 'COMMON.SERVICE_UNAVAILABLE',
+            detail: `Backpressure triggered by ${type} (${String(value)})`,
+            retryable: true,
+          });
       },
     });
   }
@@ -128,7 +142,13 @@ export async function configureApp(app: NestFastifyApplication, config: AppConfi
   app.setGlobalPrefix(config.app.apiPrefix, {
     // Probes and metrics must not sit behind the versioned API prefix; the
     // load balancer and Prometheus should not care about API versions.
-    exclude: ['health', 'health/live', 'health/ready', 'health/startup', config.observability.metricsPath.replace(/^\//, '')],
+    exclude: [
+      'health',
+      'health/live',
+      'health/ready',
+      'health/startup',
+      config.observability.metricsPath.replace(/^\//, ''),
+    ],
   });
 
   /**
@@ -213,7 +233,9 @@ export function installShutdownHandlers(
  */
 function buildCorsOriginMatcher(
   configuredOrigins: string[],
-): boolean | ((origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => void) {
+):
+  | boolean
+  | ((origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => void) {
   if (configuredOrigins.includes('*')) return true;
 
   const patterns = configuredOrigins.map((entry) => {
@@ -224,6 +246,9 @@ function buildCorsOriginMatcher(
   return (origin, cb) => {
     // No Origin header (server-to-server, curl, same-origin) — allow.
     if (!origin) return cb(null, true);
-    cb(null, patterns.some((pattern) => pattern.test(origin)));
+    cb(
+      null,
+      patterns.some((pattern) => pattern.test(origin)),
+    );
   };
 }

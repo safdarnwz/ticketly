@@ -8,7 +8,12 @@ import { BadRequestError, type BookingId } from '@kernel';
 
 import { AmendmentService } from '../../amendments/application/services/amendment.service';
 import { AgentService } from '../application/services/agent.service';
-import { AgentBookSchema, AgentCancelSchema, type AgentBookDto, type AgentCancelDto } from './dto/agent.dto';
+import {
+  AgentBookSchema,
+  AgentCancelSchema,
+  type AgentBookDto,
+  type AgentCancelDto,
+} from './dto/agent.dto';
 
 /**
  * AGENT self-service. Every route resolves "which agent am I" from the
@@ -22,7 +27,10 @@ import { AgentBookSchema, AgentCancelSchema, type AgentBookDto, type AgentCancel
 @ApiStandardErrors()
 @RequirePermission(Permission.AGENT_PORTAL)
 export class AgentPortalController {
-  constructor(private readonly agents: AgentService, private readonly amendments: AmendmentService) {}
+  constructor(
+    private readonly agents: AgentService,
+    private readonly amendments: AmendmentService,
+  ) {}
 
   @Get('me')
   @ApiOperation({ summary: 'My account: status, balance, spendable, credit limit, commission %' })
@@ -44,10 +52,17 @@ export class AgentPortalController {
   }
 
   @Get('bookings')
-  @ApiOperation({ summary: 'My bookings; optional from/to (YYYY-MM-DD) for today / week / month history' })
-  async bookings(@Query('status') status?: string, @Query('from') from?: string, @Query('to') to?: string) {
+  @ApiOperation({
+    summary: 'My bookings; optional from/to (YYYY-MM-DD) for today / week / month history',
+  })
+  async bookings(
+    @Query('status') status?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
     const ymd = /^\d{4}-\d{2}-\d{2}$/;
-    if ((from && !ymd.test(from)) || (to && !ymd.test(to)) || (from && to && from > to)) throw new BadRequestError('from/to must be YYYY-MM-DD with from ≤ to');
+    if ((from && !ymd.test(from)) || (to && !ymd.test(to)) || (from && to && from > to))
+      throw new BadRequestError('from/to must be YYYY-MM-DD with from ≤ to');
     if (from || to) return { items: await this.agents.myBookingsInPeriod(from, to) };
     return { items: await this.agents.myBookings({ status, limit: 200 }) };
   }
@@ -56,7 +71,18 @@ export class AgentPortalController {
   @HttpCode(200)
   @Idempotent()
   @ApiOperation({ summary: 'Change boarding / dropping point on my booking (same fare stage)' })
-  async changePoints(@Param('id') id: string, @Body(zodBody(z.object({ fromStopId: z.string().uuid().optional(), toStopId: z.string().uuid().optional() }))) dto: { fromStopId?: string; toStopId?: string }) {
+  async changePoints(
+    @Param('id') id: string,
+    @Body(
+      zodBody(
+        z.object({
+          fromStopId: z.string().uuid().optional(),
+          toStopId: z.string().uuid().optional(),
+        }),
+      ),
+    )
+    dto: { fromStopId?: string; toStopId?: string },
+  ) {
     await this.agents.assertMyBooking(id as BookingId);
     return this.amendments.changePoints(id as BookingId, dto);
   }
@@ -64,7 +90,11 @@ export class AgentPortalController {
   @Post('bookings/:id/change-seats')
   @HttpCode(200)
   @Idempotent()
-  async changeSeats(@Param('id') id: string, @Body(zodBody(z.object({ newSeatNumbers: z.array(z.string().trim().min(1)).min(1).max(10) }))) dto: { newSeatNumbers: string[] }) {
+  async changeSeats(
+    @Param('id') id: string,
+    @Body(zodBody(z.object({ newSeatNumbers: z.array(z.string().trim().min(1)).min(1).max(10) })))
+    dto: { newSeatNumbers: string[] },
+  ) {
     await this.agents.assertMyBooking(id as BookingId);
     return this.amendments.changeSeats(id as BookingId, dto.newSeatNumbers);
   }
@@ -72,7 +102,18 @@ export class AgentPortalController {
   @Post('bookings/:id/correct-name')
   @HttpCode(200)
   @Idempotent()
-  async correctName(@Param('id') id: string, @Body(zodBody(z.object({ seatNumber: z.string().trim().min(1), fullName: z.string().trim().min(2).max(120) }))) dto: { seatNumber: string; fullName: string }) {
+  async correctName(
+    @Param('id') id: string,
+    @Body(
+      zodBody(
+        z.object({
+          seatNumber: z.string().trim().min(1),
+          fullName: z.string().trim().min(2).max(120),
+        }),
+      ),
+    )
+    dto: { seatNumber: string; fullName: string },
+  ) {
     await this.agents.assertMyBooking(id as BookingId);
     return this.amendments.correctName(id as BookingId, dto.seatNumber, dto.fullName);
   }
@@ -85,7 +126,10 @@ export class AgentPortalController {
   @Post('bookings')
   @HttpCode(201)
   @Idempotent()
-  @ApiOperation({ summary: 'Sell seats: hold → debit my account (net of commission) → ticket issued. 402 if balance/credit is short.' })
+  @ApiOperation({
+    summary:
+      'Sell seats: hold → debit my account (net of commission) → ticket issued. 402 if balance/credit is short.',
+  })
   async book(@Body(zodBody(AgentBookSchema)) dto: AgentBookDto) {
     return this.agents.agentBook(dto);
   }
@@ -93,7 +137,9 @@ export class AgentPortalController {
   @Post('bookings/:id/cancel')
   @HttpCode(200)
   @Idempotent()
-  @ApiOperation({ summary: 'Cancel my booking (all or some seats). The refund is credited to my account.' })
+  @ApiOperation({
+    summary: 'Cancel my booking (all or some seats). The refund is credited to my account.',
+  })
   async cancel(@Param('id') id: string, @Body(zodBody(AgentCancelSchema)) dto: AgentCancelDto) {
     return this.agents.agentCancel(id as BookingId, dto);
   }

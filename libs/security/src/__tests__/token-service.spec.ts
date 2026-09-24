@@ -9,7 +9,12 @@ describe('TokenService', () => {
   const tokens = new TokenService(testConfig());
 
   it('signs and verifies an access token', () => {
-    const { token } = tokens.signAccess({ sub: 'u1' as UserId, tid: 't1' as TenantId, sid: 's1', jti: 'j1' });
+    const { token } = tokens.signAccess({
+      sub: 'u1' as UserId,
+      tid: 't1' as TenantId,
+      sid: 's1',
+      jti: 'j1',
+    });
     expect(tokens.verifyAccess(token).sub).toBe('u1');
   });
 
@@ -31,13 +36,20 @@ describe('TokenService', () => {
   it('rejects an expired token', () => {
     vi.useFakeTimers();
     const shortLived = new TokenService(testConfig({ JWT_ACCESS_TTL_SECONDS: 60 }));
-    const { token } = shortLived.signAccess({ sub: 'u1' as UserId, tid: null, sid: 's1', jti: 'j1' });
+    const { token } = shortLived.signAccess({
+      sub: 'u1' as UserId,
+      tid: null,
+      sid: 's1',
+      jti: 'j1',
+    });
     vi.advanceTimersByTime(10 * 60_000); // well past the TTL and any clock-skew leeway
     expect(() => shortLived.verifyAccess(token)).toThrow(/expired/i);
   });
 
   it('verifies tokens signed with the previous secret during rotation', () => {
-    const oldSvc = new TokenService(testConfig({ JWT_SECRET: 'old-secret-old-secret-old-secret-32b' }));
+    const oldSvc = new TokenService(
+      testConfig({ JWT_SECRET: 'old-secret-old-secret-old-secret-32b' }),
+    );
     const { token } = oldSvc.signAccess({ sub: 'u1' as UserId, tid: null, sid: 's1', jti: 'j1' });
     const rotated = new TokenService(
       testConfig({

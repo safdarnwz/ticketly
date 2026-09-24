@@ -61,26 +61,72 @@ export class Metrics {
   constructor() {
     collectDefaultMetrics({ register: this.registry, prefix: 'gds_' });
 
-    this.httpRequests = this.counter('gds_http_requests_total', 'HTTP requests', ['method', 'route', 'status']);
-    this.httpDuration = this.histogram('gds_http_request_duration_seconds', 'HTTP request duration', ['method', 'route', 'status'], HTTP_DURATION_BUCKETS);
-    this.httpInFlight = this.gauge('gds_http_in_flight_requests', 'In-flight HTTP requests', ['method']);
+    this.httpRequests = this.counter('gds_http_requests_total', 'HTTP requests', [
+      'method',
+      'route',
+      'status',
+    ]);
+    this.httpDuration = this.histogram(
+      'gds_http_request_duration_seconds',
+      'HTTP request duration',
+      ['method', 'route', 'status'],
+      HTTP_DURATION_BUCKETS,
+    );
+    this.httpInFlight = this.gauge('gds_http_in_flight_requests', 'In-flight HTTP requests', [
+      'method',
+    ]);
 
-    this.dbQueries = this.counter('gds_db_queries_total', 'Database queries', ['operation', 'target', 'outcome']);
-    this.dbDuration = this.histogram('gds_db_query_duration_seconds', 'Database query duration', ['operation', 'target'], DB_DURATION_BUCKETS);
+    this.dbQueries = this.counter('gds_db_queries_total', 'Database queries', [
+      'operation',
+      'target',
+      'outcome',
+    ]);
+    this.dbDuration = this.histogram(
+      'gds_db_query_duration_seconds',
+      'Database query duration',
+      ['operation', 'target'],
+      DB_DURATION_BUCKETS,
+    );
     this.dbPoolTotal = this.gauge('gds_db_pool_connections_total', 'Pooled connections', ['pool']);
-    this.dbPoolIdle = this.gauge('gds_db_pool_connections_idle', 'Idle pooled connections', ['pool']);
-    this.dbPoolWaiting = this.gauge('gds_db_pool_waiting_requests', 'Requests waiting for a connection', ['pool']);
-    this.dbTransactionRetries = this.counter('gds_db_transaction_retries_total', 'Transaction retries', ['reason']);
+    this.dbPoolIdle = this.gauge('gds_db_pool_connections_idle', 'Idle pooled connections', [
+      'pool',
+    ]);
+    this.dbPoolWaiting = this.gauge(
+      'gds_db_pool_waiting_requests',
+      'Requests waiting for a connection',
+      ['pool'],
+    );
+    this.dbTransactionRetries = this.counter(
+      'gds_db_transaction_retries_total',
+      'Transaction retries',
+      ['reason'],
+    );
 
-    this.cacheOps = this.counter('gds_cache_operations_total', 'Cache operations', ['layer', 'namespace', 'result']);
-    this.cacheDuration = this.histogram('gds_cache_operation_duration_seconds', 'Cache operation duration', ['layer', 'namespace'], [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1]);
+    this.cacheOps = this.counter('gds_cache_operations_total', 'Cache operations', [
+      'layer',
+      'namespace',
+      'result',
+    ]);
+    this.cacheDuration = this.histogram(
+      'gds_cache_operation_duration_seconds',
+      'Cache operation duration',
+      ['layer', 'namespace'],
+      [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1],
+    );
 
     this.seatHolds = this.counter('gds_seat_holds_total', 'Seat hold attempts', ['outcome']);
     this.bookings = this.counter('gds_bookings_total', 'Booking outcomes', ['outcome', 'channel']);
-    this.searchRequests = this.counter('gds_search_requests_total', 'Trip search requests', ['cached']);
+    this.searchRequests = this.counter('gds_search_requests_total', 'Trip search requests', [
+      'cached',
+    ]);
     this.outboxLag = this.gauge('gds_outbox_pending_events', 'Outbox events by status', ['status']);
     this.jobRuns = this.counter('gds_job_runs_total', 'Background job runs', ['job', 'outcome']);
-    this.jobDuration = this.histogram('gds_job_duration_seconds', 'Background job duration', ['job'], [0.01, 0.1, 0.5, 1, 5, 15, 60, 300]);
+    this.jobDuration = this.histogram(
+      'gds_job_duration_seconds',
+      'Background job duration',
+      ['job'],
+      [0.01, 0.1, 0.5, 1, 5, 15, 60, 300],
+    );
   }
 
   async scrape(): Promise<string> {
@@ -108,7 +154,12 @@ export class Metrics {
     return metric;
   }
 
-  private histogram<T extends string>(name: string, help: string, labelNames: T[], buckets: number[]): Histogram<T> {
+  private histogram<T extends string>(
+    name: string,
+    help: string,
+    labelNames: T[],
+    buckets: number[],
+  ): Histogram<T> {
     const metric = new Histogram({ name, help, labelNames, buckets });
     this.registry.registerMetric(metric);
     return metric;

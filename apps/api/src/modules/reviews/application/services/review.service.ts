@@ -3,7 +3,11 @@ import { Injectable } from '@nestjs/common';
 import { AppError, ErrorCode, getUserId, type BookingId, type RouteId, type UserId } from '@kernel';
 
 import { BookingRepository } from '../../../booking/infrastructure/persistence/booking.repository';
-import { aggregateRatings, bayesianRating, type RatingAggregate } from '../../domain/rating-aggregate';
+import {
+  aggregateRatings,
+  bayesianRating,
+  type RatingAggregate,
+} from '../../domain/rating-aggregate';
 import { ReviewRepository } from '../../infrastructure/persistence/review.repository';
 
 /**
@@ -20,21 +24,33 @@ export class ReviewService {
     private readonly bookings: BookingRepository,
   ) {}
 
-  async create(input: { bookingId: BookingId; rating: number; title?: string; body?: string }): Promise<{ reviewId: string }> {
+  async create(input: {
+    bookingId: BookingId;
+    rating: number;
+    title?: string;
+    body?: string;
+  }): Promise<{ reviewId: string }> {
     if (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5) {
-      throw new AppError(ErrorCode.REVIEW_INVALID_RATING, 422, { message: 'Rating must be an integer 1–5' });
+      throw new AppError(ErrorCode.REVIEW_INVALID_RATING, 422, {
+        message: 'Rating must be an integer 1–5',
+      });
     }
 
     const booking = await this.bookings.findForUpdate(input.bookingId);
-    if (!booking) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
+    if (!booking)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
 
     // Only a traveller on this booking may review it.
     if (booking.status !== 'confirmed' && booking.status !== 'completed') {
-      throw new AppError(ErrorCode.REVIEW_NOT_ELIGIBLE, 422, { message: 'You can only review a completed trip' });
+      throw new AppError(ErrorCode.REVIEW_NOT_ELIGIBLE, 422, {
+        message: 'You can only review a completed trip',
+      });
     }
     const userId = getUserId();
     if (userId && booking.customerId && booking.customerId !== userId) {
-      throw new AppError(ErrorCode.REVIEW_NOT_ELIGIBLE, 403, { message: 'You can only review your own booking' });
+      throw new AppError(ErrorCode.REVIEW_NOT_ELIGIBLE, 403, {
+        message: 'You can only review your own booking',
+      });
     }
 
     const reviewId = await this.reviews.insert({

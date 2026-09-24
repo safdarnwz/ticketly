@@ -22,7 +22,11 @@ describe('date-time', () => {
   });
 
   it('resolves a journey instant in the origin timezone', () => {
-    const instant = toInstant(localDate('2026-03-15'), minuteOfDay('20:30'), 'Asia/Kolkata' as never);
+    const instant = toInstant(
+      localDate('2026-03-15'),
+      minuteOfDay('20:30'),
+      'Asia/Kolkata' as never,
+    );
     // 20:30 IST == 15:00 UTC
     expect(instant.toISOString()).toBe('2026-03-15T15:00:00.000Z');
   });

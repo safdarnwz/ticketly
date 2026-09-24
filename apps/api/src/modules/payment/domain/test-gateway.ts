@@ -46,7 +46,13 @@ export interface TestGatewayConfig {
 /** A submitted instrument, discriminated by method. */
 export type TestInstrument =
   | { method: 'upi'; vpa: string }
-  | { method: 'credit_card' | 'debit_card'; cardNumber: string; expiry: string; cvv: string; holder?: string }
+  | {
+      method: 'credit_card' | 'debit_card';
+      cardNumber: string;
+      expiry: string;
+      cvv: string;
+      holder?: string;
+    }
   | { method: 'net_banking'; bank: string; username: string; password: string };
 
 export interface ValidationOk {
@@ -84,7 +90,10 @@ export function luhnValid(cardNumber: string): boolean {
   let dbl = false;
   for (let i = d.length - 1; i >= 0; i--) {
     let n = d.charCodeAt(i) - 48;
-    if (dbl) { n *= 2; if (n > 9) n -= 9; }
+    if (dbl) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
     sum += n;
     dbl = !dbl;
   }
@@ -170,8 +179,10 @@ export function validateTestInstrument(
       if (!bank || !banks.includes(bank.toLowerCase())) {
         return { ok: false, reason: 'Please choose a supported bank.' };
       }
-      if ((instrument.username ?? '').trim() !== config.netbankingUser.trim()
-        || (instrument.password ?? '') !== config.netbankingPassword) {
+      if (
+        (instrument.username ?? '').trim() !== config.netbankingUser.trim() ||
+        (instrument.password ?? '') !== config.netbankingPassword
+      ) {
         return { ok: false, reason: 'Net-banking login failed. Check your credentials.' };
       }
       return { ok: true, masked: `${bank} net-banking`, label: `${bank} net-banking` };

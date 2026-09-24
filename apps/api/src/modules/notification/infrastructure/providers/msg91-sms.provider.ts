@@ -50,7 +50,12 @@ export class Msg91SmsProvider implements NotificationProvider {
 
   private settings(): { authKey: string; senderId: string; route: string } {
     const saved = this.credentials.active('msg91_sms');
-    if (saved) return { authKey: saved.secrets.authKey, senderId: saved.config.senderId, route: saved.config.route };
+    if (saved)
+      return {
+        authKey: saved.secrets.authKey,
+        senderId: saved.config.senderId,
+        route: saved.config.route,
+      };
     const { msg91 } = this.config.notifications;
     return { authKey: msg91.authKey, senderId: msg91.senderId, route: msg91.route };
   }
@@ -71,7 +76,10 @@ export class Msg91SmsProvider implements NotificationProvider {
           sms: [{ message: req.body, to: [mobile] }],
         }),
       });
-      const json = (await res.json().catch(() => null)) as { type?: string; message?: string } | null;
+      const json = (await res.json().catch(() => null)) as {
+        type?: string;
+        message?: string;
+      } | null;
       if (!res.ok || json?.type === 'error') {
         const error = json?.message ?? `HTTP ${res.status}`;
         this.log.warn({ to: mobile, error }, 'MSG91 SMS send failed');

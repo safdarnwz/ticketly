@@ -109,9 +109,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     this.shuttingDown = true;
     if (this.poolMetricsTimer) clearInterval(this.poolMetricsTimer);
     if (this.replicaHealthTimer) clearInterval(this.replicaHealthTimer);
-    await Promise.allSettled(
-      [this.primaryPool, ...this.replicaPools].map((p) => p.pool.end()),
-    );
+    await Promise.allSettled([this.primaryPool, ...this.replicaPools].map((p) => p.pool.end()));
     this.log.info('database pools closed');
   }
 
@@ -273,7 +271,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           if (lag !== null && lag <= maxLagMs) {
             healthy.push(replica);
           } else {
-            this.log.warn({ replica: replica.name, lagMs: lag }, 'replica lag exceeded; removed from rotation');
+            this.log.warn(
+              { replica: replica.name, lagMs: lag },
+              'replica lag exceeded; removed from rotation',
+            );
           }
         } finally {
           client.release();

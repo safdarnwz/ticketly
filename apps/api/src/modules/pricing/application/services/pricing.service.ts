@@ -2,8 +2,13 @@ import { Injectable } from '@nestjs/common';
 
 import { CacheService } from '@cache';
 import {
-  AppError, daysBetween, ErrorCode, newId, todayIn,
-  type StopId, type TripId,
+  AppError,
+  daysBetween,
+  ErrorCode,
+  newId,
+  todayIn,
+  type StopId,
+  type TripId,
 } from '@kernel';
 
 import { PricingEngine } from '../../domain/pricing-engine';
@@ -67,30 +72,46 @@ export class PricingService {
   }): Promise<Quote> {
     const seatNumbers = input.seatNumbers ?? [];
     const seatCount = seatNumbers.length > 0 ? seatNumbers.length : (input.seatCount ?? 0);
-    if (seatCount < 1) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: 'seatNumbers or seatCount is required' });
+    if (seatCount < 1)
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+        message: 'seatNumbers or seatCount is required',
+      });
 
     const trip = await this.trips.getById(input.tripId);
     if (trip.status !== 'open') {
-      throw new AppError(ErrorCode.INVENTORY_TRIP_CLOSED, 422, { message: 'Trip is not open for booking' });
+      throw new AppError(ErrorCode.INVENTORY_TRIP_CLOSED, 422, {
+        message: 'Trip is not open for booking',
+      });
     }
 
     const seg = await this.inventory.resolveSegment(input.tripId, input.fromStopId, input.toStopId);
-    if (!seg) throw new AppError(ErrorCode.INVENTORY_SEGMENT_INVALID, 422, { message: 'Invalid boarding/dropping combination' });
+    if (!seg)
+      throw new AppError(ErrorCode.INVENTORY_SEGMENT_INVALID, 422, {
+        message: 'Invalid boarding/dropping combination',
+      });
 
     // The fare row is chosen by seatType, so the seats named MUST be of that
     // type — otherwise a sleeper could be priced (and sold) at the seater fare
     // just by sending seatType: 'seater'. Never trust the client's label.
     if (seatNumbers.length > 0) {
       const dup = seatNumbers.find((s, i) => seatNumbers.indexOf(s) !== i);
-      if (dup) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: `Seat ${dup} was selected more than once` });
+      if (dup)
+        throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+          message: `Seat ${dup} was selected more than once`,
+        });
       const types = await this.inventory.seatTypes(input.tripId, seatNumbers);
       const unknown = seatNumbers.filter((s) => !types.get(s)?.bookable);
-      if (unknown.length) throw new AppError(ErrorCode.INVENTORY_SEAT_UNAVAILABLE, 422, { message: `Not a bookable seat on this trip: ${unknown.join(', ')}` });
+      if (unknown.length)
+        throw new AppError(ErrorCode.INVENTORY_SEAT_UNAVAILABLE, 422, {
+          message: `Not a bookable seat on this trip: ${unknown.join(', ')}`,
+        });
       const wrong = seatNumbers.filter((s) => types.get(s)!.seatType !== input.seatType);
       if (wrong.length) {
         throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
           message: `Seat(s) ${wrong.join(', ')} are not ${input.seatType} seats — quote each seat type separately`,
-          details: { seatTypes: Object.fromEntries(seatNumbers.map((s) => [s, types.get(s)!.seatType])) },
+          details: {
+            seatTypes: Object.fromEntries(seatNumbers.map((s) => [s, types.get(s)!.seatType])),
+          },
         });
       }
     }
@@ -111,31 +132,48 @@ export class PricingService {
       distanceM: 0,
       journeyDate: trip.journeyDate,
     });
-    if (!fare) throw new AppError(ErrorCode.PRICING_NO_FARE_DEFINED, 422, { message: 'No fare is defined for this segment' });
+    if (!fare)
+      throw new AppError(ErrorCode.PRICING_NO_FARE_DEFINED, 422, {
+        message: 'No fare is defined for this segment',
+      });
 
     // Per-seat-number overrides — e.g. seat "1" (front row) or a window seat
     // priced differently from the rest of the same seat type. Falls back to
     // the seat-type fare for any seat with no override on file.
-    const overrides = seatNumbers.length > 0 ? await this.fares.seatOverridesFor(fare.farePlanId, seatNumbers) : new Map<string, number>();
-    const baseFaresMinor = seatNumbers.length > 0
-      ? seatNumbers.map((s) => overrides.get(s) ?? fare.baseFareMinor)
-      : Array.from({ length: seatCount }, () => fare.baseFareMinor);
+    const overrides =
+      seatNumbers.length > 0
+        ? await this.fares.seatOverridesFor(fare.farePlanId, seatNumbers)
+        : new Map<string, number>();
+    const baseFaresMinor =
+      seatNumbers.length > 0
+        ? seatNumbers.map((s) => overrides.get(s) ?? fare.baseFareMinor)
+        : Array.from({ length: seatCount }, () => fare.baseFareMinor);
 
     // Operator pricing controls: peak/off-peak by departure time + manual trip
     // adjustment on the base fare; floor/ceiling applied inside the engine
     // after dynamic yield.
     const controls = await this.fares.pricingControls(trip.routeId, trip.id);
     const ist = new Date(trip.departsAt.getTime() + 330 * 60_000);
-    const pct = adjustmentPct({ departureMinuteLocal: ist.getUTCHours() * 60 + ist.getUTCMinutes(), peakWindows: controls.peakWindows, tripPct: controls.tripPct });
-    const adjustedBaseFares = pct === 0 ? baseFaresMinor : baseFaresMinor.map((f) => applyAdjustment(f, pct));
+    const pct = adjustmentPct({
+      departureMinuteLocal: ist.getUTCHours() * 60 + ist.getUTCMinutes(),
+      peakWindows: controls.peakWindows,
+      tripPct: controls.tripPct,
+    });
+    const adjustedBaseFares =
+      pct === 0 ? baseFaresMinor : baseFaresMinor.map((f) => applyAdjustment(f, pct));
     const routePricing = await this.fares.routePricing(trip.routeId);
     const interState = await this.routes.isInterState(trip.routeId);
-    const occupancyPct = trip.totalSeats > 0 ? Math.round(((trip.totalSeats - available) / trip.totalSeats) * 100) : 0;
+    const occupancyPct =
+      trip.totalSeats > 0 ? Math.round(((trip.totalSeats - available) / trip.totalSeats) * 100) : 0;
     const daysOut = Math.max(0, daysBetween(todayIn(), trip.journeyDate));
 
-    const coupon = input.couponCode ? await this.coupons.validateAndLoad(input.couponCode, undefined, trip.journeyDate) : null;
+    const coupon = input.couponCode
+      ? await this.coupons.validateAndLoad(input.couponCode, undefined, trip.journeyDate)
+      : null;
     if (input.couponCode && !coupon) {
-      throw new AppError(ErrorCode.PRICING_COUPON_INVALID, 422, { message: 'Coupon is invalid or expired' });
+      throw new AppError(ErrorCode.PRICING_COUPON_INVALID, 422, {
+        message: 'Coupon is invalid or expired',
+      });
     }
 
     const reqTemplate = {
@@ -145,7 +183,10 @@ export class PricingService {
       yield: routePricing.ladder,
       coupon,
       tax: { gstRatePct: routePricing.gstRatePct, interState },
-      bounds: controls.floorMinor !== null || controls.ceilingMinor !== null ? { floorMinor: controls.floorMinor, ceilingMinor: controls.ceilingMinor } : undefined,
+      bounds:
+        controls.floorMinor !== null || controls.ceilingMinor !== null
+          ? { floorMinor: controls.floorMinor, ceilingMinor: controls.ceilingMinor }
+          : undefined,
     };
     const breakups = PricingEngine.priceManyDifferent(reqTemplate, adjustedBaseFares);
 
@@ -169,26 +210,46 @@ export class PricingService {
       toStopId: input.toStopId,
       seatType: input.seatType,
       perSeat: breakups[0].toJSON(),
-      seatFares: seatNumbers.map((s, i) => ({ seatNumber: s, totalMinor: breakups[i].total.minor })),
+      seatFares: seatNumbers.map((s, i) => ({
+        seatNumber: s,
+        totalMinor: breakups[i].total.minor,
+      })),
       totalMinor,
       currency: fare.currency,
       expiresAt: new Date(Date.now() + PricingService.QUOTE_TTL_SECONDS * 1000).toISOString(),
     };
 
     // Cache the full quote so booking can re-validate it by id.
-    await this.cache.set(quoteId, {
-      ...quote, couponCode: input.couponCode ?? null, seatCount,
-      totalBaseMinor, totalDiscountMinor, totalTaxMinor,
-    }, {
-      namespace: 'quote',
-      ttlSeconds: PricingService.QUOTE_TTL_SECONDS,
-    });
+    await this.cache.set(
+      quoteId,
+      {
+        ...quote,
+        couponCode: input.couponCode ?? null,
+        seatCount,
+        totalBaseMinor,
+        totalDiscountMinor,
+        totalTaxMinor,
+      },
+      {
+        namespace: 'quote',
+        ttlSeconds: PricingService.QUOTE_TTL_SECONDS,
+      },
+    );
 
     return quote;
   }
 
   /** Fetch a quote for booking re-validation. Returns null if expired/unknown. */
-  async getQuote(quoteId: string): Promise<(Quote & { couponCode: string | null; seatCount: number; totalBaseMinor: number; totalDiscountMinor: number; totalTaxMinor: number }) | undefined> {
+  async getQuote(quoteId: string): Promise<
+    | (Quote & {
+        couponCode: string | null;
+        seatCount: number;
+        totalBaseMinor: number;
+        totalDiscountMinor: number;
+        totalTaxMinor: number;
+      })
+    | undefined
+  > {
     return this.cache.get(quoteId, { namespace: 'quote' });
   }
 }

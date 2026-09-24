@@ -13,8 +13,12 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   const pool = new Pool({
-    host: env.DB_HOST, port: env.DB_PORT, database: env.DB_NAME,
-    user: env.DB_USER, password: env.DB_PASSWORD, max: 1,
+    host: env.DB_HOST,
+    port: env.DB_PORT,
+    database: env.DB_NAME,
+    user: env.DB_USER,
+    password: env.DB_PASSWORD,
+    max: 1,
   });
   await pool.query(`DROP SCHEMA IF EXISTS ${env.DB_SCHEMA} CASCADE`);
   await pool.query(`CREATE SCHEMA ${env.DB_SCHEMA}`);

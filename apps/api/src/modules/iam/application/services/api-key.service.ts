@@ -2,9 +2,16 @@ import { createHash } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
 
-import { CacheService} from '@cache';
+import { CacheService } from '@cache';
 import { DatabaseService } from '@database';
-import { newId, NotFoundError, requireTenantId, type ApiKeyId, type TenantId, type UserId } from '@kernel';
+import {
+  newId,
+  NotFoundError,
+  requireTenantId,
+  type ApiKeyId,
+  type TenantId,
+  type UserId,
+} from '@kernel';
 import { randomToken } from '@security';
 
 export interface ApiKeyRecord {
@@ -55,7 +62,17 @@ export class ApiKeyService {
     await this.db.execute_(
       `INSERT INTO api_keys (id, tenant_id, name, prefix, key_hash, scopes, ip_allowlist, expires_at, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-      [id, tenantId, input.name, prefix, keyHash, input.scopes, input.ipAllowlist ?? [], input.expiresAt ?? null, input.createdBy ?? null],
+      [
+        id,
+        tenantId,
+        input.name,
+        prefix,
+        keyHash,
+        input.scopes,
+        input.ipAllowlist ?? [],
+        input.expiresAt ?? null,
+        input.createdBy ?? null,
+      ],
       { name: 'apikey.issue', primary: true },
     );
     return { id, plaintext, prefix };
@@ -84,8 +101,12 @@ export class ApiKeyService {
         );
         if (!row) return null;
         return {
-          id: row.id, tenantId: row.tenant_id, name: row.name, prefix: row.prefix,
-          keyHash: row.key_hash, scopes: row.scopes,
+          id: row.id,
+          tenantId: row.tenant_id,
+          name: row.name,
+          prefix: row.prefix,
+          keyHash: row.key_hash,
+          scopes: row.scopes,
           ipAllowlist: (row.ip_allowlist ?? []).map(String),
           expiresAt: row.expires_at ? row.expires_at.toISOString() : null,
         };
@@ -95,15 +116,26 @@ export class ApiKeyService {
     if (!record) return null;
     if (!timingSafeStrEqual(record.keyHash, presentedHash)) return null;
     if (record.expiresAt && new Date(record.expiresAt) < new Date()) return null;
-    if (record.ipAllowlist.length > 0 && callerIp && !ipAllowed(callerIp, record.ipAllowlist)) return null;
+    if (record.ipAllowlist.length > 0 && callerIp && !ipAllowed(callerIp, record.ipAllowlist))
+      return null;
 
     // Best-effort last-used stamp; never block the request on it.
-    void this.db.execute_(`UPDATE api_keys SET last_used_at = now() WHERE id = $1`, [record.id], { name: 'apikey.touch', primary: true }).catch(() => undefined);
+    void this.db
+      .execute_(`UPDATE api_keys SET last_used_at = now() WHERE id = $1`, [record.id], {
+        name: 'apikey.touch',
+        primary: true,
+      })
+      .catch(() => undefined);
 
     return {
-      id: record.id, tenantId: record.tenantId, name: record.name, prefix: record.prefix,
-      scopes: record.scopes, ipAllowlist: record.ipAllowlist,
-      expiresAt: record.expiresAt ? new Date(record.expiresAt) : null, revokedAt: null,
+      id: record.id,
+      tenantId: record.tenantId,
+      name: record.name,
+      prefix: record.prefix,
+      scopes: record.scopes,
+      ipAllowlist: record.ipAllowlist,
+      expiresAt: record.expiresAt ? new Date(record.expiresAt) : null,
+      revokedAt: null,
     };
   }
 
@@ -127,20 +159,38 @@ export class ApiKeyService {
       { name: 'apikey.list' },
     );
     return rows.map((row) => ({
-      id: row.id, tenantId: row.tenant_id, name: row.name, prefix: row.prefix,
-      scopes: row.scopes, ipAllowlist: (row.ip_allowlist ?? []).map(String),
-      expiresAt: row.expires_at, revokedAt: row.revoked_at,
+      id: row.id,
+      tenantId: row.tenant_id,
+      name: row.name,
+      prefix: row.prefix,
+      scopes: row.scopes,
+      ipAllowlist: (row.ip_allowlist ?? []).map(String),
+      expiresAt: row.expires_at,
+      revokedAt: row.revoked_at,
     }));
   }
 }
 
 interface KeyRow {
-  id: ApiKeyId; tenant_id: TenantId; name: string; prefix: string; key_hash: string;
-  scopes: string[]; ip_allowlist: unknown[]; expires_at: Date | null; revoked_at: Date | null;
+  id: ApiKeyId;
+  tenant_id: TenantId;
+  name: string;
+  prefix: string;
+  key_hash: string;
+  scopes: string[];
+  ip_allowlist: unknown[];
+  expires_at: Date | null;
+  revoked_at: Date | null;
 }
 interface CachedKey {
-  id: ApiKeyId; tenantId: TenantId; name: string; prefix: string; keyHash: string;
-  scopes: string[]; ipAllowlist: string[]; expiresAt: string | null;
+  id: ApiKeyId;
+  tenantId: TenantId;
+  name: string;
+  prefix: string;
+  keyHash: string;
+  scopes: string[];
+  ipAllowlist: string[];
+  expiresAt: string | null;
 }
 
 function hashKey(key: string): string {
@@ -156,5 +206,7 @@ function ipAllowed(ip: string, cidrs: string[]): boolean {
   // Simple exact / prefix match; a full CIDR match lib is added in Part 10 if
   // partners need ranges. Exact IP allow-listing covers the common case.
   const clean = ip.replace(/^::ffff:/, '');
-  return cidrs.some((c) => c === clean || c.startsWith(`${clean}/`) || clean.startsWith(c.split('/')[0]));
+  return cidrs.some(
+    (c) => c === clean || c.startsWith(`${clean}/`) || clean.startsWith(c.split('/')[0]),
+  );
 }

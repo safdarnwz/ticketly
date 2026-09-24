@@ -8,7 +8,11 @@ import { Logger } from '@observability';
 import { IntegrationCredentialStore } from '../../../integrations/integration-credential.store';
 import { PaymentGateway } from './gateway.interface';
 import type {
-  CreateIntentRequest, CreateIntentResult, RefundRequest, RefundResult, WebhookVerification,
+  CreateIntentRequest,
+  CreateIntentResult,
+  RefundRequest,
+  RefundResult,
+  WebhookVerification,
 } from './gateway.interface';
 
 const RAZORPAY_API = 'https://api.razorpay.com/v1';
@@ -55,14 +59,25 @@ export class RazorpayGateway extends PaymentGateway {
   /** Saved + enabled integration, else env vars. */
   private keys(): { keyId: string; keySecret: string; webhookSecret: string } {
     const saved = this.credentials.active('razorpay');
-    if (saved) return { keyId: saved.config.keyId, keySecret: saved.secrets.keySecret, webhookSecret: saved.secrets.webhookSecret };
+    if (saved)
+      return {
+        keyId: saved.config.keyId,
+        keySecret: saved.secrets.keySecret,
+        webhookSecret: saved.secrets.webhookSecret,
+      };
     const { keyId, keySecret, webhookSecret } = this.config.payment.razorpay;
     return { keyId, keySecret, webhookSecret };
   }
 
-  private get keyId(): string { return this.keys().keyId; }
-  private get keySecret(): string { return this.keys().keySecret; }
-  private get webhookSecret(): string { return this.keys().webhookSecret; }
+  private get keyId(): string {
+    return this.keys().keyId;
+  }
+  private get keySecret(): string {
+    return this.keys().keySecret;
+  }
+  private get webhookSecret(): string {
+    return this.keys().webhookSecret;
+  }
 
   private authHeader(): string {
     return `Basic ${Buffer.from(`${this.keyId}:${this.keySecret}`).toString('base64')}`;
@@ -80,10 +95,18 @@ export class RazorpayGateway extends PaymentGateway {
         payment_capture: 1, // auto-capture on success — we don't do a separate manual-capture step.
       }),
     });
-    const json = (await res.json()) as { id?: string; amount?: number; currency?: string; status?: string; error?: { description?: string } };
+    const json = (await res.json()) as {
+      id?: string;
+      amount?: number;
+      currency?: string;
+      status?: string;
+      error?: { description?: string };
+    };
     if (!res.ok || !json.id) {
       this.log.error({ status: res.status, error: json.error }, 'Razorpay order creation failed');
-      throw new Error(`Razorpay order creation failed: ${json.error?.description ?? `HTTP ${res.status}`}`);
+      throw new Error(
+        `Razorpay order creation failed: ${json.error?.description ?? `HTTP ${res.status}`}`,
+      );
     }
     return {
       gatewayOrderId: json.id,
@@ -115,7 +138,15 @@ export class RazorpayGateway extends PaymentGateway {
       const payload = JSON.parse(rawBody.toString('utf8')) as {
         event: string;
         payload: {
-          payment?: { entity: { id: string; order_id: string; amount: number; status: string; notes?: { intentId?: string } } };
+          payment?: {
+            entity: {
+              id: string;
+              order_id: string;
+              amount: number;
+              status: string;
+              notes?: { intentId?: string };
+            };
+          };
           refund?: { entity: { id: string; payment_id: string; amount: number; status: string } };
         };
       };
@@ -143,7 +174,8 @@ export class RazorpayGateway extends PaymentGateway {
             gatewayOrderId: '', // refunds aren't keyed by order in Razorpay's payload
             gatewayPaymentId: r.payment_id,
             gatewayRefundId: r.id,
-            refundOutcome: payload.event === 'refund.failed' || r.status === 'failed' ? 'failed' : 'processed',
+            refundOutcome:
+              payload.event === 'refund.failed' || r.status === 'failed' ? 'failed' : 'processed',
             amountMinor: r.amount,
             status: 'refunded',
           },
@@ -167,35 +199,59 @@ export class RazorpayGateway extends PaymentGateway {
       },
       body: JSON.stringify({ amount: req.amountMinor, receipt: req.refundId }),
     });
-    const json = (await res.json()) as { id?: string; status?: string; error?: { description?: string } };
+    const json = (await res.json()) as {
+      id?: string;
+      status?: string;
+      error?: { description?: string };
+    };
     if (!res.ok || !json.id) {
       this.log.error({ status: res.status, error: json.error }, 'Razorpay refund failed');
       throw new Error(`Razorpay refund failed: ${json.error?.description ?? `HTTP ${res.status}`}`);
     }
     return {
       gatewayRefundId: json.id,
-      status: json.status === 'processed' ? 'processed' : json.status === 'failed' ? 'failed' : 'processing',
+      status:
+        json.status === 'processed'
+          ? 'processed'
+          : json.status === 'failed'
+            ? 'failed'
+            : 'processing',
     };
   }
 
-  override verifyClientCallback(payload: Record<string, string>): { valid: boolean; gatewayOrderId?: string; gatewayPaymentId?: string; reason?: string } {
-    const { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature } = payload;
-    if (!orderId || !paymentId || !signature) return { valid: false, reason: 'missing razorpay_order_id/payment_id/signature' };
+  override verifyClientCallback(payload: Record<string, string>): {
+    valid: boolean;
+    gatewayOrderId?: string;
+    gatewayPaymentId?: string;
+    reason?: string;
+  } {
+    const {
+      razorpay_order_id: orderId,
+      razorpay_payment_id: paymentId,
+      razorpay_signature: signature,
+    } = payload;
+    if (!orderId || !paymentId || !signature)
+      return { valid: false, reason: 'missing razorpay_order_id/payment_id/signature' };
 
     // Razorpay's documented post-checkout verification formula — DIFFERENT
     // from the webhook signature above (that one signs the whole webhook
     // body with webhook_secret; this one signs "order_id|payment_id" with
     // key_secret). https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/build-integration/#3-verify-the-payment-signature
-    const expected = createHmac('sha256', this.keySecret).update(`${orderId}|${paymentId}`).digest('hex');
+    const expected = createHmac('sha256', this.keySecret)
+      .update(`${orderId}|${paymentId}`)
+      .digest('hex');
     const a = Buffer.from(signature);
     const b = Buffer.from(expected);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) return { valid: false, reason: 'signature mismatch' };
+    if (a.length !== b.length || !timingSafeEqual(a, b))
+      return { valid: false, reason: 'signature mismatch' };
 
     return { valid: true, gatewayOrderId: orderId, gatewayPaymentId: paymentId };
   }
 }
 
-function mapRazorpayStatus(s: string): 'created' | 'authorized' | 'captured' | 'failed' | 'refunded' {
+function mapRazorpayStatus(
+  s: string,
+): 'created' | 'authorized' | 'captured' | 'failed' | 'refunded' {
   if (s === 'captured' || s === 'authorized' || s === 'failed' || s === 'refunded') return s;
   return 'created';
 }

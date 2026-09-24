@@ -8,7 +8,10 @@ import { PasswordHasher } from '@security';
 
 import { AuditService } from '../../../iam/application/services/audit.service';
 import { User } from '../../../iam/domain/user.entity';
-import { RoleRepository, SYSTEM_ROLES } from '../../../iam/infrastructure/persistence/role.repository';
+import {
+  RoleRepository,
+  SYSTEM_ROLES,
+} from '../../../iam/infrastructure/persistence/role.repository';
 import { UserRepository } from '../../../iam/infrastructure/persistence/user.repository';
 import { Tenant } from '../../domain/tenant.entity';
 import { PlanRepository } from '../../infrastructure/persistence/plan.repository';
@@ -92,13 +95,16 @@ export class TenantProvisioningService {
         }
 
         // Create the owner user and grant the 'owner' role.
-        const owner = User.create(newId() as UserId, {
-          tenantId,
-          kind: 'staff',
-          fullName: input.owner.fullName,
-          email: input.owner.email,
-          passwordHash: ownerPasswordHash,
-        } as never);
+        const owner = User.create(
+          newId() as UserId,
+          {
+            tenantId,
+            kind: 'staff',
+            fullName: input.owner.fullName,
+            email: input.owner.email,
+            passwordHash: ownerPasswordHash,
+          } as never,
+        );
         await this.users.insert(owner);
         await this.roles.grantToUser(owner.id, roleIds.get('owner')!, null);
 
@@ -132,7 +138,13 @@ export class TenantProvisioningService {
       tenant.suspend(reason);
       await this.tenants.update(tenant, tenant.version);
       this.events.publishAll(tenant.pullEvents());
-      await this.audit.recordInTx({ action: 'tenant.suspended', resourceType: 'tenant', resourceId: tenantId, tenantId, changes: { reason } });
+      await this.audit.recordInTx({
+        action: 'tenant.suspended',
+        resourceType: 'tenant',
+        resourceId: tenantId,
+        tenantId,
+        changes: { reason },
+      });
     });
     await this.tenantContext.invalidate(tenantId);
   }
@@ -144,7 +156,12 @@ export class TenantProvisioningService {
       tenant.activate();
       await this.tenants.update(tenant, tenant.version);
       this.events.publishAll(tenant.pullEvents());
-      await this.audit.recordInTx({ action: 'tenant.activated', resourceType: 'tenant', resourceId: tenantId, tenantId });
+      await this.audit.recordInTx({
+        action: 'tenant.activated',
+        resourceType: 'tenant',
+        resourceId: tenantId,
+        tenantId,
+      });
     });
     await this.tenantContext.invalidate(tenantId);
   }

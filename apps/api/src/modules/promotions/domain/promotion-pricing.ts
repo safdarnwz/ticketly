@@ -31,7 +31,11 @@ const MAX_PROMOTION_DAYS = 365;
  *     unbounded range is how a fat-fingered end-date (e.g. a typo'd year)
  *     turns into an accidental multi-year, massively-overpriced charge.
  */
-export function validateDateRange(startDate: string, endDate: string, today: string): { days: number } {
+export function validateDateRange(
+  startDate: string,
+  endDate: string,
+  today: string,
+): { days: number } {
   if (endDate < startDate) {
     throw new Error('End date cannot be before start date');
   }
@@ -42,7 +46,9 @@ export function validateDateRange(startDate: string, endDate: string, today: str
   const end = new Date(endDate + 'T00:00:00Z').getTime();
   const days = Math.round((end - start) / 86_400_000) + 1; // inclusive of both ends
   if (days > MAX_PROMOTION_DAYS) {
-    throw new Error(`A promotion cannot run longer than ${MAX_PROMOTION_DAYS} days in one purchase`);
+    throw new Error(
+      `A promotion cannot run longer than ${MAX_PROMOTION_DAYS} days in one purchase`,
+    );
   }
   return { days };
 }
@@ -68,7 +74,10 @@ export interface PromotionRateInputs {
  * would make this decomposition pick smaller buckets than expected, never
  * silently overcharge.
  */
-export function computeBucketPrice(days: number, rates: PromotionRateInputs): { totalMinor: number; breakdown: { months: number; weeks: number; days: number } } {
+export function computeBucketPrice(
+  days: number,
+  rates: PromotionRateInputs,
+): { totalMinor: number; breakdown: { months: number; weeks: number; days: number } } {
   let remaining = days;
   const months = Math.floor(remaining / 30);
   remaining -= months * 30;
@@ -76,12 +85,18 @@ export function computeBucketPrice(days: number, rates: PromotionRateInputs): { 
   remaining -= weeks * 7;
   const remainingDays = remaining;
 
-  const totalMinor = months * rates.monthlyRateMinor + weeks * rates.weeklyRateMinor + remainingDays * rates.dailyRateMinor;
+  const totalMinor =
+    months * rates.monthlyRateMinor +
+    weeks * rates.weeklyRateMinor +
+    remainingDays * rates.dailyRateMinor;
   return { totalMinor, breakdown: { months, weeks, days: remainingDays } };
 }
 
 /** The [startsAt, endsAt) instant-window for a validated calendar date-range — start of the start-day to end of the end-day, in the platform's own reference timezone (IST, since every operator and customer here is India-based). */
-export function dateRangeToWindow(startDate: string, endDate: string): { startsAt: Date; endsAt: Date } {
+export function dateRangeToWindow(
+  startDate: string,
+  endDate: string,
+): { startsAt: Date; endsAt: Date } {
   const startsAt = new Date(startDate + 'T00:00:00+05:30');
   const endsAt = new Date(new Date(endDate + 'T00:00:00+05:30').getTime() + 86_400_000);
   return { startsAt, endsAt };
@@ -138,7 +153,10 @@ export function selectTopPromoted(
     return [...candidates].sort((a, b) => a.purchasedAt.getTime() - b.purchasedAt.getTime());
   }
   return [...candidates]
-    .sort((a, b) => hashString(`${a.routeId}:${rotationBucket}`) - hashString(`${b.routeId}:${rotationBucket}`))
+    .sort(
+      (a, b) =>
+        hashString(`${a.routeId}:${rotationBucket}`) - hashString(`${b.routeId}:${rotationBucket}`),
+    )
     .slice(0, maxSlots);
 }
 
@@ -167,7 +185,9 @@ export function bubblePromotedToTop<T extends { tripId: string; routeId: string 
   // Only routes that actually have a matching result in THIS search are
   // real candidates — a route promoted platform-wide with zero trips
   // matching today's search has nothing to bubble.
-  const candidateRouteIds = new Set(results.map((r) => r.routeId).filter((id) => promotedRouteIds.has(id)));
+  const candidateRouteIds = new Set(
+    results.map((r) => r.routeId).filter((id) => promotedRouteIds.has(id)),
+  );
   if (candidateRouteIds.size === 0) return [...results];
 
   const candidates: PromotedCandidate[] = [...candidateRouteIds].map((routeId) => ({
@@ -197,6 +217,10 @@ export function bubblePromotedToTop<T extends { tripId: string; routeId: string 
   // promoted[] is currently in the customer's sort-order, not the fairness
   // rotation's order — re-sort just this small slice to match selectTopPromoted's
   // actual ordering, since THAT ordering is the fairness guarantee being sold.
-  promoted.sort((a, b) => selected.findIndex((c) => c.routeId === a.routeId) - selected.findIndex((c) => c.routeId === b.routeId));
+  promoted.sort(
+    (a, b) =>
+      selected.findIndex((c) => c.routeId === a.routeId) -
+      selected.findIndex((c) => c.routeId === b.routeId),
+  );
   return [...promoted, ...rest];
 }
