@@ -7,7 +7,6 @@ import { HttpModule } from '@http';
 import { MessagingModule } from '@messaging';
 import { ObservabilityModule } from '@observability';
 
-import { HealthModule } from './modules/health/health.module';
 import { SystemModule } from './modules/system/system.module';
 import { TenancyModule } from './modules/tenancy/tenancy.module';
 import { IamModule } from './modules/iam/iam.module';
@@ -85,7 +84,6 @@ import { KycModule } from './modules/kyc/kyc.module';
     HttpModule,
 
     // ── operational endpoints ─────────────────────────────────────────────
-    HealthModule,
     SystemModule,
 
     // ── feature modules ───────────────────────────────────────────────────

@@ -7,9 +7,11 @@ TypeScript over snake_case Postgres.
 
 ---
 
-## 1. Storefront search (`modules/storefront`)
+## 1. Journey search (`modules/search`)
 
-Refines raw trip search (Part 6) into what a storefront needs:
+One search module serves every surface (storefront, agent console, GDS
+partners); there is no separate storefront search any more. It refines raw trip
+search (Part 6) into what a traveller needs:
 
 - **Filtered + sorted results** — `domain/result-filter.ts` filters by price band,
   departure wall-clock window (`departAfter`/`departBefore`), seat type (any-match),
@@ -19,11 +21,14 @@ Refines raw trip search (Part 6) into what a storefront needs:
 - **Round trip** — one call returns matching onward + return legs.
 - **Connecting journeys** — `domain/connecting-journey.ts` pairs an A→hub leg with a
   hub→B leg only when they meet at the same hub, the layover is within
-  `[min, max]`, and the second departs after the first arrives. Combined duration
-  is honest door-to-door (includes the layover); bottleneck seat count is reported.
-  Sorted by total duration then price. Pure, 7 tests.
+  `[min, max]` (default 2–24 h), and the second departs after the first arrives.
+  Combined duration is honest door-to-door (includes the layover); bottleneck seat
+  count is reported. Sorted by total duration then price. Pure, 7 tests.
+  Booking a connecting journey is `modules/connections` (one hold + one payment
+  across both legs).
 
-`POST /v1/storefront/search`, `/round-trip`, `/connecting`.
+`POST /v1/search`, `POST /v1/search/round-trip`, `POST /v1/search/connecting`
+(`application/services/journey-search.service.ts`).
 
 ## 2. Reviews & ratings (`modules/reviews`)
 
@@ -46,14 +51,25 @@ transitions. Reply + status change commit in one transaction. Pure, 11 tests.
 `POST /v1/support/tickets`, `GET /v1/support/tickets[/:id]`,
 `POST /v1/support/tickets/:id/messages`, `POST /v1/support/tickets/:id/status`.
 
-## 4. CMS + offers (`modules/cms`)
+## 4. Content: pages, legal, banners, offers, announcements (`modules/content`)
 
-Content pages (slug-addressed, draft/published), promotional banners and marketing
-offers — each surfaced only within its validity window, evaluated at read time
-against "now", so an expired promo simply stops showing. Offers reject an inverted
-validity window. Reads are public storefront content; management is operator-gated.
+One module for everything the platform publishes (it replaces the former cms,
+legal and announcements modules):
 
-`GET /v1/content/pages/:slug|banners|offers`, `POST /v1/content/pages|banners|offers`.
+- **Pages** — slug-addressed, `kind` = `page` or `legal`. Every page has a
+  draft/published status **and** a `version` + `effective_from` that move whenever
+  the published text changes (what makes a Terms change enforceable). Legal pages
+  can never be drafts.
+- **Banners and offers** — surfaced only within their validity window, evaluated
+  at read time, so an expired promo simply stops showing. Offers reject an
+  inverted window.
+- **Announcements** — for customers or operators, sorted by severity
+  (critical first) within their display window.
+
+Public: `GET /v1/content/pages[?kind=legal]`, `/content/pages/:slug`,
+`/content/banners`, `/content/offers`, `/content/announcements/customers`;
+`GET /content/announcements/operators` (signed in).
+Platform admin: `/v1/content/admin/pages|banners|offers|uploads|announcements`.
 
 ## 5. Fraud / risk (`modules/fraud`)
 
@@ -81,6 +97,8 @@ Pure, 7 tests.
 `db/migrations/0014_storefront_reviews_support_cms_fraud.sql` — `reviews`,
 `support_tickets`, `support_messages`, `cms_pages`, `cms_banners`, `offers`,
 `fraud_assessments`. All tenant-scoped with `apply_tenant_rls(...)`.
+`0074_content_pages.sql` later merged `cms_pages` and `platform_legal_pages`
+into `content_pages`.
 
 ## Verification
 

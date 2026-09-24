@@ -13,7 +13,7 @@ import { AppConfig } from '@config';
 import { DatabaseHealthIndicator } from '@database';
 import { Public } from '@http';
 
-import { ReadinessState } from './readiness.state';
+import { ReadinessState } from '../application/readiness.state';
 
 /**
  * Probe endpoints. Excluded from the API prefix and from OpenAPI: they are

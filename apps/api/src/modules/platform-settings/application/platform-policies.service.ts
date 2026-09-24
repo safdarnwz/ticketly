@@ -2,28 +2,28 @@ import { Injectable } from '@nestjs/common';
 
 import { AppError, ErrorCode } from '@kernel';
 
-import { PlatformSettingsRepository } from './infrastructure/platform-settings.repository';
+import { PlatformSettingsRepository } from '../infrastructure/platform-settings.repository';
 import {
   agentCreditPolicyError,
   normaliseAgentCreditPolicy,
   type AgentCreditPolicy,
-} from './domain/agent-credit-policy';
+} from '../domain/agent-credit-policy';
 import {
   dataRetentionErrors,
   normaliseDataRetention,
   type DataRetentionPolicy,
-} from './domain/data-retention';
-import { DEFAULT_GST_SLABS, gstSlabErrors, type GstSlab } from './domain/gst-slabs';
-import { invalidAllowlistEntries } from './domain/ip-allowlist';
+} from '../domain/data-retention';
+import { DEFAULT_GST_SLABS, gstSlabErrors, type GstSlab } from '../domain/gst-slabs';
+import { invalidAllowlistEntries } from '../domain/ip-allowlist';
 import {
   normalisePasswordPolicy,
   passwordViolations,
   type PasswordPolicy,
-} from './domain/password-policy';
+} from '../domain/password-policy';
 import {
   normaliseSuspiciousLoginPolicy,
   type SuspiciousLoginPolicy,
-} from './domain/suspicious-login';
+} from '../domain/suspicious-login';
 
 export const POLICY_KEYS = {
   password: 'password_policy',

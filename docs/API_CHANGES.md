@@ -1,0 +1,79 @@
+# API changes — architecture cleanup (2026-09)
+
+Duplicate features were merged into one module each (see
+[ARCHITECTURE.md §2](ARCHITECTURE.md#2-where-it-stands)). The old URLs were
+**removed, not aliased**. All paths below are under `/api/v1`.
+
+## Removed → replacement
+
+### Search (`storefront` merged into `search`)
+| Old | New |
+|---|---|
+| `POST /storefront/search` | `POST /search` |
+| `POST /storefront/round-trip` | `POST /search/round-trip` |
+| `POST /storefront/connecting` | `POST /search/connecting` |
+| `GET /search/connecting?…` | `POST /search/connecting` (JSON body) |
+
+Search results now also carry `boardingStop` and `droppingStop`.
+
+### Partner API (`distribution` merged into `gds`)
+The per-operator partner API (`X-Api-Key`) is gone; partners use the GDS API
+(`X-GDS-Key`), which sells every operator that distributes to them.
+
+| Old | New |
+|---|---|
+| `POST /distribution/search` | `POST /gds/search` |
+| `POST /distribution/quote` | — the price is returned by `POST /gds/search` and `POST /gds/bookings` |
+| `POST /distribution/bookings/hold` | `POST /gds/bookings` (block seats) |
+| `POST /distribution/bookings/confirm` | `POST /gds/bookings/:id/confirm` |
+| `POST /distribution/bookings/cancel` | `POST /gds/bookings/:id/cancel` |
+
+### Webhooks (one module for operators and GDS partners)
+| Old | New |
+|---|---|
+| `GET /distribution/webhooks` | `GET /webhooks` |
+| `POST /distribution/webhooks` | `POST /webhooks` |
+| `DELETE /distribution/webhooks/:id` | `DELETE /webhooks/:id` |
+| `GET /distribution/webhooks/:id/deliveries` | `GET /webhooks/:id/deliveries` |
+| `GET /distribution/webhooks/catalogue` | `GET /webhooks/catalogue` |
+| — | `POST /webhooks/:id/test` (new: send a signed test event) |
+| GDS partner `webhookUrl` in `POST /admin/gds/partners` and `PUT /admin/gds/partners/:id/terms` | `GET` / `PUT` / `DELETE /admin/gds/partners/:id/webhook`, `POST /admin/gds/partners/:id/webhook/test` |
+
+### Content (`cms` + `legal` + `announcements` merged into `content`)
+Public reads keep their `/content/...` paths; every write moved under the
+platform-admin prefix `/content/admin`.
+
+| Old | New |
+|---|---|
+| `POST /content/pages` | `PUT /content/admin/pages/:slug` (create or update) |
+| `POST /content/banners` | `POST /content/admin/banners` |
+| — | `PATCH /content/admin/banners/:id` (new: show / hide) |
+| `POST /content/offers` | `PUT /content/admin/offers/:code` (create or update) |
+| `POST /cms/uploads` | `POST /content/admin/uploads` |
+| `GET /legal` | `GET /content/pages?kind=legal` |
+| `GET /legal/:slug` | `GET /content/pages/:slug` |
+| `POST /legal/:slug` | `PUT /content/admin/pages/:slug` with `"kind": "legal"` |
+| `GET /announcements` | `GET /content/admin/announcements` |
+| `POST /announcements` | `POST /content/admin/announcements` |
+| `DELETE /announcements/:id` | `DELETE /content/admin/announcements/:id` |
+| `GET /announcements/active/customers` | `GET /content/announcements/customers` |
+| `GET /announcements/active/operators` | `GET /content/announcements/operators` |
+| — | `GET /content/pages` (new: list), `GET /content/admin/pages` (new: list incl. drafts) |
+
+## Stricter validation (same URLs)
+Requests that used to be accepted, and then failed deeper or silently did the
+wrong thing, now get a `400` with an `issues[]` array naming the field:
+
+- **Id path params** must be UUIDs (`/bookings/not-a-uuid` → 400 at the edge; it used to reach the database).
+- **Query strings** are validated: dates must be real calendar dates
+  (`YYYY-MM-DD`, `from` ≤ `to`); status filters must be a known value; numbers
+  and flags (`?download=1`, `?all=1`, `?includeVoided=1`) are parsed.
+- **Bodies** that were read raw are validated (platform settings, payouts,
+  seat upgrade, Razorpay verify, commission, vehicle bulk import, …).
+- `GET /bookings/search` needs at least one of `pnr`, `mobile`, `ticket`;
+  `GET /bookings/by-pnr/:pnr` and `GET /bookings/mine` need `mobile`.
+
+## Permission fixes
+- `GET /admin/tenants/plans` now requires the platform admin (it had no check).
+- DPDP self-service (`/privacy/consents`, `POST /privacy/erasure-requests`) needs only a signed-in
+  user (it wrongly required `booking:read`, which customers never have).

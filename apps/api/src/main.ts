@@ -15,7 +15,7 @@ import { Logger } from '@observability';
 
 import { AppModule } from './app.module';
 import { configureApp, createFastifyAdapter, installShutdownHandlers } from './bootstrap';
-import { ReadinessState } from './modules/health/readiness.state';
+import { ReadinessState } from './modules/system';
 
 async function bootstrap(): Promise<void> {
   const env = loadEnv();

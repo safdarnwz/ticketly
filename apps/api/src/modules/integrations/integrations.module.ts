@@ -3,7 +3,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@database';
 import { SecurityModule } from '@security';
 
-import { IntegrationCredentialStore } from './integration-credential.store';
+import { IntegrationCredentialStore } from './infrastructure/integration-credential.store';
 
 /**
  * Platform integration credentials. Standalone (database + security only) so

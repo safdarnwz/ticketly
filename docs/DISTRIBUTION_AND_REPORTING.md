@@ -3,21 +3,35 @@
 The final layer: let third parties sell the inventory, let operators measure it,
 and ship the whole thing without Docker.
 
-## OTA / channel-partner distribution API
+## OTA / GDS distribution API (`modules/gds`)
 
-The redBus/Paytm-style integration surface. A partner authenticates with an
-**API key** (Part 2, `X-Api-Key`) whose scopes gate access and whose tenant the
-auth guard resolves — so a partner is always scoped to the one operator that
-issued its key.
+The redBus/Paytm-style integration surface. There is **one** partner API: the
+GDS. (An older per-operator "distribution" API keyed with `X-Api-Key` sold only
+one operator's seats and duplicated the same flow; it was removed and its
+webhooks moved to `modules/webhooks`.)
 
-The controller is a **thin adapter over the exact same internal services** the
-first-party storefront uses (`SearchService`, `PricingService`, `BookingService`).
-Partners therefore get identical inventory, identical pricing, and the identical
-anti-double-sell guarantee — there is no separate, drifting "partner" code path.
-Booking endpoints are `@Idempotent()` (partners retry hard) and rate-limited per
-key. The generated **OpenAPI spec** is the integration contract; the
-`@messaging` event catalogue is the **webhook** contract (webhooks are signed —
-HMAC over the raw body — exactly like the inbound PSP webhooks).
+A GDS partner (an OTA or a multi-operator agent) is onboarded by the platform
+admin, authenticates with `X-GDS-Key`, and sells every operator that has
+switched distribution to it on, at the commission each operator sets. Partners
+are prepaid (deposit) or postpaid (credit limit) against a partner ledger.
+
+- Partner API (`/v1/gds`): `GET account`, `POST search`,
+  `GET trips/:tripId/seats?from=&to=`, `POST bookings` (block), `POST
+  bookings/:id/confirm`, `POST bookings/:id/cancel`, `GET bookings/:id`.
+- Platform admin (`/v1/admin/gds/partners`): onboarding, status, terms,
+  receipts, API keys, and the partner's webhook endpoint
+  (`GET|PUT|DELETE :id/webhook`, `POST :id/webhook/test`).
+- Operator (`/v1/gds-partners`, `/v1/trips/:tripId/closed-channels`): which
+  partners may sell, at what commission, and channel-wise sales per trip.
+
+The controllers are thin adapters over the same internal services the
+first-party storefront uses (search, pricing, booking), so partners get
+identical inventory, pricing and the anti-double-sell guarantee. Booking
+endpoints are `@Idempotent()` (partners retry hard) and rate-limited.
+
+**Webhooks** (`modules/webhooks`) are one implementation for operators
+(`/v1/webhooks`) and GDS partners: signed with HMAC-SHA256 over the raw body,
+retried with backoff, every attempt logged, and a signed test event on demand.
 
 ## Reporting / BI
 

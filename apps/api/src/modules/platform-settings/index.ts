@@ -2,7 +2,7 @@
  * Platform settings — public API. Other modules import from here, never from
  * this module's internal folders.
  */
-export * from './platform-policies.service';
+export * from './application/platform-policies.service';
 export * from './infrastructure/platform-settings.repository';
 export * from './domain/agent-credit-policy';
 export * from './domain/data-retention';

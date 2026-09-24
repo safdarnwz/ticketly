@@ -155,6 +155,13 @@ docs/             ARCHITECTURE, DATABASE, MASTER_PLAN
 
 **All 15 parts complete.**
 
+> **Architecture cleanup (2026-09):** duplicated features were merged — one partner
+> API (`gds`), one search (`search`), one content module (`content`: pages, legal,
+> banners, offers, announcements), one webhooks module — and every request body,
+> query string and id param is validated by a zod DTO. See
+> [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the old → new URL list in
+> [docs/API_CHANGES.md](docs/API_CHANGES.md).
+
 > **Architecture note (this drop):** the project was renamed to **Ticketly** and every
 > feature module restructured into the DDD layered layout
 > (`application/` · `domain/` · `infrastructure/` · `presentation/`). Tooling moved to

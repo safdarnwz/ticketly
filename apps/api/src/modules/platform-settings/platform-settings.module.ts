@@ -4,7 +4,7 @@ import { CacheModule } from '@cache';
 import { DatabaseModule } from '@database';
 
 import { PlatformSettingsRepository } from './infrastructure/platform-settings.repository';
-import { PlatformPoliciesService } from './platform-policies.service';
+import { PlatformPoliciesService } from './application/platform-policies.service';
 
 /**
  * Deliberately standalone — depends on nothing but DatabaseModule/CacheModule,

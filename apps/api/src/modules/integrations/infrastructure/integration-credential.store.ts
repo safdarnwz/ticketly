@@ -13,7 +13,7 @@ import {
   type IntegrationConfig,
   type IntegrationProvider,
   type IntegrationSecrets,
-} from './domain/integration-catalog';
+} from '../domain/integration-catalog';
 
 export interface ActiveIntegration<P extends IntegrationProvider> {
   config: IntegrationConfig<P>;

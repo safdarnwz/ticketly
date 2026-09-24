@@ -5,28 +5,48 @@ Ticketly stays **one deployable NestJS service + worker**, on PostgreSQL (RLS mu
 Microservices would add network hops, distributed transactions and ops cost without solving the real
 problems below. What changes is **how the monolith is organised inside**.
 
-## 2. What is wrong today (measured, not opinion)
-| Problem | Measured | Consequence |
-|---|---|---|
-| Too many, inconsistent modules | 48 modules; only 26 follow the standard domain/application/infrastructure/presentation layout | Hard to find things; every module looks different |
-| Layer leaks | 172 SQL statements outside repositories (26 files) | Business rules mixed with SQL; hard to test/reuse |
-| Tight coupling | 190 deep cross-module imports (121 after step 0) | Circular-dependency workarounds (AgentLedgerModule, GdsLedgerModule, fleet quota SQL) |
-| Duplication | Agent account & GDS partner account = same ledger model twice; plan quota checked in 2 places; notification templates installed in 3 places | A fix in one place is missed in another |
-| God services | payment.service 652 lines, auth.service 552, booking.service 540 | Risky to change |
+## 2. Where it stands
 
-## 3. Target: 10 bounded contexts
-| Context | Absorbs today's modules |
+Measured at the end of the 2026-09 cleanup (the starting numbers are in brackets):
+
+| Area | Now | Was |
+|---|---|---|
+| Feature modules | 45 — every feature lives in exactly one | 48, with 4 duplicated features (below) |
+| Cross-module deep imports | 15 (ratchet baseline) | 190 |
+| Request bodies validated | all (zod DTOs in `presentation/dto`) | ~20 bodies read raw |
+| Query strings validated | all (`zodQuery`) | 62 raw `@Query('x')` strings |
+| Id route params validated | all (`@UuidParam`) | none |
+| Schemas declared inside controllers | 0 | 26 controllers |
+| Application-layer files with SQL | 22 | 26 |
+
+Duplicates removed (one implementation kept, the richer one, with the missing
+parts of the other merged in):
+
+| Was | Now |
 |---|---|
-| **identity** | iam, tenancy, onboarding, kyc, platform-settings |
-| **network** | master-data, fleet, trip-vehicle |
+| `distribution` (per-operator partner API, X-Api-Key) + `gds` (multi-operator) | `gds` — the one partner API; webhooks → `webhooks` |
+| `storefront` search + `search` + connecting search in `connections` | `search` (`/search`, `/search/round-trip`, `/search/connecting`) |
+| `cms` + `legal` + `announcements`; `cms_pages` + `platform_legal_pages` | `content`; one `content_pages` table (status **and** version/effective date) |
+| `AgentLedgerModule`, `GdsLedgerModule` workaround modules | `RefundCreditorRegistry` port in `refunds`; agents and GDS register creditors |
+| partner webhooks stored twice (`partner_webhooks`, columns on `gds_partners`) | `webhooks` module, one table, one delivery engine |
+| `channel_partners` (unused) | dropped |
+| `health` + `system` | `system` (health, readiness, metrics) |
+| Status vocabularies repeated as string unions in DTOs, services and SQL | one `*_STATUSES` const per vocabulary in the owning module's `domain/` |
+
+## 3. Bounded contexts
+| Context | Modules |
+|---|---|
+| **identity** | iam, tenancy, onboarding, kyc, platform-settings, integrations |
+| **network** | master-data, fleet, trip-vehicle, branches |
 | **inventory** | scheduling, quotas, demand |
 | **pricing** | pricing, promotions |
-| **sales** | booking, amendments, connections, ancillary, search, storefront, tickets |
-| **finance** | payment, refunds, invoicing, payouts, trip-expenses |
-| **distribution** | gds, distribution, agents |
-| **operations** | crew-app, departure-control, tracking, incidents |
-| **engagement** | notification, crm, reviews, support, cms, announcements, appearance, i18n, legal, privacy, fraud |
-| **insights** | reporting (read models) |
+| **sales** | search, booking, amendments, connections, ancillary, tickets |
+| **finance** | payment, refunds, invoicing, trip-expenses |
+| **distribution** | gds, agents, webhooks |
+| **operations** | crew-app, departure-control, tracking, incidents, realtime |
+| **engagement** | notification, crm, reviews, support, content, appearance, i18n, privacy, fraud |
+| **insights** | reporting |
+| **platform** | files, system |
 
 ## 4. Rules inside every context
 ```
@@ -38,6 +58,25 @@ contexts/<name>/
   index.ts         PUBLIC API: the facades/types other contexts may use — nothing else is importable
 ```
 * Cross-context calls: **synchronous** through the other context's `index.ts` facade; **asynchronous** through outbox domain events.
+* `index.ts` exports services, repositories, domain types/enums and DTO schemas — **never** the Nest `*Module`
+  class. Modules are imported from their own file (`../booking/booking.module`), which keeps barrel imports
+  free of module load cycles.
+* When two modules need each other, the lower one defines a **port** and a registry, the higher one
+  registers an implementation at `onModuleInit` (e.g. `RefundCreditorRegistry`, `WebhookAudienceRegistry`) —
+  no forwardRef, no workaround modules.
+
+### Presentation conventions
+* Every body: `@Body(zodBody(XSchema)) dto: XDto`; every query: `@Query(zodQuery(XQuerySchema)) q: XQueryDto`;
+  every entity id: `@UuidParam('id')`. Nothing is parsed by hand in a handler.
+* Schemas live in `presentation/dto/<name>.dto.ts`, each followed by `export type XDto = z.infer<typeof XSchema>`.
+* Shared query fragments come from `@http`: `DateRangeQuerySchema`, `OptionalDateRangeQuerySchema`,
+  `SegmentQuerySchema`, `DownloadQuerySchema`, `FileUploadQuerySchema`, `localDateQuery`, `queryFlag`, `searchText`.
+* Enumerations are defined once, `as const`, in the owning module's `domain/` — an array
+  (`export const ROUTE_STATUSES = [...] as const; export type RouteStatus = (typeof ROUTE_STATUSES)[number]`)
+  or, where named members read better in code, an object (`PageKind.LEGAL`). DTOs use `z.enum(...)` on it, so a
+  new value is added in one place. Cross-module vocabularies (booking channels) live in `@contracts`.
+* One controller per file (`*.controller.ts`); a module with several audiences has one controller per
+  audience (e.g. `gds-partner`, `gds-admin`, `gds-operator`).
 * Cross-cutting code (auth decorators, idempotency, rate limits, money, errors) lives in `libs/*` — never in a feature module.
 
 ## 5. Reusable building blocks (write once, use everywhere)
@@ -59,12 +98,15 @@ contexts/<name>/
 * `npm run check:boundaries` — ratchet: new cross-module deep imports fail CI; the legacy count can only go down.
 * Every domain rule ships with unit tests; every phase below keeps the full suite green and the HTTP API unchanged.
 
-## 8. Migration plan (incremental, nothing breaks)
-| Phase | Work | Exit criteria |
+## 8. Plan
+| Step | Work | Status |
 |---|---|---|
-| **0 — done** | Auth decorators moved to `@http` (52 imports), boundary ratchet + baseline (121) | Suite green, API unchanged |
-| **1 — 3 of 4 done** | SQL moved out of incidents, demand, trip-vehicle into repositories (amendments next); booking exposes `ticketCode` via its public `index.ts` | 0 SQL in those application layers |
-| **2** | Extract `AccountLedger`; agents + GDS use it; delete Agent/Gds ledger workaround modules | One ledger implementation |
-| **3** | Create the 10 contexts with `index.ts` public APIs; move modules in; burn baseline 121 → 0 | `check:boundaries` at 0 |
-| **4** | Split payment / auth / booking services into use-case classes | No file > 300 lines in application/ |
-| **5** | `TemplateRegistry` + `Entitlements` everywhere | No duplicated installers / quota checks |
+| 0 | Auth decorators in `@http`, boundary ratchet | done |
+| 1 | Remove duplicated features (table in §2) | done |
+| 2 | Validated DTOs for every body, query and id param; enums in domain | done |
+| 3 | Route deep imports through `index.ts` (190 → 15) | 15 left: files, promotions, quotas, crm, agents/domain, search |
+| 4 | Move the SQL still in 22 application services into repositories | open — largest remaining item |
+| 5 | Split payment / auth / booking services into use-case classes | open |
+| 6 | `TemplateRegistry` + `Entitlements` everywhere | open |
+
+Changed URLs are listed in [API_CHANGES.md](API_CHANGES.md).
