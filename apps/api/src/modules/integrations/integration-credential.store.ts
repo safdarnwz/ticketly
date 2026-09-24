@@ -68,7 +68,6 @@ export class IntegrationCredentialStore implements OnModuleInit, OnModuleDestroy
     { enabled: boolean; config: Record<string, unknown>; secrets: Record<string, unknown> | null }
   >();
   private timer?: NodeJS.Timeout;
-  private firstLoad?: Promise<void>;
 
   constructor(
     private readonly db: DatabaseService,
@@ -79,19 +78,13 @@ export class IntegrationCredentialStore implements OnModuleInit, OnModuleDestroy
   }
 
   async onModuleInit(): Promise<void> {
-    await this.ready();
+    await this.reload();
     this.timer = setInterval(() => void this.reload(), REFRESH_MS);
     this.timer.unref();
   }
 
   onModuleDestroy(): void {
     if (this.timer) clearInterval(this.timer);
-  }
-
-  /** Resolves once the first snapshot is loaded — for factories that run before onModuleInit. */
-  ready(): Promise<void> {
-    this.firstLoad ??= this.reload();
-    return this.firstLoad;
   }
 
   /** Enabled credentials for a provider, or null (→ use the env-var fallback). */

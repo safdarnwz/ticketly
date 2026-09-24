@@ -27,14 +27,12 @@ export class PrivacyController {
 
   @Post('consents')
   @HttpCode(200)
-  @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'Grant or withdraw consent for a purpose' })
   async setConsent(@Body(zodBody(ConsentSchema)) dto: z.infer<typeof ConsentSchema>) {
     return this.privacy.setConsent(dto.purpose, dto.granted);
   }
 
   @Get('consents')
-  @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'My current consent state' })
   async myConsents() {
     return { consents: await this.privacy.myConsents() };
@@ -42,7 +40,6 @@ export class PrivacyController {
 
   @Post('erasure-requests')
   @HttpCode(201)
-  @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'Request erasure of my personal data (right to be forgotten)' })
   async requestErasure() {
     return this.privacy.requestErasure();

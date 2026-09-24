@@ -3,12 +3,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bootstrapTestApp, type TestApp } from './support/bootstrap';
 
 /**
- * End-to-end: the money-and-inventory-critical purchase flow, against a real
- * Nest app + Postgres (rolled back per file). This is the highest-value e2e —
- * it exercises the anti-double-sell gate, the hold TTL, coupon redemption, the
- * ledger, and ticket issuance as one path.
- *
- * Run with: npm run test:e2e   (needs a Postgres per vitest.e2e.config.ts).
+ * End-to-end: the money-and-inventory-critical purchase flow against the real
+ * API and Postgres — search, firm quote, hold (anti-double-sell gate), test-mode
+ * payment (ledger + ticket issuance), signed boarding token.
  */
 describe('booking flow (e2e)', () => {
   let app: TestApp;
@@ -20,80 +17,79 @@ describe('booking flow (e2e)', () => {
     await app.close();
   });
 
-  it('search → quote → hold → confirm → ticket', async () => {
-    const search = await app.post('/v1/storefront/search', {
-      originCityId: app.fixtures.originCityId,
-      destCityId: app.fixtures.destCityId,
-      journeyDate: app.fixtures.journeyDate,
-    });
-    expect(search.status).toBe(200);
-    expect(search.body.count).toBeGreaterThan(0);
-
-    const quote = await app.post('/v1/pricing/quote', {
+  const quoteFor = (seat: string) =>
+    app.post('/pricing/quote', {
       tripId: app.fixtures.tripId,
-      seatNumbers: ['A1'],
       fromStopId: app.fixtures.fromStopId,
       toStopId: app.fixtures.toStopId,
+      seatType: 'seater',
+      seatNumbers: [seat],
     });
+
+  it('search → quote → hold → pay → ticket → verify', async () => {
+    const search = await app.post(
+      '/search',
+      {
+        originCityId: app.fixtures.originCityId,
+        destCityId: app.fixtures.destCityId,
+        journeyDate: app.fixtures.journeyDate,
+      },
+      { as: 'anonymous' },
+    );
+    expect(search.status).toBe(200);
+    const hit = search.body.results.find(
+      (r: { tripId: string }) => r.tripId === app.fixtures.tripId,
+    );
+    expect(hit).toBeDefined();
+    expect(hit.boardingStop.id).toBe(app.fixtures.fromStopId);
+
+    const seat = app.fixtures.seatNumbers[0];
+    const quote = await quoteFor(seat);
     expect(quote.status).toBe(200);
 
     const hold = await app.post(
-      '/v1/bookings/hold',
+      '/bookings/hold',
       {
         quoteId: quote.body.quoteId,
-        seatNumbers: ['A1'],
-        passengers: [{ seatNumber: 'A1', fullName: 'E2E Traveller', age: 30 }],
+        seatNumbers: [seat],
+        passengers: [{ seatNumber: seat, fullName: 'E2E Traveller', age: 30 }],
+        contactPhone: app.fixtures.customer.phone,
       },
-      { idempotencyKey: 'e2e-hold-1' },
+      { idempotencyKey: `e2e-hold-${app.fixtures.customer.phone}` },
     );
-    expect(hold.status).toBe(201);
+    expect(hold.status, JSON.stringify(hold.body)).toBe(201);
     expect(hold.body.pnr).toBeDefined();
 
-    const confirm = await app.post(
-      `/v1/bookings/${hold.body.bookingId}/confirm`,
-      { paidMinor: hold.body.totalMinor, reference: 'e2e-pay-1' },
-      { idempotencyKey: 'e2e-confirm-1' },
+    const pay = await app.post(
+      '/payments/charge',
+      { bookingId: hold.body.bookingId, method: 'upi', vpa: 'success@ticketly' },
+      { idempotencyKey: `e2e-pay-${app.fixtures.customer.phone}` },
     );
-    expect(confirm.status).toBe(200);
+    expect(pay.status).toBe(200);
 
-    const tickets = await app.get(`/v1/bookings/${hold.body.bookingId}/tickets`);
+    const tickets = await app.get(`/bookings/${hold.body.bookingId}/tickets`);
     expect(tickets.status).toBe(200);
-    expect(tickets.body.tickets[0].boardingToken).toContain('.');
+    const token: string = tickets.body.tickets[0].boardingToken;
+    expect(token).toContain('.');
 
-    // The gate verifies the signed token.
-    const verify = await app.post('/v1/tickets/verify', {
-      token: tickets.body.tickets[0].boardingToken,
-    });
+    const verify = await app.post('/tickets/verify', { token }, { as: 'operator' });
     expect(verify.body.valid).toBe(true);
   });
 
   it('a second hold on the same seat/segment is refused (anti-double-sell)', async () => {
-    const quote = await app.post('/v1/pricing/quote', {
-      tripId: app.fixtures.tripId,
-      seatNumbers: ['A2'],
-      fromStopId: app.fixtures.fromStopId,
-      toStopId: app.fixtures.toStopId,
-    });
-    const first = await app.post(
-      '/v1/bookings/hold',
-      {
-        quoteId: quote.body.quoteId,
-        seatNumbers: ['A2'],
-        passengers: [{ seatNumber: 'A2', fullName: 'First' }],
-      },
-      { idempotencyKey: 'e2e-a2-1' },
-    );
-    expect(first.status).toBe(201);
-
-    const second = await app.post(
-      '/v1/bookings/hold',
-      {
-        quoteId: quote.body.quoteId,
-        seatNumbers: ['A2'],
-        passengers: [{ seatNumber: 'A2', fullName: 'Second' }],
-      },
-      { idempotencyKey: 'e2e-a2-2' },
-    );
-    expect(second.status).toBe(422); // INVENTORY.SEAT_UNAVAILABLE
+    const seat = app.fixtures.seatNumbers[1];
+    const hold = async (name: string, key: string) =>
+      app.post(
+        '/bookings/hold',
+        {
+          quoteId: (await quoteFor(seat)).body.quoteId,
+          seatNumbers: [seat],
+          passengers: [{ seatNumber: seat, fullName: name }],
+          contactPhone: app.fixtures.customer.phone,
+        },
+        { idempotencyKey: key },
+      );
+    expect((await hold('First', `e2e-a-${app.fixtures.customer.phone}`)).status).toBe(201);
+    expect((await hold('Second', `e2e-b-${app.fixtures.customer.phone}`)).status).toBe(422);
   });
 });

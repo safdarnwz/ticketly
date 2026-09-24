@@ -22,8 +22,8 @@ const RAZORPAY_API = 'https://api.razorpay.com/v1';
  *
  * Implements the exact same contract as MockGateway (createIntent →
  * verifyWebhook → refund), so no booking/payment code needed to change to
- * plug this in — see PaymentModule's factory, which picks this over
- * MockGateway once `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are set.
+ * plug this in — see ConfiguredPaymentGateway, which routes to this one
+ * whenever Razorpay keys are configured.
  *
  * Docs (verify against Razorpay's current reference if something 404s — API
  * paths are stable but response shapes occasionally gain fields):
@@ -39,8 +39,8 @@ const RAZORPAY_API = 'https://api.razorpay.com/v1';
  *
  * Keys come from the platform admin's saved `razorpay` integration when it is
  * enabled (#12), else from the RAZORPAY_* env vars. They are read per call,
- * so rotating a key under Admin → Integrations needs no restart; switching
- * the platform ONTO or OFF Razorpay does (see PaymentModule's factory).
+ * so rotating a key under Admin → Integrations needs no restart (and neither
+ * does switching Razorpay on or off — see ConfiguredPaymentGateway).
  */
 @Injectable()
 export class RazorpayGateway extends PaymentGateway {

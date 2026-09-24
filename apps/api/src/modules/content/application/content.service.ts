@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
-import { AppError, ErrorCode, getUserId, NotFoundError, type UserId } from '@kernel';
+import { AppError, ErrorCode, getUserId, NotFoundError } from '@kernel';
 
 import { FileService } from '../../files';
 import {

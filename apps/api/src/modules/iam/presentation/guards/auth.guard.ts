@@ -84,7 +84,12 @@ export class AuthGuard implements CanActivate {
     // the token predates a grant change (detected via the permission hash on
     // sensitive routes — the permission guard can force a refresh).
     ctx.userId = claims.sub;
-    ctx.tenantId = claims.tid ?? undefined;
+    // A staff token is bound to its own operator, always. A tenant-less token
+    // with no roles is a customer: customer accounts are central, so the
+    // operator they are booking with comes from the request (X-Tenant-Id /
+    // host) and is kept. A tenant-less platform-staff token never inherits one.
+    const isCustomerToken = !claims.tid && (claims.roles ?? []).length === 0;
+    ctx.tenantId = claims.tid ?? (isCustomerToken ? ctx.tenantId : undefined);
     ctx.actorType = 'user';
     const resolved =
       claims.roles && claims.roles.length > 0
