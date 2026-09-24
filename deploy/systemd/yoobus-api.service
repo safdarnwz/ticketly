@@ -1,0 +1,37 @@
+# YooBus-GDS API — systemd unit (NO Docker).
+#
+# Deploy: build once (`npm run build`), then run N instances behind the load
+# balancer via a templated unit (yoobus-api@1, @2, …), each on its own port.
+# systemd handles restart, log capture (journald), and graceful reload.
+[Unit]
+Description=YooBus API (instance %i)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=gds
+Group=gds
+WorkingDirectory=/opt/yoobus
+# Config from an EnvironmentFile — never bake secrets into the unit.
+EnvironmentFile=/opt/yoobus/.env
+# Each templated instance gets its own port: 3001, 3002, …
+Environment=HTTP_PORT=30%i
+Environment=NODE_ENV=production
+Environment=INSTANCE_ID=api-%i
+ExecStart=/usr/bin/node dist/apps/api/src/main.js
+# Graceful: SIGTERM triggers the drain→close sequence in bootstrap.ts.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+Restart=always
+RestartSec=2
+# Hardening.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/yoobus/logs
+PrivateTmp=true
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

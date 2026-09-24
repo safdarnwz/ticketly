@@ -1,0 +1,62 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "lib": ["ES2023"],
+    "outDir": "./dist",
+    "rootDir": ".",
+    "baseUrl": ".",
+
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    "strict": true,
+    "strictNullChecks": true,
+    "strictPropertyInitialization": false,
+    "noImplicitAny": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": false,
+    "useUnknownInCatchVariables": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "declaration": false,
+    "sourceMap": true,
+    "removeComments": false,
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+
+    "paths": {
+      "@kernel": ["libs/kernel/src/index.ts"],
+      "@kernel/*": ["libs/kernel/src/*"],
+      "@config": ["libs/config/src/index.ts"],
+      "@config/*": ["libs/config/src/*"],
+      "@database": ["libs/database/src/index.ts"],
+      "@database/*": ["libs/database/src/*"],
+      "@cache": ["libs/cache/src/index.ts"],
+      "@cache/*": ["libs/cache/src/*"],
+      "@http": ["libs/http/src/index.ts"],
+      "@http/*": ["libs/http/src/*"],
+      "@observability": ["libs/observability/src/index.ts"],
+      "@observability/*": ["libs/observability/src/*"],
+      "@messaging": ["libs/messaging/src/index.ts"],
+      "@messaging/*": ["libs/messaging/src/*"],
+      "@security": ["libs/security/src/index.ts"],
+      "@security/*": ["libs/security/src/*"],
+      "@contracts": ["libs/contracts/src/index.ts"],
+      "@contracts/*": ["libs/contracts/src/*"],
+      "@testing": ["libs/testing/src/index.ts"],
+      "@testing/*": ["libs/testing/src/*"],
+      "@api/*": ["apps/api/src/*"],
+      "@worker/*": ["apps/worker/src/*"]
+    }
+  },
+  "include": ["apps/**/*.ts", "libs/**/*.ts", "scripts/**/*.ts", "test/**/*.ts"],
+  "exclude": ["node_modules", "dist", "coverage"]
+}

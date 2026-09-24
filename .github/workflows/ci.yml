@@ -1,0 +1,31 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: ticketly }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      # Gate 1: format + lint + typecheck.
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      # Gate 2: migrations apply cleanly against a real Postgres.
+      - run: npm run db:migrate
+        env: { DB_HOST: localhost, DB_USER: postgres, DB_PASSWORD: postgres, DB_NAME: ticketly }
+      # Gate 3: unit + architecture tests (incl. the @Idempotent enforcement).
+      - run: npm test
+      - run: npm run test:e2e
+        env: { DB_HOST: localhost, DB_USER: postgres, DB_PASSWORD: postgres, DB_NAME: ticketly }

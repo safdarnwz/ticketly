@@ -1,0 +1,124 @@
+import { Injectable } from '@nestjs/common';
+
+import { DatabaseService } from '@database';
+import { requireTenantId, type StopId, type TripId } from '@kernel';
+
+export interface SeatAvailability {
+  seatNumber: string;
+  seatType: string;
+  ladiesOnly: boolean;
+  available: boolean;
+}
+
+/**
+ * ============================================================================
+ *  Segment availability read model
+ * ============================================================================
+ *
+ * The fast side of the leg-bitmap design. "How many seats are free on A→C?" is
+ * ONE aggregate with a bitwise AND against `segment_mask`, using the partial
+ * index on trip_seats — no per-seat loop, no per-segment materialised table to
+ * keep in sync. This is what lets search (Part 6) price and rank dozens of
+ * trips in a handful of milliseconds.
+ *
+ * Reads run on a replica (they never inform a write decision here; the actual
+ * seat lock at booking time in Part 7 re-checks on the primary under a row
+ * lock, which is the authoritative gate against double-selling).
+ */
+@Injectable()
+export class InventoryRepository {
+  constructor(private readonly db: DatabaseService) {}
+
+  /** Count of available seats for a segment [fromSeq, toSeq). */
+  async availableCount(tripId: TripId, fromSeq: number, toSeq: number): Promise<number> {
+    const row = await this.db.queryOne<{ n: number }>(
+      `SELECT count(*)::int AS n FROM trip_seats
+        WHERE tenant_id = $1 AND trip_id = $2 AND is_bookable
+          AND ((occupied_legs | blocked_legs) & segment_mask($3, $4)) = 0`,
+      [requireTenantId(), tripId, fromSeq, toSeq],
+      { name: 'inventory.availableCount' },
+    );
+    return row?.n ?? 0;
+  }
+
+  /** Available counts for many trips at once (search fan-out), one round trip. */
+  async availableCountForTrips(
+    trips: readonly { tripId: TripId; fromSeq: number; toSeq: number }[],
+  ): Promise<Map<TripId, number>> {
+    if (trips.length === 0) return new Map();
+    // VALUES list of (trip, from, to) joined against a lateral aggregate.
+    const params: unknown[] = [requireTenantId()];
+    const values = trips.map((t, i) => {
+      const b = i * 3;
+      params.push(t.tripId, t.fromSeq, t.toSeq);
+      return `($${b + 2}::uuid, $${b + 3}::int, $${b + 4}::int)`;
+    });
+    const rows = await this.db.query<{ trip_id: TripId; n: number }>(
+      `SELECT q.trip_id, count(*)::int AS n
+         FROM (VALUES ${values.join(',')}) AS q(trip_id, from_seq, to_seq)
+         JOIN trip_seats s ON s.trip_id = q.trip_id AND s.tenant_id = $1 AND s.is_bookable
+          AND ((s.occupied_legs | s.blocked_legs) & segment_mask(q.from_seq, q.to_seq)) = 0
+        GROUP BY q.trip_id`,
+      params,
+      { name: 'inventory.availableCountForTrips' },
+    );
+    const result = new Map<TripId, number>(trips.map((t) => [t.tripId, 0]));
+    for (const row of rows) result.set(row.trip_id, row.n);
+    return result;
+  }
+
+  /** Per-seat availability for the seat-map render. */
+  async seatAvailability(tripId: TripId, fromSeq: number, toSeq: number): Promise<SeatAvailability[]> {
+    const rows = await this.db.query<{ seat_number: string; seat_type: string; ladies_only: boolean; available: boolean }>(
+      `SELECT seat_number, seat_type, ladies_only,
+              (is_bookable AND ((occupied_legs | blocked_legs) & segment_mask($3, $4)) = 0) AS available
+         FROM trip_seats
+        WHERE tenant_id = $1 AND trip_id = $2
+        ORDER BY seat_number`,
+      [requireTenantId(), tripId, fromSeq, toSeq],
+      { name: 'inventory.seatAvailability' },
+    );
+    return rows.map((r) => ({
+      seatNumber: r.seat_number, seatType: r.seat_type, ladiesOnly: r.ladies_only, available: r.available,
+    }));
+  }
+
+  /** Seat number → seat type (and bookability) for the given seats of a trip. */
+  async seatTypes(tripId: TripId, seatNumbers: string[]): Promise<Map<string, { seatType: string; bookable: boolean }>> {
+    if (seatNumbers.length === 0) return new Map();
+    const rows = await this.db.query<{ seat_number: string; seat_type: string; is_bookable: boolean }>(
+      `SELECT seat_number, seat_type, is_bookable FROM trip_seats WHERE tenant_id = $1 AND trip_id = $2 AND seat_number = ANY($3::text[])`,
+      [requireTenantId(), tripId, seatNumbers],
+      { name: 'inventory.seatTypes' },
+    );
+    return new Map(rows.map((r) => [r.seat_number, { seatType: r.seat_type, bookable: r.is_bookable }]));
+  }
+
+  /**
+   * Block or unblock a set of seats on a segment (operator quota / hold).
+   * Uses the same bitmap: block ORs the mask into `blocked_legs`.
+   */
+  async blockSeats(tripId: TripId, seatNumbers: string[], fromSeq: number, toSeq: number, block: boolean): Promise<number> {
+    if (seatNumbers.length === 0) return 0;
+    const op = block ? `blocked_legs | segment_mask($3,$4)` : `blocked_legs & ~segment_mask($3,$4)`;
+    return this.db.execute_(
+      `UPDATE trip_seats SET blocked_legs = ${op}, version = version + 1
+        WHERE tenant_id = $1 AND trip_id = $2 AND seat_number = ANY($5)`,
+      [requireTenantId(), tripId, fromSeq, toSeq, seatNumbers],
+      { name: 'inventory.blockSeats', primary: true },
+    );
+  }
+
+  /** Map a (fromStopId, toStopId) pair to leg sequence indices for a trip. */
+  async resolveSegment(tripId: TripId, fromStopId: StopId, toStopId: StopId): Promise<{ fromSeq: number; toSeq: number } | null> {
+    const rows = await this.db.query<{ stop_id: StopId; sequence: number; can_board: boolean; can_alight: boolean }>(
+      `SELECT stop_id, sequence, can_board, can_alight FROM trip_stops WHERE trip_id = $1 ORDER BY sequence`,
+      [tripId],
+      { name: 'inventory.resolveSegment' },
+    );
+    const from = rows.find((r) => r.stop_id === fromStopId);
+    const to = rows.find((r) => r.stop_id === toStopId);
+    if (!from || !to || from.sequence >= to.sequence || !from.can_board || !to.can_alight) return null;
+    return { fromSeq: from.sequence, toSeq: to.sequence };
+  }
+}

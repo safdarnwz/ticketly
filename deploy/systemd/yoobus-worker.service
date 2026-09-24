@@ -1,0 +1,29 @@
+# YooBus-GDS background worker — outbox dispatch, schedulers, jobs.
+# Runs SEPARATELY from the API so a slow provider never touches request latency.
+# Scale independently (worker@1, @2, …); FOR UPDATE SKIP LOCKED coordinates them.
+[Unit]
+Description=YooBus Worker (instance %i)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=gds
+Group=gds
+WorkingDirectory=/opt/yoobus
+EnvironmentFile=/opt/yoobus/.env
+Environment=NODE_ENV=production
+Environment=WORKER_ENABLED=true
+Environment=INSTANCE_ID=worker-%i
+ExecStart=/usr/bin/node dist/apps/worker/src/main.js
+KillSignal=SIGTERM
+TimeoutStopSec=30
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
