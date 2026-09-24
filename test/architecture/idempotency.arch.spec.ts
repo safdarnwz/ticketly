@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
  * This is how the "one forgotten decorator = a duplicate charge" class of bug is
  * made impossible to merge.
  */
-const GUARDED_MODULES = ['booking', 'payment', 'distribution', 'gds', 'agents', 'connections'];
+const GUARDED_MODULES = ['booking', 'payment', 'gds', 'agents', 'connections', 'refunds'];
 const GUARDED_CONTROLLERS = GUARDED_MODULES.flatMap((m) => {
   const dir = join('apps/api/src/modules', m, 'presentation');
   try {
@@ -32,15 +32,18 @@ const GUARDED_CONTROLLERS = GUARDED_MODULES.flatMap((m) => {
 //
 // POST handlers that legitimately don't need the Idempotency-Key header:
 //  - reads over POST (search/quote return data, mutate nothing)
-//  - the payment webhook (idempotency is the PSP event-id dedupe)
+//  - the payment webhook (idempotency is the PSP event-id dedupe) and refund
+//    reconcile (a refund already in a terminal state is a no-op, under a row lock)
 //  - admin config / state switches, where a replay sets the same state again
 //    and no money or seat moves: commission config, settlement ops (internally
 //    idempotent on status), stop/resume sales, no-show flag, partner/agent
-//    status, partner webhook registration, partner API key issue.
+//    status, webhook registration/test, partner API key issue.
 // The genuine double-charge/double-book surfaces — hold, extend-hold, confirm,
 // cancel, intent, receipts — are NOT exempt and must carry @Idempotent().
 const EXEMPT = new Set([
   'webhook',
+  'reconcile',
+  'testWebhook',
   'catalogue',
   'byPnr',
   'trialBalance',
@@ -55,7 +58,6 @@ const EXEMPT = new Set([
   'markNoShow',
   'status',
   'setStatus',
-  'registerWebhook',
   'issueKey',
 ]);
 

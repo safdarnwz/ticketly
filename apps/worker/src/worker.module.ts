@@ -10,7 +10,7 @@ import { NotificationModule } from '@api/modules/notification/notification.modul
 import { InvoiceModule } from '@api/modules/invoicing/invoice.module';
 import { RefundModule } from '@api/modules/refunds/refund.module';
 import { TrackingModule } from '@api/modules/tracking/tracking.module';
-import { DistributionModule } from '@api/modules/distribution/distribution.module';
+import { WebhooksModule } from '@api/modules/webhooks/webhooks.module';
 import { PaymentModule } from '@api/modules/payment/payment.module';
 import { TenancyModule } from '@api/modules/tenancy/tenancy.module';
 import { EventDispatcher } from './dispatcher/event-dispatcher';
@@ -60,7 +60,7 @@ import { ConnectionMonitorScheduler } from './schedulers/connection-monitor.sche
     InvoiceModule,
     RefundModule,
     TrackingModule,
-    DistributionModule,
+    WebhooksModule,
     PaymentModule,
     TenancyModule,
     FleetModule,

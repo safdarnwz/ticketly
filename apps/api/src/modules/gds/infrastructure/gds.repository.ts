@@ -23,11 +23,10 @@ export interface GdsPartner {
   defaultCommissionPct: number;
   contactEmail: string | null;
   contactPhone: string | null;
-  webhookUrl: string | null;
   createdAt: Date;
 }
 const COLS = `id, code, name, kind, status, status_reason, billing_mode, credit_limit_minor, balance_minor, default_commission_pct,
-  contact_email, contact_phone, webhook_url, created_at`;
+  contact_email, contact_phone, created_at`;
 interface Row {
   id: string;
   code: string;
@@ -41,7 +40,6 @@ interface Row {
   default_commission_pct: string;
   contact_email: string | null;
   contact_phone: string | null;
-  webhook_url: string | null;
   created_at: Date;
 }
 const map = (r: Row): GdsPartner => ({
@@ -57,7 +55,6 @@ const map = (r: Row): GdsPartner => ({
   defaultCommissionPct: Number(r.default_commission_pct),
   contactEmail: r.contact_email,
   contactPhone: r.contact_phone,
-  webhookUrl: r.webhook_url,
   createdAt: r.created_at,
 });
 
@@ -99,14 +96,12 @@ export class GdsRepository {
     contactEmail?: string;
     contactPhone?: string;
     gstin?: string;
-    webhookUrl?: string;
-    webhookSecret?: string;
   }): Promise<string> {
     const id = newId();
     await this.run('gds.createPartner', (q) =>
       q(
-        `INSERT INTO gds_partners (id, code, name, kind, billing_mode, credit_limit_minor, default_commission_pct, contact_email, contact_phone, gstin, webhook_url, webhook_secret)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        `INSERT INTO gds_partners (id, code, name, kind, billing_mode, credit_limit_minor, default_commission_pct, contact_email, contact_phone, gstin)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
         [
           id,
           i.code,
@@ -118,8 +113,6 @@ export class GdsRepository {
           i.contactEmail ?? null,
           i.contactPhone ?? null,
           i.gstin ?? null,
-          i.webhookUrl ?? null,
-          i.webhookSecret ?? null,
         ],
       ),
     );
@@ -151,14 +144,13 @@ export class GdsRepository {
       billingMode?: string;
       creditLimitMinor?: number;
       defaultCommissionPct?: number;
-      webhookUrl?: string | null;
     },
   ): Promise<void> {
     await this.run('gds.updatePartner', (q) =>
       q(
         `UPDATE gds_partners SET status = coalesce($2, status), status_reason = CASE WHEN $2::text IS NULL THEN status_reason ELSE $3 END,
               billing_mode = coalesce($4, billing_mode), credit_limit_minor = coalesce($5, credit_limit_minor),
-              default_commission_pct = coalesce($6, default_commission_pct), webhook_url = coalesce($7, webhook_url)
+              default_commission_pct = coalesce($6, default_commission_pct)
         WHERE id = $1`,
         [
           id,
@@ -167,7 +159,6 @@ export class GdsRepository {
           i.billingMode ?? null,
           i.creditLimitMinor ?? null,
           i.defaultCommissionPct ?? null,
-          i.webhookUrl ?? null,
         ],
       ),
     );
@@ -371,6 +362,18 @@ export class GdsRepository {
       ),
     );
     return r[0] ? { tenantId: r[0].tenant_id, partnerId: r[0].gds_partner_id } : null;
+  }
+  /** GDS partners holding a live booking on this trip — they need to hear about delays/departure. */
+  async partnersWithBookingsOnTrip(tripId: string): Promise<string[]> {
+    if (!/^[0-9a-f-]{36}$/i.test(tripId)) return [];
+    const r = await this.run('gds.partnersOnTrip', (q) =>
+      q<{ gds_partner_id: string }>(
+        `SELECT DISTINCT gds_partner_id FROM bookings
+          WHERE trip_id = $1 AND gds_partner_id IS NOT NULL AND status IN ('confirmed', 'held')`,
+        [tripId],
+      ),
+    );
+    return r.map((x) => x.gds_partner_id);
   }
   async setBookingPartner(bookingId: BookingId, partnerId: string): Promise<void> {
     await this.run(

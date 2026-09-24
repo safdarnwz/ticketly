@@ -5,7 +5,7 @@ import { AppConfig } from '@config';
 import { DatabaseService } from '@database';
 import { Logger, Metrics } from '@observability';
 
-import { WebhookDeliveryService } from '@api/modules/distribution/application/services/webhook-delivery.service';
+import { WebhookDeliveryService } from '@api/modules/webhooks';
 import { PayoutScheduler } from './payout.scheduler';
 import { TripReminderScheduler } from './trip-reminder.scheduler';
 import { ConnectionMonitorScheduler } from './connection-monitor.scheduler';

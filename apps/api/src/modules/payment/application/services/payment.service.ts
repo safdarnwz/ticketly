@@ -408,52 +408,6 @@ export class PaymentService {
   }
 
   /**
-   * OTA/GDS partner-channel confirmation (redBus, Paytm, etc.). The partner
-   * collected payment on THEIR OWN platform — there's no gateway signature of
-   * ours to verify, so this trusts the partner's reported `paidMinor` the way
-   * any GDS trusts an authenticated, contractually-bound channel partner
-   * (reconciled via periodic settlement, not per-transaction cryptography —
-   * this is the OTA integration model, not a security hole the way an
-   * anonymous public endpoint trusting the SAME field would be).
-   *
-   * What this does NOT skip: the ledger. Before this fix, distribution
-   * confirmations called `BookingService.confirm` directly — which flips the
-   * booking to 'confirmed' but posts NO ledger entry at all — meaning every
-   * OTA-channel booking was a complete accounting blind spot: no commission
-   * earned, no operator payable recorded, no GST tracked, for an entire sales
-   * channel. This routes through the exact same `onCaptured` used by the
-   * direct-payment flow, so an OTA booking accrues commission/payable/tax
-   * identically to one paid on ticketly.com. Reuses any existing 'partner'
-   * intent for this booking (a retried confirm call must never mint a second
-   * one — that would bypass onCaptured's per-intent exactly-once lock).
-   */
-  async confirmPartnerBooking(
-    bookingId: BookingId,
-    paidMinor: number,
-    reference?: string,
-  ): Promise<{ pnr: string }> {
-    const booking = await this.bookings.findForUpdate(bookingId);
-    if (!booking)
-      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
-
-    // Look up ANY prior 'partner' intent for this booking regardless of its
-    // status — createIntent()'s own idempotency check only reuses an intent
-    // while it's still 'created'/'authorized', so a retried confirm AFTER the
-    // first one already succeeded ('captured') would otherwise mint a SECOND
-    // fresh intent, and onCaptured's per-intent lock would wave it straight
-    // through into a second ledger entry.
-    const intent =
-      (await this.payments.findByBookingAndGateway(bookingId, 'partner')) ??
-      (await this.payments.createIntent({
-        bookingId,
-        gateway: 'partner',
-        amountMinor: paidMinor,
-        currency: booking.currency,
-      }));
-    return this.onCaptured(intent.id, bookingId, reference ?? `partner_${intent.id}`, paidMinor);
-  }
-
-  /**
    * Confirm a booking sold through the platform GDS (an OTA / multi-operator
    * agent). The partner's GDS account has ALREADY been debited the net price
    * (GdsService does it first, under a row lock). The platform holds that

@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseUUIDPipe,
   Post,
   Put,
   Query,
@@ -27,6 +28,7 @@ import {
 import { BadRequestError, type TripId } from '@kernel';
 
 import { TripRepository } from '../../scheduling/infrastructure/persistence/trip.repository';
+import { RegisterWebhookSchema } from '../../webhooks';
 import { GdsService, type PartnerCtx } from '../application/gds.service';
 import { GdsPartnerGuard } from './gds-partner.guard';
 
@@ -177,7 +179,6 @@ const CreatePartnerSchema = z.object({
     .toUpperCase()
     .regex(/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/)
     .optional(),
-  webhookUrl: z.string().url().startsWith('https://').optional(),
 });
 const KeySchema = z.object({
   label: z.string().trim().min(2).max(60),
@@ -236,7 +237,6 @@ export class GdsAdminController {
           billingMode: z.enum(['prepaid', 'postpaid']).optional(),
           creditLimitMinor: z.number().int().nonnegative().optional(),
           defaultCommissionPct: z.number().min(0).max(30).optional(),
-          webhookUrl: z.string().url().startsWith('https://').optional(),
         }),
       ),
     )
@@ -244,7 +244,6 @@ export class GdsAdminController {
       billingMode?: 'prepaid' | 'postpaid';
       creditLimitMinor?: number;
       defaultCommissionPct?: number;
-      webhookUrl?: string;
     },
   ) {
     await this.gds.setTerms(id, dto);
@@ -266,6 +265,36 @@ export class GdsAdminController {
     dto: { amountMinor: number; reference: string },
   ) {
     return this.gds.receipt(id, dto.amountMinor, dto.reference);
+  }
+  @Get(':id/webhook')
+  @ApiOperation({ summary: "The partner's webhook endpoint and its recent deliveries" })
+  webhook(@Param('id', ParseUUIDPipe) id: string) {
+    return this.gds.partnerWebhook(id);
+  }
+  @Put(':id/webhook')
+  @ApiOperation({
+    summary: "Set/replace the partner's webhook endpoint — returns the NEW signing secret once",
+  })
+  setWebhook(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(zodBody(RegisterWebhookSchema.omit({ name: true })))
+    dto: { url: string; eventTypes: string[] },
+  ) {
+    return this.gds.setPartnerWebhook(id, dto);
+  }
+  @Delete(':id/webhook')
+  @ApiOperation({ summary: "Remove the partner's webhook endpoint" })
+  async removeWebhook(@Param('id', ParseUUIDPipe) id: string) {
+    await this.gds.removePartnerWebhook(id);
+    return { ok: true };
+  }
+  @Post(':id/webhook/test')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Send a signed test event to the partner endpoint now and report the response',
+  })
+  testWebhook(@Param('id', ParseUUIDPipe) id: string) {
+    return this.gds.testPartnerWebhook(id);
   }
   @Post(':id/keys')
   @HttpCode(201)

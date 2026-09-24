@@ -28,6 +28,7 @@ import { PricingService } from '../../pricing/application/services/pricing.servi
 import { InventoryRepository } from '../../scheduling/infrastructure/persistence/inventory.repository';
 import { SearchService } from '../../search/application/services/search.service';
 import { generateKey } from '../domain/gds-keys';
+import { WebhookDeliveryService, WebhookRepository } from '../../webhooks';
 import { GdsRepository, type GdsPartner } from '../infrastructure/gds.repository';
 
 export interface PartnerCtx {
@@ -61,6 +62,8 @@ export class GdsService {
     private readonly payments: PaymentService,
     private readonly inventory: InventoryRepository,
     private readonly uow: UnitOfWork,
+    private readonly webhooks: WebhookRepository,
+    private readonly webhookDelivery: WebhookDeliveryService,
   ) {}
 
   /* ───────────── partner API ───────────── */
@@ -320,6 +323,47 @@ export class GdsService {
 
   /* ───────────── platform admin ───────────── */
 
+  /* ── partner webhook (delivered by the shared webhooks engine) ── */
+
+  async partnerWebhook(id: string) {
+    await this.requirePartner(id);
+    const [endpoint, deliveries] = await Promise.all([
+      this.webhooks.getForPartner(id),
+      this.webhooks.deliveriesForPartner(id),
+    ]);
+    return { endpoint, deliveries };
+  }
+
+  /** Set/replace the partner's endpoint. Returns the NEW signing secret once. */
+  async setPartnerWebhook(id: string, i: { url: string; eventTypes: string[] }) {
+    const partner = await this.requirePartner(id);
+    return this.webhooks.setForPartner({
+      gdsPartnerId: id,
+      name: `${partner.name} (GDS)`,
+      url: i.url,
+      eventTypes: i.eventTypes,
+      createdBy: getUserId() ?? null,
+    });
+  }
+
+  async removePartnerWebhook(id: string): Promise<void> {
+    await this.requirePartner(id);
+    await this.webhooks.removeForPartner(id);
+  }
+
+  async testPartnerWebhook(id: string) {
+    await this.requirePartner(id);
+    const target = await this.webhooks.targetForPartner(id);
+    if (!target) throw new NotFoundError('Webhook for GDS partner', id);
+    return this.webhookDelivery.sendTest(target);
+  }
+
+  private async requirePartner(id: string): Promise<GdsPartner> {
+    const p = await this.gds.getPartner(id);
+    if (!p) throw new NotFoundError('GDS partner', id);
+    return p;
+  }
+
   createPartner(i: Parameters<GdsRepository['createPartner']>[0]) {
     return this.gds.createPartner(i);
   }
@@ -350,7 +394,6 @@ export class GdsService {
       billingMode?: 'prepaid' | 'postpaid';
       creditLimitMinor?: number;
       defaultCommissionPct?: number;
-      webhookUrl?: string;
     },
   ) {
     await this.uow.run({ name: 'gds.setTerms' }, async () => {
@@ -366,7 +409,6 @@ export class GdsService {
         billingMode: mode,
         creditLimitMinor: limit,
         defaultCommissionPct: i.defaultCommissionPct,
-        webhookUrl: i.webhookUrl,
       });
     });
   }

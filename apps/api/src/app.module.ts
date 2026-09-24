@@ -23,7 +23,7 @@ import { NotificationModule } from './modules/notification/notification.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
 import { CrewAppModule } from './modules/crew-app/crew-app.module';
 import { ReportingModule } from './modules/reporting/reporting.module';
-import { DistributionModule } from './modules/distribution/distribution.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { AmendmentsModule } from './modules/amendments/amendments.module';
 import { AncillaryModule } from './modules/ancillary/ancillary.module';
 import { DepartureControlModule } from './modules/departure-control/departure-control.module';
@@ -106,7 +106,7 @@ import { KycModule } from './modules/kyc/kyc.module';
     TrackingModule, // Part 9 — GPS ingestion, live position & ETA
     CrewAppModule, // Part 9 — manifest, boarding scan, trip start/stop
     ReportingModule, // Part 10 — materialized-view analytics & exports
-    DistributionModule, // Part 10 — OTA/channel-partner API
+    WebhooksModule, // outbound signed event webhooks (operators + GDS partners)
     AmendmentsModule, // Part 11 — reschedule, seat-change
     AncillaryModule, // Add-on services (insurance, meals, luggage) — loyalty points, referrals, and wallet were all removed from the product
     DepartureControlModule, // Part 13 — trip chart + closeout reconciliation

@@ -2,35 +2,23 @@ import { Injectable, type OnModuleInit } from '@nestjs/common';
 
 import { type DomainEvent } from '@kernel';
 
-import { WebhookDeliveryService } from '@api/modules/distribution/application/services/webhook-delivery.service';
+import { WEBHOOK_EVENTS, WebhookDeliveryService } from '@api/modules/webhooks';
 import { EventDispatcher, type EventHandler } from '../dispatcher/event-dispatcher';
 
 /**
- * Turns internal domain events into signed webhook POSTs to OTA/GDS partners
- * — the concrete payoff of DistributionController's `webhooks/catalogue`
- * promise. Every event a partner might reasonably need to react to WITHOUT
- * polling: bookings and payments on their own channel, plus operational
- * disruptions (delay/cancellation) that affect a trip regardless of which
- * channel sold it.
+ * Turns internal domain events into signed webhook POSTs — to the operator's
+ * own endpoints and to the GDS partner that sold the booking (see the
+ * webhooks module's catalogue: GET /webhooks/catalogue).
  */
 @Injectable()
 export class WebhookConsumer implements OnModuleInit {
-  private static readonly EVENT_TYPES = [
-    'booking.confirmed',
-    'booking.cancelled',
-    'trip.delayed',
-    'trip.departed',
-    'payment.captured',
-    'refund.settled',
-  ];
-
   constructor(
     private readonly dispatcher: EventDispatcher,
     private readonly delivery: WebhookDeliveryService,
   ) {}
 
   onModuleInit(): void {
-    for (const type of WebhookConsumer.EVENT_TYPES) {
+    for (const type of WEBHOOK_EVENTS) {
       this.dispatcher.register(this.handlerFor(type));
     }
   }
@@ -39,12 +27,15 @@ export class WebhookConsumer implements OnModuleInit {
     return {
       eventType,
       handle: async (event: DomainEvent) => {
-        if (!event.tenantId) return; // platform-level events (e.g. tenant provisioning) aren't partner-facing
-        await this.delivery.deliverToTenant(event.tenantId, eventType, event.eventId, {
-          event: eventType,
+        if (!event.tenantId) return; // platform-level events (e.g. tenant provisioning) aren't webhook-facing
+        await this.delivery.deliverEvent({
+          tenantId: event.tenantId,
+          eventType,
           eventId: event.eventId,
-          occurredAt: event.occurredAt,
-          data: event.payload,
+          occurredAt: new Date(event.occurredAt).toISOString(),
+          aggregateType: event.aggregateType,
+          aggregateId: event.aggregateId,
+          payload: (event.payload ?? {}) as Record<string, unknown>,
         });
       },
     };

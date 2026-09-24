@@ -120,20 +120,21 @@ export class SearchService {
    * Whether this search fans out across every tenant, or stays scoped to
    * ONE, depends entirely on whether a tenant is ALREADY bound in context —
    * `getTenantId()` reflects whatever TenantResolutionMiddleware / the
-   * distribution API-key guard resolved for THIS request:
+   * auth guard (JWT or operator API key) resolved for THIS request:
    *
    *   - `app.<slug>.ticketly.com` (a tenant admin's own "Search & Book"),
-   *     an OTA partner's `X-Api-Key` (distribution), or an `X-Tenant-Id`
+   *     an operator's own `X-Api-Key`, or an `X-Tenant-Id`
    *     header → a tenant IS bound → search ONLY that one operator. An
    *     operator's staff must never see (or accidentally book into) a
-   *     competitor's inventory, and an OTA partner's key must never leak
-   *     every operator's trips just because it called the same endpoint the
-   *     public aggregator uses.
+   *     competitor's inventory, and an operator key must never leak every
+   *     operator's trips just because it called the same endpoint the public
+   *     aggregator uses. (GDS partners search across their contracted
+   *     operators via GdsService, which filters by agreement.)
    *   - `www.ticketly.com` (a genuine anonymous customer, no tenant at all)
    *     → nothing bound → aggregate across every active tenant.
    *
    * This one check is what makes a SINGLE search implementation correct for
-   * all three callers (public storefront, tenant console, OTA distribution)
+   * all three callers (public storefront, tenant console, GDS)
    * without three diverging code paths.
    */
   async search(input: {
