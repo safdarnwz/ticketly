@@ -6,11 +6,12 @@ import { MessagingModule } from '@messaging';
 
 import { TrackingController } from './presentation/tracking.controller';
 import { TrackingService } from './application/services/tracking.service';
+import { TrackingRepository } from './infrastructure/persistence/tracking.repository';
 
 @Module({
   imports: [ConfigModule, DatabaseModule, MessagingModule],
   controllers: [TrackingController],
-  providers: [TrackingService],
+  providers: [TrackingRepository, TrackingService],
   exports: [TrackingService],
 })
 export class TrackingModule {}

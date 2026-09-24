@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { bootstrapTestApp, type TestApp } from './support/bootstrap';
+import { confirmedBooking } from './support/flows';
 
 /**
  * End-to-end: changes to a confirmed booking — seat change, name correction,
@@ -14,32 +15,11 @@ describe('booking amendments (e2e)', () => {
 
   beforeAll(async () => {
     app = await bootstrapTestApp();
-    const seat = seats()[0];
-    const quote = await app.post('/pricing/quote', {
-      tripId: app.fixtures.tripId,
-      fromStopId: app.fixtures.fromStopId,
-      toStopId: app.fixtures.toStopId,
-      seatType: 'seater',
-      seatNumbers: [seat],
-    });
-    const hold = await app.post(
-      '/bookings/hold',
-      {
-        quoteId: quote.body.quoteId,
-        seatNumbers: [seat],
-        passengers: [{ seatNumber: seat, fullName: 'Amit Kumar', age: 34, gender: 'male' }],
-        contactPhone: app.fixtures.customer.phone,
-      },
-      { idempotencyKey: `e2e-amend-hold-${app.fixtures.customer.phone}` },
-    );
-    expect(hold.status, JSON.stringify(hold.body)).toBe(201);
-    bookingId = hold.body.bookingId;
-    const pay = await app.post(
-      '/payments/charge',
-      { bookingId, method: 'upi', vpa: 'success@ticketly' },
-      { idempotencyKey: `e2e-amend-pay-${app.fixtures.customer.phone}` },
-    );
-    expect(pay.status, JSON.stringify(pay.body)).toBe(200);
+    ({ bookingId } = await confirmedBooking(app, seats()[0], {
+      fullName: 'Amit Kumar',
+      age: 34,
+      gender: 'male',
+    }));
   });
   afterAll(async () => {
     await app.close();

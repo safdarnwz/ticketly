@@ -12,6 +12,5 @@
   "onboarding/application/services/onboarding.service.ts -> files/domain",
   "search/application/services/search.service.ts -> promotions/domain",
   "search/application/services/search.service.ts -> promotions/infrastructure",
-  "tenancy/presentation/tenant.controller.ts -> files/application",
-  "trip-expenses/application/trip-expense.service.ts -> files/application"
+  "tenancy/presentation/tenant.controller.ts -> files/application"
 ]

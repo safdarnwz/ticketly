@@ -449,6 +449,83 @@ export class BookingRepository {
     );
   }
 
+  /** The trip's passenger list (confirmed bookings) for the conductor. */
+  manifest(tripId: TripId): Promise<unknown[]> {
+    return this.db.query(
+      `SELECT p.seat_number AS "seatNumber", p.full_name AS "fullName", p.age, p.gender,
+              b.pnr, b.from_stop_id AS "fromStopId", b.to_stop_id AS "toStopId",
+              t.status AS "ticketStatus"
+         FROM passengers p
+         JOIN bookings b ON b.id = p.booking_id AND b.status = 'confirmed'
+         LEFT JOIN tickets t ON t.booking_id = b.id AND t.seat_number = p.seat_number
+        WHERE p.tenant_id = $1 AND b.trip_id = $2
+        ORDER BY p.seat_number`,
+      [requireTenantId(), tripId],
+      { name: 'booking.manifest' },
+    );
+  }
+
+  /** The ticket with this boarding code, row-locked, with its booking's status and passenger. */
+  lockTicketByBoardingCode(boardingCode: string): Promise<{
+    id: string;
+    tripId: string;
+    seatNumber: string;
+    status: string;
+    bookingStatus: string;
+    passengerName: string | null;
+  } | null> {
+    return this.db.queryOne(
+      `SELECT tk.id, tk.trip_id AS "tripId", tk.seat_number AS "seatNumber", tk.status,
+              b.status AS "bookingStatus", p.full_name AS "passengerName"
+         FROM tickets tk
+         JOIN bookings b ON b.id = tk.booking_id
+         LEFT JOIN passengers p ON p.booking_id = b.id AND p.seat_number = tk.seat_number
+        WHERE tk.tenant_id = $1 AND tk.boarding_code = $2
+        FOR UPDATE OF tk`,
+      [requireTenantId(), boardingCode],
+      { name: 'booking.lockTicketByCode', primary: true },
+    );
+  }
+
+  async lockTicketStatus(ticketId: string): Promise<string | null> {
+    const row = await this.db.queryOne<{ status: string }>(
+      `SELECT status FROM tickets WHERE tenant_id = $1 AND id = $2 FOR UPDATE`,
+      [requireTenantId(), ticketId],
+      { name: 'booking.lockTicket', primary: true },
+    );
+    return row?.status ?? null;
+  }
+
+  async setTicketStatus(ticketId: string, status: 'boarded' | 'no_show'): Promise<void> {
+    await this.db.execute_(
+      `UPDATE tickets SET status = $3,
+              boarded_at = CASE WHEN $3 = 'boarded' THEN now() ELSE boarded_at END
+        WHERE tenant_id = $1 AND id = $2`,
+      [requireTenantId(), ticketId, status],
+      { name: 'booking.setTicketStatus', primary: true },
+    );
+  }
+
+  /** Phone booking: move the release time of a booking that is still held. */
+  async setHoldExpiry(bookingId: BookingId, holdUntil: Date): Promise<void> {
+    await this.db.execute_(
+      `UPDATE bookings SET hold_expires_at = $3, updated_at = now()
+        WHERE tenant_id = $1 AND id = $2 AND status = 'held'`,
+      [requireTenantId(), bookingId, holdUntil],
+      { name: 'booking.setHoldExpiry', primary: true },
+    );
+  }
+
+  /** Adds charges (e.g. add-ons) and their tax to a booking's totals before payment. */
+  async increaseTotals(bookingId: BookingId, amountMinor: number, taxMinor: number): Promise<void> {
+    await this.db.execute_(
+      `UPDATE bookings SET total_minor = total_minor + $3, tax_minor = tax_minor + $4, updated_at = now()
+        WHERE tenant_id = $1 AND id = $2`,
+      [requireTenantId(), bookingId, amountMinor, taxMinor],
+      { name: 'booking.increaseTotals', primary: true },
+    );
+  }
+
   /** The REAL tickets table (post-confirm) — has actual DB ids, unlike loadSeats (booking_seats, hold-time only, no ticket id). Used wherever a caller needs to reference a SPECIFIC ticket, e.g. the seat-upgrade flow. */
   async listTickets(bookingId: BookingId): Promise<{ id: string; seatNumber: string }[]> {
     return this.db.query(

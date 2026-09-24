@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { AppConfig } from '@config';
 import { type SalesChannelFamily } from '@contracts';
-import { DatabaseService, isUniqueViolation, UnitOfWork } from '@database';
+import { isUniqueViolation, UnitOfWork } from '@database';
 import {
   AppError,
   ErrorCode,
@@ -42,6 +42,7 @@ import {
   type Infant,
 } from '../../domain/passenger-categories';
 import { ConcessionRepository } from '../../infrastructure/persistence/concession.repository';
+import { OperatorPolicyRepository } from '../../infrastructure/persistence/operator-policy.repository';
 
 export interface HoldOptions {
   holdUntil?: Date;
@@ -104,7 +105,7 @@ export class BookingService {
     private readonly events: EventBus,
     private readonly config: AppConfig,
     private readonly customers: CustomerRepository,
-    private readonly db: DatabaseService,
+    private readonly operatorPolicy: OperatorPolicyRepository,
     logger: Logger,
     private readonly metrics: Metrics,
   ) {
@@ -113,19 +114,10 @@ export class BookingService {
 
   /**
    * This operator's own cancellation tiers if they've set one, else the
-   * platform default — see migration 0037's own comment for why this
-   * exists. Queries `tenants` directly via DatabaseService rather than
-   * injecting TenantRepository: TenancyModule already imports BookingModule
-   * (for TripOpsService-adjacent needs), so importing TenancyModule back
-   * here would create a circular module dependency.
+   * platform default — see migration 0037's own comment for why this exists.
    */
   private async loadRefundPolicy(): Promise<RefundPolicy> {
-    const row = await this.db.queryOne<{ refund_policy: RefundPolicy | null }>(
-      `SELECT refund_policy FROM tenants WHERE id = $1`,
-      [requireTenantId()],
-      { name: 'booking.loadRefundPolicy', primary: true },
-    );
-    return row?.refund_policy ?? DEFAULT_REFUND_POLICY;
+    return (await this.operatorPolicy.refundPolicy(requireTenantId())) ?? DEFAULT_REFUND_POLICY;
   }
 
   /** Step 1 — hold seats against a valid quote. */
@@ -344,17 +336,11 @@ export class BookingService {
   async extendPhoneHold(bookingId: BookingId, holdUntil: Date): Promise<{ holdExpiresAt: string }> {
     return this.uow.run(
       { name: 'booking.extendPhoneHold', tenantId: requireTenantId() },
-      async (scope) => {
+      async () => {
         const booking = await this.bookings.findForUpdate(bookingId);
         if (!booking)
           throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
-        const ch = (
-          await scope.client.query<{ channel: string }>(
-            `SELECT channel FROM bookings WHERE tenant_id = $1 AND id = $2`,
-            [requireTenantId(), bookingId],
-          )
-        ).rows[0]?.channel;
-        if (ch !== 'phone')
+        if ((await this.bookings.channelOf(bookingId)) !== 'phone')
           throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
             message: 'Only a phone booking can have its release time changed',
           });
@@ -374,10 +360,7 @@ export class BookingService {
             throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: e.message });
           throw e;
         }
-        await scope.client.query(
-          `UPDATE bookings SET hold_expires_at = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2 AND status = 'held'`,
-          [requireTenantId(), bookingId, holdUntil],
-        );
+        await this.bookings.setHoldExpiry(bookingId, holdUntil);
         return { holdExpiresAt: holdUntil.toISOString() };
       },
     );

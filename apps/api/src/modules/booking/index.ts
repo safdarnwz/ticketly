@@ -9,3 +9,4 @@ export * from './domain/refund-policy';
 export * from './infrastructure/persistence/booking.repository';
 export * from './infrastructure/persistence/seat-lock.repository';
 export * from './infrastructure/persistence/seat-upgrade.repository';
+export * from './infrastructure/persistence/journey-connection.repository';

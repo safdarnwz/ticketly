@@ -15,6 +15,8 @@ import { BookingService } from './application/services/booking.service';
 import { TripOpsService } from './application/services/trip-ops.service';
 import { SeatLockRepository } from './infrastructure/persistence/seat-lock.repository';
 import { SeatUpgradeRepository } from './infrastructure/persistence/seat-upgrade.repository';
+import { JourneyConnectionRepository } from './infrastructure/persistence/journey-connection.repository';
+import { OperatorPolicyRepository } from './infrastructure/persistence/operator-policy.repository';
 
 /**
  * Booking — the transactional core. Depends on pricing (quote re-validation,
@@ -35,6 +37,8 @@ import { SeatUpgradeRepository } from './infrastructure/persistence/seat-upgrade
   ],
   controllers: [BookingController, ConcessionController],
   providers: [
+    OperatorPolicyRepository,
+    JourneyConnectionRepository,
     BookingRepository,
     SeatLockRepository,
     SeatUpgradeRepository,
@@ -44,6 +48,7 @@ import { SeatUpgradeRepository } from './infrastructure/persistence/seat-upgrade
   ],
   exports: [
     BookingRepository,
+    JourneyConnectionRepository,
     SeatLockRepository,
     SeatUpgradeRepository,
     BookingService,

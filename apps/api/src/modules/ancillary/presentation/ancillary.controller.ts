@@ -2,7 +2,14 @@ import { Body, Controller, Get, Post, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Idempotent, RequirePermission, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  Idempotent,
+  Public,
+  RateLimit,
+  RequirePermission,
+  zodBody,
+} from '@http';
 import { type BookingId, type Uuid } from '@kernel';
 
 import { AncillaryService } from '../application/services/ancillary.service';
@@ -22,17 +29,22 @@ export class AncillaryController {
   constructor(private readonly ancillary: AncillaryService) {}
 
   @Get()
-  @RequirePermission(Permission.BOOKING_READ)
+  @Public()
   @ApiOperation({ summary: 'Add-on catalogue (insurance, meals, luggage, …)' })
   async catalogue() {
     return { items: await this.ancillary.listCatalogue() };
   }
 
+  /**
+   * Part of checkout, like hold / payment intent / charge: allowed only while
+   * the booking is held (awaiting payment), so it is open to guest checkout.
+   */
   @Post('attach')
   @HttpCode(200)
+  @Public()
+  @RateLimit(30, 60_000, 'ip')
   @Idempotent()
-  @RequirePermission(Permission.BOOKING_CREATE)
-  @ApiOperation({ summary: 'Attach add-ons to a booking' })
+  @ApiOperation({ summary: 'Attach add-ons to a held booking (checkout, before payment)' })
   async attach(@Body(zodBody(AttachAncillarySchema)) dto: AttachAncillaryDto) {
     return this.ancillary.attach(
       dto.bookingId as BookingId,

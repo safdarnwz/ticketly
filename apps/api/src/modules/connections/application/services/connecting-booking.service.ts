@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 
-import { UnitOfWork } from '@database';
 import { AppError, ErrorCode, newId, runInNewContext, type TenantId } from '@kernel';
 
-import { BookingService, BookingRepository } from '../../../booking';
+import {
+  BookingRepository,
+  BookingService,
+  JourneyConnectionRepository,
+  type JourneyConnection,
+} from '../../../booking';
 import { PaymentService, type TestInstrument } from '../../../payment';
 import { TicketService } from '../../../tickets';
 
@@ -50,7 +54,7 @@ export interface HoldConnectionInput {
 @Injectable()
 export class ConnectingBookingService {
   constructor(
-    private readonly uow: UnitOfWork,
+    private readonly connections: JourneyConnectionRepository,
     private readonly bookings: BookingService,
     private readonly bookingRepo: BookingRepository,
     private readonly payments: PaymentService,
@@ -121,30 +125,12 @@ export class ConnectingBookingService {
       });
     }
 
-    // The link record itself is platform-level (no tenant context needed) —
-    // written via a bypassRls scope, the same pattern as any other
-    // cross-tenant table (see migration 0040's own comment).
     const connectionId = newId();
-    await this.uow.run({ name: 'connections.create', bypassRls: true }, async (scope) => {
-      await scope.client.query(
-        `INSERT INTO journey_connections (id, customer_id, leg1_tenant_id, leg1_booking_id, leg2_tenant_id, leg2_booking_id, connection_city_id, layover_minutes)
-         VALUES ($1,$2,$3,$4,$5,$6,
-                 (SELECT dest_city_id FROM routes WHERE id = (SELECT route_id FROM bookings WHERE tenant_id = $3 AND id = $4)),
-                 $7)`,
-        [
-          connectionId,
-          input.customerId ?? null,
-          input.leg1.tenantId,
-          leg1Hold.bookingId,
-          input.leg2.tenantId,
-          leg2Hold.bookingId,
-          Math.round(
-            (new Date(leg2Hold.holdExpiresAt).getTime() -
-              new Date(leg1Hold.holdExpiresAt).getTime()) /
-              60_000,
-          ),
-        ],
-      );
+    await this.connections.create({
+      id: connectionId,
+      customerId: input.customerId ?? null,
+      leg1: { tenantId: input.leg1.tenantId, bookingId: leg1Hold.bookingId },
+      leg2: { tenantId: input.leg2.tenantId, bookingId: leg2Hold.bookingId },
     });
 
     return { connectionId, leg1: leg1Hold, leg2: leg2Hold };
@@ -172,10 +158,10 @@ export class ConnectingBookingService {
 
     try {
       leg1Refund = await runInNewContext(
-        { tenantId: link.leg1_tenant_id as TenantId, actorType: 'system' },
+        { tenantId: link.leg1TenantId as TenantId, actorType: 'system' },
         () =>
           this.bookings.cancel(
-            link.leg1_booking_id as never,
+            link.leg1BookingId as never,
             'connecting-journey cancelled by customer',
           ),
       );
@@ -185,10 +171,10 @@ export class ConnectingBookingService {
 
     try {
       leg2Refund = await runInNewContext(
-        { tenantId: link.leg2_tenant_id as TenantId, actorType: 'system' },
+        { tenantId: link.leg2TenantId as TenantId, actorType: 'system' },
         () =>
           this.bookings.cancel(
-            link.leg2_booking_id as never,
+            link.leg2BookingId as never,
             'connecting-journey cancelled by customer',
           ),
       );
@@ -208,39 +194,13 @@ export class ConnectingBookingService {
           : leg2Failed
             ? 'leg1_cancelled'
             : 'both_cancelled';
-    await this.uow.run({ name: 'connections.updateStatus', bypassRls: true }, async (scope) => {
-      await scope.client.query(
-        `UPDATE journey_connections SET status = $2, updated_at = now() WHERE id = $1`,
-        [connectionId, status],
-      );
-    });
+    await this.connections.setStatus(connectionId, status);
 
     return { leg1RefundMinor: leg1Refund.refundMinor, leg2RefundMinor: leg2Refund.refundMinor };
   }
 
-  private async loadLink(connectionId: string): Promise<{
-    leg1_tenant_id: string;
-    leg1_booking_id: string;
-    leg2_tenant_id: string;
-    leg2_booking_id: string;
-    status: string;
-  }> {
-    const link = await this.uow.run(
-      { name: 'connections.load', bypassRls: true },
-      async (scope) => {
-        const row = await scope.client.query<{
-          leg1_tenant_id: string;
-          leg1_booking_id: string;
-          leg2_tenant_id: string;
-          leg2_booking_id: string;
-          status: string;
-        }>(
-          `SELECT leg1_tenant_id, leg1_booking_id, leg2_tenant_id, leg2_booking_id, status FROM journey_connections WHERE id = $1`,
-          [connectionId],
-        );
-        return row.rows[0] ?? null;
-      },
-    );
+  private async loadLink(connectionId: string): Promise<JourneyConnection> {
+    const link = await this.connections.find(connectionId);
     if (!link)
       throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Connection not found' });
     return link;
@@ -281,16 +241,15 @@ export class ConnectingBookingService {
     const link = await this.loadLink(connectionId);
 
     const leg1Booking = await runInNewContext(
-      { tenantId: link.leg1_tenant_id as TenantId, actorType: 'system' },
-      () => this.bookingRepo.findForUpdate(link.leg1_booking_id as never),
+      { tenantId: link.leg1TenantId as TenantId, actorType: 'system' },
+      () => this.bookingRepo.findForUpdate(link.leg1BookingId as never),
     );
     if (!leg1Booking)
       throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Leg 1 booking not found' });
 
     if (leg1Booking.status === 'held') {
-      await runInNewContext(
-        { tenantId: link.leg1_tenant_id as TenantId, actorType: 'system' },
-        () => this.payments.chargeTest(link.leg1_booking_id as never, leg1Instrument),
+      await runInNewContext({ tenantId: link.leg1TenantId as TenantId, actorType: 'system' }, () =>
+        this.payments.chargeTest(link.leg1BookingId as never, leg1Instrument),
       );
       // leg1 succeeding is the ONLY thing that must happen before leg2 is
       // even attempted — a connecting journey where leg1 couldn't be paid
@@ -302,8 +261,8 @@ export class ConnectingBookingService {
     }
 
     const leg2Booking = await runInNewContext(
-      { tenantId: link.leg2_tenant_id as TenantId, actorType: 'system' },
-      () => this.bookingRepo.findForUpdate(link.leg2_booking_id as never),
+      { tenantId: link.leg2TenantId as TenantId, actorType: 'system' },
+      () => this.bookingRepo.findForUpdate(link.leg2BookingId as never),
     );
     if (!leg2Booking)
       throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Leg 2 booking not found' });
@@ -319,8 +278,8 @@ export class ConnectingBookingService {
     } else {
       try {
         await runInNewContext(
-          { tenantId: link.leg2_tenant_id as TenantId, actorType: 'system' },
-          () => this.payments.chargeTest(link.leg2_booking_id as never, leg2Instrument),
+          { tenantId: link.leg2TenantId as TenantId, actorType: 'system' },
+          () => this.payments.chargeTest(link.leg2BookingId as never, leg2Instrument),
         );
         leg2Result = { status: 'confirmed', pnr: leg2Booking.pnr };
       } catch (err) {
@@ -333,15 +292,11 @@ export class ConnectingBookingService {
       }
     }
 
-    await this.uow.run({ name: 'connections.markConfirmed', bypassRls: true }, async (scope) => {
-      await scope.client.query(`UPDATE journey_connections SET updated_at = now() WHERE id = $1`, [
-        connectionId,
-      ]);
-    });
+    await this.connections.touch(connectionId);
 
     const leg1Ticket = await runInNewContext(
-      { tenantId: link.leg1_tenant_id as TenantId, actorType: 'system' },
-      () => this.tickets.issueForBooking(link.leg1_booking_id as never).catch(() => null),
+      { tenantId: link.leg1TenantId as TenantId, actorType: 'system' },
+      () => this.tickets.issueForBooking(link.leg1BookingId as never).catch(() => null),
     );
 
     return {
@@ -360,12 +315,12 @@ export class ConnectingBookingService {
     const link = await this.loadLink(connectionId);
 
     const leg1 = await runInNewContext(
-      { tenantId: link.leg1_tenant_id as TenantId, actorType: 'system' },
-      () => this.bookingRepo.findForUpdate(link.leg1_booking_id as never),
+      { tenantId: link.leg1TenantId as TenantId, actorType: 'system' },
+      () => this.bookingRepo.findForUpdate(link.leg1BookingId as never),
     );
     const leg2 = await runInNewContext(
-      { tenantId: link.leg2_tenant_id as TenantId, actorType: 'system' },
-      () => this.bookingRepo.findForUpdate(link.leg2_booking_id as never),
+      { tenantId: link.leg2TenantId as TenantId, actorType: 'system' },
+      () => this.bookingRepo.findForUpdate(link.leg2BookingId as never),
     );
     if (!leg1 || !leg2)
       throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, {
@@ -376,14 +331,14 @@ export class ConnectingBookingService {
       connectionId,
       status: link.status,
       leg1: {
-        bookingId: link.leg1_booking_id,
-        tenantId: link.leg1_tenant_id,
+        bookingId: link.leg1BookingId,
+        tenantId: link.leg1TenantId,
         status: leg1.status,
         pnr: leg1.pnr,
       },
       leg2: {
-        bookingId: link.leg2_booking_id,
-        tenantId: link.leg2_tenant_id,
+        bookingId: link.leg2BookingId,
+        tenantId: link.leg2TenantId,
         status: leg2.status,
         pnr: leg2.pnr,
       },

@@ -13,6 +13,7 @@ import {
 import { Logger } from '@observability';
 
 import { BookingRepository } from '../../infrastructure/persistence/booking.repository';
+import { JourneyConnectionRepository } from '../../infrastructure/persistence/journey-connection.repository';
 import { BookingService } from './booking.service';
 import { TripRepository } from '../../../scheduling';
 
@@ -37,6 +38,7 @@ export class TripOpsService {
     private readonly trips: TripRepository,
     private readonly bookings: BookingRepository,
     private readonly bookingService: BookingService,
+    private readonly connections: JourneyConnectionRepository,
     private readonly uow: UnitOfWork,
     logger: Logger,
   ) {
@@ -106,29 +108,12 @@ export class TripOpsService {
    * this service's own log for manual follow-up either way.
    */
   private async cancelLinkedConnectionLeg(bookingId: string, tenantId: string): Promise<void> {
-    const link = await this.uow.run(
-      { name: 'tripOps.findConnection', bypassRls: true },
-      async (scope) => {
-        const row = await scope.client.query<{
-          id: string;
-          leg1_tenant_id: string;
-          leg1_booking_id: string;
-          leg2_tenant_id: string;
-          leg2_booking_id: string;
-          status: string;
-        }>(
-          `SELECT id, leg1_tenant_id, leg1_booking_id, leg2_tenant_id, leg2_booking_id, status FROM journey_connections
-          WHERE status = 'active' AND ((leg1_tenant_id = $1 AND leg1_booking_id = $2) OR (leg2_tenant_id = $1 AND leg2_booking_id = $2))`,
-          [tenantId, bookingId],
-        );
-        return row.rows[0] ?? null;
-      },
-    );
+    const link = await this.connections.findActiveByLeg(tenantId, bookingId);
     if (!link) return; // not part of any connection — nothing to do
 
-    const isLeg1 = link.leg1_booking_id === bookingId;
-    const otherTenantId = isLeg1 ? link.leg2_tenant_id : link.leg1_tenant_id;
-    const otherBookingId = isLeg1 ? link.leg2_booking_id : link.leg1_booking_id;
+    const isLeg1 = link.leg1BookingId === bookingId;
+    const otherTenantId = isLeg1 ? link.leg2TenantId : link.leg1TenantId;
+    const otherBookingId = isLeg1 ? link.leg2BookingId : link.leg1BookingId;
 
     try {
       await runInNewContext({ tenantId: otherTenantId as TenantId, actorType: 'system' }, () =>
@@ -146,12 +131,7 @@ export class TripOpsService {
       return; // status update below reflects only what actually succeeded
     }
 
-    await this.uow.run({ name: 'tripOps.markConnectionBroken', bypassRls: true }, async (scope) => {
-      await scope.client.query(
-        `UPDATE journey_connections SET status = 'both_cancelled', updated_at = now() WHERE id = $1`,
-        [link.id],
-      );
-    });
+    await this.connections.setStatus(link.id, 'both_cancelled');
   }
 
   /** Stop taking new bookings on this trip without cancelling it or anyone already booked — e.g. the bus is nearly full and the operator wants to hold the last few seats for counter sales. */
@@ -183,21 +163,15 @@ export class TripOpsService {
    * records the fact for reporting/CRM (frequent-no-show flagging).
    */
   async markNoShow(ticketId: TicketId): Promise<void> {
-    await this.uow.run({ name: 'trip.markNoShow', tenantId: requireTenantId() }, async (scope) => {
-      const ticket = (
-        await scope.client.query<{ status: string }>(
-          `SELECT status FROM tickets WHERE tenant_id = $1 AND id = $2 FOR UPDATE`,
-          [requireTenantId(), ticketId],
-        )
-      ).rows[0];
-      if (!ticket)
+    await this.uow.run({ name: 'trip.markNoShow', tenantId: requireTenantId() }, async () => {
+      const status = await this.bookings.lockTicketStatus(ticketId);
+      if (!status)
         throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Ticket not found' });
-      if (ticket.status === 'boarded') {
+      if (status === 'boarded')
         throw new AppError(ErrorCode.COMMON_CONFLICT, 422, {
           message: 'Passenger already boarded — cannot mark as no-show',
         });
-      }
-      await scope.client.query(`UPDATE tickets SET status = 'no_show' WHERE id = $1`, [ticketId]);
+      await this.bookings.setTicketStatus(ticketId, 'no_show');
     });
   }
 }

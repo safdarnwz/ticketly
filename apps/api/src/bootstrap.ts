@@ -37,7 +37,9 @@ export function createFastifyAdapter(config: AppConfig): FastifyAdapter {
     // Must exceed the load balancer's idle timeout, otherwise a reused
     // connection is closed mid-request and the LB reports a 502.
     requestTimeout: 0,
-    maxParamLength: 256,
+    // Signed tokens travel as path params (/tracking/token/:token is ~280
+    // chars: base64url JSON + HMAC); Fastify answers 414 above this limit.
+    maxParamLength: 1024,
     ignoreTrailingSlash: true,
     caseSensitive: true,
   });
