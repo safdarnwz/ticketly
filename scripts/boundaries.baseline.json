@@ -72,8 +72,6 @@
   "search/application/services/search.service.ts -> promotions/infrastructure",
   "search/application/services/search.service.ts -> scheduling/infrastructure",
   "search/application/services/search.service.ts -> tenancy/infrastructure",
-  "search/presentation/search.controller.ts -> pricing/presentation",
-  "storefront/application/services/storefront.service.ts -> search/application",
   "tenancy/presentation/tenant-admin.controller.ts -> booking/infrastructure",
   "tenancy/presentation/tenant.controller.ts -> booking/domain",
   "tenancy/presentation/tenant.controller.ts -> files/application",

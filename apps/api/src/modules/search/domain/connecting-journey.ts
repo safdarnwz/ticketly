@@ -35,8 +35,11 @@ export interface ConnectionOptions {
   maxLayoverMin: number;
 }
 
-export interface ConnectingJourney {
-  legs: [JourneyLeg, JourneyLeg];
+/** Default layover window: long enough to change buses, short enough not to be a hotel stay. */
+export const DEFAULT_LAYOVER: ConnectionOptions = { minLayoverMin: 120, maxLayoverMin: 24 * 60 };
+
+export interface ConnectingJourney<L extends JourneyLeg = JourneyLeg> {
+  legs: [L, L];
   hub: string;
   layoverMin: number;
   totalPriceMinor: number;
@@ -52,18 +55,19 @@ function toMs(iso: string): number {
   return t;
 }
 
-export function buildConnections(
-  firstLegs: JourneyLeg[],
-  secondLegs: JourneyLeg[],
+/** Generic over the leg type, so callers keep their full leg data (operator, amenities, stops…). */
+export function buildConnections<L extends JourneyLeg>(
+  firstLegs: L[],
+  secondLegs: L[],
   options: ConnectionOptions,
-): ConnectingJourney[] {
+): ConnectingJourney<L>[] {
   if (options.minLayoverMin < 0 || options.maxLayoverMin < options.minLayoverMin) {
     throw new DomainError(ErrorCode.CONNECTION_INVALID_LAYOVER, 'Layover window is invalid', {
       details: { minLayoverMin: options.minLayoverMin, maxLayoverMin: options.maxLayoverMin },
     });
   }
 
-  const out: ConnectingJourney[] = [];
+  const out: ConnectingJourney<L>[] = [];
   for (const first of firstLegs) {
     for (const second of secondLegs) {
       if (first.toHub !== second.fromHub) continue;

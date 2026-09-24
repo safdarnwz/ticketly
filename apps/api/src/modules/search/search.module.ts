@@ -9,6 +9,8 @@ import { SchedulingModule } from '../scheduling/scheduling.module';
 import { TenancyModule } from '../tenancy/tenancy.module';
 import { PromotionsModule } from '../promotions/promotions.module';
 import { SearchController } from './presentation/search.controller';
+import { JourneySearchService } from './application/services/journey-search.service';
+import { ConnectionHubRepository } from './infrastructure/connection-hub.repository';
 import { SearchService } from './application/services/search.service';
 
 /**
@@ -34,7 +36,7 @@ import { SearchService } from './application/services/search.service';
     PromotionsModule,
   ],
   controllers: [SearchController],
-  providers: [SearchService],
-  exports: [SearchService],
+  providers: [SearchService, JourneySearchService, ConnectionHubRepository],
+  exports: [SearchService, JourneySearchService],
 })
 export class SearchModule {}

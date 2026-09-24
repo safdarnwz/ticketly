@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { CacheNamespace, CacheService } from '@cache';
+import { CacheNamespace, CacheService, CacheTtl } from '@cache';
 import { DatabaseService, registerConstraintMessages } from '@database';
 import { stateFromGstin } from '../../domain/gst-state-codes';
 import {
@@ -18,6 +18,12 @@ import { RoutePath, type RouteStopInput } from '../../routes/domain/route-path';
 registerConstraintMessages({ routes_tenant_id_code_key: 'A route with this code already exists' });
 
 export type RouteStatus = 'draft' | 'published' | 'archived';
+
+export interface RouteStopRef {
+  id: StopId;
+  name: string;
+  sequence: number;
+}
 
 export interface RouteRecord {
   id: RouteId;
@@ -162,6 +168,26 @@ export class RouteRepository {
     );
     if (affected === 0) throw new NotFoundError('Route', id);
     await this.cache.invalidate(id, CacheNamespace.ROUTE);
+    await this.cache.invalidate(`stops:${id}`, CacheNamespace.ROUTE);
+  }
+
+  /**
+   * The route's stops in order, with names — cached, because search reads it
+   * for every route it returns. Invalidated with the route (see setStatus).
+   */
+  async stopsWithNames(routeId: RouteId): Promise<RouteStopRef[]> {
+    return this.cache.getOrLoad(
+      `stops:${routeId}`,
+      { namespace: CacheNamespace.ROUTE, ttlSeconds: CacheTtl.MASTER_DATA },
+      () =>
+        this.db.query<RouteStopRef>(
+          `SELECT rs.stop_id AS id, s.name, rs.sequence
+             FROM route_stops rs JOIN stops s ON s.id = rs.stop_id
+            WHERE rs.route_id = $1 ORDER BY rs.sequence`,
+          [routeId],
+          { name: 'route.stopsWithNames' },
+        ),
+    );
   }
 
   /** Published routes connecting an origin city to a destination city (for search). */

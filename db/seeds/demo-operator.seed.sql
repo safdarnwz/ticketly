@@ -162,9 +162,9 @@ Please reach your pickup point 15 minutes early.'),
 
   INSERT INTO route_stops (id, tenant_id, route_id, stop_id, sequence, distance_from_origin_m, depart_offset_min, dwell_min, can_board, can_alight)
   VALUES
-    (uuid_generate_v7(), v_tenant_id, v_route_id, v_stop_delhi, 1, 0, 0, 0, true, false),
-    (uuid_generate_v7(), v_tenant_id, v_route_id, v_stop_alwar, 2, 150000, 175, 10, true, true),
-    (uuid_generate_v7(), v_tenant_id, v_route_id, v_stop_jaipur, 3, 280000, 330, 0, false, true);
+    (uuid_generate_v7(), v_tenant_id, v_route_id, v_stop_delhi, 0, 0, 0, 0, true, false),
+    (uuid_generate_v7(), v_tenant_id, v_route_id, v_stop_alwar, 1, 150000, 175, 10, true, true),
+    (uuid_generate_v7(), v_tenant_id, v_route_id, v_stop_jaipur, 2, 280000, 330, 0, false, true);
 
   -- 5) 2+2 seater layout, 10 rows = 40 seats (built programmatically —
   -- hand-writing 40 seat entries by hand is exactly the kind of thing that

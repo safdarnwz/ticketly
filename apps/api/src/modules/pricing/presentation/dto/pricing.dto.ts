@@ -87,13 +87,3 @@ export const QuoteSchema = z
     path: ['seatNumbers'],
   });
 export type QuoteDto = z.infer<typeof QuoteSchema>;
-
-export const SearchSchema = z.object({
-  originCityId: uuid,
-  destCityId: uuid,
-  journeyDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  seatType: z.enum(['seater', 'sleeper', 'semi_sleeper']).optional(),
-  fromStopId: uuid.optional(),
-  toStopId: uuid.optional(),
-});
-export type SearchDto = z.infer<typeof SearchSchema>;

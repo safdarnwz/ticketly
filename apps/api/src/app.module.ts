@@ -29,7 +29,6 @@ import { AncillaryModule } from './modules/ancillary/ancillary.module';
 import { DepartureControlModule } from './modules/departure-control/departure-control.module';
 import { RefundModule } from './modules/refunds/refund.module';
 import { InvoiceModule } from './modules/invoicing/invoice.module';
-import { StorefrontModule } from './modules/storefront/storefront.module';
 import { ReviewModule } from './modules/reviews/review.module';
 import { SupportModule } from './modules/support/support.module';
 import { CmsModule } from './modules/cms/cms.module';
@@ -98,7 +97,7 @@ import { KycModule } from './modules/kyc/kyc.module';
     FleetModule, // Part 4 — vehicles, documents, maintenance, crew, duty roster
     SchedulingModule, // Part 5 — services, trips, segment-wise inventory
     PricingModule, // Part 6 — fare plans, dynamic pricing, coupons, quotes
-    SearchModule, // Part 6 — sub-10ms trip search
+    SearchModule, // trip search: filters/sort, round trip, connecting journeys (sub-10ms hot path)
     PromotionsModule, // Sponsored-listings ("Prio" badge) — super-admin rate card + operator purchase
     BookingModule, // Part 7 — hold/confirm/cancel, PNR, tickets, refunds
     PaymentModule, // Part 8 — payments, double-entry ledger, settlements
@@ -112,7 +111,6 @@ import { KycModule } from './modules/kyc/kyc.module';
     DepartureControlModule, // Part 13 — trip chart + closeout reconciliation
     RefundModule, // Part 13 — refund lifecycle (source/alternate-account, gateway reconcile)
     InvoiceModule, // Part 13 — GST tax invoices + credit notes (gapless numbering)
-    StorefrontModule, // Part 14 — filtered search, round-trip, connecting journeys
     ReviewModule, // Part 14 — verified-traveller reviews & ratings
     SupportModule, // Part 14 — support tickets + message thread
     CmsModule, // Part 14 — content pages, banners, promotional offers

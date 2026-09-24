@@ -53,6 +53,7 @@ import {
   todayIn,
   type TenantId,
   type TimeZone,
+  type CityId,
 } from '@kernel';
 import { UnitOfWork } from '@database';
 
@@ -68,7 +69,7 @@ import { PaymentService } from '../apps/api/src/modules/payment/application/serv
 import { RefundService } from '../apps/api/src/modules/refunds/application/services/refund.service';
 import { SettlementService } from '../apps/api/src/modules/payment/application/services/settlement.service';
 import { InvoiceService } from '../apps/api/src/modules/invoicing/application/services/invoice.service';
-import { ConnectingSearchService } from '../apps/api/src/modules/connections/application/services/connecting-search.service';
+import { JourneySearchService } from '../apps/api/src/modules/search';
 import { ConnectingBookingService } from '../apps/api/src/modules/connections/application/services/connecting-booking.service';
 import { AgentService } from '../apps/api/src/modules/agents/application/services/agent.service';
 import { SeatQuotaService } from '../apps/api/src/modules/quotas/application/seat-quota.service';
@@ -144,7 +145,7 @@ async function main(): Promise<void> {
   const refunds = app.get(RefundService);
   const settlement = app.get(SettlementService);
   const invoices = app.get(InvoiceService);
-  const connectingSearch = app.get(ConnectingSearchService);
+  const journeySearch = app.get(JourneySearchService);
   const connectingBooking = app.get(ConnectingBookingService);
   const uow = app.get(UnitOfWork);
 
@@ -408,16 +409,16 @@ async function main(): Promise<void> {
       // ---- DPDP consents — one row per customer for this tenant, marketing purpose ----
       for (const custId of customerIds) {
         await client.query(
-          `INSERT INTO consents (id, tenant_id, customer_id, purpose, granted) VALUES (uuid_generate_v7(), $1, $2, 'marketing', $3)`,
-          [t.id, custId, Math.random() < 0.6],
+          `INSERT INTO consents (id, customer_id, purpose, granted) VALUES (uuid_generate_v7(), $1, 'marketing', $2)`,
+          [custId, Math.random() < 0.6],
         );
       }
 
       for (let b = 0; b < perTenantTarget; b++) {
         const trip = pick(tripRows);
-        const tripStops = stopRows; // single route per tenant in this seed — origin/dest are sequence 1/2
-        const fromStop = tripStops.find((s) => s.sequence === 1);
-        const toStop = tripStops.find((s) => s.sequence === tripStops.length);
+        const tripStops = stopRows; // single route per tenant in this seed — first and last stop by sequence
+        const fromStop = tripStops[0];
+        const toStop = tripStops[tripStops.length - 1];
         if (!fromStop || !toStop) continue;
 
         const customerId = pick(customerIds);
@@ -487,10 +488,9 @@ async function main(): Promise<void> {
           // the Fraud console's queue isn't permanently empty either.
           const isOutlier = Math.random() < 0.03;
           await client.query(
-            `INSERT INTO fraud_assessments (id, tenant_id, booking_id, customer_id, score, band, decision, reasons, signals)
-             VALUES (uuid_generate_v7(), $1, $2, $3, $4, $5, $6, $7, '{}'::jsonb)`,
+            `INSERT INTO fraud_assessments (id, booking_id, customer_id, score, band, decision, reasons, signals)
+             VALUES (uuid_generate_v7(), $1, $2, $3, $4, $5, $6, '{}'::jsonb)`,
             [
-              t.id,
               hold.bookingId,
               customerId,
               isOutlier ? 65 + rand(20) : rand(15),
@@ -580,8 +580,10 @@ async function main(): Promise<void> {
             outcomes.confirmed += 1;
             await maybeAddReview(client, t.id, hold.bookingId, customerId, trip.route_id, trip.id);
           }
-        } catch {
+        } catch (e) {
           outcomes.failed += 1;
+          if (outcomes.failed <= 5)
+            process.stderr.write(`  ⚠ [${t.slug}] booking failed: ${(e as Error).message}\n`);
         }
       }
 
@@ -647,7 +649,7 @@ async function main(): Promise<void> {
   // Without this, journey_connections stays completely empty after seeding
   // — the feature would exist in code with zero demonstrable data, exactly
   // the class of gap this whole seeding effort exists to avoid. Uses the
-  // REAL ConnectingSearchService/ConnectingBookingService end to end (not
+  // REAL connecting search (JourneySearchService) and ConnectingBookingService end to end (not
   // hand-crafted rows), so every ledger/invoice/ticket this produces is as
   // genuine as a real customer's connecting booking would be.
   try {
@@ -671,40 +673,39 @@ async function main(): Promise<void> {
       if (!fromCity || !toCity) continue;
       for (let d = 0; d < 5; d++) {
         const day = localDate(new Date(Date.now() - d * 86_400_000).toISOString().slice(0, 10));
-        const { options } = await connectingSearch
-          .search(fromCity, toCity, day)
-          .then((options) => ({ options }))
-          .catch(() => ({ options: [] }));
+        const options = await journeySearch
+          .connecting({
+            originCityId: fromCity as CityId,
+            destCityId: toCity as CityId,
+            journeyDate: day,
+          })
+          .catch(() => []);
         if (options.length === 0) continue;
-        const opt = options[0];
+        const [leg1, leg2] = options[0].legs;
         const custId = pick(Array.from(customerIdsByTenant.values()).flat());
         try {
-          const q1 = await runInNewContext(
-            { tenantId: opt.leg1.tenantId as TenantId, actorType: 'system' },
-            () =>
-              pricing.quote({
-                tripId: opt.leg1.tripId as never,
-                fromStopId: opt.leg1.fromStopId as never,
-                toStopId: opt.leg1.toStopId as never,
-                seatType: 'seater',
-                seatNumbers: ['1'],
-              }),
+          const q1 = await runInNewContext({ tenantId: leg1.tenantId, actorType: 'system' }, () =>
+            pricing.quote({
+              tripId: leg1.tripId,
+              fromStopId: leg1.boardingStop.id,
+              toStopId: leg1.droppingStop.id,
+              seatType: 'seater',
+              seatNumbers: ['1'],
+            }),
           );
-          const q2 = await runInNewContext(
-            { tenantId: opt.leg2.tenantId as TenantId, actorType: 'system' },
-            () =>
-              pricing.quote({
-                tripId: opt.leg2.tripId as never,
-                fromStopId: opt.leg2.fromStopId as never,
-                toStopId: opt.leg2.toStopId as never,
-                seatType: 'seater',
-                seatNumbers: ['1'],
-              }),
+          const q2 = await runInNewContext({ tenantId: leg2.tenantId, actorType: 'system' }, () =>
+            pricing.quote({
+              tripId: leg2.tripId,
+              fromStopId: leg2.boardingStop.id,
+              toStopId: leg2.droppingStop.id,
+              seatType: 'seater',
+              seatNumbers: ['1'],
+            }),
           );
 
           const held = await connectingBooking.holdConnection({
             leg1: {
-              tenantId: opt.leg1.tenantId,
+              tenantId: leg1.tenantId,
               quoteId: q1.quoteId,
               seatNumbers: ['1'],
               passengers: [
@@ -712,7 +713,7 @@ async function main(): Promise<void> {
               ],
             },
             leg2: {
-              tenantId: opt.leg2.tenantId,
+              tenantId: leg2.tenantId,
               quoteId: q2.quoteId,
               seatNumbers: ['1'],
               passengers: [

@@ -31,6 +31,11 @@ import { InventoryRepository } from '../../../scheduling/infrastructure/persiste
 import { RouteRepository } from '../../../master-data/infrastructure/persistence/route.repository';
 import { TripRepository } from '../../../scheduling/infrastructure/persistence/trip.repository';
 
+export interface StopRef {
+  id: StopId;
+  name: string;
+}
+
 export interface SearchResult {
   tripId: TripId;
   routeId: RouteId;
@@ -39,6 +44,9 @@ export interface SearchResult {
    *  on every subsequent call (trip detail, quote, hold, confirm, ticket). */
   tenantId: TenantId;
   operatorName: string;
+  /** Where this fare/availability applies from and to — pass these to the quote call. */
+  boardingStop: StopRef;
+  droppingStop: StopRef;
   departsAt: string;
   arrivesAt: string;
   durationMin: number;
@@ -146,7 +154,9 @@ export class SearchService {
     toStopId?: StopId;
   }): Promise<SearchResult[]> {
     const boundTenantId = getTenantId();
-    const cacheKey = `${boundTenantId ?? 'all'}:${input.originCityId}:${input.destCityId}:${input.journeyDate}:${input.seatType ?? 'any'}`;
+    // Every input that changes the result must be in the key — the boarding/
+    // dropping stops change the segment, hence availability and price.
+    const cacheKey = `${boundTenantId ?? 'all'}:${input.originCityId}:${input.destCityId}:${input.journeyDate}:${input.seatType ?? 'any'}:${input.fromStopId ?? '-'}:${input.toStopId ?? '-'}`;
 
     const results = await this.cache.getOrLoad<SearchResult[]>(
       cacheKey,
@@ -269,12 +279,22 @@ export class SearchService {
     for (const routeId of routeIds) {
       const route = { id: routeId };
       // Three independent reads → one round-trip of latency instead of three.
-      const [trips, routePricing, interState] = await Promise.all([
+      const [trips, routePricing, interState, routeStops] = await Promise.all([
         this.trips.findForSearch(route.id, input.journeyDate),
         this.fares.routePricing(route.id),
         this.routes.isInterState(route.id),
+        this.routes.stopsWithNames(route.id),
       ]);
-      if (trips.length === 0) continue;
+      if (trips.length === 0 || routeStops.length < 2) continue;
+      const stopRef = (id: StopId | undefined, fallback: 'first' | 'last'): StopRef | null => {
+        const s = id
+          ? routeStops.find((x) => x.id === id)
+          : routeStops[fallback === 'first' ? 0 : routeStops.length - 1];
+        return s ? { id: s.id, name: s.name } : null;
+      };
+      const boardingStop = stopRef(input.fromStopId, 'first');
+      const droppingStop = stopRef(input.toStopId, 'last');
+      if (!boardingStop || !droppingStop) continue; // the requested stops aren't on this route
 
       // Resolve segment sequence per trip and batch the availability query.
       const segByTrip = new Map<TripId, { fromSeq: number; toSeq: number }>();
@@ -308,8 +328,8 @@ export class SearchService {
         // "from" price: base for the segment, with dynamic yield at current occupancy.
         const fare = await this.fares.resolveFare({
           routeId: route.id,
-          fromStopId: input.fromStopId ?? ('' as StopId),
-          toStopId: input.toStopId ?? ('' as StopId),
+          fromStopId: boardingStop.id,
+          toStopId: droppingStop.id,
           seatType: input.seatType ?? 'seater',
           distanceM: 0,
           journeyDate: input.journeyDate,
@@ -334,6 +354,8 @@ export class SearchService {
           routeId: route.id,
           tenantId,
           operatorName,
+          boardingStop,
+          droppingStop,
           departsAt: trip.departsAt.toISOString(),
           arrivesAt: trip.arrivesAt.toISOString(),
           durationMin: Math.round((trip.arrivesAt.getTime() - trip.departsAt.getTime()) / 60000),

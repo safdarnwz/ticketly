@@ -70,7 +70,6 @@ DECLARE
   v_amenity_water uuid;
   v_branch_id uuid;
   v_manager_user_id uuid;
-  v_partner_id uuid;
   v_webhook_id uuid;
   driver_count int;
   crew_status_pick crew_status;
@@ -239,9 +238,9 @@ Please reach your pickup point 15 minutes early.'),
     RETURNING id INTO v_route_id;
     INSERT INTO route_stops (id, tenant_id, route_id, stop_id, sequence, distance_from_origin_m, depart_offset_min, dwell_min, can_board, can_alight)
     VALUES
-      (uuid_generate_v7(), v_tenant_id, v_route_id, v_stop_origin, 1, 0, 0, 0, true, false),
-      (uuid_generate_v7(), v_tenant_id, v_route_id, v_stop_mid, 2, 150000, 175, 10, true, true),
-      (uuid_generate_v7(), v_tenant_id, v_route_id, v_stop_dest, 3, 280000, 330, 0, false, true);
+      (uuid_generate_v7(), v_tenant_id, v_route_id, v_stop_origin, 0, 0, 0, 0, true, false),
+      (uuid_generate_v7(), v_tenant_id, v_route_id, v_stop_mid, 1, 150000, 175, 10, true, true),
+      (uuid_generate_v7(), v_tenant_id, v_route_id, v_stop_dest, 2, 280000, 330, 0, false, true);
 
     -- Three seat-layouts (seater / sleeper / semi-sleeper) — every operator
     -- gets all three shapes available, per spec ("har tarah ke bus").
@@ -420,8 +419,8 @@ Please reach your pickup point 15 minutes early.'),
         RETURNING id INTO v_route2_id;
         INSERT INTO route_stops (id, tenant_id, route_id, stop_id, sequence, distance_from_origin_m, depart_offset_min, dwell_min, can_board, can_alight)
         VALUES
-          (uuid_generate_v7(), v_tenant_id, v_route2_id, v_stop_jaipur2, 1, 0, 0, 0, true, false),
-          (uuid_generate_v7(), v_tenant_id, v_route2_id, v_stop_blr2, 2, 1980000, 1320, 0, false, true);
+          (uuid_generate_v7(), v_tenant_id, v_route2_id, v_stop_jaipur2, 0, 0, 0, 0, true, false),
+          (uuid_generate_v7(), v_tenant_id, v_route2_id, v_stop_blr2, 1, 1980000, 1320, 0, false, true);
 
         INSERT INTO fare_plans (id, tenant_id, route_id, name, currency, status, effective_from)
         VALUES (uuid_generate_v7(), v_tenant_id, v_route2_id, 'Standard fares', 'INR', 'active', '2026-09-01')
@@ -490,11 +489,6 @@ Please reach your pickup point 15 minutes early.'),
     INSERT INTO branches (id, tenant_id, name, address, phone, status)
     VALUES (uuid_generate_v7(), v_tenant_id, operators[i][2] || ' — Counter 2', v_origin_name || ' counter', '+9198' || lpad((i+50)::text, 8, '0'), 'active');
 
-    -- Appearance — a per-operator accent colour so the console doesn't look
-    -- identical for all 15 (a real operator DOES rebrand their own console).
-    INSERT INTO appearance_settings (id, tenant_id, scope, theme)
-    VALUES (uuid_generate_v7(), v_tenant_id, '', jsonb_build_object('primaryColor', ('#' || lpad(to_hex((i * 4111) % 16777215), 6, '0')), 'logoText', operators[i][2]));
-
     -- Per-seat fare override — a couple of premium front-row seats priced
     -- above the flat fare_rules rate (a real operator DOES do this).
     INSERT INTO seat_fare_overrides (id, tenant_id, fare_plan_id, seat_number, fare_minor) VALUES
@@ -537,41 +531,11 @@ Please reach your pickup point 15 minutes early.'),
       VALUES (uuid_generate_v7(), v_tenant_id, operators[i][2], lpad((200000000000 + i * 11)::text, 15, '0'), 'ICIC000' || lpad(i::text, 4, '0'), 'ICICI Bank', 'pending', now() - interval '2 days');
     END IF;
 
-    -- i18n — Hindi translations for the handful of customer-facing strings
-    -- that actually vary by tenant (the platform's own UI strings are
-    -- static/code-bundled, not stored here).
-    INSERT INTO translations (id, tenant_id, locale, key, value) VALUES
-      (uuid_generate_v7(), v_tenant_id, 'hi', 'ticket.subject', 'आपका टिकट'),
-      (uuid_generate_v7(), v_tenant_id, 'hi', 'booking.confirmed', 'बुकिंग की पुष्टि हो गई है');
-
-    -- FX rate — every booking here is INR-only, but the rate table existing
-    -- with at least one real row is what the currency-display code path
-    -- actually exercises (an always-empty fx_rates table means that code
-    -- has never once run against real data).
-    INSERT INTO fx_rates (id, tenant_id, base_currency, quote_currency, rate_micros, as_of)
-    VALUES (uuid_generate_v7(), v_tenant_id, 'USD', 'INR', 83000000, now());
-
-    -- CMS — an About page and one homepage banner per operator.
-    INSERT INTO cms_pages (id, tenant_id, slug, title, body, status) VALUES
-      (uuid_generate_v7(), v_tenant_id, 'about', 'About ' || operators[i][2], 'Serving passengers since ' || (2026 - (3 + i % 15)) || '. ' || operators[i][2] || ' operates a fleet of ' || fleet_size || ' buses.', 'published');
-    INSERT INTO cms_banners (id, tenant_id, title, image_url, link_url, sort_order, is_active) VALUES
-      (uuid_generate_v7(), v_tenant_id, 'Book early, save more', 'https://placehold.co/1200x300', '/search', 1, true);
-    INSERT INTO offers (id, tenant_id, code, title, description, coupon_code, valid_from, valid_to, is_active) VALUES
-      (uuid_generate_v7(), v_tenant_id, 'FESTIVE10', 'Festive Season Sale', 'Flat 10% off on all bookings', 'SAVE10', now(), now() + interval '90 days', true);
-
-    -- Distribution — a channel-partner (OTA) relationship, matching how a
-    -- real operator ALSO sells through aggregators, not just Ticketly's own
-    -- storefront. commission_pct here is what the OTA keeps, separate
-    -- entirely from Ticketly's own platform commission.
-    INSERT INTO channel_partners (id, tenant_id, name, code, commission_pct, webhook_url, webhook_secret, is_active)
-    VALUES (uuid_generate_v7(), v_tenant_id, 'RedBus', 'redbus', 8.5, 'https://partner.example/webhooks/redbus', 'whsec_' || md5(v_tenant_id::text), true)
-    RETURNING id INTO v_partner_id;
-
-    -- A registered outbound webhook subscription + a short delivery log —
+    -- A registered outbound webhook (the operator's own endpoint) + a short delivery log —
     -- a couple delivered cleanly, one failed-and-retrying, matching what a
     -- real integration's log looks like (never 100% clean, never 100% dead).
     INSERT INTO partner_webhooks (id, tenant_id, name, url, secret, event_types, is_active)
-    VALUES (uuid_generate_v7(), v_tenant_id, 'RedBus production', 'https://partner.example/webhooks/redbus', 'whsec_' || md5(v_tenant_id::text || 'x'),
+    VALUES (uuid_generate_v7(), v_tenant_id, 'ERP integration', 'https://erp.example/webhooks/ticketly', 'whsec_' || md5(v_tenant_id::text || 'x'),
             ARRAY['booking.confirmed', 'booking.cancelled'], true)
     RETURNING id INTO v_webhook_id;
 
