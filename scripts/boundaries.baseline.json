@@ -17,7 +17,6 @@
   "booking/application/services/trip-ops.service.ts -> scheduling/infrastructure",
   "booking/infrastructure/persistence/seat-lock.repository.ts -> scheduling/domain",
   "booking/infrastructure/persistence/seat-upgrade.repository.ts -> scheduling/domain",
-  "cms/presentation/cms.controller.ts -> files/application",
   "connections/application/services/connecting-booking.service.ts -> booking/application",
   "connections/application/services/connecting-booking.service.ts -> booking/infrastructure",
   "connections/application/services/connecting-booking.service.ts -> payment/application",

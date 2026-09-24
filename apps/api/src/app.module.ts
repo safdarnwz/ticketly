@@ -29,9 +29,9 @@ import { AncillaryModule } from './modules/ancillary/ancillary.module';
 import { DepartureControlModule } from './modules/departure-control/departure-control.module';
 import { RefundModule } from './modules/refunds/refund.module';
 import { InvoiceModule } from './modules/invoicing/invoice.module';
+import { ContentModule } from './modules/content/content.module';
 import { ReviewModule } from './modules/reviews/review.module';
 import { SupportModule } from './modules/support/support.module';
-import { CmsModule } from './modules/cms/cms.module';
 import { FraudModule } from './modules/fraud/fraud.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
@@ -48,8 +48,6 @@ import { DemandModule } from './modules/demand/demand.module';
 import { GdsModule } from './modules/gds/gds.module';
 import { IncidentsModule } from './modules/incidents/incidents.module';
 import { CrmModule } from './modules/crm/crm.module';
-import { AnnouncementsModule } from './modules/announcements/announcements.module';
-import { LegalModule } from './modules/legal/legal.module';
 import { ConnectionsModule } from './modules/connections/connections.module';
 import { KycModule } from './modules/kyc/kyc.module';
 
@@ -113,7 +111,7 @@ import { KycModule } from './modules/kyc/kyc.module';
     InvoiceModule, // Part 13 — GST tax invoices + credit notes (gapless numbering)
     ReviewModule, // Part 14 — verified-traveller reviews & ratings
     SupportModule, // Part 14 — support tickets + message thread
-    CmsModule, // Part 14 — content pages, banners, promotional offers
+    ContentModule, // storefront pages (incl. legal), banners, offers, announcements
     FraudModule, // Part 14 — booking risk scoring + review queue
     TicketsModule, // Part 15 — signed QR boarding tokens + printable e-ticket
     RealtimeModule, // Part 15 — live seat availability over SSE
@@ -130,8 +128,6 @@ import { KycModule } from './modules/kyc/kyc.module';
     GdsModule, // platform GDS: OTAs / multi-operator agents
     IncidentsModule, // incidents, SOS, lost & found, shift notes, dispatch reports
     CrmModule, // customer search, profile, blacklist, preferences
-    AnnouncementsModule, // platform-wide broadcast banners
-    LegalModule, // Terms/Privacy/Refund-Policy/Grievance-Officer pages (Consumer Protection E-Commerce Rules 2020, IT Rules 2021)
     ConnectionsModule, // cross-operator connecting-journey search + booking (e.g. Delhi -> Kolkata -> Bhubaneswar)
     KycModule, // PAN format-check + DigiLocker document verification for operator onboarding
   ],
