@@ -1,9 +1,15 @@
-import { Body, Controller, Get, Param, Post, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, Post, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, RequirePermission, RequirePlatformAdmin, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  RequirePermission,
+  RequirePlatformAdmin,
+  UuidParam,
+  zodBody,
+} from '@http';
 import { type BookingId, type UserId } from '@kernel';
 
 import { FraudService } from '../application/services/fraud.service';
@@ -55,7 +61,7 @@ export class FraudController {
   @RequirePermission(Permission.ALL)
   @RequirePlatformAdmin()
   @ApiOperation({ summary: 'Latest risk assessment for a booking' })
-  async forBooking(@Param('bookingId') bookingId: string) {
+  async forBooking(@UuidParam('bookingId') bookingId: string) {
     return this.fraud.forBooking(bookingId as BookingId);
   }
 }

@@ -1,4 +1,5 @@
-import { Controller, Param, Sse } from '@nestjs/common';
+import { UuidParam } from '@http';
+import { Controller, Sse } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { type Observable, map } from 'rxjs';
 
@@ -25,7 +26,7 @@ export class RealtimeController {
 
   @Sse('trips/:tripId/seats')
   @ApiOperation({ summary: 'Live seat-availability stream (SSE)' })
-  seats(@Param('tripId') tripId: string): Observable<MessageEvent> {
+  seats(@UuidParam('tripId') tripId: string): Observable<MessageEvent> {
     return this.realtime
       .stream(tripId as TripId)
       .pipe(map((u: SeatUpdate): MessageEvent => ({ type: u.type, data: u.data })));

@@ -8,6 +8,7 @@ import { Mailer } from './infrastructure/mail/mailer';
 import { IntegrationsModule } from '../integrations/integrations.module';
 import { PlatformSettingsModule } from '../platform-settings/platform-settings.module';
 import { NotificationController } from './presentation/notification.controller';
+import { NotificationTemplateRepository } from './infrastructure/persistence/notification-template.repository';
 import { NotificationService } from './application/services/notification.service';
 import { ProviderRegistry } from './infrastructure/provider-registry';
 import { EmailNotificationProvider } from './infrastructure/providers/email.provider';
@@ -39,6 +40,7 @@ import { Msg91WhatsAppProvider } from './infrastructure/providers/msg91-whatsapp
   controllers: [NotificationController],
   providers: [
     NotificationService,
+    NotificationTemplateRepository,
     ProviderRegistry,
     LogProviderFactory,
     Msg91SmsProvider,

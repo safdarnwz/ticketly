@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { Body, Controller, Post, Param, HttpCode } from '@nestjs/common';
+import { Body, Controller, Post, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Idempotent, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, Idempotent, RequirePermission, UuidParam, zodBody } from '@http';
 import { type BookingId, type StopId, type TripId } from '@kernel';
 
 import { AmendmentService } from '../application/services/amendment.service';
@@ -36,7 +36,10 @@ export class AmendmentsController {
   @Idempotent()
   @RequirePermission(Permission.BOOKING_RESCHEDULE)
   @ApiOperation({ summary: 'Reschedule a booking to a new trip (fare diff + fee)' })
-  async reschedule(@Param('id') id: string, @Body(zodBody(RescheduleSchema)) dto: RescheduleDto) {
+  async reschedule(
+    @UuidParam('id') id: string,
+    @Body(zodBody(RescheduleSchema)) dto: RescheduleDto,
+  ) {
     return this.amendments.reschedule({
       bookingId: id as BookingId,
       newTripId: dto.newTripId as TripId,
@@ -51,7 +54,10 @@ export class AmendmentsController {
   @Idempotent()
   @RequirePermission(Permission.BOOKING_RESCHEDULE)
   @ApiOperation({ summary: 'Change seats within the same trip' })
-  async changeSeats(@Param('id') id: string, @Body(zodBody(SeatChangeSchema)) dto: SeatChangeDto) {
+  async changeSeats(
+    @UuidParam('id') id: string,
+    @Body(zodBody(SeatChangeSchema)) dto: SeatChangeDto,
+  ) {
     return this.amendments.changeSeats(id as BookingId, dto.newSeatNumbers);
   }
 
@@ -64,7 +70,7 @@ export class AmendmentsController {
       'Change boarding and/or dropping point on the same trip (same fare stage; until 60 min before boarding)',
   })
   async changePoints(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(PointChangeSchema)) dto: z.infer<typeof PointChangeSchema>,
   ) {
     return this.amendments.changePoints(id as BookingId, dto);
@@ -78,7 +84,7 @@ export class AmendmentsController {
     summary: 'Correct a passenger name spelling (small edit only — a different person is refused)',
   })
   async correctName(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(NameCorrectionSchema)) dto: z.infer<typeof NameCorrectionSchema>,
   ) {
     return this.amendments.correctName(id as BookingId, dto.seatNumber, dto.fullName);

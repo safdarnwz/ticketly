@@ -1,9 +1,9 @@
-import { Body, Controller, Get, Param, Post, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, Post, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, RequirePermission, UuidParam, zodBody } from '@http';
 import { type TripId } from '@kernel';
 
 import { CrewAppService } from '../application/services/crew-app.service';
@@ -21,7 +21,7 @@ export class CrewAppController {
   @Get('trips/:id/manifest')
   @RequirePermission(Permission.TRIP_OPERATE)
   @ApiOperation({ summary: 'Passenger manifest for a trip' })
-  async manifest(@Param('id') id: string) {
+  async manifest(@UuidParam('id') id: string) {
     return { passengers: await this.crew.manifest(id as TripId) };
   }
 
@@ -29,7 +29,10 @@ export class CrewAppController {
   @HttpCode(200)
   @RequirePermission(Permission.TRIP_OPERATE)
   @ApiOperation({ summary: 'Validate a boarding code and mark boarded' })
-  async scan(@Param('id') id: string, @Body(zodBody(ScanSchema)) dto: z.infer<typeof ScanSchema>) {
+  async scan(
+    @UuidParam('id') id: string,
+    @Body(zodBody(ScanSchema)) dto: z.infer<typeof ScanSchema>,
+  ) {
     return this.crew.scanBoarding(id as TripId, dto.boardingCode);
   }
 
@@ -37,7 +40,7 @@ export class CrewAppController {
   @RequirePermission(Permission.TRIP_OPERATE)
   @ApiOperation({ summary: 'Start (depart) or close a trip' })
   async status(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(TripStatusSchema)) dto: z.infer<typeof TripStatusSchema>,
   ) {
     await this.crew.setTripStatus(id as TripId, dto.status);

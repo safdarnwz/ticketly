@@ -5,7 +5,6 @@ import {
   Get,
   HttpCode,
   Param,
-  ParseUUIDPipe,
   Patch,
   Post,
   Put,
@@ -19,6 +18,7 @@ import {
   ApiStandardErrors,
   RequirePermission,
   RequirePlatformAdmin,
+  UuidParam,
   zodBody,
   zodQuery,
 } from '@http';
@@ -88,7 +88,7 @@ export class ContentAdminController {
   @Patch('banners/:id')
   @ApiOperation({ summary: 'Show or hide a banner' })
   async setBanner(
-    @Param('id', ParseUUIDPipe) id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(z.object({ isActive: z.boolean() }))) dto: { isActive: boolean },
   ) {
     await this.content.setBannerActive(id, dto.isActive);
@@ -119,7 +119,7 @@ export class ContentAdminController {
 
   @Delete('announcements/:id')
   @ApiOperation({ summary: 'Remove an announcement' })
-  async deleteAnnouncement(@Param('id', ParseUUIDPipe) id: string) {
+  async deleteAnnouncement(@UuidParam('id') id: string) {
     await this.content.deleteAnnouncement(id);
     return { ok: true };
   }

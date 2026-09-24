@@ -1,9 +1,9 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Idempotent, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, Idempotent, RequirePermission, UuidParam, zodBody } from '@http';
 
 import { IncidentService } from '../application/incident.service';
 import { DELAY_CATEGORIES, INCIDENT_TYPES } from '../domain/incident-rules';
@@ -77,7 +77,7 @@ export class IncidentController {
   @HttpCode(200)
   @RequirePermission(Permission.TRIP_MANAGE)
   transition(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(TransitionSchema)) dto: z.infer<typeof TransitionSchema>,
   ) {
     return this.svc.transition(id, dto.status, dto.note);
@@ -91,7 +91,10 @@ export class IncidentController {
     summary:
       'Panic button from the crew app — one tap, location optional, alerts the emergency team at once',
   })
-  sos(@Param('tripId') tripId: string, @Body(zodBody(SosSchema)) dto: z.infer<typeof SosSchema>) {
+  sos(
+    @UuidParam('tripId') tripId: string,
+    @Body(zodBody(SosSchema)) dto: z.infer<typeof SosSchema>,
+  ) {
     return this.svc.report({
       tripId,
       type: dto.kind,
@@ -120,14 +123,14 @@ export class IncidentController {
   @ApiOperation({
     summary: 'Hand an item back — claimant must hold a PNR for the trip it was found on',
   })
-  claim(@Param('id') id: string, @Body(zodBody(ClaimSchema)) dto: z.infer<typeof ClaimSchema>) {
+  claim(@UuidParam('id') id: string, @Body(zodBody(ClaimSchema)) dto: z.infer<typeof ClaimSchema>) {
     return this.svc.claimItem(id, dto);
   }
 
   @Post('lost-found/:id/dispose')
   @HttpCode(200)
   @RequirePermission(Permission.TRIP_MANAGE)
-  dispose(@Param('id') id: string) {
+  dispose(@UuidParam('id') id: string) {
     return this.svc.disposeItem(id);
   }
 

@@ -1,20 +1,9 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Put,
-  Query,
-  HttpCode,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Patch, Post, Put, Query, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
 import { UnitOfWork } from '@database';
-import { ApiStandardErrors, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, RequirePermission, UuidParam, zodBody } from '@http';
 import {
   BadRequestError,
   localDate,
@@ -42,6 +31,14 @@ import {
   type UpdateVehicleDto,
   UploadDocumentSchema,
   type UploadDocumentDto,
+  BulkImportVehiclesSchema,
+  VehiclePermitTypeSchema,
+  VehiclePhotoNoteSchema,
+  VehicleStatusSchema,
+  type BulkImportVehiclesDto,
+  type VehiclePermitTypeDto,
+  type VehiclePhotoNoteDto,
+  type VehicleStatusDto,
 } from './dto/fleet.dto';
 import { VehicleVerificationService } from '../application/services/vehicle-verification.service';
 import { FleetLogsRepository } from '../infrastructure/persistence/logs.repository';
@@ -112,7 +109,7 @@ export class FleetController {
   @ApiOperation({
     summary: 'Bus details, every document version, compliance and what is blocking verification',
   })
-  async getVehicle(@Param('id') id: string) {
+  async getVehicle(@UuidParam('id') id: string) {
     return this.verification.detail(id as VehicleId);
   }
 
@@ -123,7 +120,7 @@ export class FleetController {
       'Edit bus details. The registration number can NEVER be changed; RC facts lock once submitted/approved.',
   })
   async updateVehicle(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(UpdateVehicleSchema)) dto: UpdateVehicleDto,
   ) {
     await this.verification.updateDetails(id as VehicleId, dto as never);
@@ -133,7 +130,7 @@ export class FleetController {
   @Post('vehicles/bulk-import')
   @RequirePermission(Permission.VEHICLE_MANAGE)
   @ApiOperation({ summary: 'Bulk-add buses as drafts; each row validated independently' })
-  async bulkImportVehicles(@Body() dto: { rows: CreateVehicleDto[] }) {
+  async bulkImportVehicles(@Body(zodBody(BulkImportVehiclesSchema)) dto: BulkImportVehiclesDto) {
     const tenantId = requireTenantId();
     return this.verification.bulkCreate((dto?.rows ?? []) as never, (row) =>
       this.uow.run({ name: 'fleet.bulkVehicle', tenantId }, async () => {
@@ -150,11 +147,9 @@ export class FleetController {
       'Operational status. "active" is only possible for a platform-verified bus with valid papers.',
   })
   async setVehicleStatus(
-    @Param('id') id: string,
-    @Body() dto: { status: 'active' | 'maintenance' | 'retired' },
+    @UuidParam('id') id: string,
+    @Body(zodBody(VehicleStatusSchema)) dto: VehicleStatusDto,
   ) {
-    if (!['active', 'maintenance', 'retired'].includes(dto?.status))
-      throw new BadRequestError('status must be active, maintenance or retired');
     await this.verification.setOperationalStatus(id as VehicleId, dto.status);
     return { ok: true };
   }
@@ -165,9 +160,8 @@ export class FleetController {
     summary: 'Set permit type (AITP / stage carriage / state tourist / contract carriage)',
   })
   async setVehiclePermitType(
-    @Param('id') id: string,
-    @Body()
-    dto: { permitType: 'aitp' | 'stage_carriage' | 'state_tourist_permit' | 'contract_carriage' },
+    @UuidParam('id') id: string,
+    @Body(zodBody(VehiclePermitTypeSchema)) dto: VehiclePermitTypeDto,
   ) {
     await this.vehicles.getById(id as VehicleId);
     await this.vehicles.setPermitType(id as VehicleId, dto.permitType);
@@ -177,8 +171,11 @@ export class FleetController {
   @Patch('vehicles/:id/photo-note')
   @RequirePermission(Permission.VEHICLE_MANAGE)
   @ApiOperation({ summary: 'Set a service note (photos are uploaded under vehicles/:id/media)' })
-  async setVehiclePhotoNote(@Param('id') id: string, @Body() dto: { serviceNote?: string }) {
-    await this.vehicles.setPhotoAndNote(id as VehicleId, { serviceNote: dto?.serviceNote });
+  async setVehiclePhotoNote(
+    @UuidParam('id') id: string,
+    @Body(zodBody(VehiclePhotoNoteSchema)) dto: VehiclePhotoNoteDto,
+  ) {
+    await this.vehicles.setPhotoAndNote(id as VehicleId, { serviceNote: dto.serviceNote });
     return { ok: true };
   }
 
@@ -190,7 +187,7 @@ export class FleetController {
       'Upload a document / photo (stored in object storage under {operator}/vehicles/{REG}/{type}/). Goes to pending review.',
   })
   async uploadDocument(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(UploadDocumentSchema)) dto: UploadDocumentDto,
   ) {
     return this.verification.uploadDocument(id as VehicleId, dto);
@@ -204,7 +201,7 @@ export class FleetController {
       'Upload a document FILE as raw bytes (Content-Type: application/octet-stream). PDF/JPG/PNG/DOC/DOCX, max 5 MB. Returns fileId for POST vehicles/:id/documents.',
   })
   async uploadDocumentFile(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Query('docType') docType: string,
     @Query('fileName') fileName: string | undefined,
     @Body() body: Buffer,
@@ -215,7 +212,7 @@ export class FleetController {
   @Get('vehicles/:id/media')
   @RequirePermission(Permission.VEHICLE_READ)
   @ApiOperation({ summary: 'Bus photos (max 10). Video uploads are not supported.' })
-  async listMedia(@Param('id') id: string) {
+  async listMedia(@UuidParam('id') id: string) {
     return { items: await this.verification.listMedia(id as VehicleId) };
   }
 
@@ -227,7 +224,7 @@ export class FleetController {
       'Add a bus photo (JPG/PNG/WEBP ≤ 5 MB, max 10). Raw bytes, Content-Type: application/octet-stream. Videos are refused.',
   })
   async addMedia(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Query('kind') kind: string | undefined,
     @Query('fileName') fileName: string | undefined,
     @Query('caption') caption: string | undefined,
@@ -241,7 +238,7 @@ export class FleetController {
   @Delete('vehicles/:id/media/:mediaId')
   @RequirePermission(Permission.VEHICLE_MANAGE)
   @ApiOperation({ summary: 'Remove a photo' })
-  async removeMedia(@Param('id') id: string, @Param('mediaId') mediaId: string) {
+  async removeMedia(@UuidParam('id') id: string, @UuidParam('mediaId') mediaId: string) {
     await this.verification.removeMedia(id as VehicleId, mediaId);
     return { ok: true };
   }
@@ -250,7 +247,7 @@ export class FleetController {
   @Put('vehicles/:id/documents')
   @RequirePermission(Permission.VEHICLE_MANAGE)
   async upsertDocument(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(UploadDocumentSchema)) dto: UploadDocumentDto,
   ) {
     return this.verification.uploadDocument(id as VehicleId, dto);
@@ -262,7 +259,7 @@ export class FleetController {
   @ApiOperation({
     summary: 'Submit the bus for platform verification (all required documents must be uploaded)',
   })
-  async submitVehicle(@Param('id') id: string) {
+  async submitVehicle(@UuidParam('id') id: string) {
     return this.verification.submit(id as VehicleId);
   }
 
@@ -270,7 +267,7 @@ export class FleetController {
   @HttpCode(200)
   @RequirePermission(Permission.VEHICLE_MANAGE)
   @ApiOperation({ summary: 'Pull a submitted bus back to draft to correct something' })
-  async withdrawVehicle(@Param('id') id: string) {
+  async withdrawVehicle(@UuidParam('id') id: string) {
     await this.verification.withdraw(id as VehicleId);
     return { ok: true };
   }
@@ -278,7 +275,7 @@ export class FleetController {
   @Get('vehicles/:id/compliance')
   @RequirePermission(Permission.VEHICLE_READ)
   @ApiOperation({ summary: 'Road-legality from VERIFIED documents only' })
-  async compliance(@Param('id') id: string) {
+  async compliance(@UuidParam('id') id: string) {
     return this.fleet.compliance(id as VehicleId);
   }
 
@@ -287,7 +284,7 @@ export class FleetController {
   @RequirePermission(Permission.VEHICLE_MANAGE)
   @ApiOperation({ summary: 'Record a maintenance event' })
   async addMaintenance(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(MaintenanceLogSchema)) dto: MaintenanceLogDto,
   ) {
     await this.uow.run({ name: 'fleet.addMaintenance', tenantId: requireTenantId() }, async () =>
@@ -306,7 +303,7 @@ export class FleetController {
   @Get('vehicles/:id/maintenance')
   @RequirePermission(Permission.VEHICLE_READ)
   @ApiOperation({ summary: 'Maintenance history' })
-  async listMaintenance(@Param('id') id: string) {
+  async listMaintenance(@UuidParam('id') id: string) {
     return { items: await this.logs.listMaintenance(id as VehicleId) };
   }
 
@@ -366,7 +363,7 @@ export class FleetController {
       'Mark present (late after 15 min) or absent — absent raises crew.absent for a replacement',
   })
   async attendance(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(AttendanceSchema)) dto: { status: 'present' | 'absent' },
   ) {
     return this.crewService.markAttendance(id as DutyId, dto.status);
@@ -378,7 +375,7 @@ export class FleetController {
     summary:
       'Driving minutes still allowed in the rolling 24h window, and when the crew member is next rested',
   })
-  async allowance(@Param('id') id: string) {
+  async allowance(@UuidParam('id') id: string) {
     return this.crewService.allowance(id as CrewId);
   }
 
@@ -432,7 +429,7 @@ export class FleetController {
   @Post('crew/duties/:id/cancel')
   @RequirePermission(Permission.CREW_MANAGE)
   @ApiOperation({ summary: 'Cancel a duty' })
-  async cancelDuty(@Param('id') id: string) {
+  async cancelDuty(@UuidParam('id') id: string) {
     await this.crewService.cancelDuty(id as DutyId);
     return { ok: true };
   }

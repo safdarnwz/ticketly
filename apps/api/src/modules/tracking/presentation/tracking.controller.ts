@@ -3,7 +3,7 @@ import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Public, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, Public, RequirePermission, UuidParam, zodBody } from '@http';
 import { type TripId } from '@kernel';
 
 import { TrackingService } from '../application/services/tracking.service';
@@ -36,7 +36,7 @@ export class TrackingController {
   @Public()
   @Get('trips/:id/live')
   @ApiOperation({ summary: 'Live position & ETA for a trip (passenger tracking)' })
-  async live(@Param('id') id: string) {
+  async live(@UuidParam('id') id: string) {
     return this.tracking.liveState(id as TripId);
   }
 

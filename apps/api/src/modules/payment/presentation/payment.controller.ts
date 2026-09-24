@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, Req, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, Req, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import type { FastifyRequest } from 'fastify';
 
@@ -11,6 +11,7 @@ import {
   RateLimit,
   RequirePermission,
   RequirePlatformAdmin,
+  UuidParam,
   zodBody,
 } from '@http';
 import { localDate, type BookingId } from '@kernel';
@@ -22,6 +23,12 @@ import {
   type CreateIntentDto,
   GenerateSettlementSchema,
   type GenerateSettlementDto,
+  SetCommissionSchema,
+  UpgradeSeatSchema,
+  VerifyPaymentSchema,
+  type SetCommissionDto,
+  type UpgradeSeatDto,
+  type VerifyPaymentDto,
 } from './dto/payment.dto';
 import { TEST_PAYMENT_METHODS } from '../domain/test-gateway';
 import { LedgerRepository } from '../infrastructure/persistence/ledger.repository';
@@ -95,7 +102,7 @@ export class PaymentController {
     summary:
       'Upgrade a ticket to a different seat (e.g. seater→sleeper) before the 1hr-before-departure cutoff — charges only the fare differential + its own GST',
   })
-  async upgradeSeat(@Body() dto: { ticketId: string; toSeatNumber: string }) {
+  async upgradeSeat(@Body(zodBody(UpgradeSeatSchema)) dto: UpgradeSeatDto) {
     return this.payment.upgradeSeat(dto.ticketId, dto.toSeatNumber);
   }
 
@@ -119,15 +126,7 @@ export class PaymentController {
     summary:
       "Verify the gateway's client-side checkout callback and confirm the booking immediately (webhook still runs too)",
   })
-  async verify(
-    @Body()
-    dto: {
-      bookingId: string;
-      razorpay_order_id: string;
-      razorpay_payment_id: string;
-      razorpay_signature: string;
-    },
-  ) {
+  async verify(@Body(zodBody(VerifyPaymentSchema)) dto: VerifyPaymentDto) {
     const { bookingId, ...callback } = dto;
     return this.payment.verifyAndCapture(bookingId as BookingId, callback);
   }
@@ -164,7 +163,7 @@ export class PaymentController {
   @ApiOperation({
     summary: "An operator's platform commission override (null = using the platform default)",
   })
-  async getCommission(@Param('tenantId') tenantId: string) {
+  async getCommission(@UuidParam('tenantId') tenantId: string) {
     return { override: await this.payments.getCommissionForTenant(tenantId) };
   }
 
@@ -176,16 +175,7 @@ export class PaymentController {
   @ApiOperation({
     summary: "Set an operator's negotiated platform commission (overrides the global default)",
   })
-  async setCommission(
-    @Body()
-    dto: {
-      tenantId: string;
-      model: 'percent' | 'flat' | 'percent_plus';
-      percent?: number;
-      flatMinor?: number;
-      capMinor?: number;
-    },
-  ) {
+  async setCommission(@Body(zodBody(SetCommissionSchema)) dto: SetCommissionDto) {
     await this.payments.setCommissionForTenant(dto.tenantId, dto);
     return { ok: true };
   }
@@ -213,7 +203,7 @@ export class PaymentController {
   @ApiBearerAuth('bearer')
   @RequirePermission(Permission.SETTLEMENT_MANAGE)
   @ApiOperation({ summary: 'Finalise & pay a settlement' })
-  async finaliseSettlement(@Param('id') id: string) {
+  async finaliseSettlement(@UuidParam('id') id: string) {
     await this.settlement.finalise(id);
     return { ok: true };
   }

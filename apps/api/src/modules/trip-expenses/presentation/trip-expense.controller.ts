@@ -1,9 +1,9 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Idempotent, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, Idempotent, RequirePermission, UuidParam, zodBody } from '@http';
 import { BadRequestError, type TripId } from '@kernel';
 
 import { TripExpenseService } from '../application/trip-expense.service';
@@ -39,7 +39,7 @@ export class TripExpenseController {
     summary: 'Add a trip expense (diesel, toll, bata, ...) — optionally with an uploaded receipt',
   })
   async add(
-    @Param('tripId') tripId: string,
+    @UuidParam('tripId') tripId: string,
     @Body(zodBody(AddExpenseSchema)) dto: z.infer<typeof AddExpenseSchema>,
   ) {
     return this.svc.add(tripId as TripId, dto);
@@ -52,7 +52,7 @@ export class TripExpenseController {
     summary: 'Upload a receipt as raw bytes (PDF/JPG/PNG/WEBP ≤ 5 MB) → fileId for the expense',
   })
   async receipt(
-    @Param('tripId') tripId: string,
+    @UuidParam('tripId') tripId: string,
     @Query('fileName') fileName: string | undefined,
     @Body() body: Buffer,
   ) {
@@ -65,7 +65,7 @@ export class TripExpenseController {
 
   @Get('trips/:tripId/expenses')
   @RequirePermission(Permission.TRIP_OPERATE)
-  async list(@Param('tripId') tripId: string, @Query('includeVoided') includeVoided?: string) {
+  async list(@UuidParam('tripId') tripId: string, @Query('includeVoided') includeVoided?: string) {
     return { items: await this.svc.list(tripId as TripId, includeVoided === '1') };
   }
 
@@ -74,8 +74,8 @@ export class TripExpenseController {
   @RequirePermission(Permission.TRIP_MANAGE)
   @ApiOperation({ summary: 'Void a wrong expense with a reason (never deleted — audit trail)' })
   async void(
-    @Param('tripId') tripId: string,
-    @Param('expenseId') expenseId: string,
+    @UuidParam('tripId') tripId: string,
+    @UuidParam('expenseId') expenseId: string,
     @Body(zodBody(VoidSchema)) dto: z.infer<typeof VoidSchema>,
   ) {
     return this.svc.void(tripId as TripId, expenseId, dto.reason);
@@ -84,7 +84,7 @@ export class TripExpenseController {
   @Get('trips/:tripId/pnl')
   @RequirePermission(Permission.REPORT_READ)
   @ApiOperation({ summary: 'Trip profit & loss' })
-  async tripPnl(@Param('tripId') tripId: string) {
+  async tripPnl(@UuidParam('tripId') tripId: string) {
     return this.svc.tripPnl(tripId as TripId);
   }
 

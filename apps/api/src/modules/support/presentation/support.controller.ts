@@ -1,9 +1,9 @@
-import { Body, Controller, Get, Param, Post, Query, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, RequirePermission, UuidParam, zodBody } from '@http';
 import { type BookingId, type SupportTicketId, type UserId } from '@kernel';
 
 import { SupportService } from '../application/services/support.service';
@@ -58,7 +58,7 @@ export class SupportController {
   @Get(':id')
   @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'Get a ticket with its message thread' })
-  async get(@Param('id') id: string) {
+  async get(@UuidParam('id') id: string) {
     return this.support.get(id as SupportTicketId);
   }
 
@@ -67,7 +67,7 @@ export class SupportController {
   @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'Reply on a ticket' })
   async reply(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(ReplySchema)) dto: z.infer<typeof ReplySchema>,
   ) {
     return this.support.reply(id as SupportTicketId, dto);
@@ -78,7 +78,7 @@ export class SupportController {
   @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'Change a ticket status' })
   async transition(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(TransitionSchema)) dto: z.infer<typeof TransitionSchema>,
   ) {
     return this.support.transition(id as SupportTicketId, dto.status);

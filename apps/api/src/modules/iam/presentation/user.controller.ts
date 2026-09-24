@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { Body, Controller, Param, Patch, Post, Put, HttpCode } from '@nestjs/common';
+import { Body, Controller, Patch, Post, Put, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, RequirePermission, UuidParam, zodBody } from '@http';
 import { type UserId } from '@kernel';
 
 import {
@@ -52,7 +52,7 @@ export class UserController {
   @Patch(':id')
   @RequirePermission(Permission.USER_MANAGE)
   @ApiOperation({ summary: 'Update a user' })
-  async update(@Param('id') id: string, @Body(zodBody(UpdateUserSchema)) dto: UpdateUserDto) {
+  async update(@UuidParam('id') id: string, @Body(zodBody(UpdateUserSchema)) dto: UpdateUserDto) {
     await this.users.update(id as UserId, dto);
     return { ok: true };
   }
@@ -61,7 +61,7 @@ export class UserController {
   @RequirePermission(Permission.ROLE_MANAGE)
   @ApiOperation({ summary: 'Assign roles to a user' })
   async assignRoles(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(AssignRolesSchema)) dto: AssignRolesDto,
   ) {
     await this.users.assignRoles(id as UserId, dto.roles);
@@ -72,7 +72,7 @@ export class UserController {
   @HttpCode(200)
   @RequirePermission(Permission.USER_MANAGE)
   @ApiOperation({ summary: 'Sign a staff member out everywhere, effective on their next request' })
-  forceLogout(@Param('id') id: string) {
+  forceLogout(@UuidParam('id') id: string) {
     return this.access.forceLogout(id);
   }
 
@@ -83,7 +83,7 @@ export class UserController {
       'Access expiry (contractors), login time window, reporting manager — null clears a field',
   })
   async setAccess(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(StaffAccessSchema)) dto: z.infer<typeof StaffAccessSchema>,
   ) {
     await this.access.setAccess(id, dto);
@@ -94,8 +94,8 @@ export class UserController {
   @RequirePermission(Permission.ROLE_MANAGE)
   @ApiOperation({ summary: 'Grant one role, optionally only until a date (temporary permission)' })
   async grantRole(
-    @Param('id') id: string,
-    @Param('roleId') roleId: string,
+    @UuidParam('id') id: string,
+    @UuidParam('roleId') roleId: string,
     @Body(
       zodBody(
         z.object({ expiresAt: z.string().datetime({ offset: true }).nullable().default(null) }),

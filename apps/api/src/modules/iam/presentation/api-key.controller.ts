@@ -1,8 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Post, HttpCode } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, RequirePermission, UuidParam, zodBody } from '@http';
 import { type ApiKeyId } from '@kernel';
 
 import { ApiKeyService } from '../application/services/api-key.service';
@@ -45,7 +45,7 @@ export class ApiKeyController {
   @HttpCode(204)
   @RequirePermission(Permission.TENANT_MANAGE)
   @ApiOperation({ summary: 'Revoke an API key' })
-  async revoke(@Param('id') id: string): Promise<void> {
+  async revoke(@UuidParam('id') id: string): Promise<void> {
     await this.apiKeys.revoke(id as ApiKeyId);
   }
 }

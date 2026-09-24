@@ -1,9 +1,9 @@
-import { Body, Controller, Get, HttpCode, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Idempotent, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, Idempotent, RequirePermission, UuidParam, zodBody } from '@http';
 import type { TripId, VehicleId } from '@kernel';
 
 import { TripVehicleService } from '../application/trip-vehicle.service';
@@ -29,7 +29,7 @@ export class TripVehicleController {
       'Change the bus of a trip; passengers are re-seated on the same seat type if the layout differs',
   })
   async change(
-    @Param('tripId') tripId: string,
+    @UuidParam('tripId') tripId: string,
     @Body(zodBody(ChangeVehicleSchema)) dto: z.infer<typeof ChangeVehicleSchema>,
   ) {
     return this.svc.changeVehicle(tripId as TripId, {
@@ -40,7 +40,7 @@ export class TripVehicleController {
 
   @Get('history')
   @RequirePermission(Permission.TRIP_MANAGE)
-  async history(@Param('tripId') tripId: string) {
+  async history(@UuidParam('tripId') tripId: string) {
     return { items: await this.svc.history(tripId as TripId) };
   }
 }

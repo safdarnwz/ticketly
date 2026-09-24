@@ -17,6 +17,14 @@ export const CreateStopSchema = z.object({
 });
 export type CreateStopDto = z.infer<typeof CreateStopSchema>;
 
+export const UpdateStopSchema = CreateStopSchema.omit({ cityId: true })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, 'Send at least one field');
+export type UpdateStopDto = z.infer<typeof UpdateStopSchema>;
+
+export const BulkImportStopsSchema = z.object({ rows: z.array(CreateStopSchema).min(1).max(1000) });
+export type BulkImportStopsDto = z.infer<typeof BulkImportStopsSchema>;
+
 const SeatCellSchema = z.object({
   number: z.string().min(1).max(6),
   deck: z.union([z.literal(0), z.literal(1)]),
@@ -78,3 +86,9 @@ export const CreateRouteSchema = z.object({
   stops: z.array(RouteStopSchema).min(2).max(60),
 });
 export type CreateRouteDto = z.infer<typeof CreateRouteSchema>;
+
+export const DuplicateRouteSchema = z.object({
+  code: z.string().trim().min(2).max(40),
+  name: z.string().trim().min(2).max(160),
+});
+export type DuplicateRouteDto = z.infer<typeof DuplicateRouteSchema>;

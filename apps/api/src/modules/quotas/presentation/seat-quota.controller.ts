@@ -1,9 +1,9 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Idempotent, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, Idempotent, RequirePermission, UuidParam, zodBody } from '@http';
 import type { TripId } from '@kernel';
 
 import { SeatQuotaService } from '../application/seat-quota.service';
@@ -39,7 +39,7 @@ export class SeatQuotaController {
     summary: 'Reserve seats of this trip for one agent or branch (auto-released before departure)',
   })
   async allocate(
-    @Param('tripId') tripId: string,
+    @UuidParam('tripId') tripId: string,
     @Body(zodBody(AllocateSchema)) dto: z.infer<typeof AllocateSchema>,
   ) {
     return this.quotas.allocate(tripId as TripId, dto);
@@ -47,7 +47,7 @@ export class SeatQuotaController {
 
   @Get()
   @RequirePermission(Permission.INVENTORY_MANAGE)
-  async list(@Param('tripId') tripId: string, @Query('all') all?: string) {
+  async list(@UuidParam('tripId') tripId: string, @Query('all') all?: string) {
     return { items: await this.quotas.list(tripId as TripId, all !== '1') };
   }
 
@@ -56,7 +56,7 @@ export class SeatQuotaController {
   @RequirePermission(Permission.INVENTORY_MANAGE)
   @ApiOperation({ summary: 'Take allocated seats back into general sale now' })
   async release(
-    @Param('tripId') tripId: string,
+    @UuidParam('tripId') tripId: string,
     @Body(zodBody(ReleaseSchema)) dto: z.infer<typeof ReleaseSchema>,
   ) {
     return this.quotas.release(tripId as TripId, dto.seatNumbers, dto.reason);

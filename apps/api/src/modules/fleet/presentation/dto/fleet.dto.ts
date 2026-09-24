@@ -109,3 +109,23 @@ export const MaintenanceLogSchema = z.object({
   nextDueOn: localDate.optional(),
 });
 export type MaintenanceLogDto = z.infer<typeof MaintenanceLogSchema>;
+
+export const BulkImportVehiclesSchema = z.object({
+  rows: z.array(CreateVehicleSchema).min(1).max(500),
+});
+export type BulkImportVehiclesDto = z.infer<typeof BulkImportVehiclesSchema>;
+
+export const VehicleStatusSchema = z.object({
+  status: z.enum(['active', 'maintenance', 'retired']),
+});
+export type VehicleStatusDto = z.infer<typeof VehicleStatusSchema>;
+
+export const VehiclePermitTypeSchema = z.object({
+  permitType: z.enum(['aitp', 'stage_carriage', 'state_tourist_permit', 'contract_carriage']),
+});
+export type VehiclePermitTypeDto = z.infer<typeof VehiclePermitTypeSchema>;
+
+export const VehiclePhotoNoteSchema = z.object({
+  serviceNote: z.string().trim().max(500).optional(),
+});
+export type VehiclePhotoNoteDto = z.infer<typeof VehiclePhotoNoteSchema>;

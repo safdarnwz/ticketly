@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, HttpCode } fr
 import { ApiOperation, ApiTags, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Public, RateLimit, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, Public, RateLimit, RequirePermission, UuidParam, zodBody } from '@http';
 import { NotFoundError, type CityId, type RouteId, type SeatLayoutId, type StopId } from '@kernel';
 
 import {
@@ -17,6 +17,12 @@ import {
   CreateVehicleTypeSchema,
   type CreateVehicleTypeDto,
   SeatMapSchema,
+  BulkImportStopsSchema,
+  DuplicateRouteSchema,
+  UpdateStopSchema,
+  type BulkImportStopsDto,
+  type DuplicateRouteDto,
+  type UpdateStopDto,
 } from './dto/master-data.dto';
 import { AmenityRepository } from '../infrastructure/persistence/amenity.repository';
 import { VehicleTypeRepository } from '../infrastructure/persistence/vehicle-type.repository';
@@ -76,7 +82,7 @@ export class MasterDataController {
   @Public()
   @RateLimit(120, 60_000, 'ip')
   @ApiOperation({ summary: "List this operator's stops in a city (public)" })
-  async stopsInCity(@Param('cityId') cityId: string) {
+  async stopsInCity(@UuidParam('cityId') cityId: string) {
     return { items: await this.stops.listByCity(cityId as CityId) };
   }
 
@@ -99,18 +105,8 @@ export class MasterDataController {
   @RequirePermission(Permission.STOP_MANAGE)
   @ApiOperation({ summary: 'Edit a stop' })
   async updateStop(
-    @Param('id') id: string,
-    @Body()
-    dto: {
-      name?: string;
-      kind?: 'boarding' | 'dropping' | 'both';
-      landmark?: string;
-      address?: string;
-      pincode?: string;
-      latitude?: number;
-      longitude?: number;
-      contactPhone?: string;
-    },
+    @UuidParam('id') id: string,
+    @Body(zodBody(UpdateStopSchema)) dto: UpdateStopDto,
   ) {
     await this.stops.update(id as StopId, dto);
     return { ok: true };
@@ -119,7 +115,7 @@ export class MasterDataController {
   @Post('stops/:id/activate')
   @RequirePermission(Permission.STOP_MANAGE)
   @ApiOperation({ summary: 'Reactivate a stop' })
-  async activateStop(@Param('id') id: string) {
+  async activateStop(@UuidParam('id') id: string) {
     await this.stops.setActive(id as StopId, true);
     return { ok: true };
   }
@@ -129,7 +125,7 @@ export class MasterDataController {
   @ApiOperation({
     summary: 'Deactivate a stop — hides it from customer search without deleting route history',
   })
-  async deactivateStop(@Param('id') id: string) {
+  async deactivateStop(@UuidParam('id') id: string) {
     await this.stops.setActive(id as StopId, false);
     return { ok: true };
   }
@@ -140,22 +136,7 @@ export class MasterDataController {
     summary:
       'Bulk-import stops — each row validated independently, a bad row is skipped and reported rather than aborting the whole batch',
   })
-  async bulkImportStops(
-    @Body()
-    dto: {
-      rows: Array<{
-        cityId: string;
-        name: string;
-        kind?: 'boarding' | 'dropping' | 'both';
-        landmark?: string;
-        address?: string;
-        pincode?: string;
-        latitude?: number;
-        longitude?: number;
-        contactPhone?: string;
-      }>;
-    },
-  ) {
+  async bulkImportStops(@Body(zodBody(BulkImportStopsSchema)) dto: BulkImportStopsDto) {
     return this.stops.bulkImport(dto.rows as never);
   }
 
@@ -181,7 +162,7 @@ export class MasterDataController {
   @RequirePermission(Permission.LAYOUT_MANAGE)
   @ApiOperation({ summary: 'Edit an existing seat layout in place' })
   async updateLayout(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(CreateSeatLayoutSchema)) dto: CreateSeatLayoutDto,
   ) {
     return this.layoutService.update(id as SeatLayoutId, dto.name, dto.layout);
@@ -190,7 +171,7 @@ export class MasterDataController {
   @Get('seat-layouts/:id/versions')
   @RequirePermission(Permission.ROUTE_READ)
   @ApiOperation({ summary: 'Version history for a seat layout — every past save, restorable' })
-  async listLayoutVersions(@Param('id') id: string) {
+  async listLayoutVersions(@UuidParam('id') id: string) {
     return { items: await this.layoutService.listVersions(id as SeatLayoutId) };
   }
 
@@ -200,7 +181,7 @@ export class MasterDataController {
     summary: 'Roll back to an earlier version — recorded as a new version, never rewrites history',
   })
   async restoreLayoutVersion(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Param('versionNumber') versionNumber: string,
   ) {
     return this.layoutService.restoreVersion(id as SeatLayoutId, Number(versionNumber));
@@ -216,7 +197,7 @@ export class MasterDataController {
   @Get('seat-layouts/:id')
   @RequirePermission(Permission.ROUTE_READ)
   @ApiOperation({ summary: 'Get a seat layout (full map)' })
-  async getLayout(@Param('id') id: string) {
+  async getLayout(@UuidParam('id') id: string) {
     const layout = await this.layouts.getById(id as SeatLayoutId);
     return { id: layout.id, name: layout.name, seatMap: layout.seatMap.toJSON() };
   }
@@ -224,14 +205,14 @@ export class MasterDataController {
   @Get('seat-layouts/:id/usage')
   @RequirePermission(Permission.ROUTE_READ)
   @ApiOperation({ summary: 'How many vehicles currently use this layout (check before deleting)' })
-  async layoutUsage(@Param('id') id: string) {
+  async layoutUsage(@UuidParam('id') id: string) {
     return { vehicleCount: await this.layouts.usageCount(id as SeatLayoutId) };
   }
 
   @Delete('seat-layouts/:id')
   @RequirePermission(Permission.LAYOUT_MANAGE)
   @ApiOperation({ summary: 'Delete a seat layout (refuses if any vehicle still uses it)' })
-  async deleteLayout(@Param('id') id: string) {
+  async deleteLayout(@UuidParam('id') id: string) {
     await this.layouts.delete(id as SeatLayoutId);
     return { ok: true };
   }
@@ -288,7 +269,7 @@ export class MasterDataController {
   @Get('routes/:id')
   @RequirePermission(Permission.ROUTE_READ)
   @ApiOperation({ summary: 'Get a route with its computed timetable & segments' })
-  async getRoute(@Param('id') id: string) {
+  async getRoute(@UuidParam('id') id: string) {
     const route = await this.routes.getById(id as RouteId);
     return {
       id: route.id,
@@ -305,7 +286,7 @@ export class MasterDataController {
   @Post('routes/:id/publish')
   @RequirePermission(Permission.ROUTE_MANAGE)
   @ApiOperation({ summary: 'Publish a route (makes it schedulable)' })
-  async publishRoute(@Param('id') id: string) {
+  async publishRoute(@UuidParam('id') id: string) {
     await this.routeService.publish(id as RouteId);
     return { ok: true };
   }
@@ -314,14 +295,17 @@ export class MasterDataController {
   @HttpCode(201)
   @RequirePermission(Permission.ROUTE_MANAGE)
   @ApiOperation({ summary: 'Duplicate a route — same stops/timing, fresh code, starts as draft' })
-  async duplicateRoute(@Param('id') id: string, @Body() dto: { code: string; name: string }) {
+  async duplicateRoute(
+    @UuidParam('id') id: string,
+    @Body(zodBody(DuplicateRouteSchema)) dto: DuplicateRouteDto,
+  ) {
     return { id: await this.routeService.duplicate(id as RouteId, dto.code, dto.name) };
   }
 
   @Post('routes/:id/archive')
   @RequirePermission(Permission.ROUTE_MANAGE)
   @ApiOperation({ summary: 'Archive a route' })
-  async archiveRoute(@Param('id') id: string) {
+  async archiveRoute(@UuidParam('id') id: string) {
     await this.routeService.archive(id as RouteId);
     return { ok: true };
   }

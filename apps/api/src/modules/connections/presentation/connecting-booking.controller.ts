@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Post, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, Post, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 
-import { ApiStandardErrors, Idempotent, Public, zodBody } from '@http';
+import { ApiStandardErrors, Idempotent, Public, UuidParam, zodBody } from '@http';
 
+import { ConfirmConnectionSchema, type ConfirmConnectionDto } from './dto/connection.dto';
 import { ConnectingBookingService } from '../application/services/connecting-booking.service';
 
 const LegSchema = z.object({
@@ -55,7 +56,7 @@ export class ConnectingBookingController {
     summary:
       'Cancel both legs of a connecting journey - each leg refunds under its own operator cancellation policy',
   })
-  async cancel(@Param('id') id: string) {
+  async cancel(@UuidParam('id') id: string) {
     return this.connections.cancelConnection(id);
   }
 
@@ -68,8 +69,8 @@ export class ConnectingBookingController {
       'Pay for and confirm both legs. If leg 2 fails after leg 1 succeeds, leg 1 stays confirmed - the response tells you leg 2 needs a retry.',
   })
   async confirm(
-    @Param('id') id: string,
-    @Body() dto: { leg1Instrument: unknown; leg2Instrument: unknown },
+    @UuidParam('id') id: string,
+    @Body(zodBody(ConfirmConnectionSchema)) dto: ConfirmConnectionDto,
   ) {
     return this.connections.confirmConnection(id, dto.leg1Instrument, dto.leg2Instrument);
   }
@@ -77,7 +78,7 @@ export class ConnectingBookingController {
   @Get(':id')
   @Public()
   @ApiOperation({ summary: 'Both legs status + PNRs for a connection' })
-  async details(@Param('id') id: string) {
+  async details(@UuidParam('id') id: string) {
     return this.connections.getConnectionDetails(id);
   }
 }

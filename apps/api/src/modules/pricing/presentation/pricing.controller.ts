@@ -1,10 +1,10 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, HttpCode } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post, Put, HttpCode } from '@nestjs/common';
 import { z } from 'zod';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
 import { UnitOfWork } from '@database';
-import { ApiStandardErrors, Public, RateLimit, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, Public, RateLimit, RequirePermission, UuidParam, zodBody } from '@http';
 import { BadRequestError, getUserId, requireTenantId, type StopId, type TripId } from '@kernel';
 
 import { CouponRepository } from '../infrastructure/persistence/coupon.repository';
@@ -19,6 +19,8 @@ import {
   type CreatePricingPolicyDto,
   QuoteSchema,
   type QuoteDto,
+  SeatFareOverrideSchema,
+  type SeatFareOverrideDto,
 } from './dto/pricing.dto';
 import { FareRepository } from '../infrastructure/persistence/fare.repository';
 import { PricingService } from '../application/services/pricing.service';
@@ -76,7 +78,7 @@ export class PricingController {
   @Get('fare-plans/:id/rules')
   @RequirePermission(Permission.FARE_READ)
   @ApiOperation({ summary: 'List rules for a fare plan' })
-  async listRules(@Param('id') id: string) {
+  async listRules(@UuidParam('id') id: string) {
     return { rules: await this.fares.listRules(id) };
   }
 
@@ -113,7 +115,7 @@ export class PricingController {
   @Post('fare-plans/:id/activate')
   @RequirePermission(Permission.FARE_MANAGE)
   @ApiOperation({ summary: 'Activate a fare plan' })
-  async activatePlan(@Param('id') id: string) {
+  async activatePlan(@UuidParam('id') id: string) {
     await this.uow.run({ name: 'pricing.activatePlan', tenantId: requireTenantId() }, async () =>
       this.fares.activatePlan(id),
     );
@@ -125,7 +127,7 @@ export class PricingController {
   @Get('fare-plans/:id/seat-overrides')
   @RequirePermission(Permission.FARE_READ)
   @ApiOperation({ summary: 'List per-seat-number fare overrides for a plan' })
-  async listSeatOverrides(@Param('id') id: string) {
+  async listSeatOverrides(@UuidParam('id') id: string) {
     return { items: await this.fares.listSeatOverrides(id) };
   }
 
@@ -137,8 +139,8 @@ export class PricingController {
       "Set (or update) a specific seat number's fare on this plan — overrides the seat-type rule for that seat only",
   })
   async setSeatOverride(
-    @Param('id') id: string,
-    @Body() dto: { seatNumber: string; fareMinor: number },
+    @UuidParam('id') id: string,
+    @Body(zodBody(SeatFareOverrideSchema)) dto: SeatFareOverrideDto,
   ) {
     await this.fares.setSeatOverride(id, dto.seatNumber, dto.fareMinor);
     return { ok: true };
@@ -149,7 +151,7 @@ export class PricingController {
   @ApiOperation({
     summary: 'Remove a seat-number fare override — that seat goes back to the seat-type rule',
   })
-  async deleteSeatOverride(@Param('overrideId') overrideId: string) {
+  async deleteSeatOverride(@UuidParam('overrideId') overrideId: string) {
     await this.fares.deleteSeatOverride(overrideId);
     return { ok: true };
   }
@@ -200,7 +202,7 @@ export class PricingController {
   @ApiOperation({
     summary: 'Disable a coupon — stops working immediately, existing redemptions untouched',
   })
-  async disableCoupon(@Param('id') id: string) {
+  async disableCoupon(@UuidParam('id') id: string) {
     await this.coupons.setActive(id, false);
     return { ok: true };
   }
@@ -208,7 +210,7 @@ export class PricingController {
   @Post('coupons/:id/enable')
   @RequirePermission(Permission.FARE_MANAGE)
   @ApiOperation({ summary: 'Re-enable a disabled coupon' })
-  async enableCoupon(@Param('id') id: string) {
+  async enableCoupon(@UuidParam('id') id: string) {
     await this.coupons.setActive(id, true);
     return { ok: true };
   }
@@ -216,7 +218,7 @@ export class PricingController {
   @Get('coupons/:id/stats')
   @RequirePermission(Permission.FARE_READ)
   @ApiOperation({ summary: 'Redemption count + estimated total discount given for a coupon' })
-  async couponStats(@Param('id') id: string) {
+  async couponStats(@UuidParam('id') id: string) {
     return this.coupons.stats(id);
   }
 
@@ -246,7 +248,7 @@ export class PricingController {
       'Route fare floor / ceiling (per seat, before GST) and peak / off-peak windows by departure time',
   })
   async routeRules(
-    @Param('routeId') routeId: string,
+    @UuidParam('routeId') routeId: string,
     @Body(zodBody(RouteRulesSchema)) dto: z.infer<typeof RouteRulesSchema>,
   ) {
     const problem =
@@ -263,7 +265,7 @@ export class PricingController {
       'Manual fare change for ONE trip: −50…+100 % with a reason (null clears). Applies to new quotes only.',
   })
   async tripAdjustment(
-    @Param('tripId') tripId: string,
+    @UuidParam('tripId') tripId: string,
     @Body(zodBody(TripAdjSchema)) dto: z.infer<typeof TripAdjSchema>,
   ) {
     await this.fares.setTripAdjustment(

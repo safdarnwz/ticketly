@@ -1,9 +1,9 @@
-import { Controller, Get, Param, Query, Res } from '@nestjs/common';
+import { Controller, Get, Query, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { FastifyReply } from 'fastify';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Public, RequirePermission } from '@http';
+import { ApiStandardErrors, Public, RequirePermission, UuidParam } from '@http';
 import { UnitOfWork } from '@database';
 import { NotFoundError, runAsTenant, type TenantId } from '@kernel';
 
@@ -31,7 +31,7 @@ export class FileController {
   @ApiOperation({
     summary: 'Serve a PUBLIC file (logo / bus photo / banner) when no CDN is configured',
   })
-  async publicFile(@Param('id') id: string, @Res() reply: FastifyReply): Promise<void> {
+  async publicFile(@UuidParam('id') id: string, @Res() reply: FastifyReply): Promise<void> {
     if (!/^[0-9a-f-]{36}$/i.test(id)) throw new NotFoundError('File', id);
     const row = await this.uow.run(
       { name: 'file.public', bypassRls: true },
@@ -53,7 +53,7 @@ export class FileController {
     summary:
       "A short-lived link to one of this operator's files (CDN for public, signed for private)",
   })
-  async url(@Param('id') id: string, @Query('download') download?: string) {
+  async url(@UuidParam('id') id: string, @Query('download') download?: string) {
     const meta = await this.files.meta(id);
     if (!meta) throw new NotFoundError('File', id);
     const url = await this.files.urlFor(meta, { download: download === '1' });
@@ -72,7 +72,7 @@ export class FileController {
       "Open one of this operator's files — redirects to the storage link, or streams it (dev storage)",
   })
   async open(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Query('download') download: string | undefined,
     @Res() reply: FastifyReply,
   ): Promise<void> {

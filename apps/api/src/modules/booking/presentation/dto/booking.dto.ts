@@ -86,3 +86,13 @@ export type PhoneBookingDto = z.infer<typeof PhoneBookingSchema>;
 
 export const ExtendHoldSchema = z.object({ releaseAt: z.string().datetime({ offset: true }) });
 export type ExtendHoldDto = z.infer<typeof ExtendHoldSchema>;
+
+/** Customer self-cancel: the booking's contact mobile proves ownership. */
+export const SelfCancelSchema = z.object({
+  mobile: z.string().trim().min(6).max(20),
+  reason: z.string().trim().max(300).optional(),
+});
+export type SelfCancelDto = z.infer<typeof SelfCancelSchema>;
+
+export const CancelTripSchema = z.object({ reason: z.string().trim().min(3).max(300) });
+export type CancelTripDto = z.infer<typeof CancelTripSchema>;

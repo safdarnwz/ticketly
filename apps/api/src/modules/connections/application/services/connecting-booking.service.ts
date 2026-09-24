@@ -7,6 +7,7 @@ import { BookingService } from '../../../booking/application/services/booking.se
 import { BookingRepository } from '../../../booking/infrastructure/persistence/booking.repository';
 import { PaymentService } from '../../../payment/application/services/payment.service';
 import { TicketService } from '../../../tickets/application/services/ticket.service';
+import type { TestInstrument } from '../../../payment/domain/test-gateway';
 
 export interface HoldConnectionInput {
   leg1: {
@@ -273,8 +274,8 @@ export class ConnectingBookingService {
    */
   async confirmConnection(
     connectionId: string,
-    leg1Instrument: unknown,
-    leg2Instrument: unknown,
+    leg1Instrument: TestInstrument,
+    leg2Instrument: TestInstrument,
   ): Promise<{
     leg1: { status: string; pnr?: string; ticketHtmlUrl?: string };
     leg2: { status: string; pnr?: string; ticketHtmlUrl?: string; error?: string };
@@ -291,7 +292,7 @@ export class ConnectingBookingService {
     if (leg1Booking.status === 'held') {
       await runInNewContext(
         { tenantId: link.leg1_tenant_id as TenantId, actorType: 'system' },
-        () => this.payments.chargeTest(link.leg1_booking_id as never, leg1Instrument as never),
+        () => this.payments.chargeTest(link.leg1_booking_id as never, leg1Instrument),
       );
       // leg1 succeeding is the ONLY thing that must happen before leg2 is
       // even attempted — a connecting journey where leg1 couldn't be paid
@@ -321,7 +322,7 @@ export class ConnectingBookingService {
       try {
         await runInNewContext(
           { tenantId: link.leg2_tenant_id as TenantId, actorType: 'system' },
-          () => this.payments.chargeTest(link.leg2_booking_id as never, leg2Instrument as never),
+          () => this.payments.chargeTest(link.leg2_booking_id as never, leg2Instrument),
         );
         leg2Result = { status: 'confirmed', pnr: leg2Booking.pnr };
       } catch (err) {

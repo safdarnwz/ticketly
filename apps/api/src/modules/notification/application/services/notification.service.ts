@@ -5,6 +5,7 @@ import { newId, type TenantId, type Uuid } from '@kernel';
 import { Logger } from '@observability';
 
 import { renderTemplate } from '../../domain/template';
+import { NotificationTemplateRepository } from '../../infrastructure/persistence/notification-template.repository';
 import { ProviderRegistry } from '../../infrastructure/provider-registry';
 import type { Channel } from '../../infrastructure/provider.interface';
 import { PlatformSettingsRepository } from '../../../platform-settings';
@@ -29,6 +30,7 @@ export class NotificationService {
 
   constructor(
     private readonly db: DatabaseService,
+    private readonly templates: NotificationTemplateRepository,
     private readonly providers: ProviderRegistry,
     private readonly platformSettings: PlatformSettingsRepository,
     logger: Logger,
@@ -43,16 +45,7 @@ export class NotificationService {
     recipients: Partial<Record<Channel, string>>;
     data: Record<string, string | number | undefined>;
   }): Promise<void> {
-    const templates = await this.db.query<{
-      channel: Channel;
-      subject: string | null;
-      body: string;
-    }>(
-      `SELECT channel, subject, body FROM notification_templates
-        WHERE tenant_id = $1 AND event_type = $2 AND is_active = true`,
-      [input.tenantId, input.eventType],
-      { name: 'notify.templates', primary: true },
-    );
+    const templates = await this.templates.activeFor(input.tenantId, input.eventType);
     if (templates.length === 0) return;
 
     // Fetched once per call (same tenant for every template below) — used
@@ -145,13 +138,6 @@ export class NotificationService {
     tenantId: TenantId,
     defaults: { eventType: string; channel: string; subject?: string; body: string }[],
   ): Promise<void> {
-    for (const t of defaults) {
-      await this.db.execute_(
-        `INSERT INTO notification_templates (id, tenant_id, event_type, channel, subject, body)
-         VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (tenant_id, event_type, channel) DO NOTHING`,
-        [newId(), tenantId, t.eventType, t.channel, t.subject ?? null, t.body],
-        { name: 'notify.seed', primary: true },
-      );
-    }
+    await this.templates.seedDefaults(tenantId, defaults);
   }
 }

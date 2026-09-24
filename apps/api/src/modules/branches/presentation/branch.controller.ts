@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, RequirePermission, UuidParam, zodBody } from '@http';
 import { type BranchId } from '@kernel';
 
 import { BranchRepository } from '../infrastructure/persistence/branch.repository';
@@ -40,7 +40,10 @@ export class BranchController {
   @Patch(':id')
   @RequirePermission(Permission.TENANT_MANAGE)
   @ApiOperation({ summary: 'Update a branch' })
-  async update(@Param('id') id: string, @Body(zodBody(UpdateBranchSchema)) dto: UpdateBranchDto) {
+  async update(
+    @UuidParam('id') id: string,
+    @Body(zodBody(UpdateBranchSchema)) dto: UpdateBranchDto,
+  ) {
     await this.branches.update(id as BranchId, dto);
     return { ok: true };
   }
@@ -48,7 +51,7 @@ export class BranchController {
   @Post(':id/deactivate')
   @RequirePermission(Permission.TENANT_MANAGE)
   @ApiOperation({ summary: 'Deactivate a branch' })
-  async deactivate(@Param('id') id: string) {
+  async deactivate(@UuidParam('id') id: string) {
     await this.branches.setStatus(id as BranchId, 'inactive');
     return { ok: true };
   }
@@ -56,7 +59,7 @@ export class BranchController {
   @Post(':id/activate')
   @RequirePermission(Permission.TENANT_MANAGE)
   @ApiOperation({ summary: 'Reactivate a branch' })
-  async activate(@Param('id') id: string) {
+  async activate(@UuidParam('id') id: string) {
     await this.branches.setStatus(id as BranchId, 'active');
     return { ok: true };
   }

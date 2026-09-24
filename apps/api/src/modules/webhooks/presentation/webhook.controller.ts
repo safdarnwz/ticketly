@@ -1,17 +1,8 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Param,
-  ParseUUIDPipe,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Public, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, Public, RequirePermission, UuidParam, zodBody } from '@http';
 import { getUserId, NotFoundError } from '@kernel';
 
 import { WebhookDeliveryService } from '../application/webhook-delivery.service';
@@ -65,7 +56,7 @@ export class WebhookController {
   @Get(':id/deliveries')
   @RequirePermission(Permission.TENANT_MANAGE)
   @ApiOperation({ summary: 'Recent delivery attempts for an endpoint' })
-  async deliveries(@Param('id', ParseUUIDPipe) id: string) {
+  async deliveries(@UuidParam('id') id: string) {
     return { items: await this.webhooks.deliveriesForTenant(id) };
   }
 
@@ -75,7 +66,7 @@ export class WebhookController {
   @ApiOperation({
     summary: 'Send a signed test event now and report the response (status, latency)',
   })
-  async test(@Param('id', ParseUUIDPipe) id: string) {
+  async test(@UuidParam('id') id: string) {
     const target = await this.webhooks.targetForTenant(id);
     if (!target) throw new NotFoundError('Webhook', id);
     return this.delivery.sendTest(target);
@@ -84,7 +75,7 @@ export class WebhookController {
   @Delete(':id')
   @RequirePermission(Permission.TENANT_MANAGE)
   @ApiOperation({ summary: 'Revoke a webhook endpoint' })
-  async revoke(@Param('id', ParseUUIDPipe) id: string) {
+  async revoke(@UuidParam('id') id: string) {
     await this.webhooks.revokeForTenant(id);
     return { ok: true };
   }

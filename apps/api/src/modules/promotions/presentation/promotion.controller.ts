@@ -1,7 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
-import { ApiStandardErrors, RequirePermission, RequirePlatformAdmin, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  RequirePermission,
+  RequirePlatformAdmin,
+  UuidParam,
+  zodBody,
+} from '@http';
 import { getContext } from '@kernel';
 
 import { Permission } from '@contracts';
@@ -77,7 +83,7 @@ export class PromotionController {
     summary:
       "Cancel an active promotion — today is charged in full; unused full days after today reduce what's owed (adjusted directly if not yet settled, or credited against the NEXT settlement if it already was). Not a customer-style refund — no separate payment is ever reversed.",
   })
-  async cancel(@Param('id') id: string) {
+  async cancel(@UuidParam('id') id: string) {
     return this.promotions.cancel(id);
   }
 
@@ -87,7 +93,7 @@ export class PromotionController {
     summary:
       'Opt out temporarily — stops search visibility with NO refund, but no days are lost either (resume() extends the end date by however long it was paused)',
   })
-  async pause(@Param('id') id: string) {
+  async pause(@UuidParam('id') id: string) {
     return this.promotions.pause(id);
   }
 
@@ -97,7 +103,7 @@ export class PromotionController {
     summary:
       'Opt back in — resumes a paused promotion, extending its end date by the paused duration so the full paid-for day-count is always eventually shown',
   })
-  async resume(@Param('id') id: string) {
+  async resume(@UuidParam('id') id: string) {
     return this.promotions.resume(id);
   }
 }

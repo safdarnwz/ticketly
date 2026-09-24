@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 
-import { ApiStandardErrors, Public, zodBody } from '@http';
+import { ApiStandardErrors, Public, UuidParam, zodBody } from '@http';
 
 import { KycService } from '../application/services/kyc.service';
 
@@ -92,7 +92,7 @@ export class KycController {
     summary:
       'Current PAN/Aadhaar/bank-account verification status for an in-progress onboarding application',
   })
-  async status(@Param('operatorApplicationId') operatorApplicationId: string) {
+  async status(@UuidParam('operatorApplicationId') operatorApplicationId: string) {
     return this.kyc.statusForApplication(operatorApplicationId);
   }
 }

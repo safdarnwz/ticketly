@@ -1,10 +1,10 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, HttpCode } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post, Put, HttpCode } from '@nestjs/common';
 import { z } from 'zod';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
 import { UnitOfWork } from '@database';
-import { ApiStandardErrors, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, RequirePermission, UuidParam, zodBody } from '@http';
 import { requireTenantId, type RoleId } from '@kernel';
 
 import {
@@ -49,7 +49,7 @@ export class RoleController {
   @RequirePermission(Permission.ROLE_MANAGE)
   @ApiOperation({ summary: "Replace a role's permissions" })
   async setPermissions(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(UpdateRolePermissionsSchema)) dto: UpdateRolePermissionsDto,
   ) {
     await this.uow.run({ name: 'role.setPermissions', tenantId: requireTenantId() }, async () => {
@@ -63,7 +63,7 @@ export class RoleController {
   @RequirePermission(Permission.ROLE_MANAGE)
   @ApiOperation({ summary: 'Copy a role with all its permissions under a new code and name' })
   async duplicate(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(
       zodBody(
         z.object({
@@ -83,7 +83,7 @@ export class RoleController {
   @Delete(':id')
   @RequirePermission(Permission.ROLE_MANAGE)
   @ApiOperation({ summary: 'Delete a custom role (not built-in, not assigned to anyone)' })
-  async remove(@Param('id') id: string) {
+  async remove(@UuidParam('id') id: string) {
     await this.access.deleteRole(id);
     return { ok: true };
   }

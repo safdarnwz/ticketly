@@ -1,9 +1,9 @@
-import { Body, Controller, Get, Header, Param, Post, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, Header, Post, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Public, RateLimit, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, Public, RateLimit, RequirePermission, UuidParam, zodBody } from '@http';
 import { type BookingId } from '@kernel';
 
 import { TicketService } from '../application/services/ticket.service';
@@ -21,7 +21,7 @@ export class TicketController {
   @Public()
   @RateLimit(60, 60_000, 'ip')
   @ApiOperation({ summary: 'Signed boarding tokens (QR content) for a booking' })
-  async tokens(@Param('bookingId') bookingId: string) {
+  async tokens(@UuidParam('bookingId') bookingId: string) {
     return this.tickets.issueForBooking(bookingId as BookingId);
   }
 
@@ -30,7 +30,7 @@ export class TicketController {
   @RateLimit(60, 60_000, 'ip')
   @Header('Content-Type', 'text/html; charset=utf-8')
   @ApiOperation({ summary: 'Printable HTML e-ticket' })
-  async html(@Param('bookingId') bookingId: string) {
+  async html(@UuidParam('bookingId') bookingId: string) {
     return this.tickets.renderHtml(bookingId as BookingId);
   }
 

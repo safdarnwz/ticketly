@@ -1,9 +1,9 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Public, RateLimit, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, Public, RateLimit, RequirePermission, UuidParam, zodBody } from '@http';
 import { getUserId, type TripId } from '@kernel';
 
 import { DemandService } from '../application/demand.service';
@@ -35,7 +35,7 @@ export class DemandController {
     summary: 'Join the waitlist for a FULL trip segment (notified if seats free up)',
   })
   async join(
-    @Param('tripId') tripId: string,
+    @UuidParam('tripId') tripId: string,
     @Body(zodBody(JoinSchema)) dto: z.infer<typeof JoinSchema>,
   ) {
     return this.demand.joinWaitlist(tripId as TripId, { ...dto, customerId: getUserId() ?? null });
@@ -46,8 +46,8 @@ export class DemandController {
   @Public()
   @RateLimit(10, 60_000, 'ip')
   async leave(
-    @Param('tripId') tripId: string,
-    @Param('id') id: string,
+    @UuidParam('tripId') tripId: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(LeaveSchema)) dto: z.infer<typeof LeaveSchema>,
   ) {
     return this.demand.leaveWaitlist(tripId as TripId, id, dto.contactPhone);
@@ -56,7 +56,7 @@ export class DemandController {
   @Get('trips/:tripId/waitlist')
   @ApiBearerAuth('bearer')
   @RequirePermission(Permission.BOOKING_READ)
-  async list(@Param('tripId') tripId: string) {
+  async list(@UuidParam('tripId') tripId: string) {
     return { items: await this.demand.listWaitlist(tripId as TripId) };
   }
 
@@ -66,7 +66,7 @@ export class DemandController {
   @ApiOperation({
     summary: 'Forecast final occupancy from the booking pace of recent comparable trips',
   })
-  async forecast(@Param('tripId') tripId: string) {
+  async forecast(@UuidParam('tripId') tripId: string) {
     return this.demand.forecast(tripId as TripId);
   }
 

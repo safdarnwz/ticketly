@@ -1,9 +1,16 @@
-import { Body, Controller, Get, Param, Post, Query, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Idempotent, Public, RequirePermission, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  Idempotent,
+  Public,
+  RequirePermission,
+  UuidParam,
+  zodBody,
+} from '@http';
 import { type BookingId, type RouteId } from '@kernel';
 
 import { ReviewService } from '../application/services/review.service';
@@ -39,7 +46,7 @@ export class ReviewController {
   @Get('routes/:routeId/reviews')
   @Public()
   @ApiOperation({ summary: 'Reviews + rating summary for a route' })
-  async forRoute(@Param('routeId') routeId: string, @Query('limit') limit?: string) {
+  async forRoute(@UuidParam('routeId') routeId: string, @Query('limit') limit?: string) {
     const [summary, reviews] = await Promise.all([
       this.reviews.summaryForRoute(routeId as RouteId),
       this.reviews.listForRoute(routeId as RouteId, limit ? Math.min(Number(limit), 100) : 20),

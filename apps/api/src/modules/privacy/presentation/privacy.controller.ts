@@ -1,9 +1,15 @@
-import { Body, Controller, Get, Param, Post, Query, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, RequirePermission, RequirePlatformAdmin, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  RequirePermission,
+  RequirePlatformAdmin,
+  UuidParam,
+  zodBody,
+} from '@http';
 
 import { PrivacyService } from '../application/services/privacy.service';
 
@@ -58,7 +64,7 @@ export class PrivacyController {
   @RequirePermission(Permission.ALL)
   @RequirePlatformAdmin()
   @ApiOperation({ summary: 'Fulfil an erasure request (anonymise PII, keep financials)' })
-  async process(@Param('id') id: string) {
+  async process(@UuidParam('id') id: string) {
     return this.privacy.processErasure(id);
   }
 }

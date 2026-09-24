@@ -87,3 +87,10 @@ export const QuoteSchema = z
     path: ['seatNumbers'],
   });
 export type QuoteDto = z.infer<typeof QuoteSchema>;
+
+/** One seat number's fare on a plan (overrides the seat-type rule for that seat). */
+export const SeatFareOverrideSchema = z.object({
+  seatNumber: z.string().trim().min(1).max(10),
+  fareMinor: z.number().int().positive(),
+});
+export type SeatFareOverrideDto = z.infer<typeof SeatFareOverrideSchema>;

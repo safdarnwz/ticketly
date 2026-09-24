@@ -8,6 +8,7 @@ import {
   Public,
   RateLimit,
   RequirePermission,
+  UuidParam,
   zodBody,
 } from '@http';
 import {
@@ -34,6 +35,10 @@ import {
   type PhoneBookingDto,
   ExtendHoldSchema,
   type ExtendHoldDto,
+  SelfCancelSchema,
+  type SelfCancelDto,
+  CancelTripSchema,
+  type CancelTripDto,
 } from './dto/booking.dto';
 
 /**
@@ -85,7 +90,10 @@ export class BookingController {
   @HttpCode(200)
   @RequirePermission(Permission.BOOKING_CREATE)
   @ApiOperation({ summary: 'Phone booking: change the release time while it is still on hold' })
-  async extendHold(@Param('id') id: string, @Body(zodBody(ExtendHoldSchema)) dto: ExtendHoldDto) {
+  async extendHold(
+    @UuidParam('id') id: string,
+    @Body(zodBody(ExtendHoldSchema)) dto: ExtendHoldDto,
+  ) {
     return this.booking.extendPhoneHold(id as BookingId, new Date(dto.releaseAt));
   }
 
@@ -96,7 +104,7 @@ export class BookingController {
   @ApiOperation({
     summary: 'Manually confirm a booking as paid (staff-assisted / cash / counter payment ONLY)',
   })
-  async confirm(@Param('id') id: string, @Body(zodBody(ConfirmSchema)) dto: ConfirmDto) {
+  async confirm(@UuidParam('id') id: string, @Body(zodBody(ConfirmSchema)) dto: ConfirmDto) {
     // NOT public, and never was safe to be: this trusts the CALLER's own
     // `paidMinor` figure with no gateway verification at all — fine for a
     // staff member who has actually taken cash/counter payment, catastrophic
@@ -116,7 +124,7 @@ export class BookingController {
   @Idempotent()
   @RequirePermission(Permission.BOOKING_CANCEL)
   @ApiOperation({ summary: 'Cancel a booking and compute the refund' })
-  async cancel(@Param('id') id: string, @Body(zodBody(CancelSchema)) dto: CancelDto) {
+  async cancel(@UuidParam('id') id: string, @Body(zodBody(CancelSchema)) dto: CancelDto) {
     return this.booking.cancel(
       id as BookingId,
       dto.reason,
@@ -135,7 +143,7 @@ export class BookingController {
       'Cancel only SOME seats of a multi-seat booking (e.g. one family member drops out) — the remaining seats stay confirmed. Each cancelled seat refunds off its own actual fare.',
   })
   async cancelSeats(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(CancelSeatsSchema)) dto: CancelSeatsDto,
   ) {
     return this.booking.cancelSeats(
@@ -215,7 +223,7 @@ export class BookingController {
     summary:
       'What cancelling this booking would refund RIGHT NOW — no mobile-ownership check since nothing is mutated, just a computed preview',
   })
-  async refundPreview(@Param('id') id: string) {
+  async refundPreview(@UuidParam('id') id: string) {
     return this.booking.previewRefund(id as BookingId);
   }
 
@@ -227,8 +235,10 @@ export class BookingController {
   @ApiOperation({
     summary: 'Customer self-service cancellation (mobile proves ownership, no login needed)',
   })
-  async selfCancel(@Param('id') id: string, @Body() dto: { mobile: string; reason?: string }) {
-    if (!dto.mobile?.trim()) throw new BadRequestError('mobile is required');
+  async selfCancel(
+    @UuidParam('id') id: string,
+    @Body(zodBody(SelfCancelSchema)) dto: SelfCancelDto,
+  ) {
     const owned = await this.bookings.verifyOwnership(id, dto.mobile);
     if (!owned) throw new BadRequestError('Booking not found for this mobile number');
     return runAsTenant(owned.tenantId as TenantId, () =>
@@ -246,7 +256,10 @@ export class BookingController {
     summary:
       'Cancel the whole trip — cascades to every live booking, each refunded exactly as a normal cancellation',
   })
-  async cancelTrip(@Param('tripId') tripId: string, @Body() dto: { reason: string }) {
+  async cancelTrip(
+    @UuidParam('tripId') tripId: string,
+    @Body(zodBody(CancelTripSchema)) dto: CancelTripDto,
+  ) {
     return this.tripOps.cancelTrip(tripId as never, dto.reason);
   }
 
@@ -254,7 +267,7 @@ export class BookingController {
   @HttpCode(200)
   @RequirePermission(Permission.SERVICE_MANAGE)
   @ApiOperation({ summary: 'Stop taking new bookings on this trip (existing bookings untouched)' })
-  async stopSales(@Param('tripId') tripId: string) {
+  async stopSales(@UuidParam('tripId') tripId: string) {
     await this.tripOps.stopSales(tripId as never);
     return { ok: true };
   }
@@ -263,7 +276,7 @@ export class BookingController {
   @HttpCode(200)
   @RequirePermission(Permission.SERVICE_MANAGE)
   @ApiOperation({ summary: 'Resume selling a trip that had sales stopped' })
-  async resumeSales(@Param('tripId') tripId: string) {
+  async resumeSales(@UuidParam('tripId') tripId: string) {
     await this.tripOps.resumeSales(tripId as never);
     return { ok: true };
   }
@@ -274,7 +287,7 @@ export class BookingController {
   @ApiOperation({
     summary: 'Mark a passenger as a no-show (never boarded) — for reporting, not a refund decision',
   })
-  async markNoShow(@Param('ticketId') ticketId: string) {
+  async markNoShow(@UuidParam('ticketId') ticketId: string) {
     await this.tripOps.markNoShow(ticketId as never);
     return { ok: true };
   }

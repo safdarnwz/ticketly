@@ -1,11 +1,17 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, RequirePermission } from '@http';
+import { ApiStandardErrors, RequirePermission, UuidParam, zodBody } from '@http';
 import { AppError, ErrorCode, type UserId } from '@kernel';
 
 import { CustomerRepository } from '../infrastructure/persistence/customer.repository';
+import {
+  BlacklistCustomerSchema,
+  CustomerPreferencesSchema,
+  type BlacklistCustomerDto,
+  type CustomerPreferencesDto,
+} from './dto/crm.dto';
 
 @ApiTags('crm')
 @ApiBearerAuth('bearer')
@@ -27,7 +33,7 @@ export class CrmController {
   @ApiOperation({
     summary: 'Customer profile — spend, booking count, frequent-traveller flag, blacklist status',
   })
-  async profile(@Param('id') id: string) {
+  async profile(@UuidParam('id') id: string) {
     const profile = await this.customers.profile(id as UserId);
     if (!profile)
       throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Customer not found' });
@@ -37,7 +43,7 @@ export class CrmController {
   @Get(':id/bookings')
   @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: "A customer's booking history" })
-  async bookings(@Param('id') id: string) {
+  async bookings(@UuidParam('id') id: string) {
     return { items: await this.customers.bookingHistory(id as UserId) };
   }
 
@@ -47,7 +53,10 @@ export class CrmController {
     summary:
       'Blacklist a customer — blocks NEW bookings; existing bookings and their history stay fully visible to support',
   })
-  async blacklist(@Param('id') id: string, @Body() dto: { reason: string }) {
+  async blacklist(
+    @UuidParam('id') id: string,
+    @Body(zodBody(BlacklistCustomerSchema)) dto: BlacklistCustomerDto,
+  ) {
     await this.customers.setBlacklist(id as UserId, true, dto.reason);
     return { ok: true };
   }
@@ -55,7 +64,7 @@ export class CrmController {
   @Post(':id/unblacklist')
   @RequirePermission(Permission.BOOKING_CANCEL)
   @ApiOperation({ summary: 'Remove a customer from the blacklist' })
-  async unblacklist(@Param('id') id: string) {
+  async unblacklist(@UuidParam('id') id: string) {
     await this.customers.setBlacklist(id as UserId, false);
     return { ok: true };
   }
@@ -66,7 +75,10 @@ export class CrmController {
     summary:
       "Update a customer's saved preferences (seat position, meal, notification channel, etc.) — merges with existing",
   })
-  async setPreferences(@Param('id') id: string, @Body() preferences: Record<string, unknown>) {
+  async setPreferences(
+    @UuidParam('id') id: string,
+    @Body(zodBody(CustomerPreferencesSchema)) preferences: CustomerPreferencesDto,
+  ) {
     await this.customers.setPreferences(id as UserId, preferences);
     return { ok: true };
   }

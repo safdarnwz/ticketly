@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Idempotent, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, Idempotent, RequirePermission, UuidParam, zodBody } from '@http';
 import { BadRequestError, type BookingId } from '@kernel';
 
 import { AmendmentService } from '../../amendments/application/services/amendment.service';
@@ -72,7 +72,7 @@ export class AgentPortalController {
   @Idempotent()
   @ApiOperation({ summary: 'Change boarding / dropping point on my booking (same fare stage)' })
   async changePoints(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(
       zodBody(
         z.object({
@@ -91,7 +91,7 @@ export class AgentPortalController {
   @HttpCode(200)
   @Idempotent()
   async changeSeats(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(z.object({ newSeatNumbers: z.array(z.string().trim().min(1)).min(1).max(10) })))
     dto: { newSeatNumbers: string[] },
   ) {
@@ -103,7 +103,7 @@ export class AgentPortalController {
   @HttpCode(200)
   @Idempotent()
   async correctName(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(
       zodBody(
         z.object({
@@ -119,7 +119,7 @@ export class AgentPortalController {
   }
 
   @Get('bookings/:id')
-  async booking(@Param('id') id: string) {
+  async booking(@UuidParam('id') id: string) {
     return this.agents.myBooking(id as BookingId);
   }
 
@@ -140,7 +140,7 @@ export class AgentPortalController {
   @ApiOperation({
     summary: 'Cancel my booking (all or some seats). The refund is credited to my account.',
   })
-  async cancel(@Param('id') id: string, @Body(zodBody(AgentCancelSchema)) dto: AgentCancelDto) {
+  async cancel(@UuidParam('id') id: string, @Body(zodBody(AgentCancelSchema)) dto: AgentCancelDto) {
     return this.agents.agentCancel(id as BookingId, dto);
   }
 }

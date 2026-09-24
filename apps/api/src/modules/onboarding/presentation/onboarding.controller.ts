@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, Query, HttpCode } from '@nestjs/com
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Public, RateLimit, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, Public, RateLimit, RequirePermission, UuidParam, zodBody } from '@http';
 import { getUserId } from '@kernel';
 
 import { OnboardingService } from '../application/services/onboarding.service';
@@ -50,7 +50,7 @@ export class OnboardingController {
   @Get('admin/operator-applications/:id/documents/:docType')
   @RequirePermission(Permission.PLATFORM_OPERATORS)
   @ApiOperation({ summary: 'Short-lived link to one application document' })
-  async applicationDocument(@Param('id') id: string, @Param('docType') docType: string) {
+  async applicationDocument(@UuidParam('id') id: string, @Param('docType') docType: string) {
     return this.onboarding.applicationDocumentUrl(id, docType);
   }
 
@@ -75,7 +75,7 @@ export class OnboardingController {
   @Get('admin/operator-applications/:id')
   @RequirePermission(Permission.PLATFORM_OPERATORS)
   @ApiOperation({ summary: 'Full application detail incl. documents' })
-  async get(@Param('id') id: string) {
+  async get(@UuidParam('id') id: string) {
     return this.onboarding.get(id);
   }
 
@@ -84,7 +84,7 @@ export class OnboardingController {
   @HttpCode(200)
   @RequirePermission(Permission.PLATFORM_OPERATORS)
   @ApiOperation({ summary: 'Approve → provision operator tenant + admin user' })
-  async approve(@Param('id') id: string, @Body(zodBody(ApproveSchema)) dto: ApproveDto) {
+  async approve(@UuidParam('id') id: string, @Body(zodBody(ApproveSchema)) dto: ApproveDto) {
     return this.onboarding.approve(id, getUserId() ?? null, dto?.note);
   }
 
@@ -93,7 +93,7 @@ export class OnboardingController {
   @HttpCode(200)
   @RequirePermission(Permission.PLATFORM_OPERATORS)
   @ApiOperation({ summary: 'Reject an application with a reason' })
-  async reject(@Param('id') id: string, @Body(zodBody(RejectSchema)) dto: RejectDto) {
+  async reject(@UuidParam('id') id: string, @Body(zodBody(RejectSchema)) dto: RejectDto) {
     await this.onboarding.reject(id, dto.reason, getUserId() ?? null);
     return { ok: true };
   }
@@ -106,7 +106,7 @@ export class OnboardingController {
     summary:
       'Keep an application pending with a reason (e.g. more documents needed) — emailed to the applicant',
   })
-  async hold(@Param('id') id: string, @Body(zodBody(RejectSchema)) dto: RejectDto) {
+  async hold(@UuidParam('id') id: string, @Body(zodBody(RejectSchema)) dto: RejectDto) {
     await this.onboarding.hold(id, dto.reason, getUserId() ?? null);
     return { ok: true };
   }
@@ -116,7 +116,7 @@ export class OnboardingController {
   @HttpCode(200)
   @RequirePermission(Permission.PLATFORM_OPERATORS)
   @ApiOperation({ summary: 'Move a rejected application back to pending, with a reason' })
-  async reopen(@Param('id') id: string, @Body(zodBody(RejectSchema)) dto: RejectDto) {
+  async reopen(@UuidParam('id') id: string, @Body(zodBody(RejectSchema)) dto: RejectDto) {
     await this.onboarding.reopen(id, dto.reason, getUserId() ?? null);
     return { ok: true };
   }

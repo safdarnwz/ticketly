@@ -4,8 +4,6 @@ import {
   Delete,
   Get,
   HttpCode,
-  Param,
-  ParseUUIDPipe,
   Post,
   Put,
   Query,
@@ -23,6 +21,7 @@ import {
   RateLimit,
   RequirePermission,
   RequirePlatformAdmin,
+  UuidParam,
   zodBody,
 } from '@http';
 import { BadRequestError, type TripId } from '@kernel';
@@ -108,7 +107,7 @@ export class GdsPartnerController {
   @ApiOperation({ summary: 'Live seat map for a segment' })
   seats(
     @Req() req: PartnerReq,
-    @Param('tripId') tripId: string,
+    @UuidParam('tripId') tripId: string,
     @Query('from') from: string,
     @Query('to') to: string,
   ) {
@@ -134,7 +133,7 @@ export class GdsPartnerController {
     summary:
       'Confirm: debits your GDS account (ticket value minus your commission) and issues tickets. 402 if balance/credit is short.',
   })
-  confirm(@Req() req: PartnerReq, @Param('id') id: string) {
+  confirm(@Req() req: PartnerReq, @UuidParam('id') id: string) {
     return this.gds.confirm(req.gds, id);
   }
 
@@ -147,7 +146,7 @@ export class GdsPartnerController {
   })
   cancel(
     @Req() req: PartnerReq,
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(CancelSchema)) dto: z.infer<typeof CancelSchema>,
   ) {
     return this.gds.cancel(req.gds, id, dto);
@@ -155,7 +154,7 @@ export class GdsPartnerController {
 
   @Get('bookings/:id')
   @ApiOperation({ summary: 'Booking, passengers and tickets (your bookings only)' })
-  booking(@Req() req: PartnerReq, @Param('id') id: string) {
+  booking(@Req() req: PartnerReq, @UuidParam('id') id: string) {
     return this.gds.bookingDetail(req.gds, id);
   }
 }
@@ -208,13 +207,13 @@ export class GdsAdminController {
   @Get() async list(@Query('status') status?: string) {
     return { items: await this.gds.listPartners(status) };
   }
-  @Get(':id') detail(@Param('id') id: string) {
+  @Get(':id') detail(@UuidParam('id') id: string) {
     return this.gds.partnerDetail(id);
   }
   @Post(':id/status')
   @HttpCode(200)
   async status(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(
       zodBody(
         z.object({
@@ -230,7 +229,7 @@ export class GdsAdminController {
   }
   @Put(':id/terms')
   async terms(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(
       zodBody(
         z.object({
@@ -253,7 +252,7 @@ export class GdsAdminController {
   @HttpCode(200)
   @Idempotent()
   receipt(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(
       zodBody(
         z.object({
@@ -268,7 +267,7 @@ export class GdsAdminController {
   }
   @Get(':id/webhook')
   @ApiOperation({ summary: "The partner's webhook endpoint and its recent deliveries" })
-  webhook(@Param('id', ParseUUIDPipe) id: string) {
+  webhook(@UuidParam('id') id: string) {
     return this.gds.partnerWebhook(id);
   }
   @Put(':id/webhook')
@@ -276,7 +275,7 @@ export class GdsAdminController {
     summary: "Set/replace the partner's webhook endpoint — returns the NEW signing secret once",
   })
   setWebhook(
-    @Param('id', ParseUUIDPipe) id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(RegisterWebhookSchema.omit({ name: true })))
     dto: { url: string; eventTypes: string[] },
   ) {
@@ -284,7 +283,7 @@ export class GdsAdminController {
   }
   @Delete(':id/webhook')
   @ApiOperation({ summary: "Remove the partner's webhook endpoint" })
-  async removeWebhook(@Param('id', ParseUUIDPipe) id: string) {
+  async removeWebhook(@UuidParam('id') id: string) {
     await this.gds.removePartnerWebhook(id);
     return { ok: true };
   }
@@ -293,17 +292,17 @@ export class GdsAdminController {
   @ApiOperation({
     summary: 'Send a signed test event to the partner endpoint now and report the response',
   })
-  testWebhook(@Param('id', ParseUUIDPipe) id: string) {
+  testWebhook(@UuidParam('id') id: string) {
     return this.gds.testPartnerWebhook(id);
   }
   @Post(':id/keys')
   @HttpCode(201)
   @ApiOperation({ summary: 'Issue an API key (returned ONCE). Sandbox keys are read-only.' })
-  issueKey(@Param('id') id: string, @Body(zodBody(KeySchema)) dto: z.infer<typeof KeySchema>) {
+  issueKey(@UuidParam('id') id: string, @Body(zodBody(KeySchema)) dto: z.infer<typeof KeySchema>) {
     return this.gds.issueKey(id, dto);
   }
   @Delete(':id/keys/:keyId')
-  async revoke(@Param('id') id: string, @Param('keyId') keyId: string) {
+  async revoke(@UuidParam('id') id: string, @UuidParam('keyId') keyId: string) {
     await this.gds.revokeKey(id, keyId);
     return { ok: true };
   }
@@ -332,7 +331,7 @@ export class GdsOperatorController {
     summary: 'Start / pause distributing to a partner and set the commission you give it (0–30%)',
   })
   async agreement(
-    @Param('partnerId') partnerId: string,
+    @UuidParam('partnerId') partnerId: string,
     @Body(
       zodBody(
         z.object({
@@ -354,7 +353,7 @@ export class GdsOperatorController {
       'Channel-wise sales control for one trip (e.g. ["ota"] stops partner sales, web keeps selling)',
   })
   async channels(
-    @Param('tripId') tripId: string,
+    @UuidParam('tripId') tripId: string,
     @Body(
       zodBody(
         z.object({ closed: z.array(z.enum(['direct_web', 'agent', 'ota', 'phone'])).max(4) }),

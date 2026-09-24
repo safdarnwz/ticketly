@@ -1,9 +1,9 @@
-import { Body, Controller, Get, Param, Post, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, Post, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Idempotent, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, Idempotent, RequirePermission, UuidParam, zodBody } from '@http';
 import { type BookingId } from '@kernel';
 
 import { InvoiceService } from '../application/services/invoice.service';
@@ -30,7 +30,7 @@ export class InvoiceController {
   @Get('bookings/:bookingId/invoices')
   @RequirePermission(Permission.PAYMENT_READ)
   @ApiOperation({ summary: 'List invoices/credit notes for a booking' })
-  async list(@Param('bookingId') bookingId: string) {
+  async list(@UuidParam('bookingId') bookingId: string) {
     return { invoices: await this.invoices.listForBooking(bookingId as BookingId) };
   }
 

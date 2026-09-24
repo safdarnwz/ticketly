@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Body, Controller, Get, Param, Post, Query, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
@@ -9,6 +9,7 @@ import {
   Public,
   RateLimit,
   RequirePermission,
+  UuidParam,
   zodBody,
 } from '@http';
 import {
@@ -81,14 +82,14 @@ export class SchedulingController {
   @Post('services/:id/activate')
   @RequirePermission(Permission.SERVICE_MANAGE)
   @ApiOperation({ summary: 'Activate a service and materialise its trips' })
-  async activate(@Param('id') id: string) {
+  async activate(@UuidParam('id') id: string) {
     return this.scheduling.activate(id as ServiceId);
   }
 
   @Post('services/:id/pause')
   @RequirePermission(Permission.SERVICE_MANAGE)
   @ApiOperation({ summary: 'Pause a service (stops new materialisation)' })
-  async pause(@Param('id') id: string) {
+  async pause(@UuidParam('id') id: string) {
     await this.scheduling.pause(id as ServiceId);
     return { ok: true };
   }
@@ -96,7 +97,7 @@ export class SchedulingController {
   @Post('services/:id/materialise')
   @RequirePermission(Permission.SERVICE_MANAGE)
   @ApiOperation({ summary: 'Force-materialise the horizon for a service' })
-  async materialise(@Param('id') id: string) {
+  async materialise(@UuidParam('id') id: string) {
     return { trips: await this.materialization.materialiseService(id as ServiceId) };
   }
 
@@ -112,7 +113,7 @@ export class SchedulingController {
   @Public()
   @RateLimit(120, 60_000, 'ip')
   @ApiOperation({ summary: 'Trip detail with its stop timetable' })
-  async getTrip(@Param('id') id: string) {
+  async getTrip(@UuidParam('id') id: string) {
     const trip = await this.trips.getById(id as TripId);
     const stops = await this.trips.loadStops(id as TripId);
     return { trip, stops };
@@ -135,7 +136,7 @@ export class SchedulingController {
   @ApiQuery({ name: 'to', required: true, description: 'destination stop id' })
   @ApiOperation({ summary: 'Per-seat availability for a segment' })
   async availability(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Query('from') from: string,
     @Query('to') to: string,
   ) {
@@ -152,7 +153,10 @@ export class SchedulingController {
   @Post('trips/:id/block-seats')
   @RequirePermission(Permission.INVENTORY_MANAGE)
   @ApiOperation({ summary: 'Block or unblock seats on a segment (quota/hold)' })
-  async blockSeats(@Param('id') id: string, @Body(zodBody(BlockSeatsSchema)) dto: BlockSeatsDto) {
+  async blockSeats(
+    @UuidParam('id') id: string,
+    @Body(zodBody(BlockSeatsSchema)) dto: BlockSeatsDto,
+  ) {
     const seg = await this.inventory.resolveSegment(
       id as TripId,
       dto.fromStopId as StopId,
@@ -180,7 +184,7 @@ export class SchedulingController {
       'Add one-off EXTRA trips of a service (festival / event / ladies special) for 1–31 dates. Created closed to sale unless openForSale.',
   })
   async extraTrips(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(ExtraTripsSchema)) dto: z.infer<typeof ExtraTripsSchema>,
   ) {
     const [h, m] = (dto.departureTime ?? '').split(':').map(Number);
@@ -200,7 +204,7 @@ export class SchedulingController {
   @HttpCode(200)
   @RequirePermission(Permission.INVENTORY_MANAGE)
   @ApiOperation({ summary: 'Open a trip (e.g. a new extra trip) for sale on every channel' })
-  async releaseInventory(@Param('id') id: string) {
+  async releaseInventory(@UuidParam('id') id: string) {
     if (!(await this.trips.openAllChannels(id as TripId)))
       throw new BadRequestError('Only a scheduled/open trip can be released for sale');
     return { ok: true };
@@ -224,7 +228,7 @@ export class SchedulingController {
       'Force-release all live checkout holds on a trip (phone holds kept unless includePhoneHolds)',
   })
   async releaseHolds(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(z.object({ includePhoneHolds: z.boolean().default(false) })))
     dto: { includePhoneHolds: boolean },
   ) {
@@ -237,7 +241,7 @@ export class SchedulingController {
   @RequirePermission(Permission.TRIP_OPERATE)
   @ApiOperation({ summary: 'Add an internal (staff-only) remark to a trip' })
   async addRemark(
-    @Param('id') id: string,
+    @UuidParam('id') id: string,
     @Body(zodBody(z.object({ remark: z.string().trim().min(2).max(1000) })))
     dto: { remark: string },
   ) {
@@ -248,7 +252,7 @@ export class SchedulingController {
 
   @Get('trips/:id/remarks')
   @RequirePermission(Permission.TRIP_OPERATE)
-  async listRemarks(@Param('id') id: string) {
+  async listRemarks(@UuidParam('id') id: string) {
     return { items: await this.trips.remarks(id as TripId) };
   }
 }
