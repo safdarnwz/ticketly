@@ -270,6 +270,25 @@ export class RouteRepository {
     if (!operatorState || !row) return true;
     return operatorState !== row.origin_state_code;
   }
+
+  /** The route's stops in order with their timing offset and board/alight rules. */
+  async stopRules(routeId: RouteId): Promise<
+    {
+      stopId: StopId;
+      sequence: number;
+      departOffsetMin: number;
+      canBoard: boolean;
+      canAlight: boolean;
+    }[]
+  > {
+    return this.db.query(
+      `SELECT stop_id AS "stopId", sequence, depart_offset_min AS "departOffsetMin",
+              can_board AS "canBoard", can_alight AS "canAlight"
+         FROM route_stops WHERE route_id = $1 ORDER BY sequence`,
+      [routeId],
+      { name: 'route.stopRules', primary: true },
+    );
+  }
 }
 
 interface RouteRow {

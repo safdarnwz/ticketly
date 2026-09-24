@@ -18,6 +18,7 @@ import { PaymentController } from './presentation/payment.controller';
 import { PaymentRepository } from './infrastructure/persistence/payment.repository';
 import { PaymentService } from './application/services/payment.service';
 import { SettlementService } from './application/services/settlement.service';
+import { SettlementRepository } from './infrastructure/persistence/settlement.repository';
 
 /**
  * Payments, ledger & settlement. The gateway is bound behind the
@@ -41,6 +42,7 @@ import { SettlementService } from './application/services/settlement.service';
     PaymentRepository,
     LedgerRepository,
     PaymentService,
+    SettlementRepository,
     SettlementService,
     RazorpayGateway,
     // Picks Razorpay / sandbox / mock on every call — see ConfiguredPaymentGateway.

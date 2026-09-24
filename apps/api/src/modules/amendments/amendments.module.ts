@@ -5,9 +5,11 @@ import { DatabaseModule } from '@database';
 import { MessagingModule } from '@messaging';
 
 import { BookingModule } from '../booking/booking.module';
+import { MasterDataModule } from '../master-data/master-data.module';
 import { PricingModule } from '../pricing/pricing.module';
 import { SchedulingModule } from '../scheduling/scheduling.module';
 import { AmendmentService } from './application/services/amendment.service';
+import { AmendmentRepository } from './infrastructure/persistence/amendment.repository';
 import { AmendmentsController } from './presentation/amendments.controller';
 
 /**
@@ -21,11 +23,12 @@ import { AmendmentsController } from './presentation/amendments.controller';
     DatabaseModule,
     MessagingModule,
     BookingModule,
+    MasterDataModule,
     PricingModule,
     SchedulingModule,
   ],
   controllers: [AmendmentsController],
-  providers: [AmendmentService],
+  providers: [AmendmentRepository, AmendmentService],
   exports: [AmendmentService],
 })
 export class AmendmentsModule {}

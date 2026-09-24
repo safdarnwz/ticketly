@@ -24,6 +24,8 @@ export interface TestApp {
   get(path: string, opts?: CallOptions): Promise<HttpResult>;
   close(): Promise<void>;
   fixtures: E2eFixtures;
+  /** The Nest app, for tests that drive a service directly (e.g. a scheduled job). */
+  nest: NestFastifyApplication;
 }
 
 interface CallOptions {
@@ -96,5 +98,6 @@ export async function bootstrapTestApp(): Promise<TestApp> {
     get: (p, o) => call('GET', p, undefined, o),
     close: () => app.close(),
     fixtures,
+    nest: app,
   };
 }

@@ -594,4 +594,148 @@ export class BookingRepository {
       { name: 'booking.listActiveByTrip' },
     );
   }
+
+  /* ── amendments: the booking-owned rows an amendment rewrites (run in its unit of work) ── */
+
+  /** Reschedule: point the booking at another trip/segment and replace its seats. */
+  async moveToTrip(input: {
+    bookingId: BookingId;
+    tripId: TripId;
+    fromSeq: number;
+    toSeq: number;
+    fromStopId: StopId;
+    toStopId: StopId;
+    totalMinor: number;
+    seats: { seatNumber: string; legMask: bigint; fareMinor: number }[];
+  }): Promise<void> {
+    const tenantId = requireTenantId();
+    await this.db.execute_(
+      `UPDATE bookings SET trip_id = $3, from_seq = $4, to_seq = $5, from_stop_id = $6, to_stop_id = $7,
+              total_minor = $8, times_rescheduled = times_rescheduled + 1, updated_at = now()
+        WHERE tenant_id = $1 AND id = $2`,
+      [
+        tenantId,
+        input.bookingId,
+        input.tripId,
+        input.fromSeq,
+        input.toSeq,
+        input.fromStopId,
+        input.toStopId,
+        input.totalMinor,
+      ],
+      { name: 'booking.moveToTrip', primary: true },
+    );
+    await this.db.execute_(`DELETE FROM booking_seats WHERE booking_id = $1`, [input.bookingId], {
+      name: 'booking.moveToTrip.clearSeats',
+      primary: true,
+    });
+    await this.db.execute_(
+      `INSERT INTO booking_seats (booking_id, tenant_id, trip_id, seat_number, leg_mask, fare_minor)
+       SELECT $1, $2, $3, u.seat_number, u.leg_mask, u.fare_minor
+         FROM unnest($4::text[], $5::bigint[], $6::bigint[]) AS u(seat_number, leg_mask, fare_minor)`,
+      [
+        input.bookingId,
+        tenantId,
+        input.tripId,
+        input.seats.map((s) => s.seatNumber),
+        input.seats.map((s) => s.legMask.toString()),
+        input.seats.map((s) => s.fareMinor),
+      ],
+      { name: 'booking.moveToTrip.seats', primary: true },
+    );
+  }
+
+  /**
+   * Seat change on the same trip: move booking_seats, passengers and tickets
+   * from each `from` seat to the matching `to` seat. `codes[i]` is the new
+   * boarding code for `to[i]`.
+   */
+  async moveSeats(input: {
+    bookingId: BookingId;
+    tripId: TripId;
+    from: string[];
+    to: string[];
+    legMasks: string[];
+    fares: number[];
+    codes: string[];
+  }): Promise<void> {
+    const { bookingId, from, to } = input;
+    await this.db.execute_(
+      `DELETE FROM booking_seats WHERE booking_id = $1 AND seat_number = ANY($2::text[])`,
+      [bookingId, from],
+      { name: 'booking.moveSeats.release', primary: true },
+    );
+    await this.db.execute_(
+      `INSERT INTO booking_seats (booking_id, tenant_id, trip_id, seat_number, leg_mask, fare_minor)
+       SELECT $1, $2, $3, u.seat_number, u.leg_mask, u.fare_minor
+         FROM unnest($4::text[], $5::bigint[], $6::bigint[]) AS u(seat_number, leg_mask, fare_minor)`,
+      [bookingId, requireTenantId(), input.tripId, to, input.legMasks, input.fares],
+      { name: 'booking.moveSeats.seats', primary: true },
+    );
+    await this.db.execute_(
+      `UPDATE passengers p SET seat_number = u.to_seat
+         FROM unnest($2::text[], $3::text[]) AS u(from_seat, to_seat)
+        WHERE p.booking_id = $1 AND p.seat_number = u.from_seat`,
+      [bookingId, from, to],
+      { name: 'booking.moveSeats.passengers', primary: true },
+    );
+    // Boarding codes are unique and derived from the seat, so move them in two
+    // steps — a swap (1A↔1B) can never collide mid-statement.
+    await this.db.execute_(
+      `UPDATE tickets SET boarding_code = boarding_code || ':' || id
+        WHERE booking_id = $1 AND seat_number = ANY($2::text[])`,
+      [bookingId, from],
+      { name: 'booking.moveSeats.ticketsPark', primary: true },
+    );
+    await this.db.execute_(
+      `UPDATE tickets t SET seat_number = u.to_seat, boarding_code = u.code
+         FROM unnest($2::text[], $3::text[], $4::text[]) AS u(from_seat, to_seat, code)
+        WHERE t.booking_id = $1 AND t.seat_number = u.from_seat`,
+      [bookingId, from, to, input.codes],
+      { name: 'booking.moveSeats.tickets', primary: true },
+    );
+  }
+
+  /** Point change: new boarding/dropping on the same trip, with each seat's new leg mask. */
+  async changeSegment(input: {
+    bookingId: BookingId;
+    fromSeq: number;
+    toSeq: number;
+    fromStopId: string;
+    toStopId: string;
+    seats: { seatNumber: string; legMask: bigint }[];
+  }): Promise<void> {
+    await this.db.execute_(
+      `UPDATE bookings SET from_seq = $3, to_seq = $4, from_stop_id = $5, to_stop_id = $6, updated_at = now()
+        WHERE tenant_id = $1 AND id = $2`,
+      [
+        requireTenantId(),
+        input.bookingId,
+        input.fromSeq,
+        input.toSeq,
+        input.fromStopId,
+        input.toStopId,
+      ],
+      { name: 'booking.changeSegment', primary: true },
+    );
+    await this.db.execute_(
+      `UPDATE booking_seats bs SET leg_mask = u.mask
+         FROM unnest($2::text[], $3::bigint[]) AS u(seat, mask)
+        WHERE bs.booking_id = $1 AND bs.seat_number = u.seat`,
+      [
+        input.bookingId,
+        input.seats.map((s) => s.seatNumber),
+        input.seats.map((s) => s.legMask.toString()),
+      ],
+      { name: 'booking.changeSegment.seats', primary: true },
+    );
+  }
+
+  async renamePassenger(bookingId: BookingId, seatNumber: string, fullName: string): Promise<void> {
+    await this.db.execute_(
+      `UPDATE passengers SET full_name = $3 WHERE booking_id = $1 AND seat_number = $2`,
+      [bookingId, seatNumber, fullName],
+      { name: 'booking.renamePassenger', primary: true },
+    );
+  }
 }

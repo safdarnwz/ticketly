@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
-import { newId, requireTenantId, type LocalDate } from '@kernel';
-import { DatabaseService } from '@database';
+import { newId, NotFoundError, requireTenantId, type LocalDate } from '@kernel';
 import { EventBus } from '@messaging';
 
-import { LedgerAccounts, settlementEntry } from '../../domain/ledger';
+import { settlementEntry } from '../../domain/ledger';
 import { LedgerRepository } from '../../infrastructure/persistence/ledger.repository';
+import { SettlementRepository } from '../../infrastructure/persistence/settlement.repository';
 
 /**
  * Settlement — periodically pays out an operator's accrued payable.
@@ -29,7 +29,7 @@ import { LedgerRepository } from '../../infrastructure/persistence/ledger.reposi
 @Injectable()
 export class SettlementService {
   constructor(
-    private readonly db: DatabaseService,
+    private readonly settlements: SettlementRepository,
     private readonly ledger: LedgerRepository,
     private readonly uow: UnitOfWork,
     private readonly events: EventBus,
@@ -50,190 +50,81 @@ export class SettlementService {
   ): Promise<{ settlementId: string; netMinor: number }> {
     const tenantId = requireTenantId();
 
-    const existing = await this.db.queryOne<{ id: string; net_minor: number }>(
-      `SELECT id, net_minor FROM settlements WHERE tenant_id = $1 AND period_from = $2 AND period_to = $3`,
-      [tenantId, periodFrom, periodTo],
-      { name: 'settlement.existing', primary: true },
-    );
-    if (existing) return { settlementId: existing.id, netMinor: Number(existing.net_minor) };
+    const existing = await this.settlements.findForPeriod(tenantId, periodFrom, periodTo);
+    if (existing) return { settlementId: existing.id, netMinor: existing.netMinor };
 
-    // Figures straight from the ledger for the period.
-    const figures = await this.db.queryOne<{
-      gross: number;
-      commission: number;
-      refunds: number;
-      bookings: number;
-    }>(
-      `SELECT
-         coalesce(sum(CASE WHEN account = $2 THEN -amount_minor ELSE 0 END), 0)::bigint AS gross,
-         coalesce(sum(CASE WHEN account = $3 THEN -amount_minor ELSE 0 END), 0)::bigint AS commission,
-         coalesce(sum(CASE WHEN account = $4 THEN -amount_minor ELSE 0 END), 0)::bigint AS refunds,
-         count(DISTINCT le.source_id)::int AS bookings
-       FROM ledger_postings lp
-       JOIN ledger_entries le ON le.id = lp.entry_id
-      WHERE lp.tenant_id = $1 AND le.created_at::date BETWEEN $5 AND $6`,
-      [
-        tenantId,
-        LedgerAccounts.OPERATOR_PAYABLE,
-        LedgerAccounts.PLATFORM_REVENUE,
-        LedgerAccounts.CUSTOMER_REFUNDS,
-        periodFrom,
-        periodTo,
-      ],
-      { name: 'settlement.figures', primary: true },
-    );
+    const figures = await this.settlements.ledgerFigures(tenantId, periodFrom, periodTo);
+    // Outstanding one-time platform charges (the per-bus fee, an earlier
+    // shortfall, …) are netted against THIS payout, whichever period they were
+    // charged in — they are not period-bound like booking commission.
+    const chargesMinor = await this.settlements.pendingChargesMinor(tenantId);
 
-    // Any still-outstanding one-time platform charges (the per-bus fee, etc.)
-    // get netted against THIS payout, whichever period they were charged in —
-    // they're not period-bound like booking commission is.
-    const pendingCharges = await this.db.queryOne<{ total: string }>(
-      `SELECT coalesce(sum(amount_minor), 0) AS total FROM platform_charges WHERE tenant_id = $1 AND status = 'pending'`,
-      [tenantId],
-      { name: 'settlement.pendingCharges', primary: true },
-    );
-    const platformChargesMinor = Number(pendingCharges?.total ?? 0);
-
-    const gross = figures?.gross ?? 0;
-    const commission = figures?.commission ?? 0;
-    const refunds = figures?.refunds ?? 0;
-    // operator_payable already nets booking commission; refunds reduce it via
-    // clawback; one-time platform charges (per-bus fee) are deducted here,
-    // clamped so a settlement never goes negative — if charges exceed what's
-    // owed this period, the excess simply rolls into the NEXT settlement
-    // (the charge rows stay 'pending' until finalise() has enough to cover them).
-    // Clamped so a settlement never goes negative — but the excess, when
-    // gross itself is already negative (a heavy-refund period can easily
-    // outweigh a quiet period's new bookings, since operator_payable
-    // already nets refund clawbacks into gross), is NOT simply discarded.
-    // Math.max(0, ...) alone would silently write off real money the
-    // operator was already paid out in a PRIOR settlement for bookings
-    // that have since been cancelled — a genuine platform loss repeated
-    // every time this occurs, not a rare edge case for any operator with
-    // a high-cancellation week. The shortfall becomes a new pending
-    // platform_charges row instead, reusing the exact same "rolls into
-    // the next settlement that has enough to cover it" mechanism the
-    // one-time per-bus fee already relies on below.
-    const shortfall = Math.max(0, platformChargesMinor - gross);
-    const net = Math.max(0, gross - platformChargesMinor);
+    // operator_payable already nets booking commission and refund clawbacks.
+    // A settlement never goes negative, but what it cannot cover is not
+    // written off: when charges exceed gross (or gross itself is negative
+    // after a heavy-refund period), the difference becomes a new pending
+    // 'settlement_shortfall' charge that the next settlement deducts.
+    const shortfall = Math.max(0, chargesMinor - figures.grossMinor);
+    const net = Math.max(0, figures.grossMinor - chargesMinor);
 
     const id = newId();
-    // ON CONFLICT belt-and-suspenders: the SELECT-check above closes the gap
-    // for a sequential retry, but two genuinely concurrent generate() calls
-    // for the same (tenant, period) could both pass that check before either
-    // commits — the unique index (migration 0022) is what actually prevents
-    // two rows; this just makes losing that race a clean "return the winner's
-    // row" instead of a thrown constraint-violation error.
-    const inserted = await this.uow.run(
-      { name: 'settlement.generate', tenantId },
-      async (scope) => {
-        const result = await scope.client.query<{ id: string }>(
-          `INSERT INTO settlements (id, tenant_id, period_from, period_to, gross_minor, commission_minor, refunds_minor, net_minor, booking_count, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'draft')
-         ON CONFLICT (tenant_id, period_from, period_to) DO NOTHING
-         RETURNING id`,
-          [
-            id,
-            tenantId,
-            periodFrom,
-            periodTo,
-            gross,
-            commission,
-            refunds,
-            net,
-            figures?.bookings ?? 0,
-          ],
+    // The SELECT above handles a sequential retry; the unique (tenant, period)
+    // index + ON CONFLICT handles two concurrent generate() calls — the loser
+    // gets null here and returns the winner's row below.
+    const inserted = await this.uow.run({ name: 'settlement.generate', tenantId }, async () => {
+      const wonId = await this.settlements.insertDraft({
+        id,
+        tenantId,
+        periodFrom,
+        periodTo,
+        figures,
+        netMinor: net,
+      });
+      // Only the call that actually inserted may add the shortfall, or the
+      // same debt would be counted twice.
+      if (wonId && shortfall > 0)
+        await this.settlements.addShortfallCharge(
+          tenantId,
+          shortfall,
+          `Refunds exceeded gross for ${periodFrom} to ${periodTo} — carried to next settlement`,
         );
-        const wonId = result.rows[0]?.id ?? null;
-        // Same transaction, and gated on ACTUALLY having won the insert race
-        // above — a concurrent generate() call that loses that race must
-        // never ALSO insert a shortfall charge, or the same debt gets
-        // double-counted (one real settlement row, two shortfall charges).
-        if (wonId && shortfall > 0) {
-          await scope.client.query(
-            `INSERT INTO platform_charges (id, tenant_id, kind, amount_minor, status, description)
-           VALUES ($1, $2, 'settlement_shortfall', $3, 'pending', $4)`,
-            [
-              newId(),
-              tenantId,
-              shortfall,
-              `Refunds exceeded gross for ${periodFrom} to ${periodTo} — carried to next settlement`,
-            ],
-          );
-        }
-        return wonId;
-      },
-    );
+      return wonId;
+    });
     if (!inserted) {
-      // Lost the race — fetch whichever row actually landed.
-      const winner = await this.db.queryOne<{ id: string; net_minor: number }>(
-        `SELECT id, net_minor FROM settlements WHERE tenant_id = $1 AND period_from = $2 AND period_to = $3`,
-        [tenantId, periodFrom, periodTo],
-        { name: 'settlement.raceWinner', primary: true },
-      );
-      if (winner) return { settlementId: winner.id, netMinor: Number(winner.net_minor) };
+      const winner = await this.settlements.findForPeriod(tenantId, periodFrom, periodTo);
+      if (winner) return { settlementId: winner.id, netMinor: winner.netMinor };
     }
     return { settlementId: id, netMinor: net };
   }
 
-  /** Finalise + pay: post the ledger settlement entry, mark paid, and settle any platform charges this payout covered. */
+  /** Finalise + pay: post the ledger settlement entry, mark paid, settle the charges it accounted for. */
   async finalise(settlementId: string): Promise<void> {
     const tenantId = requireTenantId();
-    await this.uow.run({ name: 'settlement.finalise', tenantId }, async (scope) => {
-      const row = (
-        await scope.client.query<{
-          net_minor: number;
-          gross_minor: number;
-          currency: string;
-          status: string;
-        }>(
-          `SELECT net_minor, gross_minor, currency, status FROM settlements WHERE tenant_id = $1 AND id = $2 FOR UPDATE`,
-          [tenantId, settlementId],
-        )
-      ).rows[0];
-      if (!row) throw new Error('Settlement not found');
+    await this.uow.run({ name: 'settlement.finalise', tenantId }, async () => {
+      const row = await this.settlements.lockForUpdate(tenantId, settlementId);
+      if (!row) throw new NotFoundError('Settlement', settlementId);
       if (row.status !== 'draft') return; // idempotent
 
-      if (row.net_minor > 0) {
+      if (row.netMinor > 0) {
         await this.ledger.post(
           settlementEntry({
             currency: row.currency as never,
             settlementId,
             operatorId: tenantId,
-            amountMinor: row.net_minor,
+            amountMinor: row.netMinor,
           }),
         );
       }
+      await this.settlements.settleChargesAccountedFor(tenantId, settlementId);
+      await this.settlements.markPaid(tenantId, settlementId);
 
-      // Settle whatever pending platform charges this payout had capacity to
-      // cover (gross_minor - net_minor is exactly what got deducted for them
-      // in generate()) — oldest first, so a partially-covered charge still
-      // waits cleanly for the next settlement rather than leaving gaps.
-      const covered = row.gross_minor - row.net_minor;
-      if (covered > 0) {
-        await scope.client.query(
-          `UPDATE platform_charges SET status = 'settled', settlement_id = $2
-             WHERE id IN (
-               SELECT id FROM platform_charges WHERE tenant_id = $1 AND status = 'pending'
-               ORDER BY created_at LIMIT 10000
-             )`,
-          [tenantId, settlementId],
-        );
-      }
-
-      await scope.client.query(
-        `UPDATE settlements SET status = 'paid', updated_at = now() WHERE tenant_id = $1 AND id = $2`,
-        [tenantId, settlementId],
-      );
-
-      // Hand off to disbursement — a payout instruction only makes sense for
-      // a non-zero payout (net_minor === 0 means charges fully absorbed the
-      // gross this period; nothing to actually send to the bank).
-      if (row.net_minor > 0) {
+      // Hand off to disbursement — only a non-zero payout needs a bank transfer.
+      if (row.netMinor > 0) {
         this.events.publish({
           type: 'settlement.finalised',
           aggregateType: 'settlement',
           aggregateId: settlementId,
-          payload: { tenantId, settlementId, amountMinor: row.net_minor, currency: row.currency },
+          payload: { tenantId, settlementId, amountMinor: row.netMinor, currency: row.currency },
         });
       }
     });
