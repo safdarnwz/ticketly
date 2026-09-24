@@ -9,6 +9,7 @@ import { User } from '../../domain/user.entity';
 import { RoleRepository } from '../../infrastructure/persistence/role.repository';
 import { SessionRepository } from '../../infrastructure/persistence/session.repository';
 import { UserRepository } from '../../infrastructure/persistence/user.repository';
+import { PlatformPoliciesService } from '../../../platform-settings/platform-policies.service';
 
 /**
  * Operator user management (invite / update / role assignment).
@@ -26,6 +27,7 @@ export class UserService {
     private readonly hasher: PasswordHasher,
     private readonly uow: UnitOfWork,
     private readonly audit: AuditService,
+    private readonly policies: PlatformPoliciesService,
   ) {}
 
   async invite(input: { fullName: string; email: string; phone?: string; password: string; roles: string[] }): Promise<UserId> {
@@ -33,6 +35,7 @@ export class UserService {
     const existing = await this.users.findByEmail(input.email);
     if (existing) throw new ConflictError('A user with this email already exists');
 
+    await this.policies.assertPasswordAcceptable(input.password);
     const passwordHash = await this.hasher.hash(input.password);
     const user = User.create(newId() as UserId, {
       tenantId,

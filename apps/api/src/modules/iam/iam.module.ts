@@ -9,9 +9,11 @@ import { DatabaseModule } from '@database';
 import { SecurityModule } from '@security';
 
 import { TenancyModule } from '../tenancy/tenancy.module';
+import { IntegrationsModule } from '../integrations/integrations.module';
 import { ApiKeyController } from './presentation/api-key.controller';
 import { ApiKeyService } from './application/services/api-key.service';
 import { AuditService } from './application/services/audit.service';
+import { SecurityAlertService } from './application/services/security-alert.service';
 import { AuthController } from './presentation/auth.controller';
 import { AuthService } from './application/services/auth.service';
 import { AdminBootstrapService } from './application/services/admin-bootstrap.service';
@@ -44,7 +46,7 @@ import { SmsOtpProvider } from './infrastructure/otp/sms-otp.provider';
  * tenant is bound for RLS and logging from the very start of the request.
  */
 @Module({
-  imports: [DatabaseModule, CacheModule, SecurityModule, TenancyModule],
+  imports: [DatabaseModule, CacheModule, SecurityModule, TenancyModule, IntegrationsModule],
   controllers: [AuthController, UserController, RoleController, ApiKeyController, MaintenanceController],
   providers: [
     StaffAccessService,
@@ -53,6 +55,7 @@ import { SmsOtpProvider } from './infrastructure/otp/sms-otp.provider';
     SessionRepository,
     ApiKeyService,
     AuditService,
+    SecurityAlertService,
     AuthService,
     AdminBootstrapService,
     UserService,

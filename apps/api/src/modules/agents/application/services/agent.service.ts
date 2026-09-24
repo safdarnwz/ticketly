@@ -22,6 +22,8 @@ import {
 } from '../../domain/agent-account';
 import { AgentRepository, type Agent } from '../../infrastructure/persistence/agent.repository';
 import { monthStart, rateFor, SlabRuleError, validateSlabs, type Slab } from '../../domain/commission-slabs';
+import { resolveAgentCreditLimit } from '../../../platform-settings/domain/agent-credit-policy';
+import { PlatformPoliciesService } from '../../../platform-settings/platform-policies.service';
 
 export interface CreateAgentRequest {
   name: string;
@@ -88,6 +90,7 @@ export class AgentService {
     private readonly uow: UnitOfWork,
     private readonly events: EventBus,
     logger: Logger,
+    private readonly policies: PlatformPoliciesService,
   ) {
     this.log = logger.forContext('AgentService');
   }
@@ -96,7 +99,9 @@ export class AgentService {
 
   async create(input: CreateAgentRequest): Promise<{ agentId: AgentId; userId: UserId; code: string }> {
     const tenantId = requireTenantId();
-    const creditLimitMinor = input.billingMode === 'prepaid' ? 0 : (input.creditLimitMinor ?? 0);
+    const credit = resolveAgentCreditLimit(await this.policies.agentCreditPolicy(), input.billingMode, input.creditLimitMinor);
+    if (!credit.ok) throw new DomainError(ErrorCode.COMMON_VALIDATION, credit.error);
+    const creditLimitMinor = credit.creditLimitMinor;
     const termsError = validateTerms({ billingMode: input.billingMode, creditLimitMinor });
     if (termsError) throw new DomainError(ErrorCode.COMMON_VALIDATION, termsError);
 
@@ -106,6 +111,7 @@ export class AgentService {
     const code = (input.code?.trim() || this.suggestCode(input.name)).toUpperCase();
     if (await this.agents.codeExists(code)) throw new ConflictError(`Agent code '${code}' is already in use`);
 
+    await this.policies.assertPasswordAcceptable(input.password);
     const passwordHash = await this.hasher.hash(input.password);
 
     return this.uow.run({ name: 'agent.create', tenantId }, async () => {

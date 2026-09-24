@@ -16,6 +16,10 @@ import { Logger, Metrics } from '@observability';
 import { OtpService, PasswordHasher, TokenService } from '@security';
 
 import { AuditService } from './audit.service';
+import { SecurityAlertService } from './security-alert.service';
+import { isIpAllowed } from '../../../platform-settings/domain/ip-allowlist';
+import { isPasswordExpired } from '../../../platform-settings/domain/password-policy';
+import { PlatformPoliciesService } from '../../../platform-settings/platform-policies.service';
 import { User } from '../../domain/user.entity';
 import { RoleRepository } from '../../infrastructure/persistence/role.repository';
 import { UserRepository } from '../../infrastructure/persistence/user.repository';
@@ -66,6 +70,8 @@ export class AuthService {
     logger: Logger,
     private readonly metrics: Metrics,
     private readonly otpProvider: OtpProvider,
+    private readonly policies: PlatformPoliciesService,
+    private readonly alerts: SecurityAlertService,
   ) {
     this.log = logger.forContext('AuthService');
   }
@@ -132,10 +138,12 @@ export class AuthService {
     if (!ok) {
       const locked = user.recordFailedLogin();
       await this.uow.run({ name: 'auth.recordFailure', tenantId: user.tenantId }, async () => { await this.users.update(user, user.version); });
+      await this.alerts.onLoginFailed(user, input.ip);
       if (locked) throw new AppError(ErrorCode.AUTH_ACCOUNT_LOCKED, 423, { message: 'Account locked after too many attempts' });
       throw new UnauthenticatedError(ErrorCode.AUTH_INVALID_CREDENTIALS, { message: 'Invalid credentials' });
     }
     user.assertCanAuthenticate();
+    await this.assertLoginPolicies(user, input.ip);
     user.recordSuccessfulLogin();
     if (this.hasher.needsRehash(user.passwordHash)) user.setPassword(await this.hasher.hash(input.password));
     return this.issueForUser(user, input.userAgent, input.ip, 'password');
@@ -207,6 +215,7 @@ export class AuthService {
       throw new AppError(ErrorCode.COMMON_CONFLICT, 409, { message: 'This email and mobile are tied to two different unfinished registrations — please use the email or mobile from whichever attempt you want to continue.' });
     }
 
+    await this.policies.assertPasswordAcceptable(input.password);
     const passwordHash = await this.hasher.hash(input.password);
     let user: User;
     if (existing) {
@@ -300,12 +309,15 @@ export class AuthService {
       await this.uow.run({ name: 'auth.recordFailure' }, async () => {
         await this.users.update(user, user.version);
       });
+      await this.alerts.onLoginFailed(user, input.ip);
       if (locked) {
         this.metrics.jobRuns.inc({ job: 'auth.login', outcome: 'locked' });
         throw new AppError(ErrorCode.AUTH_ACCOUNT_LOCKED, 423, { message: 'Account locked after too many attempts' });
       }
       throw new UnauthenticatedError(ErrorCode.AUTH_INVALID_CREDENTIALS, { message: 'Invalid email or password' });
     }
+
+    await this.assertLoginPolicies(user, input.ip);
 
     // Success: reset counters, upgrade hash if needed.
     user.recordSuccessfulLogin();
@@ -419,6 +431,8 @@ export class AuthService {
    * including on a device an attacker may have been using.
    */
   async resetPasswordWithOtp(input: { identity: string; code: string; newPassword: string; tenantId: TenantId | null }): Promise<void> {
+    // Checked before the OTP is consumed, so a rejected password doesn't burn the code.
+    await this.policies.assertPasswordAcceptable(input.newPassword);
     const userId = await this.uow.run<UserId>({ name: 'auth.resetPassword', tenantId: input.tenantId }, async (scope) => {
       const challenge = await scope.client.query<{ id: string; code_hash: string; attempts: number; max_attempts: number }>(
         `SELECT id, code_hash, attempts, max_attempts FROM otp_challenges
@@ -489,6 +503,29 @@ export class AuthService {
   }
 
   /* ── internals ────────────────────────────────────────────────────────*/
+
+  /**
+   * Checks that run only once the password is known to be correct, so they
+   * can't be used to probe which accounts exist:
+   *  - platform staff may only sign in from the admin IP allowlist (#26);
+   *  - an expired password must be reset first (#29);
+   *  - a platform admin signing in from a new IP raises an alert (#54).
+   */
+  private async assertLoginPolicies(user: User, ip: string | undefined): Promise<void> {
+    const isPlatformStaff = user.tenantId === null && user.kind === 'staff';
+    if (isPlatformStaff && !isIpAllowed(await this.policies.adminIpAllowlist(), ip)) {
+      await this.audit.record({ action: 'security.admin_ip_blocked', resourceType: 'user', resourceId: user.id, actorId: user.id, changes: { ip: ip ?? null } });
+      throw new AppError(ErrorCode.AUTH_IP_NOT_ALLOWED, 403, { message: 'Platform admin sign-in is not allowed from this network' });
+    }
+    const policy = await this.policies.passwordPolicy();
+    if (isPasswordExpired(policy, await this.users.passwordChangedAt(user.id, user.tenantId))) {
+      throw new AppError(ErrorCode.AUTH_PASSWORD_EXPIRED, 403, {
+        message: `Your password is older than ${policy.expiryDays} days — reset it to continue`,
+        details: { reset: 'POST /v1/auth/otp/request {purpose: "password_reset"} then POST /v1/auth/password-reset/confirm' },
+      });
+    }
+    if (isPlatformStaff) await this.alerts.onPlatformAdminLogin(user, ip);
+  }
 
   private async issueForUser(user: User, userAgent: string | undefined, ip: string | undefined, method: string): Promise<AuthTokens> {
     const tenantId = user.tenantId;

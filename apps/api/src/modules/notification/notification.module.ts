@@ -5,6 +5,7 @@ import { DatabaseModule } from '@database';
 import { ObservabilityModule } from '@observability';
 
 import { Mailer } from '../iam/infrastructure/mail/mailer';
+import { IntegrationsModule } from '../integrations/integrations.module';
 import { PlatformSettingsModule } from '../platform-settings/platform-settings.module';
 import { NotificationController } from './presentation/notification.controller';
 import { NotificationService } from './application/services/notification.service';
@@ -28,7 +29,7 @@ import { Msg91WhatsAppProvider } from './infrastructure/providers/msg91-whatsapp
  * matters more here than almost anywhere else.
  */
 @Module({
-  imports: [ConfigModule, DatabaseModule, ObservabilityModule, PlatformSettingsModule],
+  imports: [ConfigModule, DatabaseModule, ObservabilityModule, PlatformSettingsModule, IntegrationsModule],
   controllers: [NotificationController],
   providers: [
     NotificationService,

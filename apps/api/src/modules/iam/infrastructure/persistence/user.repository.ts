@@ -74,6 +74,16 @@ export class UserRepository {
   async findByPhoneGlobal(phone: string): Promise<User | null> {
     return this.findByBlindGlobal('phone_blind', this.encryptor.blindIndex(phone));
   }
+  /** When the password was last set — drives the password-expiry policy (#29). */
+  async passwordChangedAt(userId: UserId, tenantId: TenantId | null): Promise<Date | null> {
+    const row = await this.db.queryOne<{ password_changed_at: Date }>(
+      `SELECT password_changed_at FROM users WHERE id = $1`,
+      [userId],
+      { name: 'user.passwordChangedAt', primary: true, tenantId },
+    );
+    return row?.password_changed_at ?? null;
+  }
+
   private async findByBlindGlobal(column: string, blind: string | null): Promise<User | null> {
     if (!blind) return null;
     const row = await this.db.queryOne<UserRow>(

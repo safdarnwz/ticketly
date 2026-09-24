@@ -5,6 +5,7 @@ import { Injectable } from '@nestjs/common';
 import { AppConfig } from '@config';
 import { Logger } from '@observability';
 
+import { IntegrationCredentialStore } from '../../../integrations/integration-credential.store';
 import { PaymentGateway } from './gateway.interface';
 import type {
   CreateIntentRequest, CreateIntentResult, RefundRequest, RefundResult, WebhookVerification,
@@ -31,22 +32,37 @@ const RAZORPAY_API = 'https://api.razorpay.com/v1';
  *   - webhook_secret: verifies calls FROM Razorpay TO us (a separate secret,
  *     set once when the webhook endpoint is registered in the Razorpay
  *     dashboard — NOT the same value as key_secret).
+ *
+ * Keys come from the platform admin's saved `razorpay` integration when it is
+ * enabled (#12), else from the RAZORPAY_* env vars. They are read per call,
+ * so rotating a key under Admin → Integrations needs no restart; switching
+ * the platform ONTO or OFF Razorpay does (see PaymentModule's factory).
  */
 @Injectable()
 export class RazorpayGateway extends PaymentGateway {
   readonly name = 'razorpay';
   private readonly log: Logger;
-  private readonly keyId: string;
-  private readonly keySecret: string;
-  private readonly webhookSecret: string;
 
-  constructor(config: AppConfig, logger: Logger) {
+  constructor(
+    private readonly config: AppConfig,
+    logger: Logger,
+    private readonly credentials: IntegrationCredentialStore,
+  ) {
     super();
     this.log = logger.forContext('RazorpayGateway');
-    this.keyId = config.payment.razorpay.keyId;
-    this.keySecret = config.payment.razorpay.keySecret;
-    this.webhookSecret = config.payment.razorpay.webhookSecret;
   }
+
+  /** Saved + enabled integration, else env vars. */
+  private keys(): { keyId: string; keySecret: string; webhookSecret: string } {
+    const saved = this.credentials.active('razorpay');
+    if (saved) return { keyId: saved.config.keyId, keySecret: saved.secrets.keySecret, webhookSecret: saved.secrets.webhookSecret };
+    const { keyId, keySecret, webhookSecret } = this.config.payment.razorpay;
+    return { keyId, keySecret, webhookSecret };
+  }
+
+  private get keyId(): string { return this.keys().keyId; }
+  private get keySecret(): string { return this.keys().keySecret; }
+  private get webhookSecret(): string { return this.keys().webhookSecret; }
 
   private authHeader(): string {
     return `Basic ${Buffer.from(`${this.keyId}:${this.keySecret}`).toString('base64')}`;

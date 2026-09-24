@@ -9,6 +9,8 @@ import { SchedulingModule } from '../scheduling/scheduling.module';
 import { PricingModule } from '../pricing/pricing.module';
 import { MasterDataModule } from '../master-data/master-data.module';
 import { PlatformSettingsModule } from '../platform-settings/platform-settings.module';
+import { IntegrationsModule } from '../integrations/integrations.module';
+import { IntegrationCredentialStore } from '../integrations/integration-credential.store';
 import { MockGateway } from './infrastructure/gateways/mock.gateway';
 import { RazorpayGateway } from './infrastructure/gateways/razorpay.gateway';
 import { TestGateway } from './infrastructure/gateways/test.gateway';
@@ -25,7 +27,7 @@ import { SettlementService } from './application/services/settlement.service';
  * Depends on booking (to confirm on capture).
  */
 @Module({
-  imports: [ConfigModule, DatabaseModule, MessagingModule, BookingModule, SchedulingModule, PricingModule, MasterDataModule, PlatformSettingsModule],
+  imports: [ConfigModule, DatabaseModule, MessagingModule, BookingModule, SchedulingModule, PricingModule, MasterDataModule, PlatformSettingsModule, IntegrationsModule],
   controllers: [PaymentController],
   providers: [
     PaymentRepository,
@@ -37,12 +39,16 @@ import { SettlementService } from './application/services/settlement.service';
     // (while PAYMENT_TEST_MODE is on) → reference MockGateway. Flipping to
     // production is purely an env-var change — RAZORPAY_KEY_ID present wins
     // regardless of PAYMENT_TEST_MODE, so you don't have to remember to also
-    // flip that flag off.
+    // flip that flag off. Razorpay saved + enabled under Admin → Integrations
+    // counts the same as the env keys; that choice is made at process start.
     {
       provide: PaymentGateway,
-      useFactory: (config: AppConfig, razorpay: RazorpayGateway) =>
-        config.payment.razorpay.enabled ? razorpay : config.payment.testMode ? new TestGateway(config) : new MockGateway(config),
-      inject: [AppConfig, RazorpayGateway],
+      useFactory: async (config: AppConfig, razorpay: RazorpayGateway, credentials: IntegrationCredentialStore) => {
+        await credentials.ready();
+        const razorpayOn = config.payment.razorpay.enabled || credentials.active('razorpay') !== null;
+        return razorpayOn ? razorpay : config.payment.testMode ? new TestGateway(config) : new MockGateway(config);
+      },
+      inject: [AppConfig, RazorpayGateway, IntegrationCredentialStore],
     },
   ],
   exports: [LedgerRepository, PaymentRepository, PaymentService, SettlementService, PaymentGateway],

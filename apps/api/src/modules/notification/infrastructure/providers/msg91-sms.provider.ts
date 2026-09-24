@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { AppConfig } from '@config';
 import { Logger } from '@observability';
 
+import { IntegrationCredentialStore } from '../../../integrations/integration-credential.store';
 import type { NotificationProvider, SendRequest, SendResult } from '../provider.interface';
 
 /**
@@ -24,6 +25,9 @@ import type { NotificationProvider, SendRequest, SendResult } from '../provider.
  *
  * `country` is hardcoded to '91' (India) since MSG91's core business is
  * India-only routes; international SMS needs a different MSG91 product.
+ *
+ * Credentials: the platform admin's saved `msg91_sms` integration wins when
+ * it is enabled (#16); otherwise the MSG91_* environment variables are used.
  */
 @Injectable()
 export class Msg91SmsProvider implements NotificationProvider {
@@ -33,13 +37,26 @@ export class Msg91SmsProvider implements NotificationProvider {
 
   constructor(
     private readonly config: AppConfig,
+    private readonly credentials: IntegrationCredentialStore,
     logger: Logger,
   ) {
     this.log = logger.forContext('Msg91Sms');
   }
 
-  async send(req: SendRequest): Promise<SendResult> {
+  /** True when either the saved integration or the env vars can send. */
+  isConfigured(): boolean {
+    return this.credentials.active('msg91_sms') !== null || this.config.notifications.msg91.enabled;
+  }
+
+  private settings(): { authKey: string; senderId: string; route: string } {
+    const saved = this.credentials.active('msg91_sms');
+    if (saved) return { authKey: saved.secrets.authKey, senderId: saved.config.senderId, route: saved.config.route };
     const { msg91 } = this.config.notifications;
+    return { authKey: msg91.authKey, senderId: msg91.senderId, route: msg91.route };
+  }
+
+  async send(req: SendRequest): Promise<SendResult> {
+    const msg91 = this.settings();
     const mobile = normaliseIndianMobile(req.recipient);
     if (!mobile) return { ok: false, error: `Not a valid Indian mobile number: ${req.recipient}` };
 

@@ -4,6 +4,7 @@ import { CacheModule } from '@cache';
 import { DatabaseModule } from '@database';
 
 import { PlatformSettingsRepository } from '../tenancy/infrastructure/persistence/platform-settings.repository';
+import { PlatformPoliciesService } from './platform-policies.service';
 
 /**
  * Deliberately standalone — depends on nothing but DatabaseModule/CacheModule,
@@ -15,10 +16,14 @@ import { PlatformSettingsRepository } from '../tenancy/infrastructure/persistenc
  * importing TenancyModule directly is safe for them — BookingModule doesn't
  * import either back — so they're left as-is; this module exists purely to
  * break the one cycle that mattered.)
+ *
+ * `PlatformPoliciesService` (password policy, admin IP allowlist, GST slabs,
+ * agent credit and retention policies) lives here for the same reason: IAM,
+ * agents and the worker all read it.
  */
 @Module({
   imports: [DatabaseModule, CacheModule],
-  providers: [PlatformSettingsRepository],
-  exports: [PlatformSettingsRepository],
+  providers: [PlatformSettingsRepository, PlatformPoliciesService],
+  exports: [PlatformSettingsRepository, PlatformPoliciesService],
 })
 export class PlatformSettingsModule {}

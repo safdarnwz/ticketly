@@ -3,6 +3,8 @@ import nodemailer, { type Transporter } from 'nodemailer';
 
 import { Logger } from '@observability';
 
+import { IntegrationCredentialStore } from '../../../integrations/integration-credential.store';
+
 /**
  * SMTP mailer backed by Gmail (an app-password account).
  *
@@ -23,6 +25,11 @@ import { Logger } from '@observability';
  * operator's customers seeing "Ticketly" regardless of who they actually
  * booked with — the platform's own name is the right fallback only when no
  * tenant context applies (a platform-wide email, or fromName omitted).
+ *
+ * SMTP OVERRIDE (#18): when the platform admin has saved and enabled an
+ * `smtp` integration, mail goes through THAT server and From address instead
+ * of the Gmail env account. The transport is rebuilt only when the saved
+ * settings change.
  */
 @Injectable()
 export class Mailer {
@@ -31,7 +38,9 @@ export class Mailer {
   private readonly from: string;
   private readonly fromAddress: string;
 
-  constructor(logger: Logger) {
+  private smtp?: { key: string; transporter: Transporter; from: string; fromAddress: string };
+
+  constructor(logger: Logger, private readonly credentials: IntegrationCredentialStore) {
     this.log = logger.forContext('Mailer');
     const user = process.env.GMAIL_USER;
     const pass = process.env.GMAIL_APP_PASSWORD;
@@ -48,12 +57,16 @@ export class Mailer {
   }
 
   async send(input: { to: string; subject: string; html: string; text?: string; fromName?: string; attachments?: { filename: string; content: Buffer; contentType?: string }[] }): Promise<void> {
-    const from = input.fromName ? `${input.fromName} <${this.fromAddress}>` : this.from;
-    if (!this.transporter) {
+    const saved = this.savedSmtp();
+    const fromAddress = saved?.fromAddress ?? this.fromAddress;
+    const defaultFrom = saved?.from ?? this.from;
+    const from = input.fromName ? `${input.fromName} <${fromAddress}>` : defaultFrom;
+    const transporter = saved?.transporter ?? this.transporter;
+    if (!transporter) {
       this.log.info({ to: input.to, subject: input.subject, from, attachments: input.attachments?.length ?? 0 }, 'Email (dev, not sent)');
       return;
     }
-    await this.transporter.sendMail({
+    await transporter.sendMail({
       from,
       to: input.to,
       subject: input.subject,
@@ -63,4 +76,22 @@ export class Mailer {
     });
     this.log.info({ to: input.to, subject: input.subject, from, attachments: input.attachments?.length ?? 0 }, 'Email sent');
   }
+
+  /** The admin-configured SMTP transport, or undefined to use the Gmail env account. */
+  private savedSmtp(): { transporter: Transporter; from: string; fromAddress: string } | undefined {
+    const saved = this.credentials.active('smtp');
+    if (!saved) return undefined;
+    const { host, port, secure, user, fromAddress, fromName } = saved.config;
+    const key = JSON.stringify([host, port, secure, user, fromAddress, fromName, saved.secrets.password]);
+    if (this.smtp?.key !== key) {
+      this.smtp = {
+        key,
+        transporter: nodemailer.createTransport({ host, port, secure, auth: { user, pass: saved.secrets.password } }),
+        from: `${fromName} <${fromAddress}>`,
+        fromAddress,
+      };
+    }
+    return this.smtp;
+  }
 }
+

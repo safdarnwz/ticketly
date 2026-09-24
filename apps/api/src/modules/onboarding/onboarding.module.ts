@@ -9,6 +9,7 @@ import { NotificationModule } from '../notification/notification.module';
 import { OnboardingService } from './application/services/onboarding.service';
 import { OperatorApplicationRepository } from './infrastructure/persistence/operator-application.repository';
 import { OnboardingController } from './presentation/onboarding.controller';
+import { PlatformSettingsModule } from '../platform-settings/platform-settings.module';
 
 /**
  * Operator onboarding: the public "Become an Operator" application + the
@@ -17,7 +18,7 @@ import { OnboardingController } from './presentation/onboarding.controller';
  * pure (domain/application-status.ts).
  */
 @Module({
-  imports: [DatabaseModule, SecurityModule, IamModule, NotificationModule, FilesModule],
+  imports: [DatabaseModule, SecurityModule, IamModule, NotificationModule, FilesModule, PlatformSettingsModule],
   controllers: [OnboardingController],
   providers: [OperatorApplicationRepository, OnboardingService],
   exports: [OnboardingService],

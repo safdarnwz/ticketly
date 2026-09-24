@@ -88,6 +88,18 @@ export class SessionRepository {
     );
   }
 
+  /** Distinct IPs of the user's most recent sessions (for new-IP login alerts). */
+  async recentIps(userId: UserId, tenantId: TenantId | null, limit = 20): Promise<string[]> {
+    const rows = await this.db.query<{ ip: string }>(
+      `SELECT DISTINCT host(ip) AS ip FROM (
+         SELECT ip FROM sessions WHERE user_id = $1 AND ip IS NOT NULL ORDER BY created_at DESC LIMIT $2
+       ) recent`,
+      [userId, limit],
+      { name: 'session.recentIps', primary: true, tenantId },
+    );
+    return rows.map((r) => r.ip);
+  }
+
   async touch(id: SessionId): Promise<void> {
     await this.db.execute_(
       `UPDATE sessions SET last_used_at = now() WHERE id = $1`,

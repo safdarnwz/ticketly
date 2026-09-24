@@ -14,6 +14,7 @@ import { Tenant } from '../../domain/tenant.entity';
 import { PlanRepository } from '../../infrastructure/persistence/plan.repository';
 import { TenantContextService } from './tenant-context.service';
 import { TenantRepository } from '../../infrastructure/persistence/tenant.repository';
+import { PlatformPoliciesService } from '../../../platform-settings/platform-policies.service';
 
 /**
  * Tenant provisioning — the transactional workflow that stands up a new
@@ -43,6 +44,7 @@ export class TenantProvisioningService {
     private readonly tenantContext: TenantContextService,
     private readonly events: EventBus,
     logger: Logger,
+    private readonly policies: PlatformPoliciesService,
   ) {
     this.log = logger.forContext('TenantProvisioning');
   }
@@ -68,6 +70,7 @@ export class TenantProvisioningService {
       planId: plan?.id ?? null,
     });
 
+    await this.policies.assertPasswordAcceptable(input.owner.password);
     const ownerPasswordHash = await this.hasher.hash(input.owner.password);
 
     const ownerId = await this.uow.run<UserId>(

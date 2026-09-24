@@ -15,6 +15,7 @@ import { defaultLogoSvg } from '../../../files/domain/default-logo';
 import { Logger } from '@observability';
 import { approvalBlockers, assertReview, type ApplicationStatus } from '../../domain/application-status';
 import { OperatorApplicationRepository } from '../../infrastructure/persistence/operator-application.repository';
+import { PlatformPoliciesService } from '../../../platform-settings/platform-policies.service';
 
 export interface ApplyInput {
   firstName: string; lastName: string; email: string; mobile: string; designation?: string; password: string;
@@ -52,6 +53,7 @@ export class OnboardingService {
     private readonly notifications: NotificationService,
     private readonly files: FileService,
     private readonly logger: Logger,
+    private readonly policies: PlatformPoliciesService,
   ) {}
 
   async apply(input: ApplyInput): Promise<{ applicationId: string; status: 'pending' }> {
@@ -70,6 +72,7 @@ export class OnboardingService {
         throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: `Document '${docType}' was not uploaded correctly — please upload it again` });
       });
     }
+    await this.policies.assertPasswordAcceptable(input.password);
     const passwordHash = await this.hasher.hash(input.password);
     const applicationId = await this.repo.insert({
       ...input, passwordHash,

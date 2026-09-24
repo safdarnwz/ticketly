@@ -158,6 +158,9 @@ export class User extends AggregateRoot<UserId> {
   get kind(): UserKind {
     return this.props.kind;
   }
+  get email(): string | null {
+    return this.props.email;
+  }
   snapshot(): Readonly<UserProps> {
     return this.props;
   }

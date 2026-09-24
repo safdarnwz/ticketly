@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { AppConfig } from '@config';
 import { Logger } from '@observability';
 
+import { IntegrationCredentialStore } from '../../../integrations/integration-credential.store';
 import { normaliseIndianMobile } from './msg91-sms.provider';
 import type { NotificationProvider, SendRequest, SendResult } from '../provider.interface';
 
@@ -23,6 +24,9 @@ import type { NotificationProvider, SendRequest, SendResult } from '../provider.
  * business step, not something this code can do; this provider covers the
  * within-window / already-templated-text case. Swap `content_type`/`payload`
  * to MSG91's template shape once a template is approved, if needed.
+ *
+ * Credentials: the saved `msg91_whatsapp` integration wins when enabled
+ * (#17); otherwise the MSG91_* environment variables are used.
  */
 @Injectable()
 export class Msg91WhatsAppProvider implements NotificationProvider {
@@ -32,13 +36,26 @@ export class Msg91WhatsAppProvider implements NotificationProvider {
 
   constructor(
     private readonly config: AppConfig,
+    private readonly credentials: IntegrationCredentialStore,
     logger: Logger,
   ) {
     this.log = logger.forContext('Msg91WhatsApp');
   }
 
-  async send(req: SendRequest): Promise<SendResult> {
+  isConfigured(): boolean {
     const { msg91 } = this.config.notifications;
+    return this.credentials.active('msg91_whatsapp') !== null || (msg91.enabled && msg91.whatsappIntegratedNumber.length > 0);
+  }
+
+  private settings(): { authKey: string; whatsappIntegratedNumber: string } {
+    const saved = this.credentials.active('msg91_whatsapp');
+    if (saved) return { authKey: saved.secrets.authKey, whatsappIntegratedNumber: saved.config.integratedNumber };
+    const { msg91 } = this.config.notifications;
+    return { authKey: msg91.authKey, whatsappIntegratedNumber: msg91.whatsappIntegratedNumber };
+  }
+
+  async send(req: SendRequest): Promise<SendResult> {
+    const msg91 = this.settings();
     const mobile = normaliseIndianMobile(req.recipient);
     if (!mobile) return { ok: false, error: `Not a valid Indian mobile number: ${req.recipient}` };
 
