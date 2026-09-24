@@ -27,6 +27,7 @@ import { User } from '../../domain/user.entity';
 import { RoleRepository } from '../../infrastructure/persistence/role.repository';
 import { UserRepository } from '../../infrastructure/persistence/user.repository';
 import { SessionRepository } from '../../infrastructure/persistence/session.repository';
+import { OtpChallengeRepository } from '../../infrastructure/persistence/otp-challenge.repository';
 import { OtpProvider } from '../../infrastructure/otp/otp-provider';
 
 export interface AuthTokens {
@@ -73,6 +74,7 @@ export class AuthService {
     logger: Logger,
     private readonly metrics: Metrics,
     private readonly otpProvider: OtpProvider,
+    private readonly otpChallenges: OtpChallengeRepository,
     private readonly policies: PlatformPoliciesService,
     private readonly alerts: SecurityAlertService,
   ) {
@@ -296,47 +298,24 @@ export class AuthService {
     userAgent?: string;
     ip?: string;
   }): Promise<AuthTokens> {
-    const user = await this.uow.run<User>({ name: 'auth.verifyRegistration' }, async (scope) => {
-      const ch = await scope.client.query<{
-        id: string;
-        code_hash: string;
-        attempts: number;
-        max_attempts: number;
-      }>(
-        `SELECT id, code_hash, attempts, max_attempts FROM otp_challenges
-          WHERE tenant_id IS NULL AND identity = $1 AND purpose = 'register'
-            AND consumed_at IS NULL AND expires_at > now()
-          ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
-        [input.email],
-      );
-      const row = ch.rows[0];
-      if (!row)
-        throw new AppError(ErrorCode.AUTH_OTP_INVALID, 401, {
-          message: 'No active code; request a new one',
-        });
-      if (row.attempts >= row.max_attempts)
-        throw new AppError(ErrorCode.AUTH_OTP_INVALID, 429, {
-          message: 'Too many attempts; request a new code',
-        });
-      if (!this.otp.verify(input.code, input.email, row.code_hash)) {
-        await scope.client.query(
-          `UPDATE otp_challenges SET attempts = attempts + 1 WHERE id = $1`,
-          [row.id],
-        );
-        throw new AppError(ErrorCode.AUTH_OTP_INVALID, 401, { message: 'Incorrect code' });
-      }
-      await scope.client.query(`UPDATE otp_challenges SET consumed_at = now() WHERE id = $1`, [
-        row.id,
-      ]);
+    const user = await this.uow.run<User | AppError>(
+      { name: 'auth.verifyRegistration' },
+      async () => {
+        const rejected = await this.consumeOtp(null, input.email, 'register', input.code);
+        if (rejected) return rejected;
 
-      const found = await this.users.findByEmailGlobal(input.email);
-      if (!found)
-        throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Registration not found' });
-      found.activate();
-      found.recordSuccessfulLogin();
-      await this.users.update(found, found.version);
-      return found;
-    });
+        const found = await this.users.findByEmailGlobal(input.email);
+        if (!found)
+          throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, {
+            message: 'Registration not found',
+          });
+        found.activate();
+        found.recordSuccessfulLogin();
+        await this.users.update(found, found.version);
+        return found;
+      },
+    );
+    if (user instanceof AppError) throw user;
     return this.issueForUser(user, input.userAgent, input.ip, 'register');
   }
 
@@ -351,12 +330,13 @@ export class AuthService {
     const codeHash = this.otp.hashOtp(code, input.identity);
     const ttl = 300;
     const challengeId = newId();
-    await this.uow.run({ name: 'auth.issueOtp', tenantId: input.tenantId }, async (scope) => {
-      await scope.client.query(
-        `INSERT INTO otp_challenges (id, tenant_id, identity, purpose, code_hash, expires_at)
-         VALUES ($1,$2,$3,$4,$5, now() + make_interval(secs => $6))`,
-        [challengeId, input.tenantId, input.identity, input.purpose, codeHash, ttl],
-      );
+    await this.otpChallenges.insert({
+      id: challengeId,
+      tenantId: input.tenantId,
+      identity: input.identity,
+      purpose: input.purpose,
+      codeHash,
+      ttlSeconds: ttl,
     });
     try {
       await this.otpProvider.deliver(input.identity, code, {
@@ -369,6 +349,35 @@ export class AuthService {
     if (!this.config.isProduction)
       this.log.info({ identity: input.identity, code }, 'OTP (dev only)');
     return { challengeId, expiresInSeconds: ttl };
+  }
+
+  /**
+   * Check `code` against the newest active challenge and consume it. Runs
+   * inside the caller's unit of work. A wrong code is RETURNED, not thrown: the
+   * caller commits (so the failed attempt is counted — a throw would roll it
+   * back and make the attempt limit useless) and throws after the transaction.
+   */
+  private async consumeOtp(
+    tenantId: TenantId | null,
+    identity: string,
+    purpose: string,
+    code: string,
+  ): Promise<AppError | null> {
+    const challenge = await this.otpChallenges.lockLatestActive(tenantId, identity, purpose);
+    if (!challenge)
+      throw new AppError(ErrorCode.AUTH_OTP_INVALID, 401, {
+        message: 'No active code; request a new one',
+      });
+    if (challenge.attempts >= challenge.maxAttempts)
+      throw new AppError(ErrorCode.AUTH_OTP_INVALID, 429, {
+        message: 'Too many attempts; request a new code',
+      });
+    if (!this.otp.verify(code, identity, challenge.codeHash)) {
+      await this.otpChallenges.recordFailedAttempt(challenge.id);
+      return new AppError(ErrorCode.AUTH_OTP_INVALID, 401, { message: 'Incorrect code' });
+    }
+    await this.otpChallenges.consume(challenge.id);
+    return null;
   }
 
   /** Email + password login (operator staff). */
@@ -434,42 +443,17 @@ export class AuthService {
     // operator pays for every single one. One request per identity per
     // 45 seconds is enough for a genuine "didn't arrive, resend" case
     // without opening this door.
-    const recent = await this.uow.run<{ n: string } | null>(
-      { name: 'auth.requestOtp.cooldownCheck', tenantId: input.tenantId },
-      async (scope) =>
-        (
-          await scope.client.query<{ n: string }>(
-            `SELECT count(*) AS n FROM otp_challenges WHERE identity = $1 AND created_at > now() - interval '45 seconds'`,
-            [input.identity],
-          )
-        ).rows[0] ?? null,
-    );
-    if (Number(recent?.n ?? 0) > 0) {
+    if ((await this.otpChallenges.countSentSince(input.identity, 45, input.tenantId)) > 0) {
       throw new AppError(ErrorCode.COMMON_RATE_LIMITED, 429, {
         message: 'Please wait before requesting another code',
         retryable: true,
       });
     }
-
-    const code = this.otp.generate(6);
-    const codeHash = this.otp.hashOtp(code, input.identity);
-    const ttl = 300;
-    const challengeId = newId();
-
-    await this.uow.run({ name: 'auth.requestOtp', tenantId: input.tenantId }, async (scope) => {
-      await scope.client.query(
-        `INSERT INTO otp_challenges (id, tenant_id, identity, purpose, code_hash, expires_at)
-         VALUES ($1,$2,$3,$4,$5, now() + make_interval(secs => $6))`,
-        [challengeId, input.tenantId, input.identity, input.purpose ?? 'login', codeHash, ttl],
-      );
+    return this.issueOtp({
+      identity: input.identity,
+      tenantId: input.tenantId,
+      purpose: input.purpose ?? 'login',
     });
-
-    // In production the code is delivered by the notification module (Part 9)
-    // subscribing to this event. In dev we log it so testing is possible.
-    if (!this.config.isProduction)
-      this.log.info({ identity: input.identity, code }, 'OTP (dev only)');
-
-    return { challengeId, expiresInSeconds: ttl };
   }
 
   /** Step 2 of OTP login: verify the code, create the customer if new, issue tokens. */
@@ -481,41 +465,11 @@ export class AuthService {
     userAgent?: string;
     ip?: string;
   }): Promise<AuthTokens> {
-    const user = await this.uow.run<User>(
+    const user = await this.uow.run<User | AppError>(
       { name: 'auth.verifyOtp', tenantId: input.tenantId },
-      async (scope) => {
-        const challenge = await scope.client.query<{
-          id: string;
-          code_hash: string;
-          attempts: number;
-          max_attempts: number;
-        }>(
-          `SELECT id, code_hash, attempts, max_attempts FROM otp_challenges
-          WHERE tenant_id IS NOT DISTINCT FROM $1 AND identity = $2 AND purpose = 'login'
-            AND consumed_at IS NULL AND expires_at > now()
-          ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
-          [input.tenantId, input.identity],
-        );
-        const row = challenge.rows[0];
-        if (!row)
-          throw new AppError(ErrorCode.AUTH_OTP_INVALID, 401, {
-            message: 'No active code; request a new one',
-          });
-        if (row.attempts >= row.max_attempts)
-          throw new AppError(ErrorCode.AUTH_OTP_INVALID, 429, {
-            message: 'Too many attempts; request a new code',
-          });
-
-        if (!this.otp.verify(input.code, input.identity, row.code_hash)) {
-          await scope.client.query(
-            `UPDATE otp_challenges SET attempts = attempts + 1 WHERE id = $1`,
-            [row.id],
-          );
-          throw new AppError(ErrorCode.AUTH_OTP_INVALID, 401, { message: 'Incorrect code' });
-        }
-        await scope.client.query(`UPDATE otp_challenges SET consumed_at = now() WHERE id = $1`, [
-          row.id,
-        ]);
+      async () => {
+        const rejected = await this.consumeOtp(input.tenantId, input.identity, 'login', input.code);
+        if (rejected) return rejected;
 
         // Find-or-create the customer by phone/email.
         const isEmail = input.identity.includes('@');
@@ -542,6 +496,7 @@ export class AuthService {
         return found;
       },
     );
+    if (user instanceof AppError) throw user;
 
     return this.issueForUser(user, input.userAgent, input.ip, 'otp');
   }
@@ -565,41 +520,16 @@ export class AuthService {
   }): Promise<void> {
     // Checked before the OTP is consumed, so a rejected password doesn't burn the code.
     await this.policies.assertPasswordAcceptable(input.newPassword);
-    const userId = await this.uow.run<UserId>(
+    const userId = await this.uow.run<UserId | AppError>(
       { name: 'auth.resetPassword', tenantId: input.tenantId },
-      async (scope) => {
-        const challenge = await scope.client.query<{
-          id: string;
-          code_hash: string;
-          attempts: number;
-          max_attempts: number;
-        }>(
-          `SELECT id, code_hash, attempts, max_attempts FROM otp_challenges
-          WHERE tenant_id IS NOT DISTINCT FROM $1 AND identity = $2 AND purpose = 'password_reset'
-            AND consumed_at IS NULL AND expires_at > now()
-          ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
-          [input.tenantId, input.identity],
+      async () => {
+        const rejected = await this.consumeOtp(
+          input.tenantId,
+          input.identity,
+          'password_reset',
+          input.code,
         );
-        const row = challenge.rows[0];
-        if (!row)
-          throw new AppError(ErrorCode.AUTH_OTP_INVALID, 401, {
-            message: 'No active code; request a new one',
-          });
-        if (row.attempts >= row.max_attempts)
-          throw new AppError(ErrorCode.AUTH_OTP_INVALID, 429, {
-            message: 'Too many attempts; request a new code',
-          });
-
-        if (!this.otp.verify(input.code, input.identity, row.code_hash)) {
-          await scope.client.query(
-            `UPDATE otp_challenges SET attempts = attempts + 1 WHERE id = $1`,
-            [row.id],
-          );
-          throw new AppError(ErrorCode.AUTH_OTP_INVALID, 401, { message: 'Incorrect code' });
-        }
-        await scope.client.query(`UPDATE otp_challenges SET consumed_at = now() WHERE id = $1`, [
-          row.id,
-        ]);
+        if (rejected) return rejected;
 
         const isEmail = input.identity.includes('@');
         const user = isEmail
@@ -615,6 +545,7 @@ export class AuthService {
         return user.id;
       },
     );
+    if (userId instanceof AppError) throw userId;
 
     await this.sessions.revokeAllForUser(userId, 'password-reset');
   }

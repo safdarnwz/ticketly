@@ -2,6 +2,7 @@ import { Module, type MiddlewareConsumer, type NestModule } from '@nestjs/common
 import { APP_GUARD } from '@nestjs/core';
 import { MaintenanceGuard } from './presentation/guards/maintenance.guard';
 import { StaffAccessService } from './application/services/staff-access.service';
+import { StaffAccessRepository } from './infrastructure/persistence/staff-access.repository';
 import { MaintenanceController } from './presentation/maintenance.controller';
 
 import { CacheModule } from '@cache';
@@ -14,6 +15,8 @@ import { IntegrationsModule } from '../integrations/integrations.module';
 import { NotificationModule } from '../notification/notification.module';
 import { ApiKeyController } from './presentation/api-key.controller';
 import { ApiKeyService } from './application/services/api-key.service';
+import { ApiKeyRepository } from './infrastructure/persistence/api-key.repository';
+import { OtpChallengeRepository } from './infrastructure/persistence/otp-challenge.repository';
 import { SecurityAlertService } from './application/services/security-alert.service';
 import { AuthController } from './presentation/auth.controller';
 import { AuthService } from './application/services/auth.service';
@@ -28,6 +31,7 @@ import { TenantResolutionMiddleware } from './presentation/tenant-resolution.mid
 import { OtpProvider } from './infrastructure/otp/otp-provider';
 import { EmailOtpProvider } from './infrastructure/otp/email-otp.provider';
 import { SmsOtpProvider } from './infrastructure/otp/sms-otp.provider';
+import { OtpDeliveryRouter } from './infrastructure/otp/otp-delivery.router';
 
 /**
  * Identity & Access Management.
@@ -60,7 +64,10 @@ import { SmsOtpProvider } from './infrastructure/otp/sms-otp.provider';
     MaintenanceController,
   ],
   providers: [
+    StaffAccessRepository,
     StaffAccessService,
+    ApiKeyRepository,
+    OtpChallengeRepository,
     ApiKeyService,
     SecurityAlertService,
     AuthService,
@@ -69,7 +76,8 @@ import { SmsOtpProvider } from './infrastructure/otp/sms-otp.provider';
     SmsOtpProvider,
     // OTP delivery is behind an abstraction — email today, SMS later is a one-line swap.
     // Injected by type via the abstract-class token (no @Inject / Symbol).
-    { provide: OtpProvider, useClass: EmailOtpProvider },
+    EmailOtpProvider,
+    { provide: OtpProvider, useClass: OtpDeliveryRouter },
     AuthGuard,
     PermissionGuard,
     TenantActiveGuard,

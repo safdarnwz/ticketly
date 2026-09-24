@@ -3,7 +3,6 @@ import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 
 import { CacheService } from '@cache';
-import { DatabaseService } from '@database';
 import {
   newId,
   NotFoundError,
@@ -13,6 +12,8 @@ import {
   type UserId,
 } from '@kernel';
 import { randomToken } from '@security';
+
+import { ApiKeyRepository } from '../../infrastructure/persistence/api-key.repository';
 
 export interface ApiKeyRecord {
   id: ApiKeyId;
@@ -26,7 +27,7 @@ export interface ApiKeyRecord {
 }
 
 /**
- * API keys for OTA / channel-partner server-to-server access.
+ * Operator API keys for server-to-server access (sent as `X-Api-Key`).
  *
  * SHAPE: `gds_<prefix8>_<secret>`. Only a SHA-256 of the whole key is stored;
  * the plaintext is returned exactly once at creation. The 8-char prefix is
@@ -40,7 +41,7 @@ export interface ApiKeyRecord {
 @Injectable()
 export class ApiKeyService {
   constructor(
-    private readonly db: DatabaseService,
+    private readonly keys: ApiKeyRepository,
     private readonly cache: CacheService,
   ) {}
 
@@ -59,22 +60,17 @@ export class ApiKeyService {
     const plaintext = `gds_${prefix}_${secret}`;
     const keyHash = hashKey(plaintext);
 
-    await this.db.execute_(
-      `INSERT INTO api_keys (id, tenant_id, name, prefix, key_hash, scopes, ip_allowlist, expires_at, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-      [
-        id,
-        tenantId,
-        input.name,
-        prefix,
-        keyHash,
-        input.scopes,
-        input.ipAllowlist ?? [],
-        input.expiresAt ?? null,
-        input.createdBy ?? null,
-      ],
-      { name: 'apikey.issue', primary: true },
-    );
+    await this.keys.insert({
+      id,
+      tenantId,
+      name: input.name,
+      prefix,
+      keyHash,
+      scopes: input.scopes,
+      ipAllowlist: input.ipAllowlist ?? [],
+      expiresAt: input.expiresAt ?? null,
+      createdBy: input.createdBy ?? null,
+    });
     return { id, plaintext, prefix };
   }
 
@@ -93,22 +89,17 @@ export class ApiKeyService {
       prefix,
       { namespace: 'apikey', ttlSeconds: 60 },
       async () => {
-        const row = await this.db.queryOne<KeyRow>(
-          `SELECT id, tenant_id, name, prefix, key_hash, scopes, ip_allowlist, expires_at, revoked_at
-             FROM api_keys WHERE prefix = $1 AND revoked_at IS NULL`,
-          [prefix],
-          { name: 'apikey.load', primary: true },
-        );
+        const row = await this.keys.findActiveByPrefix(prefix);
         if (!row) return null;
         return {
           id: row.id,
-          tenantId: row.tenant_id,
+          tenantId: row.tenantId,
           name: row.name,
           prefix: row.prefix,
-          keyHash: row.key_hash,
+          keyHash: row.keyHash,
           scopes: row.scopes,
-          ipAllowlist: (row.ip_allowlist ?? []).map(String),
-          expiresAt: row.expires_at ? row.expires_at.toISOString() : null,
+          ipAllowlist: row.ipAllowlist,
+          expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,
         };
       },
     );
@@ -120,12 +111,7 @@ export class ApiKeyService {
       return null;
 
     // Best-effort last-used stamp; never block the request on it.
-    void this.db
-      .execute_(`UPDATE api_keys SET last_used_at = now() WHERE id = $1`, [record.id], {
-        name: 'apikey.touch',
-        primary: true,
-      })
-      .catch(() => undefined);
+    void this.keys.touch(record.id).catch(() => undefined);
 
     return {
       id: record.id,
@@ -140,48 +126,17 @@ export class ApiKeyService {
   }
 
   async revoke(id: ApiKeyId): Promise<void> {
-    const tenantId = requireTenantId();
-    const row = await this.db.queryOne<{ prefix: string }>(
-      `UPDATE api_keys SET revoked_at = now() WHERE id = $1 AND tenant_id = $2 AND revoked_at IS NULL RETURNING prefix`,
-      [id, tenantId],
-      { name: 'apikey.revoke', primary: true },
-    );
-    if (!row) throw new NotFoundError('API key', id);
-    await this.cache.invalidate(row.prefix, 'apikey');
+    const prefix = await this.keys.revoke(id, requireTenantId());
+    if (!prefix) throw new NotFoundError('API key', id);
+    await this.cache.invalidate(prefix, 'apikey');
   }
 
   async list(): Promise<ApiKeyRecord[]> {
-    const tenantId = requireTenantId();
-    const rows = await this.db.query<KeyRow>(
-      `SELECT id, tenant_id, name, prefix, key_hash, scopes, ip_allowlist, expires_at, revoked_at
-         FROM api_keys WHERE tenant_id = $1 AND revoked_at IS NULL ORDER BY created_at DESC`,
-      [tenantId],
-      { name: 'apikey.list' },
-    );
-    return rows.map((row) => ({
-      id: row.id,
-      tenantId: row.tenant_id,
-      name: row.name,
-      prefix: row.prefix,
-      scopes: row.scopes,
-      ipAllowlist: (row.ip_allowlist ?? []).map(String),
-      expiresAt: row.expires_at,
-      revokedAt: row.revoked_at,
-    }));
+    const rows = await this.keys.listActive(requireTenantId());
+    return rows.map(({ keyHash: _hash, ...key }) => key);
   }
 }
 
-interface KeyRow {
-  id: ApiKeyId;
-  tenant_id: TenantId;
-  name: string;
-  prefix: string;
-  key_hash: string;
-  scopes: string[];
-  ip_allowlist: unknown[];
-  expires_at: Date | null;
-  revoked_at: Date | null;
-}
 interface CachedKey {
   id: ApiKeyId;
   tenantId: TenantId;

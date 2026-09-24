@@ -48,6 +48,6 @@ import { Msg91WhatsAppProvider } from './infrastructure/providers/msg91-whatsapp
     EmailNotificationProvider,
     Mailer,
   ],
-  exports: [NotificationService, Mailer],
+  exports: [NotificationService, Mailer, ProviderRegistry],
 })
 export class NotificationModule {}

@@ -5,6 +5,7 @@ import { DatabaseModule } from '@database';
 import { SecurityModule } from '@security';
 
 import { AuditService } from './application/services/audit.service';
+import { AuditLogRepository } from './infrastructure/persistence/audit-log.repository';
 import { RoleRepository } from './infrastructure/persistence/role.repository';
 import { SessionRepository } from './infrastructure/persistence/session.repository';
 import { UserRepository } from './infrastructure/persistence/user.repository';
@@ -18,7 +19,7 @@ import { UserRepository } from './infrastructure/persistence/user.repository';
  */
 @Module({
   imports: [DatabaseModule, CacheModule, SecurityModule],
-  providers: [UserRepository, RoleRepository, SessionRepository, AuditService],
-  exports: [UserRepository, RoleRepository, SessionRepository, AuditService],
+  providers: [UserRepository, RoleRepository, SessionRepository, AuditLogRepository, AuditService],
+  exports: [UserRepository, RoleRepository, SessionRepository, AuditLogRepository, AuditService],
 })
 export class IamCoreModule {}

@@ -8,6 +8,7 @@ import { Logger } from '@observability';
 import { PasswordHasher } from '@security';
 
 import { User } from '../../domain/user.entity';
+import { RoleRepository } from '../../infrastructure/persistence/role.repository';
 import { UserRepository } from '../../infrastructure/persistence/user.repository';
 
 /**
@@ -33,6 +34,7 @@ export class AdminBootstrapService implements OnApplicationBootstrap {
 
   constructor(
     private readonly users: UserRepository,
+    private readonly roles: RoleRepository,
     private readonly hasher: PasswordHasher,
     private readonly uow: UnitOfWork,
     logger: Logger,
@@ -74,11 +76,9 @@ export class AdminBootstrapService implements OnApplicationBootstrap {
           this.log.info({ email }, 'Super admin user created from environment');
         }
 
-        await this.uow.run({ name: 'bootstrap.superAdminRole' }, async (scope) => {
-          const role = await scope.client.query<{ id: string }>(
-            `SELECT id FROM roles WHERE code = 'super_admin' AND tenant_id IS NULL AND deleted_at IS NULL LIMIT 1`,
-          );
-          if (!role.rows[0]) {
+        await this.uow.run({ name: 'bootstrap.superAdminRole' }, async () => {
+          const role = await this.roles.findByCode('super_admin');
+          if (!role) {
             this.log.error(
               { email },
               "Super admin user exists but the 'super_admin' role row is missing — " +
@@ -86,12 +86,8 @@ export class AdminBootstrapService implements OnApplicationBootstrap {
             );
             return;
           }
-          const grant = await scope.client.query(
-            `INSERT INTO user_roles (user_id, role_id) VALUES ($1,$2)
-             ON CONFLICT DO NOTHING RETURNING user_id`,
-            [userId, role.rows[0].id],
-          );
-          if (grant.rows[0]) this.log.info({ email }, 'Super admin role granted');
+          // Idempotent: re-granting on every boot also repairs an expired grant.
+          await this.roles.grantToUser(userId, role.id, null);
         });
       } catch (e) {
         this.log.error({ err: e }, 'Super admin bootstrap failed');

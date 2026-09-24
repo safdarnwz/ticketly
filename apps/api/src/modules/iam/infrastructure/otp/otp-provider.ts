@@ -3,14 +3,14 @@
  *  OTP delivery provider abstraction
  * ============================================================================
  *
- * A one-time code needs to reach the user over SOME channel. Today that's email;
- * SMS is a planned addition. Coding the flow against this abstraction (not
- * against "send an email") means adding SMS later is one new adapter + a binding
- * change, with zero edits to the auth flow.
+ * A one-time code reaches the user by email or SMS. The auth flow codes
+ * against this abstraction; the bound implementation, OtpDeliveryRouter, picks
+ * the channel from the identity (an email address, else a mobile number).
  *
  *   OtpProvider
- *   ├── EmailOtpProvider   (live — Gmail)
- *   └── SmsOtpProvider     (stub — future)
+ *   ├── OtpDeliveryRouter  (the binding — routes to one of:)
+ *   ├── EmailOtpProvider   (Mailer: SMTP / Gmail, themed template)
+ *   └── SmsOtpProvider     (notification SMS provider: MSG91, or log when unconfigured)
  *
  * It is an ABSTRACT CLASS (not an interface) so it can serve as its own Nest DI
  * token and be injected by type — `private readonly otp: OtpProvider` — with no
@@ -25,7 +25,6 @@ export interface OtpDeliveryContext {
 }
 
 export abstract class OtpProvider {
-  abstract readonly channel: 'email' | 'sms';
-  /** `to` is an email address or an E.164 phone, per the channel. */
+  /** `to` is an email address or a mobile number. */
   abstract deliver(to: string, code: string, ctx?: OtpDeliveryContext): Promise<void>;
 }

@@ -6,8 +6,6 @@ import { OtpProvider, type OtpDeliveryContext } from './otp-provider';
 /** Delivers OTP codes by email, using the themed email template. */
 @Injectable()
 export class EmailOtpProvider extends OtpProvider {
-  readonly channel = 'email' as const;
-
   constructor(private readonly mailer: Mailer) {
     super();
   }

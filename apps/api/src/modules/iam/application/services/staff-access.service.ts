@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 
-import { DatabaseService } from '@database';
 import {
   AppError,
   ErrorCode,
@@ -14,6 +13,7 @@ import {
 import { validateWindow, type LoginWindow } from '../../domain/access-policy';
 import { RoleRepository } from '../../infrastructure/persistence/role.repository';
 import { SessionRepository } from '../../infrastructure/persistence/session.repository';
+import { StaffAccessRepository } from '../../infrastructure/persistence/staff-access.repository';
 
 /**
  * Operator-side staff access controls. Every change invalidates the user's
@@ -25,18 +25,14 @@ import { SessionRepository } from '../../infrastructure/persistence/session.repo
 @Injectable()
 export class StaffAccessService {
   constructor(
-    private readonly db: DatabaseService,
+    private readonly staff: StaffAccessRepository,
     private readonly roles: RoleRepository,
     private readonly sessions: SessionRepository,
   ) {}
 
   private async assertStaff(userId: string): Promise<void> {
-    const r = await this.db.queryOne<{ id: string }>(
-      `SELECT id FROM users WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL`,
-      [userId, requireTenantId()],
-      { name: 'staff.exists', primary: true },
-    );
-    if (!r) throw new NotFoundError('User', userId);
+    if (!(await this.staff.exists(userId, requireTenantId())))
+      throw new NotFoundError('User', userId);
   }
 
   async forceLogout(userId: string): Promise<{ sessionsRevoked: number }> {
@@ -45,11 +41,7 @@ export class StaffAccessService {
       throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
         message: 'Use "sign out everywhere" to end your own sessions',
       });
-    await this.db.execute_(
-      `UPDATE users SET tokens_valid_after = now() WHERE id = $1 AND tenant_id = $2`,
-      [userId, requireTenantId()],
-      { name: 'staff.forceLogout', primary: true },
-    );
+    await this.staff.invalidateTokens(userId, requireTenantId());
     const n = await this.sessions.revokeAllForUser(userId as UserId, 'forced-by-admin');
     await this.roles.invalidateUser(userId as UserId);
     return { sessionsRevoked: n };
@@ -75,36 +67,12 @@ export class StaffAccessService {
         });
       await this.assertStaff(input.managerId);
       // No reporting cycles: the proposed manager must not (indirectly) report to this user.
-      const cycle = await this.db.queryOne<{ hit: boolean }>(
-        `WITH RECURSIVE up AS (SELECT id, manager_id FROM users WHERE id = $1
-           UNION SELECT u.id, u.manager_id FROM users u JOIN up ON u.id = up.manager_id)
-         SELECT EXISTS (SELECT 1 FROM up WHERE id = $2) AS hit`,
-        [input.managerId, userId],
-        { name: 'staff.managerCycle', primary: true },
-      );
-      if (cycle?.hit)
+      if (await this.staff.reportsTo(input.managerId, userId))
         throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
           message: 'That would create a reporting loop',
         });
     }
-    await this.db.execute_(
-      `UPDATE users SET
-         access_expires_at = CASE WHEN $3 THEN $4::timestamptz ELSE access_expires_at END,
-         login_window      = CASE WHEN $5 THEN $6::jsonb ELSE login_window END,
-         manager_id        = CASE WHEN $7 THEN $8::uuid ELSE manager_id END
-       WHERE id = $1 AND tenant_id = $2`,
-      [
-        userId,
-        requireTenantId(),
-        input.accessExpiresAt !== undefined,
-        input.accessExpiresAt ?? null,
-        input.loginWindow !== undefined,
-        input.loginWindow ? JSON.stringify(input.loginWindow) : null,
-        input.managerId !== undefined,
-        input.managerId ?? null,
-      ],
-      { name: 'staff.setAccess', primary: true },
-    );
+    await this.staff.setAccess(userId, requireTenantId(), input);
     await this.roles.invalidateUser(userId as UserId);
   }
 

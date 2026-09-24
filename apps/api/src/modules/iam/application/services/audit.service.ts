@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 
-import { DatabaseService } from '@database';
 import { getContext, type Json, type TenantId, type UserId } from '@kernel';
 import { Logger } from '@observability';
+
+import { AuditLogRepository } from '../../infrastructure/persistence/audit-log.repository';
 
 export interface AuditEntry {
   action: string;
@@ -37,7 +38,7 @@ export class AuditService {
   private readonly log: Logger;
 
   constructor(
-    private readonly db: DatabaseService,
+    private readonly repo: AuditLogRepository,
     logger: Logger,
   ) {
     this.log = logger.forContext('AuditService');
@@ -62,61 +63,24 @@ export class AuditService {
 
   private async write(entry: AuditEntry): Promise<void> {
     const ctx = getContext();
-    await this.db.execute_(
-      `INSERT INTO audit_log
-         (tenant_id, actor_id, actor_type, action, resource_type, resource_id,
-          changes, ip, user_agent, correlation_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [
-        entry.tenantId ?? ctx?.tenantId ?? null,
-        entry.actorId ?? ctx?.userId ?? null,
-        entry.actorType ?? ctx?.actorType ?? 'system',
-        entry.action,
-        entry.resourceType,
-        entry.resourceId ?? null,
-        entry.changes ? JSON.stringify(entry.changes) : null,
-        ctx?.ip ?? null,
-        ctx?.userAgent ?? null,
-        ctx?.correlationId ?? null,
-      ],
-      { name: 'audit.write', primary: true },
-    );
+    await this.repo.insert({
+      tenantId: entry.tenantId ?? ctx?.tenantId ?? null,
+      actorId: entry.actorId ?? ctx?.userId ?? null,
+      actorType: entry.actorType ?? ctx?.actorType ?? 'system',
+      action: entry.action,
+      resourceType: entry.resourceType,
+      resourceId: entry.resourceId ?? null,
+      changes: entry.changes ? JSON.stringify(entry.changes) : null,
+      ip: ctx?.ip ?? null,
+      userAgent: ctx?.userAgent ?? null,
+      correlationId: ctx?.correlationId ?? null,
+    });
   }
 
-  /**
-   * Platform-admin read — cross-tenant by design (super admin needs to see
-   * every operator's sensitive actions, not just one). No RLS on this table
-   * (it's append-only and never customer-facing), so a plain query is fine —
-   * unlike bookings/appearance/etc. this doesn't need bypassRls.
-   */
-  async list(
+  /** Platform-admin read — cross-tenant by design (see AuditLogRepository). */
+  list(
     filter: { tenantId?: string; action?: string; resourceType?: string; limit?: number } = {},
   ): Promise<unknown[]> {
-    const conditions: string[] = [];
-    const params: unknown[] = [];
-    if (filter.tenantId) {
-      params.push(filter.tenantId);
-      conditions.push(`tenant_id = $${params.length}`);
-    }
-    if (filter.action) {
-      params.push(`%${filter.action}%`);
-      conditions.push(`action ILIKE $${params.length}`);
-    }
-    if (filter.resourceType) {
-      params.push(filter.resourceType);
-      conditions.push(`resource_type = $${params.length}`);
-    }
-    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    params.push(Math.min(filter.limit ?? 100, 500));
-
-    return this.db.query(
-      `SELECT id, tenant_id AS "tenantId", actor_id AS "actorId", actor_type AS "actorType",
-              action, resource_type AS "resourceType", resource_id AS "resourceId",
-              changes, ip, occurred_at AS "occurredAt"
-         FROM audit_log ${where}
-        ORDER BY occurred_at DESC LIMIT $${params.length}`,
-      params,
-      { name: 'audit.list' },
-    );
+    return this.repo.list({ ...filter, limit: Math.min(filter.limit ?? 100, 500) });
   }
 }

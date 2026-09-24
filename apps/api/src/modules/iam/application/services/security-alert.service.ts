@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 
-import { DatabaseService } from '@database';
 import type { TenantId, UserId } from '@kernel';
 import { Logger } from '@observability';
 
@@ -10,6 +9,7 @@ import {
   PlatformPoliciesService,
 } from '../../../platform-settings';
 import { Mailer } from '../../../notification';
+import { AuditLogRepository } from '../../infrastructure/persistence/audit-log.repository';
 import { SessionRepository } from '../../infrastructure/persistence/session.repository';
 import { AuditService } from './audit.service';
 
@@ -26,7 +26,7 @@ export class SecurityAlertService {
     private readonly policies: PlatformPoliciesService,
     private readonly audit: AuditService,
     private readonly sessions: SessionRepository,
-    private readonly db: DatabaseService,
+    private readonly auditLog: AuditLogRepository,
     private readonly mailer: Mailer,
     logger: Logger,
   ) {
@@ -49,14 +49,11 @@ export class SecurityAlertService {
       });
       const policy = await this.policies.suspiciousLoginPolicy();
       if (!policy.enabled) return;
-      const row = await this.db.queryOne<{ n: string }>(
-        `SELECT count(*) AS n FROM audit_log
-          WHERE action = 'user.login_failed' AND resource_id = $1
-            AND occurred_at > now() - make_interval(mins => $2)`,
-        [user.id, policy.windowMinutes],
-        { name: 'securityAlert.failureCount', primary: true },
+      const failures = await this.auditLog.countRecent(
+        'user.login_failed',
+        user.id,
+        policy.windowMinutes,
       );
-      const failures = Number(row?.n ?? 0);
       if (shouldAlertOnFailures(policy, failures)) {
         await this.raise(
           'repeated_failures',
