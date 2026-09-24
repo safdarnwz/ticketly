@@ -19,8 +19,6 @@ import {
   partnerCommissionReversalEntry,
   refundEntry,
 } from '../../../payment/domain/ledger';
-import { GdsRefundService } from '../../../gds/application/gds-refund.service';
-import { AgentRefundService } from '../../../agents/application/services/agent-refund.service';
 import { LedgerRepository } from '../../../payment/infrastructure/persistence/ledger.repository';
 import { PaymentGateway } from '../../../payment/infrastructure/gateways/gateway.interface';
 import {
@@ -31,6 +29,7 @@ import {
   type RefundStatus,
 } from '../../domain/refund-state';
 import { splitRefundClawback } from '../../domain/refund-clawback';
+import { RefundCreditorRegistry } from './refund-creditor.registry';
 import { RefundRepository } from '../../infrastructure/persistence/refund.repository';
 
 /**
@@ -70,8 +69,7 @@ export class RefundService {
     private readonly events: EventBus,
     logger: Logger,
     private readonly metrics: Metrics,
-    private readonly agentRefunds: AgentRefundService,
-    private readonly gdsRefunds: GdsRefundService,
+    private readonly creditors: RefundCreditorRegistry,
   ) {
     this.log = logger.forContext('RefundService');
   }
@@ -173,65 +171,50 @@ export class RefundService {
           return { kind: 'done', refundId, status: 'processing' };
         }
 
-        // B2B agent sale: the operator holds the cash → credit the agent's
-        // account, reverse the platform commission offline, settle now.
-        if (intent?.gateway === 'agent') {
-          const credited = await this.agentRefunds.creditRefund({
+        // B2B sale (operator agent / GDS partner): the refund is credited to
+        // the seller's account by that channel's registered creditor.
+        const creditor = this.creditors.for(intent?.gateway);
+        if (creditor) {
+          const tenantId = requireTenantId();
+          const credited = await creditor.creditRefund({
             bookingId: input.bookingId,
             refundId,
             refundMinor: input.amountMinor,
+            tenantId,
           });
           if (!credited) {
             await this.refunds.transition(refundId, 'failed', {
-              failureReason: 'agent booking without an agent account',
+              failureReason: creditor.missingAccountReason,
             });
             return { kind: 'done', refundId, status: 'failed' };
           }
-          await this.postOfflineRefundLedger(input.bookingId, input.amountMinor, currency);
+          if (creditor.collectedBy === 'operator') {
+            // The operator holds the cash: only the platform's commission share is reversed.
+            await this.postOfflineRefundLedger(input.bookingId, input.amountMinor, currency);
+          } else {
+            // The platform captured it from the partner: reverse the capture and
+            // give the partner's commission share back to the operator.
+            const rev = partnerCommissionReversalEntry({
+              currency,
+              bookingId: input.bookingId,
+              operatorId: tenantId,
+              clawbackMinor: credited.clawbackMinor,
+            });
+            if (rev) await this.ledger.post(rev);
+            await this.postRefundLedger(input.bookingId, input.amountMinor, currency);
+          }
           await this.refunds.transition(refundId, 'settled', { reconciled: true });
           await this.publishSettled(
             refundId,
             input.bookingId,
             input.amountMinor,
             currency,
-            'agent_account',
+            creditor.destination,
           );
-          this.metrics.bookings.inc({ outcome: 'refund_agent_account', channel: 'agent' });
-          return { kind: 'done', refundId, status: 'settled' };
-        }
-
-        // Platform GDS sale (OTA / multi-operator agent): the PARTNER refunds its
-        // customer, so the refund is credited to the partner's GDS account; the
-        // platform's capture is reversed and the partner's commission share is
-        // given back to the operator.
-        if (intent?.gateway === 'gds') {
-          const credited = await this.gdsRefunds.creditRefund({
-            bookingId: input.bookingId,
-            refundId,
-            refundMinor: input.amountMinor,
-            tenantId: requireTenantId(),
+          this.metrics.bookings.inc({
+            outcome: `refund_${creditor.destination}`,
+            channel: creditor.channel,
           });
-          if (!credited) {
-            await this.refunds.transition(refundId, 'failed', {
-              failureReason: 'GDS booking without a partner',
-            });
-            return { kind: 'done', refundId, status: 'failed' };
-          }
-          const rev = partnerCommissionReversalEntry({
-            currency,
-            bookingId: input.bookingId,
-            operatorId: requireTenantId(),
-            clawbackMinor: credited.clawbackMinor,
-          });
-          if (rev) await this.ledger.post(rev);
-          await this.settle(
-            refundId,
-            input.bookingId,
-            input.amountMinor,
-            currency,
-            'gds_partner_account',
-          );
-          this.metrics.bookings.inc({ outcome: 'refund_gds_partner', channel: 'ota' });
           return { kind: 'done', refundId, status: 'settled' };
         }
 

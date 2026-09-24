@@ -14,23 +14,14 @@ import { TenantContextService } from './application/services/tenant-context.serv
 import { TenantController } from './presentation/tenant.controller';
 import { TenantProvisioningService } from './application/services/tenant-provisioning.service';
 import { TenantRepository } from './infrastructure/persistence/tenant.repository';
-// IAM providers the provisioning service depends on. Imported lazily via
-// forwardRef-free ordering: TenancyModule is imported by IamModule, and the
-// provisioning service's IAM deps are re-provided here so the tenancy module is
-// self-contained for provisioning.
-import { UserRepository } from '../iam/infrastructure/persistence/user.repository';
-import { RoleRepository } from '../iam/infrastructure/persistence/role.repository';
-import { AuditService } from '../iam/application/services/audit.service';
+import { IamCoreModule } from '../iam/iam-core.module';
 
 /**
  * Tenancy: operators, plans, provisioning and the runtime tenant profile.
  *
- * Note the dependency direction: IamModule imports TenancyModule (for the
- * tenant-active guard and resolution), and provisioning needs a few IAM
- * repositories. To avoid a circular module import we register those specific
- * repositories here too — they are stateless data-access classes, so having the
- * DI container construct them in this module's scope is harmless and keeps the
- * graph acyclic. BookingModule is imported directly (verified acyclic — Booking/
+ * IAM persistence (users, roles, audit) comes from the leaf `IamCoreModule`,
+ * which IamModule also imports — so neither module registers the other's
+ * repositories and the graph stays acyclic. BookingModule is imported directly (verified acyclic — Booking/
  * Scheduling never import Tenancy or Iam) so the platform-admin per-operator
  * stats endpoint can read `BookingRepository.statsForTenant`.
  *
@@ -45,6 +36,7 @@ import { AuditService } from '../iam/application/services/audit.service';
     DatabaseModule,
     CacheModule,
     SecurityModule,
+    IamCoreModule,
     BookingModule,
     PlatformSettingsModule,
     FilesModule,
@@ -56,9 +48,6 @@ import { AuditService } from '../iam/application/services/audit.service';
     PayoutRepository,
     TenantContextService,
     TenantProvisioningService,
-    UserRepository,
-    RoleRepository,
-    AuditService,
   ],
   exports: [
     TenantRepository,

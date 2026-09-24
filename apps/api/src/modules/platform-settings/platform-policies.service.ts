@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { AppError, ErrorCode } from '@kernel';
 
-import { PlatformSettingsRepository } from '../tenancy/infrastructure/persistence/platform-settings.repository';
+import { PlatformSettingsRepository } from './infrastructure/platform-settings.repository';
 import {
   agentCreditPolicyError,
   normaliseAgentCreditPolicy,

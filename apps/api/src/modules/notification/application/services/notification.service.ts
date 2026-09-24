@@ -7,7 +7,7 @@ import { Logger } from '@observability';
 import { renderTemplate } from '../../domain/template';
 import { ProviderRegistry } from '../../infrastructure/provider-registry';
 import type { Channel } from '../../infrastructure/provider.interface';
-import { PlatformSettingsRepository } from '../../../tenancy/infrastructure/persistence/platform-settings.repository';
+import { PlatformSettingsRepository } from '../../../platform-settings';
 
 /**
  * Notification engine.

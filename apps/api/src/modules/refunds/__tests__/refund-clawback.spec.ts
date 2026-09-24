@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { splitRefundClawback } from '../domain/refund-clawback';
+import { commissionClawbackMinor, splitRefundClawback } from '../domain/refund-clawback';
 
 /** captured = commission + commission GST + operator share (fare + fare GST pass through to the operator). */
 describe('splitRefundClawback', () => {
@@ -61,5 +61,41 @@ describe('splitRefundClawback', () => {
       expect(r.operatorClawbackMinor).toBeGreaterThanOrEqual(0);
       expect(foot(r)).toBe(refund);
     }
+  });
+});
+
+describe('commissionClawbackMinor (B2B sale refund)', () => {
+  it('full refund reverses all commission', () => {
+    expect(
+      commissionClawbackMinor({
+        commissionCreditedMinor: 5000,
+        refundMinor: 105000,
+        paidMinor: 105000,
+      }),
+    ).toBe(5000);
+  });
+  it('partial refund reverses the same proportion', () => {
+    expect(
+      commissionClawbackMinor({
+        commissionCreditedMinor: 5000,
+        refundMinor: 52500,
+        paidMinor: 105000,
+      }),
+    ).toBe(2500);
+  });
+  it('never exceeds what was credited, never negative', () => {
+    expect(
+      commissionClawbackMinor({
+        commissionCreditedMinor: 5000,
+        refundMinor: 200000,
+        paidMinor: 105000,
+      }),
+    ).toBe(5000);
+    expect(
+      commissionClawbackMinor({ commissionCreditedMinor: 0, refundMinor: 1000, paidMinor: 1000 }),
+    ).toBe(0);
+    expect(
+      commissionClawbackMinor({ commissionCreditedMinor: 5000, refundMinor: 0, paidMinor: 1000 }),
+    ).toBe(0);
   });
 });

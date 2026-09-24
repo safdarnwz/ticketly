@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { renderOtpEmail } from '../../domain/email-template';
-import { Mailer } from '../mail/mailer';
+import { Mailer, renderOtpEmail } from '../../../notification';
 import { OtpProvider, type OtpDeliveryContext } from './otp-provider';
 
 /** Delivers OTP codes by email, using the themed email template. */

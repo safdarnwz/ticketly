@@ -2,12 +2,11 @@ import { Body, Controller, Delete, Get, Param, Post, HttpCode } from '@nestjs/co
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, zodBody } from '@http';
+import { ApiStandardErrors, RequirePermission, zodBody } from '@http';
 import { type ApiKeyId } from '@kernel';
 
 import { ApiKeyService } from '../application/services/api-key.service';
 import { CreateApiKeySchema, type CreateApiKeyDto } from './dto/api-key.dto';
-import { RequirePermission } from './decorators/require-permission.decorator';
 
 @ApiTags('api-keys')
 @ApiBearerAuth('bearer')

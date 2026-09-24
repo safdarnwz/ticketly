@@ -6,18 +6,12 @@ import { EventBus } from '@messaging';
 import { Logger } from '@observability';
 import { PasswordHasher } from '@security';
 
-import { AuditService } from '../../../iam/application/services/audit.service';
-import { User } from '../../../iam/domain/user.entity';
-import {
-  RoleRepository,
-  SYSTEM_ROLES,
-} from '../../../iam/infrastructure/persistence/role.repository';
-import { UserRepository } from '../../../iam/infrastructure/persistence/user.repository';
+import { AuditService, User, RoleRepository, SYSTEM_ROLES, UserRepository } from '../../../iam';
 import { Tenant } from '../../domain/tenant.entity';
 import { PlanRepository } from '../../infrastructure/persistence/plan.repository';
 import { TenantContextService } from './tenant-context.service';
 import { TenantRepository } from '../../infrastructure/persistence/tenant.repository';
-import { PlatformPoliciesService } from '../../../platform-settings/platform-policies.service';
+import { PlatformPoliciesService } from '../../../platform-settings';
 
 /**
  * Tenant provisioning — the transactional workflow that stands up a new

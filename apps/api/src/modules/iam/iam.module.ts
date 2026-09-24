@@ -9,25 +9,22 @@ import { DatabaseModule } from '@database';
 import { SecurityModule } from '@security';
 
 import { TenancyModule } from '../tenancy/tenancy.module';
+import { IamCoreModule } from './iam-core.module';
 import { IntegrationsModule } from '../integrations/integrations.module';
+import { NotificationModule } from '../notification/notification.module';
 import { ApiKeyController } from './presentation/api-key.controller';
 import { ApiKeyService } from './application/services/api-key.service';
-import { AuditService } from './application/services/audit.service';
 import { SecurityAlertService } from './application/services/security-alert.service';
 import { AuthController } from './presentation/auth.controller';
 import { AuthService } from './application/services/auth.service';
 import { AdminBootstrapService } from './application/services/admin-bootstrap.service';
-import { SessionRepository } from './infrastructure/persistence/session.repository';
 import { AuthGuard } from './presentation/guards/auth.guard';
 import { PermissionGuard } from './presentation/guards/permission.guard';
 import { TenantActiveGuard } from './presentation/guards/tenant-active.guard';
 import { RoleController } from './presentation/role.controller';
-import { RoleRepository } from './infrastructure/persistence/role.repository';
 import { UserController } from './presentation/user.controller';
-import { UserRepository } from './infrastructure/persistence/user.repository';
 import { UserService } from './application/services/user.service';
 import { TenantResolutionMiddleware } from './presentation/tenant-resolution.middleware';
-import { Mailer } from './infrastructure/mail/mailer';
 import { OtpProvider } from './infrastructure/otp/otp-provider';
 import { EmailOtpProvider } from './infrastructure/otp/email-otp.provider';
 import { SmsOtpProvider } from './infrastructure/otp/sms-otp.provider';
@@ -46,7 +43,15 @@ import { SmsOtpProvider } from './infrastructure/otp/sms-otp.provider';
  * tenant is bound for RLS and logging from the very start of the request.
  */
 @Module({
-  imports: [DatabaseModule, CacheModule, SecurityModule, TenancyModule, IntegrationsModule],
+  imports: [
+    DatabaseModule,
+    CacheModule,
+    SecurityModule,
+    IamCoreModule,
+    TenancyModule,
+    IntegrationsModule,
+    NotificationModule,
+  ],
   controllers: [
     AuthController,
     UserController,
@@ -56,16 +61,11 @@ import { SmsOtpProvider } from './infrastructure/otp/sms-otp.provider';
   ],
   providers: [
     StaffAccessService,
-    UserRepository,
-    RoleRepository,
-    SessionRepository,
     ApiKeyService,
-    AuditService,
     SecurityAlertService,
     AuthService,
     AdminBootstrapService,
     UserService,
-    Mailer,
     SmsOtpProvider,
     // OTP delivery is behind an abstraction — email today, SMS later is a one-line swap.
     // Injected by type via the abstract-class token (no @Inject / Symbol).
@@ -80,7 +80,7 @@ import { SmsOtpProvider } from './infrastructure/otp/sms-otp.provider';
     { provide: APP_GUARD, useExisting: MaintenanceGuard },
     { provide: APP_GUARD, useClass: PermissionGuard },
   ],
-  exports: [UserRepository, RoleRepository, ApiKeyService, AuditService, SessionRepository, Mailer],
+  exports: [IamCoreModule, ApiKeyService],
 })
 export class IamModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

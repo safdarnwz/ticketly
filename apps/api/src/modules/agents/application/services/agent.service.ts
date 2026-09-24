@@ -27,9 +27,7 @@ import {
 import { BookingRepository } from '../../../booking/infrastructure/persistence/booking.repository';
 import { PaymentService } from '../../../payment/application/services/payment.service';
 import { SeatQuotaService } from '../../../quotas/application/seat-quota.service';
-import { User } from '../../../iam/domain/user.entity';
-import { RoleRepository } from '../../../iam/infrastructure/persistence/role.repository';
-import { UserRepository } from '../../../iam/infrastructure/persistence/user.repository';
+import { User, RoleRepository, UserRepository } from '../../../iam';
 import {
   agentCommissionMinor,
   canTransition,
@@ -48,8 +46,7 @@ import {
   validateSlabs,
   type Slab,
 } from '../../domain/commission-slabs';
-import { resolveAgentCreditLimit } from '../../../platform-settings/domain/agent-credit-policy';
-import { PlatformPoliciesService } from '../../../platform-settings/platform-policies.service';
+import { resolveAgentCreditLimit, PlatformPoliciesService } from '../../../platform-settings';
 
 export interface CreateAgentRequest {
   name: string;

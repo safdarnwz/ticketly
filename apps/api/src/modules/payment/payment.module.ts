@@ -10,7 +10,7 @@ import { PricingModule } from '../pricing/pricing.module';
 import { MasterDataModule } from '../master-data/master-data.module';
 import { PlatformSettingsModule } from '../platform-settings/platform-settings.module';
 import { IntegrationsModule } from '../integrations/integrations.module';
-import { IntegrationCredentialStore } from '../integrations/integration-credential.store';
+import { IntegrationCredentialStore } from '../integrations';
 import { MockGateway } from './infrastructure/gateways/mock.gateway';
 import { RazorpayGateway } from './infrastructure/gateways/razorpay.gateway';
 import { TestGateway } from './infrastructure/gateways/test.gateway';

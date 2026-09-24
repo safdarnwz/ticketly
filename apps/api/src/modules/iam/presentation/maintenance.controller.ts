@@ -2,11 +2,10 @@ import { Body, Controller, Get, Put } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 
-import { ApiStandardErrors, zodBody } from '@http';
+import { ApiStandardErrors, RequirePlatformAdmin, zodBody } from '@http';
 import { AppError, ErrorCode, getUserId } from '@kernel';
 
-import { PlatformSettingsRepository } from '../../tenancy/infrastructure/persistence/platform-settings.repository';
-import { RequirePlatformAdmin } from './decorators/require-platform-admin.decorator';
+import { PlatformSettingsRepository } from '../../platform-settings';
 import {
   MAINTENANCE_KEY,
   MaintenanceGuard,

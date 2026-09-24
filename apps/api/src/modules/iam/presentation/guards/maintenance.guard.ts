@@ -3,7 +3,7 @@ import type { FastifyRequest } from 'fastify';
 
 import { AppError, ErrorCode, getContext } from '@kernel';
 
-import { PlatformSettingsRepository } from '../../../tenancy/infrastructure/persistence/platform-settings.repository';
+import { PlatformSettingsRepository } from '../../../platform-settings';
 
 export interface MaintenanceState {
   enabled: boolean;

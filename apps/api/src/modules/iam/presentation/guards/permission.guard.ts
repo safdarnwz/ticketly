@@ -4,11 +4,7 @@ import { Reflector } from '@nestjs/core';
 import type { PermissionValue } from '@contracts';
 import { ForbiddenError, getContext } from '@kernel';
 
-import {
-  REQUIRE_PERMISSION_KEY,
-  REQUIRE_PERMISSION_MODE,
-} from '../decorators/require-permission.decorator';
-import { REQUIRE_PLATFORM_ADMIN_KEY } from '../decorators/require-platform-admin.decorator';
+import { REQUIRE_PERMISSION_KEY, REQUIRE_PERMISSION_MODE, REQUIRE_PLATFORM_ADMIN_KEY } from '@http';
 
 /**
  * Enforces `@RequirePermission(...)` and `@RequirePlatformAdmin()`.

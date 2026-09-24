@@ -18,7 +18,7 @@ import { Logger, Metrics } from '@observability';
 
 import { BookingService } from '../../../booking/application/services/booking.service';
 import { BookingRepository } from '../../../booking/infrastructure/persistence/booking.repository';
-import { PlatformSettingsRepository } from '../../../tenancy/infrastructure/persistence/platform-settings.repository';
+import { PlatformSettingsRepository } from '../../../platform-settings';
 import { SeatUpgradeRepository } from '../../../booking/infrastructure/persistence/seat-upgrade.repository';
 import { TripRepository } from '../../../scheduling/infrastructure/persistence/trip.repository';
 import { FareRepository } from '../../../pricing/infrastructure/persistence/fare.repository';

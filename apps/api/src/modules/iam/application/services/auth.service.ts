@@ -18,9 +18,11 @@ import { OtpService, PasswordHasher, TokenService } from '@security';
 
 import { AuditService } from './audit.service';
 import { SecurityAlertService } from './security-alert.service';
-import { isIpAllowed } from '../../../platform-settings/domain/ip-allowlist';
-import { isPasswordExpired } from '../../../platform-settings/domain/password-policy';
-import { PlatformPoliciesService } from '../../../platform-settings/platform-policies.service';
+import {
+  isIpAllowed,
+  isPasswordExpired,
+  PlatformPoliciesService,
+} from '../../../platform-settings';
 import { User } from '../../domain/user.entity';
 import { RoleRepository } from '../../infrastructure/persistence/role.repository';
 import { UserRepository } from '../../infrastructure/persistence/user.repository';

@@ -1,6 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, type OnModuleInit } from '@nestjs/common';
 
-import { commissionClawbackMinor } from '../../agents/domain/agent-account';
+import {
+  commissionClawbackMinor,
+  RefundCreditorRegistry,
+  type RefundCreditInput,
+  type RefundCreditor,
+} from '../../refunds';
 import { GdsRepository } from '../infrastructure/gds.repository';
 
 /**
@@ -10,15 +15,23 @@ import { GdsRepository } from '../infrastructure/gds.repository';
  * RefundService can post the matching ledger reversal; null = not a GDS sale.
  */
 @Injectable()
-export class GdsRefundService {
-  constructor(private readonly gds: GdsRepository) {}
+export class GdsRefundService implements RefundCreditor, OnModuleInit {
+  readonly gateway = 'gds';
+  readonly collectedBy = 'platform';
+  readonly destination = 'gds_partner_account';
+  readonly channel = 'ota';
+  readonly missingAccountReason = 'GDS booking without a partner';
 
-  async creditRefund(input: {
-    bookingId: string;
-    refundId: string;
-    refundMinor: number;
-    tenantId: string;
-  }): Promise<{ clawbackMinor: number } | null> {
+  constructor(
+    private readonly gds: GdsRepository,
+    private readonly registry: RefundCreditorRegistry,
+  ) {}
+
+  onModuleInit(): void {
+    this.registry.register(this);
+  }
+
+  async creditRefund(input: RefundCreditInput): Promise<{ clawbackMinor: number } | null> {
     const owner = await this.gds.bookingOwner(input.bookingId);
     if (!owner?.partnerId) return null;
     const partnerId = owner.partnerId;

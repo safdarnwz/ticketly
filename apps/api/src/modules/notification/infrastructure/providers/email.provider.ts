@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { Mailer } from '../../../iam/infrastructure/mail/mailer';
+import { Mailer } from '../mail/mailer';
 import type { NotificationProvider, SendRequest, SendResult } from '../provider.interface';
 
 /**

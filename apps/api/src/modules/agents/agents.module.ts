@@ -8,7 +8,9 @@ import { BookingModule } from '../booking/booking.module';
 import { IamModule } from '../iam/iam.module';
 import { PaymentModule } from '../payment/payment.module';
 import { QuotasModule } from '../quotas/quotas.module';
-import { AgentLedgerModule } from './agent-ledger.module';
+import { RefundModule } from '../refunds/refund.module';
+import { AgentRepository } from './infrastructure/persistence/agent.repository';
+import { AgentRefundService } from './application/services/agent-refund.service';
 import { AgentService } from './application/services/agent.service';
 import { AgentPortalController } from './presentation/agent-portal.controller';
 import { AgentController } from './presentation/agent.controller';
@@ -22,13 +24,13 @@ import { PlatformSettingsModule } from '../platform-settings/platform-settings.m
     BookingModule,
     PaymentModule,
     IamModule,
-    AgentLedgerModule,
+    RefundModule,
     QuotasModule,
     AmendmentsModule,
     PlatformSettingsModule,
   ],
   controllers: [AgentController, AgentPortalController],
-  providers: [AgentService],
+  providers: [AgentService, AgentRepository, AgentRefundService],
   exports: [AgentService],
 })
 export class AgentsModule {}

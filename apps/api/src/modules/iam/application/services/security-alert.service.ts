@@ -7,9 +7,9 @@ import { Logger } from '@observability';
 import {
   shouldAlertOnFailures,
   shouldAlertOnNewIp,
-} from '../../../platform-settings/domain/suspicious-login';
-import { PlatformPoliciesService } from '../../../platform-settings/platform-policies.service';
-import { Mailer } from '../../infrastructure/mail/mailer';
+  PlatformPoliciesService,
+} from '../../../platform-settings';
+import { Mailer } from '../../../notification';
 import { SessionRepository } from '../../infrastructure/persistence/session.repository';
 import { AuditService } from './audit.service';
 

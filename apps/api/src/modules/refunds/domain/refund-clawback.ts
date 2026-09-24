@@ -59,3 +59,24 @@ export function splitRefundClawback(captured: CapturedSplit, refundMinor: number
     operatorClawbackMinor: operatorClawback,
   };
 }
+
+/**
+ * Commission to claw back when part of a B2B sale (operator agent or GDS
+ * partner) is refunded — the same
+ * proportion of the commission as the refund is of the amount paid, so a
+ * full refund reverses all of it and the seller never keeps commission on a
+ * ticket that was not ultimately sold. Never more than was credited.
+ */
+export function commissionClawbackMinor(input: {
+  commissionCreditedMinor: number;
+  refundMinor: number;
+  paidMinor: number;
+}): number {
+  if (input.commissionCreditedMinor <= 0 || input.refundMinor <= 0 || input.paidMinor <= 0)
+    return 0;
+  if (input.refundMinor >= input.paidMinor) return input.commissionCreditedMinor;
+  return Math.min(
+    input.commissionCreditedMinor,
+    Math.round((input.commissionCreditedMinor * input.refundMinor) / input.paidMinor),
+  );
+}

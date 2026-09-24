@@ -7,8 +7,10 @@ import { PaymentModule } from '../payment/payment.module';
 import { PricingModule } from '../pricing/pricing.module';
 import { SchedulingModule } from '../scheduling/scheduling.module';
 import { SearchModule } from '../search/search.module';
+import { RefundModule } from '../refunds/refund.module';
+import { GdsRepository } from './infrastructure/gds.repository';
+import { GdsRefundService } from './application/gds-refund.service';
 import { GdsService } from './application/gds.service';
-import { GdsLedgerModule } from './gds-ledger.module';
 import {
   GdsAdminController,
   GdsOperatorController,
@@ -25,9 +27,9 @@ import { GdsPartnerGuard } from './presentation/gds-partner.guard';
     BookingModule,
     PaymentModule,
     SchedulingModule,
-    GdsLedgerModule,
+    RefundModule,
   ],
   controllers: [GdsPartnerController, GdsAdminController, GdsOperatorController],
-  providers: [GdsService, GdsPartnerGuard],
+  providers: [GdsService, GdsPartnerGuard, GdsRepository, GdsRefundService],
 })
 export class GdsModule {}

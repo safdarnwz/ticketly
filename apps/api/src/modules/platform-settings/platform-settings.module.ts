@@ -3,7 +3,7 @@ import { Module } from '@nestjs/common';
 import { CacheModule } from '@cache';
 import { DatabaseModule } from '@database';
 
-import { PlatformSettingsRepository } from '../tenancy/infrastructure/persistence/platform-settings.repository';
+import { PlatformSettingsRepository } from './infrastructure/platform-settings.repository';
 import { PlatformPoliciesService } from './platform-policies.service';
 
 /**

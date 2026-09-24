@@ -14,11 +14,8 @@ import {
 } from '@kernel';
 import { PasswordHasher } from '@security';
 
-import { User } from '../../../iam/domain/user.entity';
-import { UserRepository } from '../../../iam/infrastructure/persistence/user.repository';
-import { Mailer } from '../../../iam/infrastructure/mail/mailer';
-import { renderOperatorStatusEmail } from '../../../iam/domain/email-template';
-import { NotificationService } from '../../../notification/application/services/notification.service';
+import { User, UserRepository } from '../../../iam';
+import { Mailer, renderOperatorStatusEmail, NotificationService } from '../../../notification';
 import { FileService } from '../../../files/application/file.service';
 import { defaultLogoSvg } from '../../../files/domain/default-logo';
 import { Logger } from '@observability';
@@ -28,7 +25,7 @@ import {
   type ApplicationStatus,
 } from '../../domain/application-status';
 import { OperatorApplicationRepository } from '../../infrastructure/persistence/operator-application.repository';
-import { PlatformPoliciesService } from '../../../platform-settings/platform-policies.service';
+import { PlatformPoliciesService } from '../../../platform-settings';
 
 export interface ApplyInput {
   firstName: string;

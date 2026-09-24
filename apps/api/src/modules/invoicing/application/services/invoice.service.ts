@@ -7,8 +7,8 @@ import { BookingRepository } from '../../../booking/infrastructure/persistence/b
 import { RouteRepository } from '../../../master-data/infrastructure/persistence/route.repository';
 import { StopRepository } from '../../../master-data/infrastructure/persistence/stop.repository';
 import { TenantRepository } from '../../../tenancy/infrastructure/persistence/tenant.repository';
-import { PlatformSettingsRepository } from '../../../tenancy/infrastructure/persistence/platform-settings.repository';
-import { Mailer } from '../../../iam/infrastructure/mail/mailer';
+import { PlatformSettingsRepository } from '../../../platform-settings';
+import { Mailer } from '../../../notification';
 import { computeGstInvoice } from '../../domain/gst-invoice';
 import { formatInvoiceNumber } from '../../domain/invoice-number';
 import { renderInvoicePdf } from '../../domain/invoice-pdf';

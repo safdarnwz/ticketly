@@ -1,6 +1,4 @@
 import { Module } from '@nestjs/common';
-import { AgentLedgerModule } from '../agents/agent-ledger.module';
-import { GdsLedgerModule } from '../gds/gds-ledger.module';
 
 import { DatabaseModule } from '@database';
 import { MessagingModule } from '@messaging';
@@ -10,6 +8,7 @@ import { PaymentModule } from '../payment/payment.module';
 import { RefundController } from './presentation/refund.controller';
 import { RefundRepository } from './infrastructure/persistence/refund.repository';
 import { RefundService } from './application/services/refund.service';
+import { RefundCreditorRegistry } from './application/services/refund-creditor.registry';
 
 /**
  * Refund lifecycle (Part 13). A refund is a small state machine — initiated,
@@ -23,19 +22,14 @@ import { RefundService } from './application/services/refund.service';
  * completing because nothing ever published it).
  *
  * Depends on booking (the booking being refunded) and payment (the gateway +
- * the ledger).
+ * the ledger). B2B channels (agents, GDS) register a RefundCreditor with
+ * RefundCreditorRegistry so refunds of their sales credit their accounts —
+ * this module never imports those channels.
  */
 @Module({
-  imports: [
-    DatabaseModule,
-    MessagingModule,
-    BookingModule,
-    PaymentModule,
-    AgentLedgerModule,
-    GdsLedgerModule,
-  ],
+  imports: [DatabaseModule, MessagingModule, BookingModule, PaymentModule],
   controllers: [RefundController],
-  providers: [RefundRepository, RefundService],
-  exports: [RefundService, RefundRepository],
+  providers: [RefundRepository, RefundService, RefundCreditorRegistry],
+  exports: [RefundService, RefundRepository, RefundCreditorRegistry],
 })
 export class RefundModule {}

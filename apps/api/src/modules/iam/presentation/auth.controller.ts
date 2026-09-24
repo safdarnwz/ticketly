@@ -2,10 +2,16 @@ import { Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { FastifyRequest } from 'fastify';
 
-import { ApiStandardErrors, Public, RateLimit, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  CurrentUser,
+  Public,
+  RateLimit,
+  zodBody,
+  type AuthPrincipal,
+} from '@http';
 import { getContext } from '@kernel';
 
-import { CurrentUser, type AuthPrincipal } from './decorators/current-user.decorator';
 import {
   CheckIdentitySchema,
   type CheckIdentityDto,

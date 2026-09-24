@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { currentTransaction, DatabaseService, UnitOfWork } from '@database';
 import { newId, requireTenantId, type BookingId, type PaymentId } from '@kernel';
 
-import { PlatformSettingsRepository } from '../../../tenancy/infrastructure/persistence/platform-settings.repository';
+import { PlatformSettingsRepository } from '../../../platform-settings';
 
 export interface PaymentIntent {
   id: PaymentId;

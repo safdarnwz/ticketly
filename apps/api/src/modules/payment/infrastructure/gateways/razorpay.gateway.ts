@@ -5,7 +5,7 @@ import { Injectable } from '@nestjs/common';
 import { AppConfig } from '@config';
 import { Logger } from '@observability';
 
-import { IntegrationCredentialStore } from '../../../integrations/integration-credential.store';
+import { IntegrationCredentialStore } from '../../../integrations';
 import { PaymentGateway } from './gateway.interface';
 import type {
   CreateIntentRequest,

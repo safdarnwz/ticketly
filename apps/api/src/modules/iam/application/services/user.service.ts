@@ -9,7 +9,7 @@ import { User } from '../../domain/user.entity';
 import { RoleRepository } from '../../infrastructure/persistence/role.repository';
 import { SessionRepository } from '../../infrastructure/persistence/session.repository';
 import { UserRepository } from '../../infrastructure/persistence/user.repository';
-import { PlatformPoliciesService } from '../../../platform-settings/platform-policies.service';
+import { PlatformPoliciesService } from '../../../platform-settings';
 
 /**
  * Operator user management (invite / update / role assignment).

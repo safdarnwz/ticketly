@@ -5,7 +5,7 @@ import { DatabaseService } from '@database';
 import { newId, requireTenantId, type RouteId, type StopId } from '@kernel';
 import { AppError, ErrorCode } from '@kernel';
 
-import { PlatformSettingsRepository } from '../../../tenancy/infrastructure/persistence/platform-settings.repository';
+import { PlatformSettingsRepository } from '../../../platform-settings';
 import type { YieldLadder } from '../../domain/pricing-engine';
 import {
   selectFarePlan,

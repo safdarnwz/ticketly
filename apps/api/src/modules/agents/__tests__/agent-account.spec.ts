@@ -4,7 +4,6 @@ import {
   agentCommissionMinor,
   canTransition,
   checkFunds,
-  commissionClawbackMinor,
   isLowBalance,
   netCostMinor,
   signedAmount,
@@ -86,42 +85,6 @@ describe('agent account — funds check', () => {
         commissionMinor: 500,
       }).ok,
     ).toBe(false);
-  });
-});
-
-describe('agent account — refund clawback', () => {
-  it('full refund reverses all commission', () => {
-    expect(
-      commissionClawbackMinor({
-        commissionCreditedMinor: 5000,
-        refundMinor: 105000,
-        paidMinor: 105000,
-      }),
-    ).toBe(5000);
-  });
-  it('partial refund reverses the same proportion', () => {
-    expect(
-      commissionClawbackMinor({
-        commissionCreditedMinor: 5000,
-        refundMinor: 52500,
-        paidMinor: 105000,
-      }),
-    ).toBe(2500);
-  });
-  it('never exceeds what was credited, never negative', () => {
-    expect(
-      commissionClawbackMinor({
-        commissionCreditedMinor: 5000,
-        refundMinor: 200000,
-        paidMinor: 105000,
-      }),
-    ).toBe(5000);
-    expect(
-      commissionClawbackMinor({ commissionCreditedMinor: 0, refundMinor: 1000, paidMinor: 1000 }),
-    ).toBe(0);
-    expect(
-      commissionClawbackMinor({ commissionCreditedMinor: 5000, refundMinor: 0, paidMinor: 1000 }),
-    ).toBe(0);
   });
 });
 

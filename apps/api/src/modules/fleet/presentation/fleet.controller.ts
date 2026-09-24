@@ -47,7 +47,7 @@ import { VehicleVerificationService } from '../application/services/vehicle-veri
 import { FleetLogsRepository } from '../infrastructure/persistence/logs.repository';
 import { FleetService } from '../application/services/fleet.service';
 import { VehicleRepository } from '../infrastructure/persistence/vehicle.repository';
-import { PlatformSettingsRepository } from '../../tenancy/infrastructure/persistence/platform-settings.repository';
+import { PlatformSettingsRepository } from '../../platform-settings';
 
 @ApiTags('fleet')
 @ApiBearerAuth('bearer')

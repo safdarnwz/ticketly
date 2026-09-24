@@ -3,10 +3,9 @@ import { Body, Controller, Param, Patch, Post, Put, HttpCode } from '@nestjs/com
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, zodBody } from '@http';
+import { ApiStandardErrors, RequirePermission, zodBody } from '@http';
 import { type UserId } from '@kernel';
 
-import { RequirePermission } from './decorators/require-permission.decorator';
 import {
   AssignRolesSchema,
   type AssignRolesDto,

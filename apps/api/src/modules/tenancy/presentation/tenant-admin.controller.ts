@@ -7,7 +7,7 @@ import { Permission } from '@contracts';
 import { ApiStandardErrors, Idempotent, RequirePermission, zodBody } from '@http';
 import { BadRequestError, ForbiddenError, getContext, type TenantId } from '@kernel';
 
-import { AuditService } from '../../iam/application/services/audit.service';
+import { AuditService } from '../../iam';
 import { BookingRepository } from '../../booking/infrastructure/persistence/booking.repository';
 import { PayoutRepository } from '../infrastructure/persistence/payout.repository';
 import {
@@ -18,7 +18,7 @@ import {
 } from './dto/tenant.dto';
 import { PlanRepository } from '../infrastructure/persistence/plan.repository';
 import { TenantContextService } from '../application/services/tenant-context.service';
-import { PlatformSettingsRepository } from '../infrastructure/persistence/platform-settings.repository';
+import { PlatformSettingsRepository } from '../../platform-settings';
 import { TenantProvisioningService } from '../application/services/tenant-provisioning.service';
 import { TenantRepository } from '../infrastructure/persistence/tenant.repository';
 

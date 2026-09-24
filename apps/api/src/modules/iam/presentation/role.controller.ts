@@ -4,10 +4,9 @@ import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
 import { UnitOfWork } from '@database';
-import { ApiStandardErrors, zodBody } from '@http';
+import { ApiStandardErrors, RequirePermission, zodBody } from '@http';
 import { requireTenantId, type RoleId } from '@kernel';
 
-import { RequirePermission } from './decorators/require-permission.decorator';
 import {
   CreateRoleSchema,
   type CreateRoleDto,

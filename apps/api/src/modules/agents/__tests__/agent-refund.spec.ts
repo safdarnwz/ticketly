@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { RefundCreditorRegistry } from '../../refunds';
 import { AgentRefundService } from '../application/services/agent-refund.service';
 
 /** In-memory AgentRepository: just the ledger lines, same semantics as the SQL. */
@@ -34,12 +35,24 @@ const sale = () => [
   { kind: 'commission_credit', amount: 10000 },
 ]; // ₹2000 sale, ₹100 commission
 
+const registry = new RefundCreditorRegistry();
+
 describe('AgentRefundService.creditRefund', () => {
   it('two equal partial refunds claw back HALF the commission each (not less the second time)', async () => {
     const repo = fakeRepo(sale());
-    const svc = new AgentRefundService(repo as never);
-    await svc.creditRefund({ bookingId: 'b' as never, refundId: 'r1', refundMinor: 100000 });
-    await svc.creditRefund({ bookingId: 'b' as never, refundId: 'r2', refundMinor: 100000 });
+    const svc = new AgentRefundService(repo as never, registry);
+    await svc.creditRefund({
+      bookingId: 'b' as never,
+      tenantId: 't' as never,
+      refundId: 'r1',
+      refundMinor: 100000,
+    });
+    await svc.creditRefund({
+      bookingId: 'b' as never,
+      tenantId: 't' as never,
+      refundId: 'r2',
+      refundMinor: 100000,
+    });
     const reversals = repo.lines
       .filter((l) => l.kind === 'commission_reversal')
       .map((l) => -l.amount);
@@ -47,29 +60,50 @@ describe('AgentRefundService.creditRefund', () => {
   });
   it('a redelivered refund is credited once (idempotent per refund id)', async () => {
     const repo = fakeRepo(sale());
-    const svc = new AgentRefundService(repo as never);
-    await svc.creditRefund({ bookingId: 'b' as never, refundId: 'r1', refundMinor: 50000 });
-    await svc.creditRefund({ bookingId: 'b' as never, refundId: 'r1', refundMinor: 50000 });
+    const svc = new AgentRefundService(repo as never, registry);
+    await svc.creditRefund({
+      bookingId: 'b' as never,
+      tenantId: 't' as never,
+      refundId: 'r1',
+      refundMinor: 50000,
+    });
+    await svc.creditRefund({
+      bookingId: 'b' as never,
+      tenantId: 't' as never,
+      refundId: 'r1',
+      refundMinor: 50000,
+    });
     expect(repo.lines.filter((l) => l.kind === 'refund_credit')).toHaveLength(1);
   });
   it('clawback never exceeds the commission still un-reversed', async () => {
     const repo = fakeRepo(sale());
-    const svc = new AgentRefundService(repo as never);
-    await svc.creditRefund({ bookingId: 'b' as never, refundId: 'r1', refundMinor: 200000 });
-    await svc.creditRefund({ bookingId: 'b' as never, refundId: 'r2', refundMinor: 1000 });
+    const svc = new AgentRefundService(repo as never, registry);
+    await svc.creditRefund({
+      bookingId: 'b' as never,
+      tenantId: 't' as never,
+      refundId: 'r1',
+      refundMinor: 200000,
+    });
+    await svc.creditRefund({
+      bookingId: 'b' as never,
+      tenantId: 't' as never,
+      refundId: 'r2',
+      refundMinor: 1000,
+    });
     const total = repo.lines
       .filter((l) => l.kind === 'commission_reversal')
       .reduce((s, l) => s - l.amount, 0);
     expect(total).toBe(10000);
   });
-  it('not an agent booking → false, nothing posted', async () => {
+  it('not an agent booking → null, nothing posted', async () => {
     const repo = { ...fakeRepo(sale()), agentForBooking: async () => null };
     expect(
-      await new AgentRefundService(repo as never).creditRefund({
+      await new AgentRefundService(repo as never, registry).creditRefund({
         bookingId: 'b' as never,
+        tenantId: 't' as never,
         refundId: 'r',
         refundMinor: 1,
       }),
-    ).toBe(false);
+    ).toBeNull();
   });
 });

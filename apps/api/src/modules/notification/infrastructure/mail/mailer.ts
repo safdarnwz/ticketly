@@ -4,7 +4,7 @@ import nodemailer, { type Transporter } from 'nodemailer';
 import { AppConfig } from '@config';
 import { Logger } from '@observability';
 
-import { IntegrationCredentialStore } from '../../../integrations/integration-credential.store';
+import { IntegrationCredentialStore } from '../../../integrations';
 
 /**
  * SMTP mailer backed by Gmail (an app-password account).
