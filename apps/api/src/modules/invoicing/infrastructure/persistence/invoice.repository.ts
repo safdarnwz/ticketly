@@ -20,14 +20,14 @@ export class InvoiceRepository {
     const key = seriesKey(prefix, date);
     const scope = currentTransaction();
     const runner = scope
-      ? (sql: string, p: unknown[]) => scope.client.query(sql, p).then((r) => r.rows[0])
-      : (sql: string, p: unknown[]) => this.db.queryOne(sql, p, { name: 'invoice.nextSeq', primary: true });
+      ? (sql: string, p: unknown[]) => scope.client.query<{ last_sequence: number }>(sql, p).then((r) => r.rows[0] ?? null)
+      : (sql: string, p: unknown[]) => this.db.queryOne<{ last_sequence: number }>(sql, p, { name: 'invoice.nextSeq', primary: true });
     const row = (await runner(
       `INSERT INTO invoice_series (tenant_id, series_key, last_sequence) VALUES ($1, $2, 1)
        ON CONFLICT (tenant_id, series_key) DO UPDATE SET last_sequence = invoice_series.last_sequence + 1, updated_at = now()
        RETURNING last_sequence`,
       [requireTenantId(), key],
-    )) as { last_sequence: number } | null;
+    ));
     return row?.last_sequence ?? 1;
   }
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { currentTransaction, DatabaseService, UnitOfWork } from '@database';
+import { DatabaseService, UnitOfWork } from '@database';
 import { AppError, ErrorCode, newId, requireTenantId, type BookingId, type Uuid } from '@kernel';
 
 import { PlatformSettingsRepository } from '../../../tenancy/infrastructure/persistence/platform-settings.repository';

@@ -121,7 +121,7 @@ export class AgentService {
       });
       await this.users.insert(user);
       const roleId = await this.ensureAgentRole();
-      await this.roles.grantToUser(user.id, roleId, (getUserId() ?? null) as UserId | null);
+      await this.roles.grantToUser(user.id, roleId, (getUserId() ?? null));
 
       const agentId = await this.agents.create({
         userId: user.id, code, name: input.name.trim(), contactName: input.contactName, contactPhone: input.contactPhone,
@@ -199,7 +199,7 @@ export class AgentService {
       const kind = agent.billingMode === 'prepaid' ? 'deposit' : 'payment_received';
       const res = await this.agents.post({
         agentId: id, kind, magnitudeMinor: input.amountMinor, reference: `receipt:${input.reference.trim()}`,
-        note: input.note ?? null, createdBy: (getUserId() ?? null) as UserId | null,
+        note: input.note ?? null, createdBy: (getUserId() ?? null),
       });
       const fresh = await this.agents.getById(id);
       return { balanceMinor: fresh?.balanceMinor ?? agent.balanceMinor, applied: res.applied };
@@ -221,7 +221,7 @@ export class AgentService {
       await this.agents.post({
         agentId: id, kind: 'adjustment', magnitudeMinor: input.amountMinor,
         reference: input.reference ? `adj:${input.reference}` : `adj:${newId()}`,
-        note: input.reason.trim(), createdBy: (getUserId() ?? null) as UserId | null,
+        note: input.reason.trim(), createdBy: (getUserId() ?? null),
       });
       return { balanceMinor: agent.balanceMinor + input.amountMinor };
     });
@@ -429,7 +429,7 @@ export class AgentService {
   /** Tenant-local 'agent' role — tenants provisioned before this feature won't have one yet. */
   private async ensureAgentRole(): Promise<RoleId> {
     const existing = await this.roles.findByCode('agent');
-    if (existing) return existing.id as RoleId;
+    if (existing) return existing.id;
     return this.roles.createRole({
       tenantId: requireTenantId(), code: 'agent', name: 'Travel Agent',
       description: 'B2B agent — agent portal only', isSystem: true, permissions: AGENT_ROLE_PERMISSIONS,

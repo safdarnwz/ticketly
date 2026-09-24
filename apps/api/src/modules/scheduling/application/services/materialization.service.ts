@@ -4,7 +4,7 @@ import { AppConfig } from '@config';
 import { UnitOfWork } from '@database';
 import {
   addDays, todayIn, localDate, requireTenantId, toInstant,
-  type LocalDate, type ServiceId, type TripId, type TimeZone,
+  type LocalDate, type ServiceId, type TripId, type TimeZone, type SeatLayoutId, type VehicleId
 } from '@kernel';
 import { DomainError, ErrorCode } from '@kernel';
 import { EventBus } from '@messaging';
@@ -118,7 +118,7 @@ export class MaterializationService {
   private async materialiseOne(
     service: Awaited<ReturnType<ServiceRepository['getById']>>,
     route: Awaited<ReturnType<RouteRepository['getById']>>,
-    seatLayoutId: import('@kernel').SeatLayoutId,
+    seatLayoutId: SeatLayoutId,
     seatInit: SeatInit[],
     journeyDate: LocalDate,
     tz: TimeZone,
@@ -129,7 +129,7 @@ export class MaterializationService {
     // fixed minute-offset from it (route offsets are relative to service start),
     // so we add milliseconds rather than re-resolving each instant — simpler and
     // free of per-stop wrapping/DST edge bugs.
-    const originInstant = toInstant(journeyDate, service.startMinute as never, tz);
+    const originInstant = toInstant(journeyDate, service.startMinute, tz);
     const stops: TripStopRow[] = route.path.stops.map((s) => {
       const departOffsetMin = s.departDayOffset * 1440 + s.departMinute;
       const arrivalOffsetMin = s.arrivalDayOffset * 1440 + s.arrivalMinute;
@@ -196,7 +196,7 @@ export class MaterializationService {
    * never blocks the others (bulk festival specials).
    */
   async createExtraTrips(input: {
-    serviceId: ServiceId; journeyDates: LocalDate[]; departureMinute?: number; vehicleId?: import('@kernel').VehicleId | null;
+    serviceId: ServiceId; journeyDates: LocalDate[]; departureMinute?: number; vehicleId?: VehicleId | null;
     reason: string; openForSale: boolean; ladiesSpecial: boolean; allowOverlap: boolean;
   }): Promise<{ created: { tripId: TripId; journeyDate: string }[]; skipped: { journeyDate: string; reason: string }[] }> {
     const reason = input.reason?.trim() ?? '';
@@ -225,7 +225,7 @@ export class MaterializationService {
       const journeyDate = localDate(d);
       if (journeyDate < today) { skipped.push({ journeyDate: d, reason: 'date is in the past' }); continue; }
       try {
-        const departs = toInstant(journeyDate, effective.startMinute as never, tz);
+        const departs = toInstant(journeyDate, effective.startMinute, tz);
         if (departs.getTime() <= Date.now()) { skipped.push({ journeyDate: d, reason: 'departure time has already passed' }); continue; }
         if (!input.allowOverlap) {
           const near = await this.trips.tripsNear(service.routeId, departs, 30);
@@ -236,7 +236,7 @@ export class MaterializationService {
         if (input.vehicleId && await this.trips.vehicleBusyAround(input.vehicleId, departs, durationMin)) {
           skipped.push({ journeyDate: d, reason: 'the chosen bus is already running another trip at that time' }); continue;
         }
-        const tripId = await this.materialiseOne(effective as never, route, layout.id, seatInit, journeyDate, tz, { isExtra: true, reason, ladiesSpecial: input.ladiesSpecial, closedChannels: input.openForSale ? [] : ['direct_web', 'agent', 'ota', 'phone'] });
+        const tripId = await this.materialiseOne(effective, route, layout.id, seatInit, journeyDate, tz, { isExtra: true, reason, ladiesSpecial: input.ladiesSpecial, closedChannels: input.openForSale ? [] : ['direct_web', 'agent', 'ota', 'phone'] });
         created.push({ tripId, journeyDate: d });
       } catch (e) {
         skipped.push({ journeyDate: d, reason: e instanceof Error ? e.message : 'failed' });

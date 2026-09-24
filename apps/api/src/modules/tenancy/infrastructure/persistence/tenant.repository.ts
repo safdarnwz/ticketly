@@ -289,8 +289,8 @@ export class TenantRepository {
    * set one (BookingService.cancel() falls back to DEFAULT_REFUND_POLICY in
    * that case — see migration 0037's own comment for why this exists at all).
    */
-  async getRefundPolicy(tenantId?: string): Promise<unknown | null> {
-    const row = await this.db.queryOne<{ refund_policy: unknown | null }>(
+  async getRefundPolicy(tenantId?: string): Promise<unknown> {
+    const row = await this.db.queryOne<{ refund_policy: unknown }>(
       `SELECT refund_policy FROM tenants WHERE id = $1`,
       [tenantId ?? requireTenantId()],
       { name: 'tenant.getRefundPolicy', primary: true },
@@ -299,7 +299,7 @@ export class TenantRepository {
   }
 
   /** Pass `null` to revert to the platform default. */
-  async setRefundPolicy(policy: unknown | null, tenantId?: string): Promise<void> {
+  async setRefundPolicy(policy: unknown, tenantId?: string): Promise<void> {
     await this.db.execute_(
       `UPDATE tenants SET refund_policy = $2, updated_at = now() WHERE id = $1`,
       [tenantId ?? requireTenantId(), policy === null ? null : JSON.stringify(policy)],

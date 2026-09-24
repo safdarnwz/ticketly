@@ -28,7 +28,7 @@ export class FraudService {
     return { ...result, assessmentId };
   }
 
-  async forBooking(bookingId: BookingId): Promise<unknown | null> {
+  async forBooking(bookingId: BookingId): Promise<unknown> {
     return this.repo.latestForBooking(bookingId);
   }
 

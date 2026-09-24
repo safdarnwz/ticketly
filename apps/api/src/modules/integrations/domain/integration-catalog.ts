@@ -98,7 +98,7 @@ export function validateIntegrationUpdate(
     ...(secrets.success ? [] : secrets.error.issues.map((i) => `secrets.${i.path.join('.')}: ${i.message}`)),
   ];
   if (errors.length > 0 || !config.success || !secrets.success) return { ok: false, errors };
-  return { ok: true, config: config.data as Record<string, unknown>, secrets: secrets.data as Record<string, unknown> };
+  return { ok: true, config: config.data, secrets: secrets.data };
 }
 
 /** "abcd…wxyz" style hint so an admin can tell WHICH key is stored without seeing it. */

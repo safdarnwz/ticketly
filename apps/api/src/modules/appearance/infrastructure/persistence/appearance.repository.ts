@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { DatabaseService } from '@database';
-import { newId, type Json } from '@kernel';
+import { newId } from '@kernel';
 
 import type { ThemePatch } from '../../domain/theme';
 
@@ -31,7 +31,7 @@ export class AppearanceRepository {
       `INSERT INTO appearance_settings (id, scope, theme)
        VALUES ($1,$2,$3)
        ON CONFLICT (scope) DO UPDATE SET theme = EXCLUDED.theme, updated_at = now()`,
-      [newId(), scope, JSON.stringify(patch) as unknown as Json],
+      [newId(), scope, JSON.stringify(patch)],
       { name: 'appearance.upsert', primary: true },
     );
   }

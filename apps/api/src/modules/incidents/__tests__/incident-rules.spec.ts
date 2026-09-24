@@ -30,7 +30,7 @@ describe('incident workflow', () => {
     expect(() => assertTransition('open', 'acknowledged')).not.toThrow();
     expect(() => assertTransition('acknowledged', 'resolved')).toThrow(/resolution note/);
     expect(() => assertTransition('acknowledged', 'resolved', 'Mechanic fixed it')).not.toThrow();
-    expect(() => assertTransition('closed', 'open' as never)).toThrow(/cannot become/);
+    expect(() => assertTransition('closed', 'open')).toThrow(/cannot become/);
     expect(() => assertTransition('open', 'closed')).toThrow(/cannot become/);
   });
   it('critical SOS unacknowledged after 5 minutes is overdue', () => {

@@ -4,6 +4,17 @@ import { randomBytes } from 'node:crypto';
 import { DatabaseService, UnitOfWork } from '@database';
 import { newId, requireTenantId } from '@kernel';
 
+export interface DueDelivery {
+  id: string;
+  webhookId: string;
+  url: string;
+  secret: string;
+  eventType: string;
+  eventId: string;
+  payload: unknown;
+  attempts: number;
+}
+
 export interface PartnerWebhook {
   id: string;
   name: string;
@@ -123,9 +134,9 @@ export class WebhookRepository {
   }
 
   /** Deliveries due for a (re)try — for the worker's retry sweep. */
-  async duePending(limit = 50): Promise<{ id: string; webhookId: string; url: string; secret: string; eventType: string; eventId: string; payload: unknown; attempts: number }[]> {
+  async duePending(limit = 50): Promise<DueDelivery[]> {
     return this.uow.run({ name: 'webhook.duePending', bypassRls: true }, async (scope) => {
-      const result = await scope.client.query(
+      const result = await scope.client.query<DueDelivery>(
         `SELECT d.id, d.webhook_id AS "webhookId", w.url, w.secret, d.event_type AS "eventType",
                 d.event_id AS "eventId", d.payload, d.attempts
            FROM webhook_deliveries d JOIN partner_webhooks w ON w.id = d.webhook_id

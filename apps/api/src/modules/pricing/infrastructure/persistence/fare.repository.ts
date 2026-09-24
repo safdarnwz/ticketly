@@ -112,7 +112,7 @@ export class FareRepository {
     return {
       floorMinor: r?.floor_minor != null ? Number(r.floor_minor) : null,
       ceilingMinor: r?.ceiling_minor != null ? Number(r.ceiling_minor) : null,
-      peakWindows: Array.isArray(r?.peak_windows) ? r!.peak_windows : [],
+      peakWindows: Array.isArray(r?.peak_windows) ? r.peak_windows : [],
       tripPct: t ? Number(t.pct) : null,
     };
   }

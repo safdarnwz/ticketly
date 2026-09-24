@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 
 import { AppConfig } from '@config';
-import { AppError, ErrorCode, getUserId, newId, type UserId } from '@kernel';
+import { AppError, ErrorCode, getUserId, newId } from '@kernel';
 import { Logger } from '@observability';
 
 import { checkSvgSafety, checkWordSafety, decodeBase64Upload, looksLikeVideo, safeFileName, sniffMime, type AllowedMime } from '../domain/file-validation';
@@ -92,7 +92,7 @@ export class FileService {
       await this.files.insert({
         id: rowId, purpose: req.purpose, provider: this.storage.provider, bucket: this.storage.bucket, objectKey,
         visibility: req.visibility, fileName: displayName, mimeType: mime, sizeBytes: bytes.length, sha256,
-        uploadedBy: (getUserId() ?? null) as UserId | null,
+        uploadedBy: (getUserId() ?? null),
       });
       const meta = (await this.files.get(rowId))!;
       return { ...meta, url: await this.urlFor(meta) };

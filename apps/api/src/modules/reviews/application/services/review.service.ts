@@ -32,7 +32,7 @@ export class ReviewService {
     if (booking.status !== 'confirmed' && booking.status !== 'completed') {
       throw new AppError(ErrorCode.REVIEW_NOT_ELIGIBLE, 422, { message: 'You can only review a completed trip' });
     }
-    const userId = getUserId() as UserId | undefined;
+    const userId = getUserId();
     if (userId && booking.customerId && booking.customerId !== userId) {
       throw new AppError(ErrorCode.REVIEW_NOT_ELIGIBLE, 403, { message: 'You can only review your own booking' });
     }

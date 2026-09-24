@@ -46,7 +46,7 @@ import { Pool, type PoolClient } from 'pg';
 
 import { buildAppConfig, loadEnv } from '@config';
 import { FieldEncryptor, PasswordHasher } from '@security';
-import { runInNewContext, localDate, addDays, todayIn, type TenantId } from '@kernel';
+import { runInNewContext, localDate, addDays, todayIn, type TenantId, type TimeZone } from '@kernel';
 import { UnitOfWork } from '@database';
 
 import { AppModule } from '../apps/api/src/app.module';
@@ -54,7 +54,7 @@ import { ServiceRepository } from '../apps/api/src/modules/scheduling/infrastruc
 import { TripRepository } from '../apps/api/src/modules/scheduling/infrastructure/persistence/trip.repository';
 import { RouteRepository } from '../apps/api/src/modules/master-data/infrastructure/persistence/route.repository';
 import { SeatLayoutRepository } from '../apps/api/src/modules/master-data/infrastructure/persistence/seat-layout.repository';
-import { VehicleTypeRepository } from '../apps/api/src/modules/fleet/infrastructure/persistence/vehicle-type.repository';
+import { VehicleTypeRepository } from '../apps/api/src/modules/master-data/infrastructure/persistence/vehicle-type.repository';
 import { PricingService } from '../apps/api/src/modules/pricing/application/services/pricing.service';
 import { BookingService } from '../apps/api/src/modules/booking/application/services/booking.service';
 import { PaymentService } from '../apps/api/src/modules/payment/application/services/payment.service';
@@ -121,7 +121,7 @@ async function main(): Promise<void> {
   const connectingBooking = app.get(ConnectingBookingService);
   const uow = app.get(UnitOfWork);
 
-  const tz = 'Asia/Kolkata';
+  const tz = 'Asia/Kolkata' as TimeZone;
   const today = todayIn(tz);
 
   // ---- 1) Tenants -----------------------------------------------------
@@ -157,7 +157,7 @@ async function main(): Promise<void> {
                 canBoard: s.canBoard, canAlight: s.canAlight,
               };
             });
-            await uow.run({ name: 'demo.materialise', tenantId: t.id }, async () =>
+            await uow.run({ name: 'demo.materialise', tenantId: t.id as TenantId }, async () =>
               trips.insertTrip({
                 serviceId: svc.id, routeId: svc.routeId, vehicleId: svc.defaultVehicleId ?? null, seatLayoutId: layout.id,
                 journeyDate: d, departsAt: stopRows[0].departsAt, arrivesAt: stopRows[stopRows.length - 1].arrivesAt,
@@ -165,7 +165,7 @@ async function main(): Promise<void> {
               }),
             );
             created += 1;
-          } catch (e) {
+          } catch {
             // A UNIQUE(service_id, journey_date) hit means this date was
             // already materialised on a previous run — expected on re-run,
             // not a real failure.
@@ -443,7 +443,7 @@ async function main(): Promise<void> {
             outcomes.confirmed += 1;
             await maybeAddReview(client, t.id, hold.bookingId, customerId, trip.route_id, trip.id);
           }
-        } catch (e) {
+        } catch {
           outcomes.failed += 1;
         }
       }
@@ -602,8 +602,8 @@ async function main(): Promise<void> {
           });
           b2b.agentBookings += 1;
           if (i === 3) { // one cancellation → refund credited back to the agent's account
-            const c = await bookings.cancel(sold.bookingId as never, 'Passenger changed plans (agent)') as { refundMinor?: number };
-            if (c?.refundMinor && c.refundMinor > 0) await refunds.initiate({ bookingId: sold.bookingId as never, amountMinor: c.refundMinor, destination: 'source' });
+            const c = await bookings.cancel(sold.bookingId, 'Passenger changed plans (agent)') as { refundMinor?: number };
+            if (c?.refundMinor && c.refundMinor > 0) await refunds.initiate({ bookingId: sold.bookingId, amountMinor: c.refundMinor, destination: 'source' });
             b2b.agentCancels += 1;
           }
         });

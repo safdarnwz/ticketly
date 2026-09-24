@@ -24,7 +24,7 @@ export class FraudRepository {
     return id;
   }
 
-  async latestForBooking(bookingId: BookingId): Promise<unknown | null> {
+  async latestForBooking(bookingId: BookingId): Promise<unknown> {
     return this.db.queryOne(
       `SELECT id, score, band, decision, reasons, created_at AS "createdAt"
          FROM fraud_assessments WHERE booking_id = $1 ORDER BY created_at DESC LIMIT 1`,

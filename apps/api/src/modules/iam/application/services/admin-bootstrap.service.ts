@@ -1,5 +1,7 @@
 import { Injectable, type OnApplicationBootstrap } from '@nestjs/common';
 
+import { AppConfig } from '@config';
+
 import { UnitOfWork } from '@database';
 import { createContext, newId, runWithContext, type UserId } from '@kernel';
 import { Logger } from '@observability';
@@ -34,13 +36,13 @@ export class AdminBootstrapService implements OnApplicationBootstrap {
     private readonly hasher: PasswordHasher,
     private readonly uow: UnitOfWork,
     logger: Logger,
+    private readonly config: AppConfig,
   ) {
     this.log = logger.forContext('AdminBootstrap');
   }
 
   async onApplicationBootstrap(): Promise<void> {
-    const email = process.env.SUPER_ADMIN_EMAIL?.trim().toLowerCase();
-    const password = process.env.SUPER_ADMIN_PASSWORD;
+    const { superAdminEmail: email, superAdminPassword: password, superAdminName } = this.config.bootstrap;
     if (!email || !password) return;
 
     await runWithContext(createContext({ actorType: 'system' }), async () => {
@@ -53,7 +55,7 @@ export class AdminBootstrapService implements OnApplicationBootstrap {
         } else {
           const hash = await this.hasher.hash(password);
           const admin = User.create(newId() as UserId, {
-            tenantId: null, kind: 'staff', fullName: process.env.SUPER_ADMIN_NAME ?? 'Super Admin',
+            tenantId: null, kind: 'staff', fullName: superAdminName,
             email, phone: null, passwordHash: hash, status: 'active',
           });
           await this.uow.run({ name: 'bootstrap.superAdmin' }, async () => { await this.users.insert(admin); });

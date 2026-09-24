@@ -12,7 +12,7 @@ import {
   CreateIntentSchema, type CreateIntentDto,
   GenerateSettlementSchema, type GenerateSettlementDto,
 } from './dto/payment.dto';
-import { TEST_PAYMENT_METHODS, type TestInstrument } from '../domain/test-gateway';
+import { TEST_PAYMENT_METHODS } from '../domain/test-gateway';
 import { LedgerRepository } from '../infrastructure/persistence/ledger.repository';
 import { PaymentService } from '../application/services/payment.service';
 import { PaymentRepository } from '../infrastructure/persistence/payment.repository';
@@ -73,7 +73,7 @@ export class PaymentController {
   @ApiOperation({ summary: 'Charge a held booking via the sandbox gateway (test mode)' })
   async charge(@Body(zodBody(ChargeTestSchema)) dto: ChargeTestDto) {
     const { bookingId, ...instrument } = dto;
-    return this.payment.chargeTest(bookingId as BookingId, instrument as TestInstrument);
+    return this.payment.chargeTest(bookingId as BookingId, instrument);
   }
 
   @Post('upgrade-seat')

@@ -45,14 +45,14 @@ export async function retry<T>(fn: () => Promise<T>, options: RetryOptions = {})
 
 export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (signal?.aborted) return reject(signal.reason);
+    if (signal?.aborted) return reject(abortReason(signal));
     const timer = setTimeout(() => {
       signal?.removeEventListener('abort', onAbort);
       resolve();
     }, ms);
     function onAbort(): void {
       clearTimeout(timer);
-      reject(signal?.reason);
+      reject(abortReason(signal));
     }
     signal?.addEventListener('abort', onAbort, { once: true });
   });
@@ -75,4 +75,9 @@ export async function withTimeout<T>(
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+function abortReason(signal: AbortSignal | undefined): Error {
+  const reason: unknown = signal?.reason;
+  return reason instanceof Error ? reason : new Error(typeof reason === 'string' ? reason : 'Aborted');
 }

@@ -1,4 +1,4 @@
-import { DatabaseService } from '@database';
+import type { DatabaseService } from '@database';
 import { getTenantId } from '@kernel';
 
 const scope = (): string | null => (getTenantId() as string | undefined) ?? null;

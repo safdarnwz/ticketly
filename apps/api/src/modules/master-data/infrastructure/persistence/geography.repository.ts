@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { CacheNamespace, CacheService, CacheTtl } from '@cache';
 import { DatabaseService, UnitOfWork } from '@database';
-import type { CityId, StateId, Uuid } from '@kernel';
+import type { CityId, StateId } from '@kernel';
 
 export interface City {
   id: CityId;

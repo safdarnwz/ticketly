@@ -39,7 +39,7 @@ for (const f of files(ROOT)) {
   }
 }
 
-const baseline: string[] = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8')) : [];
+const baseline: string[] = existsSync(BASELINE) ? (JSON.parse(readFileSync(BASELINE, 'utf8')) as string[]) : [];
 if (process.argv.includes('--update') || !existsSync(BASELINE)) {
   writeFileSync(BASELINE, JSON.stringify([...found].sort(), null, 2) + '\n');
   console.log(`baseline written: ${found.size} known cross-module deep imports`);

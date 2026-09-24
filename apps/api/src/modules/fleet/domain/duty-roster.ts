@@ -1,4 +1,4 @@
-import { DomainError, ErrorCode } from '@kernel';
+import { DomainError, ErrorCode, type Json } from '@kernel';
 
 /**
  * ============================================================================
@@ -160,7 +160,7 @@ export function assertAssignable(candidate: Duty, existing: Duty[], rules: RestR
     throw new DomainError(
       ErrorCode.COMMON_CONFLICT,
       `Crew assignment rejected: ${result.conflicts.map((c) => c.message).join('; ')}`,
-      { details: { conflicts: result.conflicts as unknown as import('@kernel').Json } },
+      { details: { conflicts: result.conflicts as unknown as Json } },
     );
   }
 }

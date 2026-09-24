@@ -5,7 +5,7 @@ import { from, of, type Observable } from 'rxjs';
 import { catchError, switchMap, tap } from 'rxjs/operators';
 
 import { AppConfig } from '@config';
-import { AppError, ErrorCode, getContext, toAppError, type TenantId, type Uuid } from '@kernel';
+import { AppError, ErrorCode, getContext, toAppError, type Uuid } from '@kernel';
 
 import { IDEMPOTENT_KEY } from '../decorators/idempotent.decorator';
 import { IdempotencyStore } from './idempotency.store';
@@ -67,7 +67,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
       });
     }
 
-    const tenantId = (ctx?.tenantId ?? null) as TenantId | null;
+    const tenantId = (ctx?.tenantId ?? null);
     const userId = (ctx?.userId ?? null) as Uuid | null;
     const fingerprint = IdempotencyStore.fingerprint(request.method, request.url, request.body);
 

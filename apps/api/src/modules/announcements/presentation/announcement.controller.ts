@@ -3,7 +3,7 @@ import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
 import { ApiStandardErrors, Public, RequirePermission } from '@http';
-import { getUserId, getContext, ForbiddenError, type UserId } from '@kernel';
+import { getUserId, getContext, ForbiddenError } from '@kernel';
 
 import { AnnouncementRepository } from '../infrastructure/persistence/announcement.repository';
 
@@ -20,7 +20,7 @@ export class AnnouncementController {
   @ApiOperation({ summary: 'Create a platform-wide announcement (super-admin only)' })
   async create(@Body() dto: { title: string; body: string; severity?: 'info' | 'warning' | 'critical'; audience?: 'operators' | 'customers' | 'all'; startsAt?: string; endsAt?: string }) {
     this.assertPlatformAdmin();
-    const id = await this.announcements.create({ ...dto, createdBy: (getUserId() as UserId) ?? null });
+    const id = await this.announcements.create({ ...dto, createdBy: (getUserId()) ?? null });
     return { id };
   }
 

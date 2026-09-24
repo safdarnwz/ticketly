@@ -20,8 +20,8 @@ export interface AuthPrincipal {
 export const CurrentUser = createParamDecorator((_data: unknown, _ctx: ExecutionContext): AuthPrincipal => {
   const context = getContext();
   return {
-    userId: (context?.userId ?? null) as UserId | null,
-    tenantId: (context?.tenantId ?? null) as TenantId | null,
+    userId: (context?.userId ?? null),
+    tenantId: (context?.tenantId ?? null),
     actorType: context?.actorType ?? 'anonymous',
     permissions: context?.permissions ?? new Set(),
     roles: (context?.extra?.roles as string[]) ?? [],
@@ -30,5 +30,5 @@ export const CurrentUser = createParamDecorator((_data: unknown, _ctx: Execution
 
 /** `@CurrentTenant()` — inject the resolved tenant id (throws if absent upstream). */
 export const CurrentTenant = createParamDecorator((_data: unknown, _ctx: ExecutionContext): TenantId | null => {
-  return (getContext()?.tenantId ?? null) as TenantId | null;
+  return (getContext()?.tenantId ?? null);
 });

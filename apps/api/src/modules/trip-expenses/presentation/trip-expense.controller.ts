@@ -43,8 +43,8 @@ export class TripExpenseController {
   @RequirePermission(Permission.TRIP_OPERATE)
   @ApiOperation({ summary: 'Upload a receipt as raw bytes (PDF/JPG/PNG/WEBP ≤ 5 MB) → fileId for the expense' })
   async receipt(@Param('tripId') tripId: string, @Query('fileName') fileName: string | undefined, @Body() body: Buffer) {
-    if (!Buffer.isBuffer(body) || (body as Buffer).length === 0) throw new BadRequestError('Send the receipt as raw bytes with Content-Type: application/octet-stream');
-    return this.svc.uploadReceipt(tripId as TripId, body as Buffer, fileName);
+    if (!Buffer.isBuffer(body) || (body).length === 0) throw new BadRequestError('Send the receipt as raw bytes with Content-Type: application/octet-stream');
+    return this.svc.uploadReceipt(tripId as TripId, body, fileName);
   }
 
   @Get('trips/:tripId/expenses')

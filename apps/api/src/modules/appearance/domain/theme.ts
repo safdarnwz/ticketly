@@ -117,8 +117,8 @@ export function validateTheme(theme: Theme): void {
   if (theme.mode !== 'light' && theme.mode !== 'dark') {
     throw new DomainError(ErrorCode.COMMON_VALIDATION, `mode must be 'light' or 'dark'`);
   }
-  for (const [k, v] of Object.entries(theme.colors)) assertHex(`colors.${k}`, v);
-  for (const [k, v] of Object.entries(theme.radius)) assertRange(`radius.${k}`, v, 0, 9999);
+  for (const [k, v] of Object.entries(theme.colors) as [string, string][]) assertHex(`colors.${k}`, v);
+  for (const [k, v] of Object.entries(theme.radius) as [string, number][]) assertRange(`radius.${k}`, v, 0, 9999);
   assertRange('font.sizeBase', theme.font.sizeBase, 10, 24);
   assertRange('font.scale', theme.font.scale, 1, 2);
   assertRange('spacingUnit', theme.spacingUnit, 2, 16);
@@ -132,13 +132,13 @@ function isObject(v: unknown): v is Record<string, unknown> {
 
 /** Deep-merge a partial override onto a base theme (override wins, recursively). */
 export function mergeTheme(base: Theme, patch: ThemePatch): Theme {
-  return deepMerge(base as unknown as Record<string, unknown>, patch as Record<string, unknown>) as unknown as Theme;
+  return deepMerge(base as unknown as Record<string, unknown>, patch) as unknown as Theme;
 }
 function deepMerge(base: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...base };
   for (const [k, v] of Object.entries(patch)) {
     if (v === undefined) continue;
-    if (isObject(v) && isObject(out[k])) out[k] = deepMerge(out[k] as Record<string, unknown>, v);
+    if (isObject(v) && isObject(out[k])) out[k] = deepMerge(out[k], v);
     else out[k] = v;
   }
   return out;
@@ -157,9 +157,9 @@ export function resolveTheme(platformPatch: ThemePatch = {}, rolePatch: ThemePat
 /** Flatten a theme into the `--yb-*` CSS-variable map the frontend consumes. */
 export function tokensToCssVars(theme: Theme): Record<string, string> {
   const vars: Record<string, string> = {};
-  for (const [k, v] of Object.entries(theme.colors)) vars[`--yb-color-${kebab(k)}`] = v;
+  for (const [k, v] of Object.entries(theme.colors) as [string, string][]) vars[`--yb-color-${kebab(k)}`] = v;
   for (const [k, v] of Object.entries(theme.radius)) vars[`--yb-radius-${k}`] = `${v}px`;
-  for (const [k, v] of Object.entries(theme.shadow)) vars[`--yb-shadow-${k}`] = v;
+  for (const [k, v] of Object.entries(theme.shadow) as [string, string][]) vars[`--yb-shadow-${k}`] = v;
   vars['--yb-font-family'] = theme.font.family;
   vars['--yb-font-family-heading'] = theme.font.familyHeading;
   vars['--yb-font-size-base'] = `${theme.font.sizeBase}px`;

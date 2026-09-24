@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { CacheNamespace, CacheService, CacheTtl } from '@cache';
+import { CacheNamespace, CacheService } from '@cache';
 import { DatabaseService, registerConstraintMessages } from '@database';
 import { stateFromGstin } from '../../domain/gst-state-codes';
 import {

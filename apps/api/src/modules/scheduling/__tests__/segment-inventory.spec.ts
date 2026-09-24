@@ -37,7 +37,7 @@ describe('SegmentMap — the core coexistence property', () => {
   });
 
   it('rejects double-booking an overlapping segment', () => {
-    let occ = map.occupy(0n, 0, 2); // A→C
+    const occ = map.occupy(0n, 0, 2); // A→C
     expect(() => map.occupy(occ, 1, 3)).toThrow(/already occupied/); // B→D overlaps leg 1
   });
 });

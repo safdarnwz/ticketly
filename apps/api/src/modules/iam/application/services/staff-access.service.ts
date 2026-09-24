@@ -64,7 +64,7 @@ export class StaffAccessService {
   async grantRole(userId: string, roleId: string, expiresAt: string | null): Promise<void> {
     await this.assertStaff(userId);
     if (expiresAt && Date.parse(expiresAt) <= Date.now()) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: 'The end date must be in the future' });
-    await this.roles.grantToUser(userId as UserId, roleId as RoleId, (getUserId() ?? null) as UserId | null, expiresAt ? new Date(expiresAt) : null);
+    await this.roles.grantToUser(userId as UserId, roleId as RoleId, (getUserId() ?? null), expiresAt ? new Date(expiresAt) : null);
   }
 
   duplicateRole(roleId: string, code: string, name: string) { return this.roles.duplicate(roleId as RoleId, code, name); }

@@ -27,7 +27,7 @@ export class CmsRepository {
     return row?.id ?? '';
   }
 
-  async getPage(slug: string): Promise<unknown | null> {
+  async getPage(slug: string): Promise<unknown> {
     return this.db.queryOne(
       `SELECT slug, title, body, status, updated_at AS "updatedAt" FROM cms_pages
         WHERE slug = $1 AND status = 'published'`,

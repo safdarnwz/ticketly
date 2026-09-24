@@ -37,7 +37,7 @@ export class S3CompatibleStorage implements ObjectStorage {
     const { host, path, base } = this.locate(key);
     const payloadHash = body ? sha256Hex(body) : sha256Hex('');
     const headers = signHeaders({ method, host, path, headers: extraHeaders, payloadHash, creds: this.creds });
-    delete (headers as Record<string, string>).host; // fetch sets Host itself
+    delete (headers).host; // fetch sets Host itself
     let res: Response;
     try {
       res = await fetch(`${base}${path}`, { method, headers, body: body ? new Uint8Array(body) : undefined, signal: AbortSignal.timeout(this.cfg.timeoutMs) });

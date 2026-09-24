@@ -1,4 +1,5 @@
-import { AppError, toAppError } from './errors';
+import type { AppError} from './errors';
+import { toAppError } from './errors';
 
 /**
  * ============================================================================

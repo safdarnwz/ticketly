@@ -32,7 +32,7 @@ describe('redactPii', () => {
   });
 
   it('edge: absent or null PII fields are left alone', () => {
-    const out = redactPii({ email: null, totalMinor: 1 } as Record<string, unknown>);
+    const out = redactPii({ email: null, totalMinor: 1 });
     expect(out.email).toBeNull();
   });
 

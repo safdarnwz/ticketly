@@ -83,7 +83,7 @@ export function checkSvgSafety(buf: Buffer): string | null {
 export const EXTENSION: Record<AllowedMime, string> = {
   'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/svg+xml': 'svg',
   'application/msword': 'doc', [DOCX]: 'docx',
-} as Record<AllowedMime, string>;
+};
 
 /**
  * Word files can carry macros. A .docx whose package contains vbaProject.bin

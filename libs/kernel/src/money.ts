@@ -121,7 +121,7 @@ export class Money {
    * commission across segments, apportioning a coupon across seats.
    */
   allocate(nOrWeights: number | number[]): Money[] {
-    const weights = typeof nOrWeights === 'number' ? new Array(nOrWeights).fill(1) : nOrWeights;
+    const weights: number[] = typeof nOrWeights === 'number' ? new Array<number>(nOrWeights).fill(1) : nOrWeights;
     const totalWeight = weights.reduce((a, b) => a + b, 0);
     if (totalWeight <= 0) throw new BadRequestError('allocate() requires positive weights');
 

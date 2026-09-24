@@ -220,6 +220,24 @@ export const envSchema = z.object({
   MSG91_WHATSAPP_INTEGRATED_NUMBER: z.string().default(''), // WhatsApp Business number registered with MSG91
   MSG91_WHATSAPP_NAMESPACE: z.string().default(''),
 
+  /* ── Email (Gmail SMTP fallback; an SMTP integration saved by the platform admin wins) ── */
+  GMAIL_USER: z.string().default(''),
+  GMAIL_APP_PASSWORD: z.string().default(''),
+  MAIL_FROM: z.string().default(''),
+
+  /* ── First-boot platform super admin (created once if missing) ── */
+  SUPER_ADMIN_EMAIL: z.string().default(''),
+  SUPER_ADMIN_PASSWORD: z.string().default(''),
+  SUPER_ADMIN_NAME: z.string().default('Super Admin'),
+
+  /* ── KYC: Digio (DigiLocker) ── */
+  DIGIO_CLIENT_ID: z.string().default(''),
+  DIGIO_CLIENT_SECRET: z.string().default(''),
+  DIGIO_ENV: z.string().default('sandbox').transform((v): 'sandbox' | 'production' => (v === 'production' ? 'production' : 'sandbox')),
+
+  /* ── Customer-facing web origin (tracking links etc.) ── */
+  PUBLIC_WEB_URL: z.string().url().default('https://www.ticketly.com'),
+
   /* ── Payments: Razorpay (real PSP) ──────────────────────────────────────*
    * Leave RAZORPAY_KEY_ID empty to keep using the test/mock gateway — see
    * PaymentModule's factory. Get these from https://dashboard.razorpay.com/.

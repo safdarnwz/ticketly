@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { UnitOfWork } from '@database';
 import { AppError, ErrorCode, getUserId, type UserId } from '@kernel';
 
-import { consentState, isProcessingAllowed, recordConsent, type ConsentEvent, type ConsentPurpose } from '../../domain/consent';
+import { consentState, isProcessingAllowed, recordConsent, type ConsentPurpose } from '../../domain/consent';
 import { PrivacyRepository } from '../../infrastructure/persistence/privacy.repository';
 
 /**
@@ -22,7 +22,7 @@ export class PrivacyService {
   ) {}
 
   private requireCustomer(): UserId {
-    const id = getUserId() as UserId | undefined;
+    const id = getUserId();
     if (!id) throw new AppError(ErrorCode.COMMON_UNAUTHENTICATED, 401, { message: 'Sign-in required' });
     return id;
   }

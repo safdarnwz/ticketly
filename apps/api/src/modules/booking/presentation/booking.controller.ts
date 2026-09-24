@@ -59,6 +59,7 @@ export class BookingController {
   }
 
   @Post(':id/extend-hold')
+  @Idempotent()
   @HttpCode(200)
   @RequirePermission(Permission.BOOKING_CREATE)
   @ApiOperation({ summary: 'Phone booking: change the release time while it is still on hold' })

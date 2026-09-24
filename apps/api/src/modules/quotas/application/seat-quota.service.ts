@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
-import { AppError, ErrorCode, getUserId, requireTenantId, type BookingId, type TripId, type UserId } from '@kernel';
+import { AppError, ErrorCode, getUserId, requireTenantId, type BookingId, type TripId } from '@kernel';
 
 import { TripRepository } from '../../scheduling/infrastructure/persistence/trip.repository';
 import { QuotaRuleError, quotaReleaseAt, validateQuotaAllocation, type QuotaHolderType } from '../domain/quota-rules';
@@ -32,7 +32,7 @@ export class SeatQuotaService {
       const { missing, busy } = await this.quotas.lockAndInspect(tripId, seats);
       if (missing.length) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: `No such seat on this trip: ${missing.join(', ')}` });
       if (busy.length) throw new AppError(ErrorCode.INVENTORY_SEAT_UNAVAILABLE, 409, { message: `Already sold, blocked, allocated or being booked: ${busy.join(', ')}` });
-      const created = await this.quotas.allocate({ tripId, seats, holderType: input.holderType, holderId: input.holderId, releaseAt, createdBy: (getUserId() ?? null) as UserId | null });
+      const created = await this.quotas.allocate({ tripId, seats, holderType: input.holderType, holderId: input.holderId, releaseAt, createdBy: (getUserId() ?? null) });
       return { allocated: created, releaseAt: releaseAt.toISOString() };
     });
   }

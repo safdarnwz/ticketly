@@ -8,8 +8,8 @@ import {
   getContext,
   UnauthenticatedError,
   ErrorCode,
-  type TenantId,
-  type UserId,
+  
+  
 } from '@kernel';
 
 import { ApiKeyService } from '../../application/services/api-key.service';
@@ -87,11 +87,11 @@ export class AuthGuard implements CanActivate {
     // Permissions are embedded in the token for speed; we re-resolve only when
     // the token predates a grant change (detected via the permission hash on
     // sensitive routes — the permission guard can force a refresh).
-    ctx.userId = claims.sub as UserId;
-    ctx.tenantId = (claims.tid ?? undefined) as TenantId | undefined;
+    ctx.userId = claims.sub;
+    ctx.tenantId = (claims.tid ?? undefined);
     ctx.actorType = 'user';
     const resolved = claims.roles && claims.roles.length > 0
-      ? await this.roles.resolvePermissions(claims.sub as UserId)
+      ? await this.roles.resolvePermissions(claims.sub)
       : { permissions: [], roles: claims.roles ?? [], active: true, accessExpiresAt: null, tokensValidAfter: null, loginWindow: null };
     if (!resolved.active) {
       throw new AppError(ErrorCode.AUTH_TOKEN_INVALID, 401, { message: 'This account has been disabled — please contact your administrator' });

@@ -4,7 +4,7 @@ import { AppConfig } from '@config';
 import { DatabaseService, isUniqueViolation, UnitOfWork } from '@database';
 import {
   AppError, ErrorCode, getUserId, requireTenantId,
-  type BookingId, type TripId, type UserId,
+  type BookingId, type TripId,
 } from '@kernel';
 import { EventBus } from '@messaging';
 import { Logger, Metrics } from '@observability';
@@ -157,7 +157,7 @@ export class BookingService {
     }
     // ONE instant: stored and returned identically.
     const holdExpiresAt = opts.holdUntil ?? new Date(Date.now() + holdTtl * 1000);
-    const userId = (getUserId() ?? null) as UserId | null;
+    const userId = (getUserId() ?? null);
 
     return this.uow.run({ name: 'booking.hold', tenantId: requireTenantId(), isolation: 'read committed' }, async () => {
       // The anti-double-sell gate: row-lock + bitmap + hold-overlap check.
@@ -376,7 +376,7 @@ export class BookingService {
         paidMinor: booking.paidMinor,
         feeMinor: refund.fee.minor,
         refundMinor: refund.refund.minor,
-        cancelledBy: (getUserId() ?? null) as UserId | null,
+        cancelledBy: (getUserId() ?? null),
       });
 
       this.metrics.bookings.inc({ outcome: 'cancelled', channel: 'direct' });
@@ -470,7 +470,7 @@ export class BookingService {
         paidMinor: cancelledPaidMinor,
         feeMinor: refund.fee.minor,
         refundMinor: refund.refund.minor,
-        cancelledBy: (getUserId() ?? null) as UserId | null,
+        cancelledBy: (getUserId() ?? null),
       });
 
       this.metrics.bookings.inc({ outcome: 'partial_cancelled', channel: 'direct' });

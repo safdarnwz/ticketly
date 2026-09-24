@@ -1,11 +1,14 @@
-import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
-import { promisify } from 'node:util';
+import { randomBytes, scrypt, timingSafeEqual, type ScryptOptions } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
 
 import { AppConfig } from '@config';
 
-const scryptAsync = promisify(scrypt);
+function scryptAsync(password: string, salt: Buffer, keyLength: number, options: ScryptOptions): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    scrypt(password, salt, keyLength, options, (err, derived) => (err ? reject(err) : resolve(derived)));
+  });
+}
 
 /**
  * ============================================================================
@@ -52,7 +55,7 @@ export class PasswordHasher {
       r: this.blockSize,
       p: this.parallelism,
       maxmem: 256 * 1024 * 1024,
-    })) as Buffer;
+    }));
     return `scrypt$${this.cost}$${this.blockSize}$${this.parallelism}$${salt.toString('base64')}$${derived.toString('base64')}`;
   }
 
@@ -65,7 +68,7 @@ export class PasswordHasher {
         r: parsed.r,
         p: parsed.p,
         maxmem: 256 * 1024 * 1024,
-      })) as Buffer;
+      }));
       return derived.length === parsed.hash.length && timingSafeEqual(derived, parsed.hash);
     } catch {
       return false;

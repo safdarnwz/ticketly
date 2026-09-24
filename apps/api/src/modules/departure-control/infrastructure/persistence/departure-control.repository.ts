@@ -34,7 +34,7 @@ export class DepartureControlRepository {
     return { totalSeats: Number(row.total), confirmedSeats: Number(row.confirmed), boardedSeats: Number(row.boarded) };
   }
 
-  async findChart(tripId: TripId): Promise<unknown | null> {
+  async findChart(tripId: TripId): Promise<unknown> {
     return this.db.queryOne(
       `SELECT id, trip_id AS "tripId", total_seats AS "totalSeats", confirmed_seats AS "confirmedSeats",
               boarded_seats AS "boardedSeats", no_show_seats AS "noShowSeats", vacant_seats AS "vacantSeats",

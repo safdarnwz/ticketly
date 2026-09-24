@@ -206,7 +206,7 @@ export function isValidTimeZone(tz: string): tz is TimeZone {
 
 export function timeZone(value: string): TimeZone {
   if (!isValidTimeZone(value)) throw new BadRequestError(`Unknown IANA timezone '${value}'`);
-  return value as TimeZone;
+  return value;
 }
 
 /* ── Durations ───────────────────────────────────────────────────────────── */

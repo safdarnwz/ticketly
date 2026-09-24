@@ -321,7 +321,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
 
   private setL1<T>(fullKey: string, envelope: Envelope<T>, options: CacheOptions): void {
     if (!this.l1 || options.skipL1) return;
-    this.l1.set(fullKey, envelope as Envelope<unknown>, {
+    this.l1.set(fullKey, envelope, {
       ttl: options.l1TtlMs ?? Math.min(this.config.cache.l1TtlMs, options.ttlSeconds * 1000),
     });
   }
@@ -368,7 +368,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       } catch (error) {
         this.log.warn({ err: (error as Error).message, key: fullKey }, 'background refresh failed');
       }
-      return undefined as unknown;
+      return undefined;
     });
   }
 }

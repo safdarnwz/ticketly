@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { SeatMap, type SeatCell, type SeatMapProps } from '../domain/seat-map';
+import { SeatMap, type SeatMapProps } from '../domain/seat-map';
 
 /** A minimal valid 2x2 seater layout. */
 function validSeater(): SeatMapProps {
@@ -92,7 +92,7 @@ describe('SeatMap — negative & edge cases', () => {
 
   it('rejects a seat on a non-existent deck', () => {
     const props = validSeater();
-    props.seats[0].deck = 1 as never; // only 1 deck declared
+    props.seats[0].deck = 1; // only 1 deck declared
     expect(() => SeatMap.create(props)).toThrow(/deck/);
   });
 

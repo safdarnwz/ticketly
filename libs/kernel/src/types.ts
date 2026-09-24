@@ -20,7 +20,7 @@ export type Maybe<T> = T | null | undefined;
 
 export type DeepReadonly<T> = T extends (infer R)[]
   ? ReadonlyArray<DeepReadonly<R>>
-  : T extends Function
+  : T extends (...args: never[]) => unknown
     ? T
     : T extends object
       ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
@@ -42,7 +42,7 @@ export type Json = string | number | boolean | null | Json[] | { [key: string]: 
 export type Awaitable<T> = T | Promise<T>;
 
 /** Constructor type, used by the DI helpers and test factories. */
-export type Ctor<T = unknown> = new (...args: any[]) => T;
+export type Ctor<T = unknown> = new (...args: never[]) => T;
 
 /** Exhaustiveness helper for switch statements over discriminated unions. */
 export function assertNever(value: never, message = 'Unexpected value'): never {

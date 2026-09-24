@@ -10,7 +10,7 @@ import {
   runWithContext,
   UnauthenticatedError,
   type TenantId,
-  type UserId,
+  type UserId, type SessionId
 } from '@kernel';
 import { Logger, Metrics } from '@observability';
 import { OtpService, PasswordHasher, TokenService } from '@security';
@@ -540,9 +540,9 @@ export class AuthService {
   }
 
   /** Create the session row and sign both tokens. Runs inside a UoW. */
-  private async mintTokens(user: User, tenantId: TenantId | null, meta: { userAgent?: string; ip?: string }, parentId: import('@kernel').SessionId | null): Promise<AuthTokens> {
+  private async mintTokens(user: User, tenantId: TenantId | null, meta: { userAgent?: string; ip?: string }, parentId: SessionId | null): Promise<AuthTokens> {
     const { permissions, roles } = await this.roles.resolvePermissions(user.id);
-    const sessionId = newId() as import('@kernel').SessionId;
+    const sessionId = newId() as SessionId;
 
     const refresh = this.tokens.signRefresh({ sub: user.id, tid: tenantId, sid: sessionId, jti: newId() });
     const realSessionId = await this.sessions.create({

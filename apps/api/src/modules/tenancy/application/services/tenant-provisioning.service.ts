@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
-import { newId, ConflictError, type TenantId, type UserId } from '@kernel';
+import { newId, ConflictError, type TenantId, type UserId, type RoleId } from '@kernel';
 import { EventBus } from '@messaging';
 import { Logger } from '@observability';
 import { PasswordHasher } from '@security';
@@ -79,7 +79,7 @@ export class TenantProvisioningService {
         await this.tenants.insert(tenant);
 
         // Seed the five system roles for this tenant.
-        const roleIds = new Map<string, import('@kernel').RoleId>();
+        const roleIds = new Map<string, RoleId>();
         for (const role of SYSTEM_ROLES) {
           const id = await this.roles.createRole({
             tenantId,

@@ -58,7 +58,7 @@ export function buildConnections(
 ): ConnectingJourney[] {
   if (options.minLayoverMin < 0 || options.maxLayoverMin < options.minLayoverMin) {
     throw new DomainError(ErrorCode.CONNECTION_INVALID_LAYOVER, 'Layover window is invalid', {
-      details: options,
+      details: { minLayoverMin: options.minLayoverMin, maxLayoverMin: options.maxLayoverMin },
     });
   }
 

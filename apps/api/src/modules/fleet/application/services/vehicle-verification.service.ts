@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { UnitOfWork } from '@database';
 import {
   AppError, ConflictError, DomainError, ErrorCode, NotFoundError, getUserId, runAsTenant, todayIn,
-  type Json, type TenantId, type UserId, type VehicleId, type VehicleTypeId,
+  type Json, type TenantId, type VehicleId, type VehicleTypeId,
 } from '@kernel';
 import { EventBus } from '@messaging';
 import { Logger } from '@observability';
@@ -98,7 +98,7 @@ export class VehicleVerificationService {
         throw new DomainError(ErrorCode.COMMON_VALIDATION, 'The chassis number cannot be changed once set');
       }
       if (v.verificationStatus === 'approved' || v.verificationStatus === 'submitted') {
-        const touched = RC_LOCKED_FIELDS.filter((f) => input[f] !== undefined && String(input[f]) !== String((v as unknown as Record<string, unknown>)[f] ?? ''));
+        const touched = RC_LOCKED_FIELDS.filter((f) => input[f] !== undefined && String(input[f]) !== stringOf((v as unknown as Record<string, unknown>)[f]));
         if (touched.length) {
           throw new DomainError(ErrorCode.COMMON_VALIDATION,
             `${touched.join(', ')} cannot be edited while the bus is ${v.verificationStatus} — these are verified against the RC. Contact support to correct them.`);
@@ -221,7 +221,7 @@ export class VehicleVerificationService {
         const need = [...c.missing, ...c.rejected, ...c.expired].map((t) => DOC_LABELS[t] ?? t);
         throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: `Upload valid copies of: ${need.join(', ')}`, details: { compliance: c } as unknown as Json });
       }
-      await this.vehicles.setVerification(id, { status: 'submitted', reason: null, actorId: (getUserId() ?? null) as UserId | null });
+      await this.vehicles.setVerification(id, { status: 'submitted', reason: null, actorId: (getUserId() ?? null) });
       this.events.publish({ type: 'vehicle.submitted', aggregateType: 'vehicle', aggregateId: id, payload: { registrationNo: v.registrationNo } });
       return { status: 'submitted' as const };
     });
@@ -234,7 +234,7 @@ export class VehicleVerificationService {
       if (!canTransition(v.verificationStatus, 'draft', 'operator')) {
         throw new DomainError(ErrorCode.COMMON_CONFLICT, `Only a submitted bus can be withdrawn (this one is '${v.verificationStatus}')`);
       }
-      await this.vehicles.setVerification(id, { status: 'draft', reason: 'Withdrawn by operator', actorId: (getUserId() ?? null) as UserId | null });
+      await this.vehicles.setVerification(id, { status: 'draft', reason: 'Withdrawn by operator', actorId: (getUserId() ?? null) });
     });
   }
 
@@ -276,7 +276,7 @@ export class VehicleVerificationService {
 
   async adminList(filter: { verification?: VerificationStatus; search?: string; limit?: number }) {
     return this.uow.run({ name: 'vehicle.admin.list', bypassRls: true }, async (scope) => {
-      const res = await scope.client.query(
+      const res = await scope.client.query<Record<string, unknown>>(
         `SELECT v.id, v.registration_no AS "registrationNo", v.make, v.model, v.manufacture_year AS "manufactureYear",
                 v.verification_status AS "verificationStatus", v.verification_reason AS "verificationReason",
                 v.submitted_at AS "submittedAt", v.verified_at AS "verifiedAt", v.status,
@@ -315,7 +315,7 @@ export class VehicleVerificationService {
           throw new DomainError(ErrorCode.COMMON_VALIDATION, 'RC number does not match the bus registration');
         }
       }
-      const actor = (getUserId() ?? null) as UserId | null;
+      const actor = (getUserId() ?? null);
       await this.vehicles.setDocumentVerification(docId, { status: decision, reason: decision === 'rejected' ? reason!.trim() : null, actorId: actor });
       if (decision === 'verified') await this.vehicles.supersedeOlderVerified(vehicleId, doc.docType, docId);
       this.events.publish({ type: `vehicle.document_${decision}`, aggregateType: 'vehicle', aggregateId: vehicleId, payload: { docType: doc.docType, reason: reason ?? null, registrationNo: v.registrationNo } });
@@ -340,7 +340,7 @@ export class VehicleVerificationService {
         const missing = this.missingDetails(v);
         if (missing.length) throw new DomainError(ErrorCode.COMMON_VALIDATION, `Bus details incomplete: ${missing.join(', ')}`);
       }
-      await this.vehicles.setVerification(vehicleId, { status: to, reason: reason?.trim() || null, actorId: (getUserId() ?? null) as UserId | null });
+      await this.vehicles.setVerification(vehicleId, { status: to, reason: reason?.trim() || null, actorId: (getUserId() ?? null) });
       const detachedTrips = to === 'suspended' ? await this.vehicles.detachFromFutureService(vehicleId) : 0;
       this.events.publish({ type: `vehicle.${to}`, aggregateType: 'vehicle', aggregateId: vehicleId, payload: { registrationNo: v.registrationNo, reason: reason ?? null, detachedTrips } });
       return { status: to, detachedTrips };
@@ -420,3 +420,11 @@ export class VehicleVerificationService {
 }
 
 export { ALL_DOC_TYPES };
+
+/** Scalar → string for a changed-field comparison (null/undefined → ''). */
+function stringOf(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'object') return JSON.stringify(value);
+  return typeof value === 'string' ? value : JSON.stringify(value);
+}

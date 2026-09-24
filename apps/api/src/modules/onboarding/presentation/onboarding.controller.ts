@@ -3,7 +3,7 @@ import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
 import { ApiStandardErrors, Public, RateLimit, RequirePermission, zodBody } from '@http';
-import { getUserId, type UserId } from '@kernel';
+import { getUserId } from '@kernel';
 
 import { OnboardingService } from '../application/services/onboarding.service';
 import { ApplyOperatorSchema, type ApplyOperatorDto, ApproveSchema, type ApproveDto, RejectSchema, type RejectDto } from './dto/onboarding.dto';
@@ -72,7 +72,7 @@ export class OnboardingController {
   @RequirePermission(Permission.PLATFORM_OPERATORS)
   @ApiOperation({ summary: 'Approve → provision operator tenant + admin user' })
   async approve(@Param('id') id: string, @Body(zodBody(ApproveSchema)) dto: ApproveDto) {
-    return this.onboarding.approve(id, (getUserId() ?? null) as UserId | null, dto?.note);
+    return this.onboarding.approve(id, (getUserId() ?? null), dto?.note);
   }
 
   @ApiBearerAuth('bearer')
@@ -81,7 +81,7 @@ export class OnboardingController {
   @RequirePermission(Permission.PLATFORM_OPERATORS)
   @ApiOperation({ summary: 'Reject an application with a reason' })
   async reject(@Param('id') id: string, @Body(zodBody(RejectSchema)) dto: RejectDto) {
-    await this.onboarding.reject(id, dto.reason, (getUserId() ?? null) as UserId | null);
+    await this.onboarding.reject(id, dto.reason, (getUserId() ?? null));
     return { ok: true };
   }
 
@@ -91,7 +91,7 @@ export class OnboardingController {
   @RequirePermission(Permission.PLATFORM_OPERATORS)
   @ApiOperation({ summary: 'Keep an application pending with a reason (e.g. more documents needed) — emailed to the applicant' })
   async hold(@Param('id') id: string, @Body(zodBody(RejectSchema)) dto: RejectDto) {
-    await this.onboarding.hold(id, dto.reason, (getUserId() ?? null) as UserId | null);
+    await this.onboarding.hold(id, dto.reason, (getUserId() ?? null));
     return { ok: true };
   }
 
@@ -101,7 +101,7 @@ export class OnboardingController {
   @RequirePermission(Permission.PLATFORM_OPERATORS)
   @ApiOperation({ summary: 'Move a rejected application back to pending, with a reason' })
   async reopen(@Param('id') id: string, @Body(zodBody(RejectSchema)) dto: RejectDto) {
-    await this.onboarding.reopen(id, dto.reason, (getUserId() ?? null) as UserId | null);
+    await this.onboarding.reopen(id, dto.reason, (getUserId() ?? null));
     return { ok: true };
   }
 }

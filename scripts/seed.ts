@@ -19,7 +19,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Pool, type PoolClient } from 'pg';
 
-import { AppConfig, buildAppConfig, loadEnv } from '@config';
+import type { AppConfig} from '@config';
+import { buildAppConfig, loadEnv } from '@config';
 import { FieldEncryptor, PasswordHasher } from '@security';
 
 const SEEDS_DIR = join(__dirname, '..', 'db', 'seeds');

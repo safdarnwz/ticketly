@@ -85,15 +85,15 @@ export class OnboardingService {
   async uploadApplicationDocument(docType: string, body: unknown, fileName?: string) {
     const allowed = ['gst_certificate', 'pan_card', 'cancelled_cheque', 'aadhaar', 'business_registration', 'fleet_list', 'other'];
     if (!allowed.includes(docType)) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: `docType must be one of: ${allowed.join(', ')}` });
-    if (!Buffer.isBuffer(body) || (body as Buffer).length === 0) {
+    if (!Buffer.isBuffer(body) || (body).length === 0) {
       throw new AppError(ErrorCode.COMMON_VALIDATION, 400, { message: 'Send the file as raw bytes with Content-Type: application/octet-stream' });
     }
-    const f = await this.files.upload({ purpose: 'application_document', bytes: body as Buffer, fileName, sub: ['applications', docType] });
+    const f = await this.files.upload({ purpose: 'application_document', bytes: body, fileName, sub: ['applications', docType] });
     return { fileId: f.id, fileName: f.fileName, sizeBytes: f.sizeBytes, mimeType: f.mimeType };
   }
 
   async applicationDocumentUrl(applicationId: string, docType: string): Promise<{ url: string | null; fileName: string }> {
-    const app = await this.repo.getFull(applicationId) as Record<string, unknown> | null;
+    const app = await this.repo.getFull(applicationId);
     if (!app) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Application not found' });
     const fileId = (app.documents as Record<string, string> | null)?.[docType];
     if (!fileId) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: `No '${docType}' document on this application` });
@@ -117,7 +117,7 @@ export class OnboardingService {
     const app = await this.repo.getFull(id);
     if (!app) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Application not found' });
     // Never expose the stored password hash.
-    delete (app as Record<string, unknown>).password_hash;
+    delete (app).password_hash;
     const a = app as Record<string, string | null>;
     // Readiness is shown BEFORE the admin clicks approve, so they see exactly what is missing.
     const blockers = a.status === 'pending' ? approvalBlockers({
@@ -139,7 +139,7 @@ export class OnboardingService {
         if (!app) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Application not found' });
         assertReview(app.status, 'approve', note);
 
-        const blockers = approvalBlockers(app as never);
+        const blockers = approvalBlockers(app);
         if (blockers.length) {
           throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
             message: `Cannot approve yet: ${blockers.join('; ')}`, details: { blockers },

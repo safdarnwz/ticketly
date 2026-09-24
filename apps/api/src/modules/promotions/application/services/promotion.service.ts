@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { UnitOfWork, DatabaseService } from '@database';
+import { UnitOfWork } from '@database';
 import { AppError, ErrorCode, newId, requireTenantId, todayIn, type RouteId } from '@kernel';
 
 import { PromotionRepository, type PromotionPricingRule, type RoutePromotion } from '../../infrastructure/persistence/promotion.repository';
@@ -12,7 +12,6 @@ export class PromotionService {
   constructor(
     private readonly promotions: PromotionRepository,
     private readonly routes: RouteRepository,
-    private readonly db: DatabaseService,
     private readonly uow: UnitOfWork,
   ) {}
 

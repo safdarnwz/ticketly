@@ -301,6 +301,6 @@ export class FleetController {
 
 /** A raw-body route only accepts Content-Type: application/octet-stream (parsed to a Buffer in bootstrap). */
 function asBuffer(body: unknown): Buffer {
-  if (Buffer.isBuffer(body) && (body as Buffer).length > 0) return body as Buffer;
+  if (Buffer.isBuffer(body) && (body).length > 0) return body;
   throw new BadRequestError('Send the file as raw bytes with Content-Type: application/octet-stream');
 }

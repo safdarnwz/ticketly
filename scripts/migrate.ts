@@ -39,7 +39,9 @@ async function main(): Promise<void> {
   });
 
   const client = await pool.connect();
-  const log = (message: string): void => process.stdout.write(`${message}\n`);
+  const log = (message: string): void => {
+    process.stdout.write(`${message}\n`);
+  };
 
   try {
     const files = await loadMigrations(MIGRATIONS_DIR);

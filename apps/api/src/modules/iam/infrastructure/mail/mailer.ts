@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import nodemailer, { type Transporter } from 'nodemailer';
 
+import { AppConfig } from '@config';
 import { Logger } from '@observability';
 
 import { IntegrationCredentialStore } from '../../../integrations/integration-credential.store';
@@ -40,11 +41,10 @@ export class Mailer {
 
   private smtp?: { key: string; transporter: Transporter; from: string; fromAddress: string };
 
-  constructor(logger: Logger, private readonly credentials: IntegrationCredentialStore) {
+  constructor(logger: Logger, private readonly credentials: IntegrationCredentialStore, config: AppConfig) {
     this.log = logger.forContext('Mailer');
-    const user = process.env.GMAIL_USER;
-    const pass = process.env.GMAIL_APP_PASSWORD;
-    this.from = process.env.MAIL_FROM ?? (user ? `Ticketly <${user}>` : 'Ticketly <no-reply@ticketly.com>');
+    const { gmailUser: user, gmailAppPassword: pass } = config.mail;
+    this.from = config.mail.from || (user ? `Ticketly <${user}>` : 'Ticketly <no-reply@ticketly.com>');
     // Pull just the address out of "Name <addr>" (or use it as-is if it's
     // already a bare address) — this is what a per-operator fromName gets
     // recombined with below.

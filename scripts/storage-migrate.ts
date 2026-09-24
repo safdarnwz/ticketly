@@ -33,7 +33,7 @@ import { createContext, runWithContext, type TenantId } from '@kernel';
 import { createStorage } from '../apps/api/src/modules/files/infrastructure/storage/storage.factory';
 
 function targetSettings(base: AppConfig['storage']): AppConfig['storage'] {
-  // eslint-disable-next-line no-process-env
+   
   const e = process.env;
   const provider = e.TARGET_STORAGE_PROVIDER as AppConfig['storage']['provider'] | undefined;
   if (!provider || !['r2', 's3', 'azure', 'database'].includes(provider)) throw new Error('Set TARGET_STORAGE_PROVIDER (r2 | s3 | azure | database)');
@@ -57,9 +57,9 @@ async function main(): Promise<void> {
   const pool = new Pool({ host: env.DB_HOST, port: env.DB_PORT, database: env.DB_NAME, user: env.DB_USER, password: env.DB_PASSWORD, max: 2 });
   // Minimal DatabaseService facade for the 'database' provider (dev) — RLS bypassed for this admin script.
   const db = {
-    query: async (text: string, params: unknown[]) => (await pool.query(text, params as unknown[])).rows,
-    queryOne: async (text: string, params: unknown[]) => (await pool.query(text, params as unknown[])).rows[0] ?? null,
-    execute_: async (text: string, params: unknown[]) => (await pool.query(text, params as unknown[])).rowCount ?? 0,
+    query: async (text: string, params: unknown[]): Promise<unknown[]> => (await pool.query<Record<string, unknown>>(text, params)).rows,
+    queryOne: async (text: string, params: unknown[]): Promise<unknown> => (await pool.query<Record<string, unknown>>(text, params)).rows[0] ?? null,
+    execute_: async (text: string, params: unknown[]) => (await pool.query(text, params)).rowCount ?? 0,
   } as unknown as DatabaseService;
 
   const source = createStorage(config.storage, db);

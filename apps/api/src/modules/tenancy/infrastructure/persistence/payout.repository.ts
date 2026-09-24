@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { DatabaseService, UnitOfWork } from '@database';
+import { UnitOfWork } from '@database';
 import { newId } from '@kernel';
 
 export interface PayoutInstruction {
@@ -24,12 +24,20 @@ export interface PayoutInstruction {
  * never retroactively rewrite an instruction already created (let alone one
  * already sent to the bank).
  */
+export interface PendingBankChange {
+  id: string;
+  tenantId: string;
+  tenantName: string;
+  accountHolder: string;
+  accountNumber: string;
+  ifsc: string;
+  bankName: string | null;
+  createdAt: Date;
+}
+
 @Injectable()
 export class PayoutRepository {
-  constructor(
-    private readonly db: DatabaseService,
-    private readonly uow: UnitOfWork,
-  ) {}
+  constructor(private readonly uow: UnitOfWork) {}
 
   /**
    * Create the disbursement instruction for a just-finalised settlement.
@@ -61,7 +69,7 @@ export class PayoutRepository {
   /** Every payout awaiting disbursement, oldest first — for the bank-file export. */
   async listPending(): Promise<PayoutInstruction[]> {
     return this.uow.run({ name: 'payout.listPending', bypassRls: true }, async (scope) => {
-      const result = await scope.client.query(
+      const result = await scope.client.query<PayoutInstruction>(
         `SELECT id, tenant_id AS "tenantId", settlement_id AS "settlementId", amount_minor AS "amountMinor", currency,
                 beneficiary_name AS "beneficiaryName", bank_account_number AS "bankAccountNumber", bank_ifsc AS "bankIfsc",
                 status, created_at AS "createdAt"
@@ -73,7 +81,7 @@ export class PayoutRepository {
 
   async listAll(limit = 200): Promise<PayoutInstruction[]> {
     return this.uow.run({ name: 'payout.listAll', bypassRls: true }, async (scope) => {
-      const result = await scope.client.query(
+      const result = await scope.client.query<PayoutInstruction>(
         `SELECT id, tenant_id AS "tenantId", settlement_id AS "settlementId", amount_minor AS "amountMinor", currency,
                 beneficiary_name AS "beneficiaryName", bank_account_number AS "bankAccountNumber", bank_ifsc AS "bankIfsc",
                 status, created_at AS "createdAt"
@@ -166,9 +174,9 @@ export class PayoutRepository {
   }
 
   /** Every pending change request, across every operator — for the super-admin review queue. */
-  async listPendingBankChangeRequests(): Promise<{ id: string; tenantId: string; tenantName: string; accountHolder: string; accountNumber: string; ifsc: string; bankName: string | null; createdAt: Date }[]> {
+  async listPendingBankChangeRequests(): Promise<PendingBankChange[]> {
     return this.uow.run({ name: 'payout.listPendingBankChanges', bypassRls: true }, async (scope) => {
-      const result = await scope.client.query(
+      const result = await scope.client.query<PendingBankChange>(
         `SELECT r.id, r.tenant_id AS "tenantId", t.display_name AS "tenantName", r.account_holder AS "accountHolder",
                 r.account_number AS "accountNumber", r.ifsc, r.bank_name AS "bankName", r.created_at AS "createdAt"
            FROM bank_account_change_requests r JOIN tenants t ON t.id = r.tenant_id

@@ -3,7 +3,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { FastifyRequest } from 'fastify';
 
 import { ApiStandardErrors, Public, RateLimit, zodBody } from '@http';
-import { getContext, type TenantId} from '@kernel';
+import { getContext} from '@kernel';
 
 import { CurrentUser, type AuthPrincipal } from './decorators/current-user.decorator';
 import {
@@ -39,7 +39,7 @@ export class AuthController {
     return this.auth.passwordLogin({
       identifier: (dto.identifier ?? dto.email) as string,
       password: dto.password,
-      tenantId: (ctx?.tenantId ?? null) as TenantId | null,
+      tenantId: (ctx?.tenantId ?? null),
       loginSurface: ctx?.extra?.authSurface as 'customer' | 'superAdmin' | 'tenantAdmin' | 'unresolved' | undefined,
       userAgent: ctx?.userAgent,
       ip: req.ip,
@@ -81,7 +81,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Request a one-time code (customer login)' })
   async requestOtp(@Body(zodBody(RequestOtpSchema)) dto: RequestOtpDto) {
     const ctx = getContext();
-    return this.auth.requestOtp({ identity: dto.identity, purpose: dto.purpose, tenantId: (ctx?.tenantId ?? null) as TenantId | null });
+    return this.auth.requestOtp({ identity: dto.identity, purpose: dto.purpose, tenantId: (ctx?.tenantId ?? null) });
   }
 
   @Public()
@@ -95,7 +95,7 @@ export class AuthController {
       identity: dto.identity,
       code: dto.code,
       fullName: dto.fullName,
-      tenantId: (ctx?.tenantId ?? null) as TenantId | null,
+      tenantId: (ctx?.tenantId ?? null),
       userAgent: ctx?.userAgent,
       ip: req.ip,
     });
@@ -110,7 +110,7 @@ export class AuthController {
     const ctx = getContext();
     await this.auth.resetPasswordWithOtp({
       identity: dto.identity, code: dto.code, newPassword: dto.newPassword,
-      tenantId: (ctx?.tenantId ?? null) as TenantId | null,
+      tenantId: (ctx?.tenantId ?? null),
     });
     return { ok: true };
   }

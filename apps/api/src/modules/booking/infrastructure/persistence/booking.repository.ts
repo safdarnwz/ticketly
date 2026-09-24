@@ -148,8 +148,8 @@ export class BookingRepository {
     async findForUpdate(id: BookingId): Promise<BookingRow | null> {
     const tx = currentTransaction();
     const runner = tx
-      ? (sql: string, params: unknown[]) => tx.client.query(sql, params).then((r) => r.rows[0] ?? null)
-      : (sql: string, params: unknown[]) => this.db.queryOne(sql, params, { name: 'booking.find', primary: true });
+      ? (sql: string, params: unknown[]) => tx.client.query<BookingRow>(sql, params).then((r) => r.rows[0] ?? null)
+      : (sql: string, params: unknown[]) => this.db.queryOne<BookingRow>(sql, params, { name: 'booking.find', primary: true });
     const lock = tx ? ' FOR UPDATE' : '';
     return runner(
       `SELECT id, pnr, trip_id AS "tripId", route_id AS "routeId", from_seq AS "fromSeq", to_seq AS "toSeq",
@@ -158,7 +158,7 @@ export class BookingRepository {
               contact_phone AS "contactPhone", contact_email AS "contactEmail"
          FROM bookings WHERE tenant_id = $1 AND id = $2${lock}`,
       [requireTenantId(), id],
-    ) as Promise<BookingRow | null>;
+    );
   }
 
   /**

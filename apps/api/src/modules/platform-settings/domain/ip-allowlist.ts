@@ -16,11 +16,11 @@ export function parseAllowlistEntry(raw: string): ParsedEntry | null {
   if (version === 0) return null;
   const family = version === 4 ? 'ipv4' : 'ipv6';
   const max = version === 4 ? 32 : 128;
-  if (prefixRaw === undefined) return { address: address!, prefix: max, family };
+  if (prefixRaw === undefined) return { address: address, prefix: max, family };
   if (!/^\d{1,3}$/.test(prefixRaw)) return null;
   const prefix = Number(prefixRaw);
   if (prefix < 0 || prefix > max) return null;
-  return { address: address!, prefix, family };
+  return { address: address, prefix, family };
 }
 
 /** Invalid entries, for a 422 before anything is saved. */
@@ -32,7 +32,7 @@ export function invalidAllowlistEntries(entries: string[]): string[] {
 export function normaliseIp(ip: string): string {
   const trimmed = ip.trim();
   const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(trimmed);
-  return mapped ? mapped[1]! : trimmed;
+  return mapped ? mapped[1] : trimmed;
 }
 
 export function isIpAllowed(entries: string[], ip: string | null | undefined): boolean {

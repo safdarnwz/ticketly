@@ -6,7 +6,7 @@ import { AppError, ErrorCode, requireTenantId, runInNewContext, type StopId, typ
 import { EventBus } from '@messaging';
 import { hmacSha256 } from '@security';
 
-import { etaSeconds, nextStopEta, type StopProgress } from '../../domain/geo';
+import { nextStopEta, type StopProgress } from '../../domain/geo';
 import {
   trackingSigningInput, encodeTrackingToken, verifyTrackingToken, verifyTrackingTokenSignatureOnly, type TrackingTokenPayload,
 } from '../../domain/tracking-token';
@@ -109,9 +109,9 @@ export class TrackingService {
    * tenant-bound crew/device context), this runs with bypassRls and filters
    * on trip_id alone.
    */
-  async liveState(tripId: TripId): Promise<unknown> {
+  async liveState(tripId: TripId): Promise<Record<string, unknown> | null> {
     return this.uow.run({ name: 'tracking.liveState', bypassRls: true }, async (scope) => {
-      const result = await scope.client.query(
+      const result = await scope.client.query<Record<string, unknown>>(
         `SELECT lat, lng, speed_kmph AS "speedKmph", next_stop_id AS "nextStopId",
                 next_stop_eta_at AS "nextStopEtaAt", delay_minutes AS "delayMinutes",
                 status, last_ping_at AS "lastPingAt"
@@ -158,8 +158,7 @@ export class TrackingService {
   }
 
   buildTrackingUrl(token: string): string {
-    const base = process.env.PUBLIC_WEB_URL ?? 'https://www.ticketly.com';
-    return `${base}/track/${token}`;
+    return `${this.config.app.publicWebUrl}/track/${token}`;
   }
 
   /** PUBLIC — no ambient tenant context. Resolves the tenant from the trip embedded in the token, then reads within that tenant's own RLS scope. */
@@ -231,7 +230,7 @@ export class TrackingService {
         pnr: payload.pnr,
         fromStopName: stops?.from_stop_name ?? 'Boarding point',
         toStopName: stops?.to_stop_name ?? 'Dropping point',
-        recentPings: pings.rows.reverse().map((p) => ({ lat: p.lat, lng: p.lng, recordedAt: p.recorded_at.toISOString() })),
+        recentPings: pings.reverse().map((p) => ({ lat: p.lat, lng: p.lng, recordedAt: p.recorded_at.toISOString() })),
       };
     });
   }

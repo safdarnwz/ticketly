@@ -1,7 +1,7 @@
 import { DatabaseService } from '@database';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 
-import { type DomainEvent, type TenantId, type Uuid } from '@kernel';
+import { type DomainEvent } from '@kernel';
 
 import { NotificationService } from '@api/modules/notification/application/services/notification.service';
 import { EventDispatcher, type EventHandler } from '../dispatcher/event-dispatcher';
@@ -53,12 +53,12 @@ export class NotificationConsumer implements OnModuleInit {
         const t = await this.db.queryOne<{ contact_phone: string | null; contact_email: string | null }>(
           `SELECT contact_phone, contact_email FROM tenants WHERE id = $1`, [event.tenantId], { name: 'notify.emergencyContacts', primary: true });
         if (!t?.contact_phone && !t?.contact_email) return;
-        const p = event.payload as Record<string, unknown>;
+        const p = event.payload as { lat?: number | null; lng?: number | null; type?: string; tripId?: string; description?: string };
         const location = p.lat != null && p.lng != null ? `https://maps.google.com/?q=${p.lat},${p.lng}` : 'not shared';
         await this.notifications.notify({
-          tenantId: event.tenantId as TenantId, eventId: event.eventId as Uuid, eventType: 'incident.critical',
+          tenantId: event.tenantId, eventId: event.eventId, eventType: 'incident.critical',
           recipients: { sms: t.contact_phone ?? undefined, email: t.contact_email ?? undefined },
-          data: { type: String(p.type ?? 'sos').toUpperCase(), tripId: String(p.tripId ?? '—'), time: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }), location, description: String(p.description ?? '') },
+          data: { type: (p.type ?? 'sos').toUpperCase(), tripId: p.tripId ?? '—', time: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }), location, description: p.description ?? '' },
         });
       },
     };
@@ -69,12 +69,12 @@ export class NotificationConsumer implements OnModuleInit {
       eventType: 'waitlist.seats_available',
       handle: async (event: DomainEvent) => {
         if (!event.tenantId) return;
-        const p = event.payload as Record<string, unknown>;
-        const recipients = { sms: (p.contactPhone as string) ?? undefined, email: (p.contactEmail as string) ?? undefined };
+        const p = event.payload as { contactPhone?: string; contactEmail?: string; seatCount?: number; routeName?: string; journeyDate?: string; bookUrl?: string };
+        const recipients = { sms: p.contactPhone ?? undefined, email: p.contactEmail ?? undefined };
         if (!recipients.sms && !recipients.email) return;
         await this.notifications.notify({
-          tenantId: event.tenantId as TenantId, eventId: event.eventId as Uuid, eventType: 'waitlist.seats_available', recipients,
-          data: { seatCount: String(p.seatCount ?? ''), routeName: p.routeName as string, journeyDate: p.journeyDate as string, bookUrl: p.bookUrl as string },
+          tenantId: event.tenantId, eventId: event.eventId, eventType: 'waitlist.seats_available', recipients,
+          data: { seatCount: p.seatCount ?? '', routeName: p.routeName, journeyDate: p.journeyDate, bookUrl: p.bookUrl },
         });
       },
     };
@@ -90,7 +90,7 @@ export class NotificationConsumer implements OnModuleInit {
         if (!recipients.sms && !recipients.email) return;
         const passengers = Array.isArray(p.passengers) ? p.passengers as { seat: string; name: string }[] : [];
         await this.notifications.notify({
-          tenantId: event.tenantId as TenantId, eventId: event.eventId as Uuid, eventType: 'trip.reminder.12h',
+          tenantId: event.tenantId, eventId: event.eventId, eventType: 'trip.reminder.12h',
           recipients,
           data: {
             pnr: p.pnr as string,
@@ -117,7 +117,7 @@ export class NotificationConsumer implements OnModuleInit {
         const driver = p.driver as { name: string; phone: string | null } | null;
         const attendant = p.attendant as { name: string; phone: string | null } | null;
         await this.notifications.notify({
-          tenantId: event.tenantId as TenantId, eventId: event.eventId as Uuid, eventType: 'trip.reminder.4h',
+          tenantId: event.tenantId, eventId: event.eventId, eventType: 'trip.reminder.4h',
           recipients,
           data: {
             pnr: p.pnr as string,
@@ -153,8 +153,8 @@ export class NotificationConsumer implements OnModuleInit {
         if (!recipients.sms && !recipients.email) return;
 
         await this.notifications.notify({
-          tenantId: event.tenantId as TenantId,
-          eventId: event.eventId as Uuid,
+          tenantId: event.tenantId,
+          eventId: event.eventId,
           eventType,
           recipients,
           data: {

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
-import { AppError, ErrorCode, getUserId, requireTenantId, type TripId, type UserId } from '@kernel';
+import { AppError, ErrorCode, getUserId, requireTenantId, type TripId } from '@kernel';
 
 import { reconcileChart } from '../../domain/chart-reconciliation';
 import { DepartureControlRepository } from '../../infrastructure/persistence/departure-control.repository';
@@ -54,7 +54,7 @@ export class DepartureControlService {
         cashExpectedMinor: result.cashExpectedMinor,
         cashVarianceMinor: result.cashVarianceMinor,
         reconciled: result.reconciled,
-        chartedBy: (getUserId() ?? null) as UserId | null,
+        chartedBy: (getUserId() ?? null),
       });
 
       return {

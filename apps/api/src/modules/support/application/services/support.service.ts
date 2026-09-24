@@ -23,7 +23,7 @@ export class SupportService {
 
   async open(input: { subject: string; body: string; category?: string; priority?: string; bookingId?: BookingId }): Promise<{ ticketId: string }> {
     return this.uow.run({ name: 'support.open', tenantId: requireTenantId() }, async () => {
-      const customerId = (getUserId() ?? null) as UserId | null;
+      const customerId = (getUserId() ?? null);
       const ticketId = await this.repo.createTicket({
         subject: input.subject,
         category: input.category ?? 'general',
@@ -43,7 +43,7 @@ export class SupportService {
       if (isTicketClosed(ticket.status)) {
         throw new AppError(ErrorCode.SUPPORT_TICKET_CLOSED, 422, { message: 'Cannot reply to a closed ticket' });
       }
-      const authorId = (getUserId() ?? null) as UserId | null;
+      const authorId = (getUserId() ?? null);
       await this.repo.addMessage({ ticketId, authorKind: input.authorKind, authorId, body: input.body });
 
       const next = statusAfterMessage(ticket.status, input.authorKind);

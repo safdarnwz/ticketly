@@ -4,11 +4,13 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import underPressure from '@fastify/under-pressure';
 import { VersioningType, type INestApplication } from '@nestjs/common';
-import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import { FastifyAdapter } from '@nestjs/platform-fastify';
 
-import { AppConfig } from '@config';
+import type { AppConfig } from '@config';
 import { setupSwagger } from '@http';
-import { Logger } from '@observability';
+import type { Logger } from '@observability';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 
 /**
  * Fastify tuning and platform middleware.
@@ -110,7 +112,7 @@ export async function configureApp(app: NestFastifyApplication, config: AppConfi
       message: 'Server is under heavy load, please retry shortly',
       retryAfter: 5,
       exposeStatusRoute: false,
-      pressureHandler: (_req, reply, type, value) => {
+      pressureHandler: (_req: FastifyRequest, reply: FastifyReply, type: string, value: number | undefined) => {
         void reply.status(503).header('Retry-After', '5').send({
           type: 'about:blank',
           title: 'Service temporarily overloaded',

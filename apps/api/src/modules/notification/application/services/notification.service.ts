@@ -101,6 +101,7 @@ export class NotificationService {
         { name: 'notify.logUpdate', primary: true },
       );
       if (!result.ok) {
+        this.log.warn({ tenantId: input.tenantId, channel: template.channel, provider: provider.name, error: result.error }, 'notification send failed; the outbox will retry');
         // Throw so the outbox retries the whole event (and this de-dupes on retry).
         throw new Error(`Notification via ${template.channel} failed: ${result.error ?? 'unknown'}`);
       }

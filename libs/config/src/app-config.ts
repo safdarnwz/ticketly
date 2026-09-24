@@ -40,6 +40,8 @@ export class AppConfig {
     version: '',
     instanceId: '',
     publicBaseUrl: '',
+    /** The customer web app's origin, for links sent to passengers. */
+    publicWebUrl: '',
     apiPrefix: '',
   };
 
@@ -59,6 +61,9 @@ export class AppConfig {
   payment!: PaymentConfig;
   notifications!: NotificationsConfig;
   storage!: StorageConfig;
+  mail!: MailConfig;
+  bootstrap!: BootstrapConfig;
+  kyc!: KycConfig;
 
   raw(): Readonly<Env> {
     return this.env;
@@ -223,6 +228,25 @@ export interface NotificationsConfig {
   };
 }
 
+/** Gmail SMTP fallback used when no SMTP integration is enabled. */
+export interface MailConfig {
+  gmailUser: string;
+  gmailAppPassword: string;
+  /** "Name <address>"; empty = "Ticketly <gmailUser>". */
+  from: string;
+}
+
+/** The platform super admin created on first boot, if absent. */
+export interface BootstrapConfig {
+  superAdminEmail: string;
+  superAdminPassword: string;
+  superAdminName: string;
+}
+
+export interface KycConfig {
+  digio: { clientId: string; clientSecret: string; environment: 'sandbox' | 'production' };
+}
+
 export interface StorageConfig {
   provider: 'database' | 'r2' | 's3' | 'azure';
   bucket: string;
@@ -248,6 +272,7 @@ export function buildAppConfig(env: Env): AppConfig {
     version: env.APP_VERSION,
     instanceId: env.INSTANCE_ID ?? hostname(),
     publicBaseUrl: env.PUBLIC_BASE_URL.replace(/\/+$/, ''),
+    publicWebUrl: env.PUBLIC_WEB_URL.replace(/\/+$/, ''),
     apiPrefix: env.API_PREFIX.replace(/^\/+|\/+$/g, ''),
   });
 
@@ -417,6 +442,16 @@ export function buildAppConfig(env: Env): AppConfig {
     signedUrlTtlSeconds: env.STORAGE_SIGNED_URL_TTL_SECONDS,
     timeoutMs: env.STORAGE_TIMEOUT_MS,
   };
+
+  config.mail = { gmailUser: env.GMAIL_USER, gmailAppPassword: env.GMAIL_APP_PASSWORD, from: env.MAIL_FROM };
+
+  config.bootstrap = {
+    superAdminEmail: env.SUPER_ADMIN_EMAIL.trim().toLowerCase(),
+    superAdminPassword: env.SUPER_ADMIN_PASSWORD,
+    superAdminName: env.SUPER_ADMIN_NAME,
+  };
+
+  config.kyc = { digio: { clientId: env.DIGIO_CLIENT_ID, clientSecret: env.DIGIO_CLIENT_SECRET, environment: env.DIGIO_ENV } };
 
   return config;
 }

@@ -37,7 +37,7 @@ export class ZodValidationPipe implements PipeTransform {
 
 /** Factory used in controllers: `@Body(zodBody(CreateBookingSchema))`. */
 export function zodBody<T>(schema: ZodSchema<T, ZodTypeDef, unknown>): ZodValidationPipe {
-  return new ZodValidationPipe(schema as ZodSchema<unknown, ZodTypeDef, unknown>);
+  return new ZodValidationPipe(schema);
 }
 
 export function toValidationError(error: ZodError): ValidationError {

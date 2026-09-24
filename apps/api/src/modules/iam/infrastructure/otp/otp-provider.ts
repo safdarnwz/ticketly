@@ -19,7 +19,8 @@
  */
 export interface OtpDeliveryContext {
   name?: string;
-  purpose?: 'login' | 'register' | string;
+  /** 'login' | 'register' | 'password_reset' | … */
+  purpose?: string;
   brandName?: string;
 }
 

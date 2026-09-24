@@ -60,7 +60,7 @@ export class EventBus {
       tenantId: input.tenantId ?? ctx?.tenantId,
       correlationId: ctx?.correlationId,
     });
-    recordEvent(event as DomainEvent);
+    recordEvent(event);
     this.log.debug({ type: event.type, aggregateId: event.aggregateId }, 'event queued');
     return event;
   }

@@ -79,7 +79,7 @@ export class TokenService {
     if (claims.typ !== 'access') {
       throw new UnauthenticatedError(ErrorCode.AUTH_TOKEN_INVALID, { message: 'Expected an access token' });
     }
-    return claims as AccessTokenClaims;
+    return claims;
   }
 
   verifyRefresh(token: string): RefreshTokenClaims {
@@ -87,7 +87,7 @@ export class TokenService {
     if (claims.typ !== 'refresh') {
       throw new UnauthenticatedError(ErrorCode.AUTH_TOKEN_INVALID, { message: 'Expected a refresh token' });
     }
-    return claims as RefreshTokenClaims;
+    return claims;
   }
 
   /* ── internals ────────────────────────────────────────────────────────*/

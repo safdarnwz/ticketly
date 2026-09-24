@@ -1,4 +1,4 @@
-import { Injectable, type OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
 import { requireTenantId, type BookingId, type Json } from '@kernel';
@@ -120,7 +120,7 @@ export class InvoiceService {
         taxTotalMinor,
         roundOffMinor,
         totalMinor,
-        lines: lines as unknown as Json,
+        lines: lines,
         taxLines: computed.taxLines as unknown as Json,
       });
       return { invoiceId, invoiceNumber };

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
 import { type LocalDate } from '@kernel';
+import type { PoolClient } from 'pg';
 
 const MIN_LAYOVER_MINUTES = 2 * 60;
 const MAX_LAYOVER_MINUTES = 24 * 60;
@@ -135,7 +136,7 @@ export class ConnectingSearchService {
   }
 
   private async legDetail(
-    client: any,
+    client: PoolClient,
     tenantId: string, routeId: string,
     trip: { id: string; departs_at: Date; arrives_at: Date; total_seats: number },
   ): Promise<Omit<LegSummary, 'operatorName'> | null> {

@@ -27,7 +27,7 @@ export abstract class AggregateRoot<TId extends Uuid = Uuid> extends Entity<TId>
 
   /** Record an event to be published when the aggregate is persisted. */
   protected record<TPayload extends Json>(event: DomainEvent<TPayload>): void {
-    this.pendingEvents.push(event as DomainEvent);
+    this.pendingEvents.push(event);
   }
 
   /** Drain events — called by the repository inside the write transaction. */

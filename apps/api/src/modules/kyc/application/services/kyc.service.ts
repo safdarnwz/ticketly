@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
+import { AppConfig } from '@config';
+
 import { AppError, ErrorCode } from '@kernel';
 
 import { checkPanFormat } from '../../domain/pan';
@@ -7,7 +9,7 @@ import {
   generateAadhaarOtp, maskAccountNumber, submitAadhaarOtp, verifyBankAccount, verifyPan,
   type DigioConfig,
 } from '../../infrastructure/digio/digio-client';
-import { KycRepository, type KycDocumentType } from '../../infrastructure/persistence/kyc.repository';
+import { KycRepository } from '../../infrastructure/persistence/kyc.repository';
 
 /**
  * Three verification paths for operator onboarding:
@@ -30,13 +32,12 @@ import { KycRepository, type KycDocumentType } from '../../infrastructure/persis
  */
 @Injectable()
 export class KycService {
-  constructor(private readonly repo: KycRepository) {}
+  constructor(private readonly repo: KycRepository, private readonly config: AppConfig) {}
 
   private digioConfig(): DigioConfig | null {
-    const clientId = process.env.DIGIO_CLIENT_ID;
-    const clientSecret = process.env.DIGIO_CLIENT_SECRET;
+    const { clientId, clientSecret, environment } = this.config.kyc.digio;
     if (!clientId || !clientSecret) return null;
-    return { clientId, clientSecret, environment: process.env.DIGIO_ENV === 'production' ? 'production' : 'sandbox' };
+    return { clientId, clientSecret, environment };
   }
 
   private requireDigio(): DigioConfig {

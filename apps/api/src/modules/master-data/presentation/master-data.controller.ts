@@ -77,7 +77,7 @@ export class MasterDataController {
   @RequirePermission(Permission.STOP_MANAGE)
   @ApiOperation({ summary: 'Create a boarding / dropping point' })
   async createStop(@Body(zodBody(CreateStopSchema)) dto: CreateStopDto) {
-    return { id: await this.stops.create(dto) };
+    return { id: await this.stops.create({ ...dto, cityId: dto.cityId as CityId }) };
   }
 
   @Get('stops')
@@ -133,14 +133,14 @@ export class MasterDataController {
   @RequirePermission(Permission.LAYOUT_MANAGE)
   @ApiOperation({ summary: 'Create a validated seat layout' })
   async createLayout(@Body(zodBody(CreateSeatLayoutSchema)) dto: CreateSeatLayoutDto) {
-    return this.layoutService.create(dto.name, dto.layout as never);
+    return this.layoutService.create(dto.name, dto.layout);
   }
 
   @Patch('seat-layouts/:id')
   @RequirePermission(Permission.LAYOUT_MANAGE)
   @ApiOperation({ summary: 'Edit an existing seat layout in place' })
   async updateLayout(@Param('id') id: string, @Body(zodBody(CreateSeatLayoutSchema)) dto: CreateSeatLayoutDto) {
-    return this.layoutService.update(id as SeatLayoutId, dto.name, dto.layout as never);
+    return this.layoutService.update(id as SeatLayoutId, dto.name, dto.layout);
   }
 
   @Get('seat-layouts/:id/versions')

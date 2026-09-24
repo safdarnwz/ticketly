@@ -1,4 +1,5 @@
-import { uuidv7 as generateUuidV7, uuidv7obj, UUID } from 'uuidv7';
+import type { UUID } from 'uuidv7';
+import { uuidv7 as generateUuidV7, uuidv7obj } from 'uuidv7';
 
 import type { Brand } from './types';
 
@@ -132,61 +133,67 @@ export function uuidObject(): UUID {
  *  Every bounded context re-exports the ids it owns; they are declared here so
  *  cross-context references (a `Trip` holding a `RouteId`) never create a
  *  module cycle. Adding a new aggregate = adding one line here.
+ *
+ *  Each is a `Uuid` narrowed by kind, so `newId() as TripId` is a checked
+ *  narrowing, a `TripId` is accepted anywhere a `Uuid` is, and a `TripId`
+ *  is still NOT accepted where a `VehicleId` is expected.
  */
-export type TenantId = Brand<string, 'TenantId'>; // the SaaS customer (bus operator)
-export type UserId = Brand<string, 'UserId'>;
-export type RoleId = Brand<string, 'RoleId'>;
-export type ApiKeyId = Brand<string, 'ApiKeyId'>;
-export type SessionId = Brand<string, 'SessionId'>;
+declare const __idKind: unique symbol;
+export type TypedId<K extends string> = Uuid & { readonly [__idKind]: K };
+export type TenantId = TypedId<'TenantId'>; // the SaaS customer (bus operator)
+export type UserId = TypedId<'UserId'>;
+export type RoleId = TypedId<'RoleId'>;
+export type ApiKeyId = TypedId<'ApiKeyId'>;
+export type SessionId = TypedId<'SessionId'>;
 
-export type CountryId = Brand<string, 'CountryId'>;
-export type StateId = Brand<string, 'StateId'>;
-export type CityId = Brand<string, 'CityId'>;
-export type StopId = Brand<string, 'StopId'>;
-export type RouteId = Brand<string, 'RouteId'>;
-export type RouteStopId = Brand<string, 'RouteStopId'>;
-export type AmenityId = Brand<string, 'AmenityId'>;
+export type CountryId = TypedId<'CountryId'>;
+export type StateId = TypedId<'StateId'>;
+export type CityId = TypedId<'CityId'>;
+export type StopId = TypedId<'StopId'>;
+export type RouteId = TypedId<'RouteId'>;
+export type RouteStopId = TypedId<'RouteStopId'>;
+export type AmenityId = TypedId<'AmenityId'>;
 
-export type VehicleId = Brand<string, 'VehicleId'>;
-export type VehicleTypeId = Brand<string, 'VehicleTypeId'>;
-export type SeatLayoutId = Brand<string, 'SeatLayoutId'>;
-export type SeatId = Brand<string, 'SeatId'>;
-export type CrewId = Brand<string, 'CrewId'>;
-export type AgentId = Brand<string, 'AgentId'>;
-export type BranchId = Brand<string, 'BranchId'>;
-export type DutyId = Brand<string, 'DutyId'>;
+export type VehicleId = TypedId<'VehicleId'>;
+export type VehicleTypeId = TypedId<'VehicleTypeId'>;
+export type SeatLayoutId = TypedId<'SeatLayoutId'>;
+export type SeatId = TypedId<'SeatId'>;
+export type CrewId = TypedId<'CrewId'>;
+export type AgentId = TypedId<'AgentId'>;
+export type BranchId = TypedId<'BranchId'>;
+export type DutyId = TypedId<'DutyId'>;
 
-export type ServiceId = Brand<string, 'ServiceId'>; // a recurring scheduled service
-export type TripId = Brand<string, 'TripId'>; // one dated instance of a service
-export type SegmentId = Brand<string, 'SegmentId'>;
-export type InventoryHoldId = Brand<string, 'InventoryHoldId'>;
+export type ServiceId = TypedId<'ServiceId'>; // a recurring scheduled service
+export type TripId = TypedId<'TripId'>; // one dated instance of a service
+export type SegmentId = TypedId<'SegmentId'>;
+export type InventoryHoldId = TypedId<'InventoryHoldId'>;
 
-export type FareRuleId = Brand<string, 'FareRuleId'>;
-export type FarePlanId = Brand<string, 'FarePlanId'>;
-export type CouponId = Brand<string, 'CouponId'>;
-export type PricingPolicyId = Brand<string, 'PricingPolicyId'>;
+export type FareRuleId = TypedId<'FareRuleId'>;
+export type FarePlanId = TypedId<'FarePlanId'>;
+export type CouponId = TypedId<'CouponId'>;
+export type PricingPolicyId = TypedId<'PricingPolicyId'>;
 
-export type BookingId = Brand<string, 'BookingId'>;
-export type TicketId = Brand<string, 'TicketId'>;
-export type PassengerId = Brand<string, 'PassengerId'>;
-export type CancellationId = Brand<string, 'CancellationId'>;
+export type BookingId = TypedId<'BookingId'>;
+export type TicketId = TypedId<'TicketId'>;
+export type PassengerId = TypedId<'PassengerId'>;
+export type CancellationId = TypedId<'CancellationId'>;
 
-export type PaymentId = Brand<string, 'PaymentId'>;
-export type RefundId = Brand<string, 'RefundId'>;
-export type LedgerEntryId = Brand<string, 'LedgerEntryId'>;
-export type SettlementId = Brand<string, 'SettlementId'>;
-export type InvoiceId = Brand<string, 'InvoiceId'>;
+export type PaymentId = TypedId<'PaymentId'>;
+export type RefundId = TypedId<'RefundId'>;
+export type LedgerEntryId = TypedId<'LedgerEntryId'>;
+export type SettlementId = TypedId<'SettlementId'>;
+export type InvoiceId = TypedId<'InvoiceId'>;
 
-export type DeviceId = Brand<string, 'DeviceId'>;
-export type NotificationId = Brand<string, 'NotificationId'>;
-export type OutboxId = Brand<string, 'OutboxId'>;
-export type ChannelPartnerId = Brand<string, 'ChannelPartnerId'>; // OTA / GDS consumer
+export type DeviceId = TypedId<'DeviceId'>;
+export type NotificationId = TypedId<'NotificationId'>;
+export type OutboxId = TypedId<'OutboxId'>;
+export type ChannelPartnerId = TypedId<'ChannelPartnerId'>; // OTA / GDS consumer
 
 // Storefront (Part 14)
-export type ReviewId = Brand<string, 'ReviewId'>;
-export type SupportTicketId = Brand<string, 'SupportTicketId'>;
-export type SupportMessageId = Brand<string, 'SupportMessageId'>;
-export type OfferId = Brand<string, 'OfferId'>;
-export type CmsPageId = Brand<string, 'CmsPageId'>;
-export type BannerId = Brand<string, 'BannerId'>;
-export type RiskAssessmentId = Brand<string, 'RiskAssessmentId'>;
+export type ReviewId = TypedId<'ReviewId'>;
+export type SupportTicketId = TypedId<'SupportTicketId'>;
+export type SupportMessageId = TypedId<'SupportMessageId'>;
+export type OfferId = TypedId<'OfferId'>;
+export type CmsPageId = TypedId<'CmsPageId'>;
+export type BannerId = TypedId<'BannerId'>;
+export type RiskAssessmentId = TypedId<'RiskAssessmentId'>;

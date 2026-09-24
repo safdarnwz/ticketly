@@ -57,6 +57,19 @@ interface PnlRow {
   total_seats: number; sales: string; gst: string; commission: string; commission_gst: string; expenses: string; seats: string;
 }
 
+export interface TripExpenseRow {
+  id: string;
+  category: string;
+  /** bigint → string from pg. */
+  amountMinor: string;
+  note: string | null;
+  receiptFileId: string | null;
+  incurredAt: Date;
+  voidedAt: Date | null;
+  voidReason: string | null;
+  createdBy: string | null;
+}
+
 @Injectable()
 export class TripExpenseService {
   constructor(private readonly uow: UnitOfWork, private readonly files: FileService) {}
@@ -99,8 +112,8 @@ export class TripExpenseService {
     });
   }
 
-  async list(tripId: TripId, includeVoided = false) {
-    return this.uow.run({ name: 'expense.list', tenantId: requireTenantId(), readOnly: true }, async (scope) => (await scope.client.query(
+  async list(tripId: TripId, includeVoided = false): Promise<TripExpenseRow[]> {
+    return this.uow.run({ name: 'expense.list', tenantId: requireTenantId(), readOnly: true }, async (scope) => (await scope.client.query<TripExpenseRow>(
       `SELECT x.id, x.category, x.amount_minor::bigint AS "amountMinor", x.note, x.receipt_file_id AS "receiptFileId", x.incurred_at AS "incurredAt",
               x.voided_at AS "voidedAt", x.void_reason AS "voidReason", u.full_name AS "createdBy"
          FROM trip_expenses x LEFT JOIN users u ON u.id = x.created_by

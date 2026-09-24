@@ -144,7 +144,7 @@ export class RateLimiter {
   }
 
   /** CacheService owns the connection; `undefined` means "use the local path". */
-  private redis(): ReturnType<CacheService['connection']> | undefined {
+  private redis(): CacheService['connection'] {
     return this.cache.connection;
   }
 }

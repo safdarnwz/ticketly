@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
-import { DomainError, ErrorCode, requireTenantId, type CityId, type RouteId, type StopId } from '@kernel';
+import { DomainError, ErrorCode, requireTenantId, type CityId, type RouteId } from '@kernel';
 import { EventBus } from '@messaging';
 
 import { StopRepository } from '../../infrastructure/persistence/stop.repository';

@@ -21,7 +21,7 @@ describe('ticket token encode/decode', () => {
   });
 
   it('positive: signing input is stable regardless of key order in the source object', () => {
-    const a = signingInput({ v: 1, seat: 'A1', bookingId: 'b1', pnr: 'YB12AB', tripId: 't1', issuedAtMs: 1_000_000, expiresAtMs: 2_000_000 } as TicketTokenPayload);
+    const a = signingInput({ v: 1, seat: 'A1', bookingId: 'b1', pnr: 'YB12AB', tripId: 't1', issuedAtMs: 1_000_000, expiresAtMs: 2_000_000 });
     const b = signingInput(payload());
     expect(a).toBe(b);
   });

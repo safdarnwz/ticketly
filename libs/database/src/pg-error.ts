@@ -117,14 +117,14 @@ export function mapPostgresError(error: unknown, options: AppErrorOptions = {}):
       const friendly = error.constraint ? constraintMessages.get(error.constraint) : undefined;
       return new ConflictError(friendly ?? 'A record with these values already exists', {
         ...base,
-        details: { constraint: error.constraint },
+        details: { constraint: error.constraint ?? null },
       });
     }
 
     case PG_CODE.FOREIGN_KEY_VIOLATION:
       return new AppError(ErrorCode.DB_FOREIGN_KEY_VIOLATION, 409, {
         message: 'Referenced record does not exist or is still in use',
-        details: { constraint: error.constraint },
+        details: { constraint: error.constraint ?? null },
         severity: 'info',
         ...base,
       });
@@ -132,7 +132,7 @@ export function mapPostgresError(error: unknown, options: AppErrorOptions = {}):
     case PG_CODE.NOT_NULL_VIOLATION:
       return new AppError(ErrorCode.COMMON_VALIDATION, 400, {
         message: `Required value missing for '${error.column ?? 'field'}'`,
-        details: { column: error.column },
+        details: { column: error.column ?? null },
         severity: 'info',
         ...base,
       });
@@ -141,7 +141,7 @@ export function mapPostgresError(error: unknown, options: AppErrorOptions = {}):
     case PG_CODE.EXCLUSION_VIOLATION:
       return new AppError(ErrorCode.DB_CHECK_VIOLATION, 422, {
         message: constraintMessages.get(error.constraint ?? '') ?? 'A data integrity rule was violated',
-        details: { constraint: error.constraint },
+        details: { constraint: error.constraint ?? null },
         severity: 'info',
         ...base,
       });

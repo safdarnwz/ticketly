@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
 import {
-  AppError, ErrorCode, getUserId, requireTenantId, type Json, type SeatLayoutId, type TripId, type VehicleId,
+  AppError, ErrorCode, getUserId, requireTenantId, type Json, type TripId, type VehicleId,
 } from '@kernel';
 import { EventBus } from '@messaging';
 
@@ -69,7 +69,7 @@ export class TripVehicleService {
       }
 
       // ── different layout: re-map seats (pure plan, see domain/vehicle-swap-plan.ts) ──
-      const layout = await this.layouts.getById(v.seatLayoutId as SeatLayoutId);
+      const layout = await this.layouts.getById(v.seatLayoutId);
       const current = await this.repo.lockSeats(tripId);
       const plan = planVehicleSwap(current, layout.seatMap.toJSON().seats.map((s) => ({ number: s.number, type: s.type, bookable: s.bookable !== false, ladiesOnly: s.ladiesOnly === true })));
       if (plan.blockers.length) {
