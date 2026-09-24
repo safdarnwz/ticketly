@@ -56,3 +56,11 @@ export type MarkPayoutsSentDto = z.infer<typeof MarkPayoutsSentSchema>;
 
 export const ReasonSchema = z.object({ reason });
 export type ReasonDto = z.infer<typeof ReasonSchema>;
+
+/** Cross-tenant audit trail filters; `action` matches partially. */
+export const AuditLogQuerySchema = z.object({
+  tenantId: z.string().uuid().optional(),
+  action: z.string().trim().max(80).optional(),
+  resourceType: z.string().trim().max(80).optional(),
+});
+export type AuditLogQueryDto = z.infer<typeof AuditLogQuerySchema>;

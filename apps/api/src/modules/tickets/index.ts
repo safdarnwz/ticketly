@@ -1,1 +1,1 @@
-export * from './tickets.module';
+export * from './application/services/ticket.service';

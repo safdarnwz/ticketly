@@ -2,10 +2,16 @@ import { Controller, Get, Header, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, RequirePermission } from '@http';
-import { localDate, requireTenantId } from '@kernel';
+import {
+  ApiStandardErrors,
+  DateRangeQuerySchema,
+  RequirePermission,
+  zodQuery,
+  type DateRangeQuery,
+} from '@http';
+import { requireTenantId } from '@kernel';
 
-import { BookingRepository } from '../../booking/infrastructure/persistence/booking.repository';
+import { BookingRepository } from '../../booking';
 import { ReportingService } from '../application/services/reporting.service';
 
 @ApiTags('reporting')
@@ -33,15 +39,15 @@ export class ReportingController {
   @ApiQuery({ name: 'from', required: true })
   @ApiQuery({ name: 'to', required: true })
   @ApiOperation({ summary: 'Revenue over a date range' })
-  async revenue(@Query('from') from: string, @Query('to') to: string) {
-    return this.reporting.revenue(localDate(from), localDate(to));
+  async revenue(@Query(zodQuery(DateRangeQuerySchema)) { from, to }: DateRangeQuery) {
+    return this.reporting.revenue(from, to);
   }
 
   @Get('occupancy')
   @RequirePermission(Permission.REPORT_READ)
   @ApiOperation({ summary: 'Daily occupancy over a date range' })
-  async occupancy(@Query('from') from: string, @Query('to') to: string) {
-    return { series: await this.reporting.occupancy(localDate(from), localDate(to)) };
+  async occupancy(@Query(zodQuery(DateRangeQuerySchema)) { from, to }: DateRangeQuery) {
+    return { series: await this.reporting.occupancy(from, to) };
   }
 
   @Get('routes/performance')
@@ -56,21 +62,21 @@ export class ReportingController {
   @Header('Content-Type', 'text/csv')
   @Header('Content-Disposition', 'attachment; filename="revenue.csv"')
   @ApiOperation({ summary: 'Export revenue as CSV' })
-  async revenueCsv(@Query('from') from: string, @Query('to') to: string) {
-    return this.reporting.revenueCsv(localDate(from), localDate(to));
+  async revenueCsv(@Query(zodQuery(DateRangeQuerySchema)) { from, to }: DateRangeQuery) {
+    return this.reporting.revenueCsv(from, to);
   }
 
   @Get('cancellations')
   @RequirePermission(Permission.REPORT_READ)
   @ApiOperation({ summary: 'Cancellation trend + rate over a date range' })
-  async cancellations(@Query('from') from: string, @Query('to') to: string) {
-    return this.reporting.cancellationReport(localDate(from), localDate(to));
+  async cancellations(@Query(zodQuery(DateRangeQuerySchema)) { from, to }: DateRangeQuery) {
+    return this.reporting.cancellationReport(from, to);
   }
 
   @Get('peak-hours')
   @RequirePermission(Permission.REPORT_READ)
   @ApiOperation({ summary: 'Booking volume by hour of day — for staffing/counter-hours decisions' })
-  async peakHours(@Query('from') from: string, @Query('to') to: string) {
-    return { items: await this.reporting.peakHourReport(localDate(from), localDate(to)) };
+  async peakHours(@Query(zodQuery(DateRangeQuerySchema)) { from, to }: DateRangeQuery) {
+    return { items: await this.reporting.peakHourReport(from, to) };
   }
 }

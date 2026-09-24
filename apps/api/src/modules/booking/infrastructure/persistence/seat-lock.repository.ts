@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { currentTransaction } from '@database';
 import { AppError, ErrorCode, InternalError, type TripId } from '@kernel';
 
-import { SegmentMap } from '../../../scheduling/domain/segment-inventory';
+import { SegmentMap } from '../../../scheduling';
 
 export interface SeatLockRequest {
   tripId: TripId;

@@ -1,5 +1,4 @@
 import { Body, Controller, Delete, Get, Post, Put, HttpCode } from '@nestjs/common';
-import { z } from 'zod';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
@@ -9,8 +8,10 @@ import { requireTenantId, type RoleId } from '@kernel';
 
 import {
   CreateRoleSchema,
-  type CreateRoleDto,
+  DuplicateRoleSchema,
   UpdateRolePermissionsSchema,
+  type CreateRoleDto,
+  type DuplicateRoleDto,
   type UpdateRolePermissionsDto,
 } from './dto/role.dto';
 import { RoleRepository } from '../infrastructure/persistence/role.repository';
@@ -64,18 +65,7 @@ export class RoleController {
   @ApiOperation({ summary: 'Copy a role with all its permissions under a new code and name' })
   async duplicate(
     @UuidParam('id') id: string,
-    @Body(
-      zodBody(
-        z.object({
-          code: z
-            .string()
-            .trim()
-            .regex(/^[a-z][a-z0-9_]{2,40}$/),
-          name: z.string().trim().min(2).max(80),
-        }),
-      ),
-    )
-    dto: { code: string; name: string },
+    @Body(zodBody(DuplicateRoleSchema)) dto: DuplicateRoleDto,
   ) {
     return { id: await this.access.duplicateRole(id, dto.code, dto.name) };
   }

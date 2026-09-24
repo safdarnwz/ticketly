@@ -13,11 +13,9 @@ import { GdsWebhookAudience } from './application/gds-webhook-audience';
 import { GdsRepository } from './infrastructure/gds.repository';
 import { GdsRefundService } from './application/gds-refund.service';
 import { GdsService } from './application/gds.service';
-import {
-  GdsAdminController,
-  GdsOperatorController,
-  GdsPartnerController,
-} from './presentation/gds.controllers';
+import { GdsAdminController } from './presentation/gds-admin.controller';
+import { GdsOperatorController } from './presentation/gds-operator.controller';
+import { GdsPartnerController } from './presentation/gds-partner.controller';
 import { GdsPartnerGuard } from './presentation/gds-partner.guard';
 
 /** Platform GDS: one partner integration → every participating operator. */

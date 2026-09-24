@@ -1,28 +1,30 @@
 import { Body, Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Idempotent, RequirePermission, UuidParam, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  FileUploadQuerySchema,
+  Idempotent,
+  RequirePermission,
+  UuidParam,
+  zodBody,
+  zodQuery,
+  type FileUploadQuery,
+} from '@http';
 import { BadRequestError, type TripId } from '@kernel';
 
 import { TripExpenseService } from '../application/trip-expense.service';
-import { EXPENSE_CATEGORIES } from '../domain/pnl';
-
-const AddExpenseSchema = z.object({
-  category: z.enum(EXPENSE_CATEGORIES),
-  amountMinor: z.number().int().positive(),
-  note: z.string().trim().max(300).optional(),
-  receiptFileId: z.string().uuid().optional(),
-});
-const VoidSchema = z.object({ reason: z.string().trim().min(5).max(300) });
-const ReportQuery = z.object({
-  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  groupBy: z.enum(['trip', 'route', 'vehicle']).default('route'),
-  routeId: z.string().uuid().optional(),
-  vehicleId: z.string().uuid().optional(),
-});
+import {
+  AddExpenseSchema,
+  ListExpensesQuerySchema,
+  PnlReportQuerySchema,
+  VoidExpenseSchema,
+  type AddExpenseDto,
+  type ListExpensesQueryDto,
+  type PnlReportQueryDto,
+  type VoidExpenseDto,
+} from './dto/trip-expense.dto';
 
 @ApiTags('trip-expenses')
 @ApiBearerAuth('bearer')
@@ -40,7 +42,7 @@ export class TripExpenseController {
   })
   async add(
     @UuidParam('tripId') tripId: string,
-    @Body(zodBody(AddExpenseSchema)) dto: z.infer<typeof AddExpenseSchema>,
+    @Body(zodBody(AddExpenseSchema)) dto: AddExpenseDto,
   ) {
     return this.svc.add(tripId as TripId, dto);
   }
@@ -53,7 +55,7 @@ export class TripExpenseController {
   })
   async receipt(
     @UuidParam('tripId') tripId: string,
-    @Query('fileName') fileName: string | undefined,
+    @Query(zodQuery(FileUploadQuerySchema)) { fileName }: FileUploadQuery,
     @Body() body: Buffer,
   ) {
     if (!Buffer.isBuffer(body) || body.length === 0)
@@ -65,8 +67,11 @@ export class TripExpenseController {
 
   @Get('trips/:tripId/expenses')
   @RequirePermission(Permission.TRIP_OPERATE)
-  async list(@UuidParam('tripId') tripId: string, @Query('includeVoided') includeVoided?: string) {
-    return { items: await this.svc.list(tripId as TripId, includeVoided === '1') };
+  async list(
+    @UuidParam('tripId') tripId: string,
+    @Query(zodQuery(ListExpensesQuerySchema)) q: ListExpensesQueryDto,
+  ) {
+    return { items: await this.svc.list(tripId as TripId, q.includeVoided) };
   }
 
   @Post('trips/:tripId/expenses/:expenseId/void')
@@ -76,7 +81,7 @@ export class TripExpenseController {
   async void(
     @UuidParam('tripId') tripId: string,
     @UuidParam('expenseId') expenseId: string,
-    @Body(zodBody(VoidSchema)) dto: z.infer<typeof VoidSchema>,
+    @Body(zodBody(VoidExpenseSchema)) dto: VoidExpenseDto,
   ) {
     return this.svc.void(tripId as TripId, expenseId, dto.reason);
   }
@@ -93,10 +98,7 @@ export class TripExpenseController {
   @ApiOperation({
     summary: 'Profit & loss over a period (≤ 92 days), grouped by trip, route or bus — worst first',
   })
-  async report(@Query() q: Record<string, string>) {
-    const parsed = ReportQuery.safeParse(q);
-    if (!parsed.success)
-      throw new BadRequestError(parsed.error.issues[0]?.message ?? 'Invalid report query');
-    return this.svc.report(parsed.data);
+  async report(@Query(zodQuery(PnlReportQuerySchema)) q: PnlReportQueryDto) {
+    return this.svc.report(q);
   }
 }

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { AppConfig } from '@config';
+import { SALES_CHANNEL_FAMILIES } from '@contracts';
 import { UnitOfWork } from '@database';
 import {
   addDays,
@@ -19,10 +20,8 @@ import { DomainError, ErrorCode } from '@kernel';
 import { EventBus } from '@messaging';
 import { Logger, Metrics } from '@observability';
 
-import { SeatLayoutRepository } from '../../../master-data/infrastructure/persistence/seat-layout.repository';
-import { VehicleTypeRepository } from '../../../master-data/infrastructure/persistence/vehicle-type.repository';
-import { RouteRepository } from '../../../master-data/infrastructure/persistence/route.repository';
-import { FleetService } from '../../../fleet/application/services/fleet.service';
+import { SeatLayoutRepository, VehicleTypeRepository, RouteRepository } from '../../../master-data';
+import { FleetService } from '../../../fleet';
 import { datesToMaterialise } from '../../domain/recurrence';
 import { ServiceRepository } from '../../infrastructure/persistence/service.repository';
 import {
@@ -334,7 +333,7 @@ export class MaterializationService {
             isExtra: true,
             reason,
             ladiesSpecial: input.ladiesSpecial,
-            closedChannels: input.openForSale ? [] : ['direct_web', 'agent', 'ota', 'phone'],
+            closedChannels: input.openForSale ? [] : [...SALES_CHANNEL_FAMILIES],
           },
         );
         created.push({ tripId, journeyDate: d });

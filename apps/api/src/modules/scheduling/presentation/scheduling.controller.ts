@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import { Body, Controller, Get, Post, Query, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 
@@ -9,8 +8,11 @@ import {
   Public,
   RateLimit,
   RequirePermission,
+  SegmentQuerySchema,
   UuidParam,
   zodBody,
+  zodQuery,
+  type SegmentQuery,
 } from '@http';
 import {
   BadRequestError,
@@ -23,33 +25,23 @@ import {
 
 import {
   BlockSeatsSchema,
-  type BlockSeatsDto,
   CreateServiceSchema,
-  type CreateServiceDto,
+  ExtraTripsSchema,
   PreviewDatesSchema,
+  ReleaseHoldsSchema,
+  TripRemarkSchema,
+  type BlockSeatsDto,
+  type CreateServiceDto,
+  type ExtraTripsDto,
   type PreviewDatesDto,
+  type ReleaseHoldsDto,
+  type TripRemarkDto,
 } from './dto/scheduling.dto';
 import { InventoryRepository } from '../infrastructure/persistence/inventory.repository';
 import { MaterializationService } from '../application/services/materialization.service';
 import { SchedulingService } from '../application/services/scheduling.service';
 import { ServiceRepository } from '../infrastructure/persistence/service.repository';
 import { TripRepository } from '../infrastructure/persistence/trip.repository';
-
-const ExtraTripsSchema = z.object({
-  journeyDates: z
-    .array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/))
-    .min(1)
-    .max(31),
-  departureTime: z
-    .string()
-    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM (24h)')
-    .optional(),
-  vehicleId: z.string().uuid().optional(),
-  reason: z.string().trim().min(3).max(200),
-  openForSale: z.boolean().optional(),
-  ladiesSpecial: z.boolean().optional(),
-  allowOverlap: z.boolean().optional(),
-});
 
 @ApiTags('scheduling')
 @ApiBearerAuth('bearer')
@@ -137,10 +129,9 @@ export class SchedulingController {
   @ApiOperation({ summary: 'Per-seat availability for a segment' })
   async availability(
     @UuidParam('id') id: string,
-    @Query('from') from: string,
-    @Query('to') to: string,
+    @Query(zodQuery(SegmentQuerySchema)) q: SegmentQuery,
   ) {
-    const seg = await this.inventory.resolveSegment(id as TripId, from as StopId, to as StopId);
+    const seg = await this.inventory.resolveSegment(id as TripId, q.from as StopId, q.to as StopId);
     if (!seg) throw new BadRequestError('Invalid boarding/dropping combination for this trip');
     const seats = await this.inventory.seatAvailability(id as TripId, seg.fromSeq, seg.toSeq);
     return {
@@ -185,7 +176,7 @@ export class SchedulingController {
   })
   async extraTrips(
     @UuidParam('id') id: string,
-    @Body(zodBody(ExtraTripsSchema)) dto: z.infer<typeof ExtraTripsSchema>,
+    @Body(zodBody(ExtraTripsSchema)) dto: ExtraTripsDto,
   ) {
     const [h, m] = (dto.departureTime ?? '').split(':').map(Number);
     return this.materialization.createExtraTrips({
@@ -229,8 +220,7 @@ export class SchedulingController {
   })
   async releaseHolds(
     @UuidParam('id') id: string,
-    @Body(zodBody(z.object({ includePhoneHolds: z.boolean().default(false) })))
-    dto: { includePhoneHolds: boolean },
+    @Body(zodBody(ReleaseHoldsSchema)) dto: ReleaseHoldsDto,
   ) {
     await this.trips.getById(id as TripId);
     return { released: await this.trips.releaseHolds(id as TripId, dto.includePhoneHolds) };
@@ -242,8 +232,7 @@ export class SchedulingController {
   @ApiOperation({ summary: 'Add an internal (staff-only) remark to a trip' })
   async addRemark(
     @UuidParam('id') id: string,
-    @Body(zodBody(z.object({ remark: z.string().trim().min(2).max(1000) })))
-    dto: { remark: string },
+    @Body(zodBody(TripRemarkSchema)) dto: TripRemarkDto,
   ) {
     await this.trips.getById(id as TripId);
     await this.trips.addRemark(id as TripId, dto.remark, getUserId() ?? null);

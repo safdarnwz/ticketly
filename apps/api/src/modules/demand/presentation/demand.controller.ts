@@ -1,25 +1,27 @@
 import { Body, Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Public, RateLimit, RequirePermission, UuidParam, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  Public,
+  RateLimit,
+  RequirePermission,
+  UuidParam,
+  zodBody,
+  zodQuery,
+} from '@http';
 import { getUserId, type TripId } from '@kernel';
 
 import { DemandService } from '../application/demand.service';
-
-const phone = z
-  .string()
-  .trim()
-  .regex(/^\+?[0-9]{10,15}$/, 'Enter a valid phone number');
-const JoinSchema = z.object({
-  fromStopId: z.string().uuid(),
-  toStopId: z.string().uuid(),
-  seatCount: z.number().int().min(1).max(6),
-  contactPhone: phone,
-  contactEmail: z.string().trim().email().optional(),
-});
-const LeaveSchema = z.object({ contactPhone: phone });
+import {
+  ForecastQuerySchema,
+  JoinDemandListSchema,
+  LeaveDemandListSchema,
+  type ForecastQueryDto,
+  type JoinDemandListDto,
+  type LeaveDemandListDto,
+} from './dto/demand.dto';
 
 @ApiTags('demand')
 @Controller({ path: '', version: '1' })
@@ -36,7 +38,7 @@ export class DemandController {
   })
   async join(
     @UuidParam('tripId') tripId: string,
-    @Body(zodBody(JoinSchema)) dto: z.infer<typeof JoinSchema>,
+    @Body(zodBody(JoinDemandListSchema)) dto: JoinDemandListDto,
   ) {
     return this.demand.joinWaitlist(tripId as TripId, { ...dto, customerId: getUserId() ?? null });
   }
@@ -48,7 +50,7 @@ export class DemandController {
   async leave(
     @UuidParam('tripId') tripId: string,
     @UuidParam('id') id: string,
-    @Body(zodBody(LeaveSchema)) dto: z.infer<typeof LeaveSchema>,
+    @Body(zodBody(LeaveDemandListSchema)) dto: LeaveDemandListDto,
   ) {
     return this.demand.leaveWaitlist(tripId as TripId, id, dto.contactPhone);
   }
@@ -73,7 +75,7 @@ export class DemandController {
   @Get('reports/occupancy-forecast')
   @ApiBearerAuth('bearer')
   @RequirePermission(Permission.REPORT_READ)
-  async upcoming(@Query('days') days?: string) {
-    return this.demand.upcomingForecast(Number(days) || 7);
+  async upcoming(@Query(zodQuery(ForecastQuerySchema)) q: ForecastQueryDto) {
+    return this.demand.upcomingForecast(q.days);
   }
 }

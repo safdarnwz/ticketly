@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Post, Query, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { z } from 'zod';
 
 import { Permission } from '@contracts';
 import {
@@ -13,24 +12,14 @@ import {
 } from '@http';
 
 import { I18nService } from '../application/services/i18n.service';
-
-const TranslationSchema = z.object({
-  locale: z.string().min(2).max(10),
-  key: z.string().min(1).max(160),
-  value: z.string().min(1).max(4000),
-});
-const RateSchema = z.object({
-  base: z.string().length(3),
-  quote: z.string().length(3),
-  rateMicros: z.number().int().positive(),
-  asOf: z.string().datetime(),
-});
-
-const ConvertQuerySchema = z.object({
-  amountMinor: z.coerce.number().int().nonnegative(),
-  from: z.string().trim().length(3).toUpperCase(),
-  to: z.string().trim().length(3).toUpperCase(),
-});
+import {
+  TranslationSchema,
+  ExchangeRateSchema,
+  ConvertQuerySchema,
+  type TranslationDto,
+  type ExchangeRateDto,
+  type ConvertQueryDto,
+} from './dto/i18n.dto';
 
 @ApiTags('i18n')
 @Controller({ path: 'i18n', version: '1' })
@@ -41,7 +30,7 @@ export class I18nController {
   @Get('convert')
   @Public()
   @ApiOperation({ summary: 'Convert an amount (minor units) between currencies' })
-  async convert(@Query(zodQuery(ConvertQuerySchema)) query: z.infer<typeof ConvertQuerySchema>) {
+  async convert(@Query(zodQuery(ConvertQuerySchema)) query: ConvertQueryDto) {
     return this.i18n.convert(query.amountMinor, query.from, query.to);
   }
 
@@ -51,9 +40,7 @@ export class I18nController {
   @RequirePermission(Permission.ALL)
   @RequirePlatformAdmin()
   @ApiOperation({ summary: 'Create/update a translation string' })
-  async upsertTranslation(
-    @Body(zodBody(TranslationSchema)) dto: z.infer<typeof TranslationSchema>,
-  ) {
+  async upsertTranslation(@Body(zodBody(TranslationSchema)) dto: TranslationDto) {
     await this.i18n.upsertTranslation(dto.locale, dto.key, dto.value);
     return { ok: true };
   }
@@ -64,7 +51,7 @@ export class I18nController {
   @RequirePermission(Permission.ALL)
   @RequirePlatformAdmin()
   @ApiOperation({ summary: 'Publish an FX rate (quote per 1 base, ×1e6)' })
-  async upsertRate(@Body(zodBody(RateSchema)) dto: z.infer<typeof RateSchema>) {
+  async upsertRate(@Body(zodBody(ExchangeRateSchema)) dto: ExchangeRateDto) {
     await this.i18n.upsertRate(dto.base, dto.quote, dto.rateMicros, dto.asOf);
     return { ok: true };
   }

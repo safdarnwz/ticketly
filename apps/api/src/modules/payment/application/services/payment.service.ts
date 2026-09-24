@@ -16,13 +16,11 @@ import {
 import { EventBus } from '@messaging';
 import { Logger, Metrics } from '@observability';
 
-import { BookingService } from '../../../booking/application/services/booking.service';
-import { BookingRepository } from '../../../booking/infrastructure/persistence/booking.repository';
+import { BookingService, BookingRepository, SeatUpgradeRepository } from '../../../booking';
 import { PlatformSettingsRepository } from '../../../platform-settings';
-import { SeatUpgradeRepository } from '../../../booking/infrastructure/persistence/seat-upgrade.repository';
-import { TripRepository } from '../../../scheduling/infrastructure/persistence/trip.repository';
-import { FareRepository } from '../../../pricing/infrastructure/persistence/fare.repository';
-import { RouteRepository } from '../../../master-data/infrastructure/persistence/route.repository';
+import { TripRepository } from '../../../scheduling';
+import { FareRepository } from '../../../pricing';
+import { RouteRepository } from '../../../master-data';
 import { captureEntry, offlineCaptureEntry, partnerCommissionEntry } from '../../domain/ledger';
 import { classifyCapture } from '../../domain/duplicate-capture';
 import { computeCommission, type CommissionConfig } from '../../domain/commission';

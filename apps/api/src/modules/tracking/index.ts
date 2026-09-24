@@ -1,1 +1,1 @@
-export * from './tracking.module';
+export * from './application/services/tracking.service';

@@ -1,14 +1,12 @@
 import { Body, Controller, Get, Header, Post, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { z } from 'zod';
 
 import { Permission } from '@contracts';
 import { ApiStandardErrors, Public, RateLimit, RequirePermission, UuidParam, zodBody } from '@http';
 import { type BookingId } from '@kernel';
 
 import { TicketService } from '../application/services/ticket.service';
-
-const VerifySchema = z.object({ token: z.string().min(10).max(4000) });
+import { VerifyTicketSchema, type VerifyTicketDto } from './dto/ticket.dto';
 
 @ApiTags('tickets')
 @ApiBearerAuth('bearer')
@@ -38,7 +36,7 @@ export class TicketController {
   @HttpCode(200)
   @RequirePermission(Permission.TRIP_OPERATE)
   @ApiOperation({ summary: 'Verify a scanned boarding token (offline-style)' })
-  async verify(@Body(zodBody(VerifySchema)) dto: z.infer<typeof VerifySchema>) {
+  async verify(@Body(zodBody(VerifyTicketSchema)) dto: VerifyTicketDto) {
     const payload = this.tickets.verify(dto.token);
     return { valid: true, payload };
   }

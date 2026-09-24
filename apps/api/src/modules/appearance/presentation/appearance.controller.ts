@@ -1,16 +1,22 @@
 import { Body, Controller, Delete, Get, Header, Param, Put, Query, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Public, RequirePermission, RequirePlatformAdmin, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  Public,
+  RequirePermission,
+  RequirePlatformAdmin,
+  zodBody,
+  zodQuery,
+} from '@http';
 
 import { AppearanceService } from '../application/services/appearance.service';
 import type { ThemePatch } from '../domain/theme';
+import { ThemePatchSchema, ThemeQuerySchema, type ThemeQueryDto } from './dto/appearance.dto';
 
 // A permissive schema: any subset of the token tree. Values are validated
 // against the token rules in the service (validateTheme) before persisting.
-const ThemePatchSchema = z.record(z.any());
 
 @ApiTags('appearance')
 @ApiBearerAuth('bearer')
@@ -22,7 +28,7 @@ export class AppearanceController {
   @Get()
   @Public()
   @ApiOperation({ summary: 'Effective theme for a role (default ← role)' })
-  async theme(@Query('role') role?: string) {
+  async theme(@Query(zodQuery(ThemeQuerySchema)) { role }: ThemeQueryDto) {
     return { theme: await this.appearance.effectiveTheme(role) };
   }
 
@@ -30,7 +36,7 @@ export class AppearanceController {
   @Public()
   @Header('Content-Type', 'text/css; charset=utf-8')
   @ApiOperation({ summary: 'Effective theme as an injectable :root stylesheet' })
-  async css(@Query('role') role?: string) {
+  async css(@Query(zodQuery(ThemeQuerySchema)) { role }: ThemeQueryDto) {
     return this.appearance.css(role);
   }
 

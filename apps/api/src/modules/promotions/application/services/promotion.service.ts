@@ -14,7 +14,7 @@ import {
   computeBucketPrice,
   type PromotionBillingCycle,
 } from '../../domain/promotion-pricing';
-import { RouteRepository } from '../../../master-data/infrastructure/persistence/route.repository';
+import { RouteRepository } from '../../../master-data';
 
 @Injectable()
 export class PromotionService {

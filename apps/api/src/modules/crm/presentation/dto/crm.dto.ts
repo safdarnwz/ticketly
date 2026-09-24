@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { searchText } from '@http';
 
 export const BlacklistCustomerSchema = z.object({ reason: z.string().trim().min(3).max(500) });
 export type BlacklistCustomerDto = z.infer<typeof BlacklistCustomerSchema>;
@@ -11,3 +12,7 @@ export const CustomerPreferencesSchema = z
   )
   .refine((v) => Object.keys(v).length <= 50, 'At most 50 preferences');
 export type CustomerPreferencesDto = z.infer<typeof CustomerPreferencesSchema>;
+
+/** Name (partial), or an exact phone / email. */
+export const CustomerSearchQuerySchema = z.object({ q: searchText.optional() });
+export type CustomerSearchQueryDto = z.infer<typeof CustomerSearchQuerySchema>;

@@ -11,7 +11,6 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { z } from 'zod';
 
 import { Permission } from '@contracts';
 import {
@@ -30,12 +29,14 @@ import {
   CreateBannerSchema,
   SaveOfferSchema,
   SavePageSchema,
+  SetBannerActiveSchema,
   SlugSchema,
   UploadQuerySchema,
   type CreateAnnouncementDto,
   type CreateBannerDto,
   type SaveOfferDto,
   type SavePageDto,
+  type SetBannerActiveDto,
   type UploadQueryDto,
 } from './dto/content.dto';
 
@@ -89,7 +90,7 @@ export class ContentAdminController {
   @ApiOperation({ summary: 'Show or hide a banner' })
   async setBanner(
     @UuidParam('id') id: string,
-    @Body(zodBody(z.object({ isActive: z.boolean() }))) dto: { isActive: boolean },
+    @Body(zodBody(SetBannerActiveSchema)) dto: SetBannerActiveDto,
   ) {
     await this.content.setBannerActive(id, dto.isActive);
     return { ok: true };

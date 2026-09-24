@@ -2,7 +2,7 @@ import { Injectable, type CanActivate, type ExecutionContext } from '@nestjs/com
 
 import { getContext } from '@kernel';
 
-import { TenantContextService } from '../../../tenancy/application/services/tenant-context.service';
+import { TenantContextService } from '../../../tenancy';
 
 /**
  * Ensures the resolved tenant is actually servable (active, not suspended).

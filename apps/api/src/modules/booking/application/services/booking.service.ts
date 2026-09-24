@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { AppConfig } from '@config';
+import { type SalesChannelFamily } from '@contracts';
 import { DatabaseService, isUniqueViolation, UnitOfWork } from '@database';
 import {
   AppError,
@@ -13,9 +14,8 @@ import {
 import { EventBus } from '@messaging';
 import { Logger, Metrics } from '@observability';
 
-import { PricingService } from '../../../pricing/application/services/pricing.service';
-import { CouponRepository } from '../../../pricing/infrastructure/persistence/coupon.repository';
-import { TripRepository } from '../../../scheduling/infrastructure/persistence/trip.repository';
+import { PricingService, CouponRepository } from '../../../pricing';
+import { TripRepository } from '../../../scheduling';
 import { CustomerRepository } from '../../../crm/infrastructure/persistence/customer.repository';
 import { assertTransition, isCancellable } from '../../domain/booking-state';
 import {
@@ -781,9 +781,7 @@ function asHoldError<T>(fn: () => T): T {
 }
 
 /** Every channel string maps to one of the controllable channel families. */
-export function channelFamily(
-  channel: string | undefined,
-): 'direct_web' | 'agent' | 'ota' | 'phone' {
+export function channelFamily(channel: string | undefined): SalesChannelFamily {
   if (channel === 'agent' || channel === 'phone' || channel === 'ota') return channel;
   if (channel?.startsWith('gds:') || channel === 'partner') return 'ota';
   return 'direct_web';

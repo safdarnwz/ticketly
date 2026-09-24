@@ -5,7 +5,7 @@ import { CacheNamespace, CacheService, CacheTtl } from '@cache';
 import { AppConfig } from '@config';
 import { getContext, parseUuid, type TenantId } from '@kernel';
 
-import { TenantRepository } from '../../tenancy/infrastructure/persistence/tenant.repository';
+import { TenantRepository } from '../../tenancy';
 
 /**
  * ============================================================================

@@ -14,7 +14,7 @@ import { Logger } from '@observability';
 
 import { BookingRepository } from '../../infrastructure/persistence/booking.repository';
 import { BookingService } from './booking.service';
-import { TripRepository } from '../../../scheduling/infrastructure/persistence/trip.repository';
+import { TripRepository } from '../../../scheduling';
 
 /**
  * Staff-facing trip operations — distinct from BookingService (one

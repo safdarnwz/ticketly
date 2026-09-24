@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import { Body, Controller, Patch, Post, Put, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
@@ -8,27 +7,18 @@ import { type UserId } from '@kernel';
 
 import {
   AssignRolesSchema,
-  type AssignRolesDto,
+  GrantRoleSchema,
   InviteUserSchema,
-  type InviteUserDto,
+  StaffAccessSchema,
   UpdateUserSchema,
+  type AssignRolesDto,
+  type GrantRoleDto,
+  type InviteUserDto,
+  type StaffAccessDto,
   type UpdateUserDto,
 } from './dto/user.dto';
 import { StaffAccessService } from '../application/services/staff-access.service';
 import { UserService } from '../application/services/user.service';
-
-const StaffAccessSchema = z.object({
-  accessExpiresAt: z.string().datetime({ offset: true }).nullable().optional(),
-  loginWindow: z
-    .object({
-      days: z.array(z.number().int().min(1).max(7)).min(1).max(7),
-      startMinute: z.number().int().min(0).max(1439),
-      endMinute: z.number().int().min(0).max(1439),
-    })
-    .nullable()
-    .optional(),
-  managerId: z.string().uuid().nullable().optional(),
-});
 
 @ApiTags('users')
 @ApiBearerAuth('bearer')
@@ -84,7 +74,7 @@ export class UserController {
   })
   async setAccess(
     @UuidParam('id') id: string,
-    @Body(zodBody(StaffAccessSchema)) dto: z.infer<typeof StaffAccessSchema>,
+    @Body(zodBody(StaffAccessSchema)) dto: StaffAccessDto,
   ) {
     await this.access.setAccess(id, dto);
     return { ok: true };
@@ -96,12 +86,7 @@ export class UserController {
   async grantRole(
     @UuidParam('id') id: string,
     @UuidParam('roleId') roleId: string,
-    @Body(
-      zodBody(
-        z.object({ expiresAt: z.string().datetime({ offset: true }).nullable().default(null) }),
-      ),
-    )
-    dto: { expiresAt: string | null },
+    @Body(zodBody(GrantRoleSchema)) dto: GrantRoleDto,
   ) {
     await this.access.grantRole(id, roleId, dto.expiresAt);
     return { ok: true };

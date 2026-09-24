@@ -16,7 +16,8 @@ import { DomainError, ErrorCode } from '@kernel';
  * A reply can bounce a ticket between open/pending/resolved; only `closed` is
  * terminal. Encoding it here keeps the workflow rules in one testable place.
  */
-export type TicketStatus = 'open' | 'pending' | 'resolved' | 'closed';
+export const TICKET_STATUSES = ['open', 'pending', 'resolved', 'closed'] as const;
+export type TicketStatus = (typeof TICKET_STATUSES)[number];
 
 const TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   open: ['pending', 'resolved', 'closed'],

@@ -2,8 +2,17 @@ import { Body, Controller, Get, HttpCode, Patch, Post, Put, Query } from '@nestj
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Idempotent, RequirePermission, UuidParam, zodBody } from '@http';
-import { BadRequestError, type AgentId } from '@kernel';
+import {
+  ApiStandardErrors,
+  DateRangeQuerySchema,
+  Idempotent,
+  RequirePermission,
+  UuidParam,
+  zodBody,
+  zodQuery,
+  type DateRangeQuery,
+} from '@http';
+import { type AgentId } from '@kernel';
 
 import { AgentService } from '../application/services/agent.service';
 import {
@@ -12,7 +21,10 @@ import {
   CreateAgentSchema,
   ReceiptSchema,
   SlabsSchema,
-  StatementQuerySchema,
+  AgentLedgerQuerySchema,
+  ListAgentsQuerySchema,
+  type AgentLedgerQueryDto,
+  type ListAgentsQueryDto,
   UpdateAgentSchema,
   type AdjustmentDto,
   type SlabsDto,
@@ -42,10 +54,8 @@ export class AgentController {
   @Get()
   @RequirePermission(Permission.AGENT_READ)
   @ApiOperation({ summary: 'Agents with balance, spendable amount, sales and commission' })
-  async list(@Query('status') status?: string, @Query('search') search?: string) {
-    if (status && !['pending', 'active', 'suspended', 'rejected'].includes(status))
-      throw new BadRequestError('Unknown status filter');
-    return { items: await this.agents.list({ status: status as never, search }) };
+  async list(@Query(zodQuery(ListAgentsQuerySchema)) q: ListAgentsQueryDto) {
+    return { items: await this.agents.list(q) };
   }
 
   @Get('commission-slabs')
@@ -142,17 +152,9 @@ export class AgentController {
   @RequirePermission(Permission.AGENT_READ)
   async ledger(
     @UuidParam('id') id: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-    @Query('limit') limit?: string,
+    @Query(zodQuery(AgentLedgerQuerySchema)) q: AgentLedgerQueryDto,
   ) {
-    return {
-      items: await this.agents.ledger(id as AgentId, {
-        from,
-        to,
-        limit: limit ? Math.min(1000, Math.max(1, Number(limit) || 200)) : undefined,
-      }),
-    };
+    return { items: await this.agents.ledger(id as AgentId, q) };
   }
 
   @Get(':id/statement')
@@ -162,11 +164,8 @@ export class AgentController {
   })
   async statement(
     @UuidParam('id') id: string,
-    @Query('from') from: string,
-    @Query('to') to: string,
+    @Query(zodQuery(DateRangeQuerySchema)) q: DateRangeQuery,
   ) {
-    const q = StatementQuerySchema.safeParse({ from, to });
-    if (!q.success) throw new BadRequestError(q.error.issues[0]?.message ?? 'Invalid period');
-    return this.agents.statement(id as AgentId, q.data.from, q.data.to);
+    return this.agents.statement(id as AgentId, q.from, q.to);
   }
 }

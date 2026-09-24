@@ -14,10 +14,11 @@ import {
 } from '@kernel';
 
 import { RoutePath, type RouteStopInput } from '../../routes/domain/route-path';
+import { type RouteStatus } from '../../domain/route';
+
+export type { RouteStatus };
 
 registerConstraintMessages({ routes_tenant_id_code_key: 'A route with this code already exists' });
-
-export type RouteStatus = 'draft' | 'published' | 'archived';
 
 export interface RouteStopRef {
   id: StopId;

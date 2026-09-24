@@ -19,14 +19,16 @@ import { DomainError, ErrorCode } from '@kernel';
  * `held` carries a TTL; if payment doesn't complete in time the seat-hold
  * sweeper (Part 9) moves it to `expired` and frees the seats.
  */
-export type BookingStatus =
-  | 'pending' // created, seats not yet held
-  | 'held' // seats locked, awaiting payment (has hold_expires_at)
-  | 'confirmed' // paid, tickets issued
-  | 'completed' // trip travelled
-  | 'cancelled' // cancelled by passenger/operator (refund per policy)
-  | 'expired' // hold lapsed before payment
-  | 'failed'; // creation/payment failed terminally
+export const BOOKING_STATUSES = [
+  'pending', // created, seats not yet held
+  'held', // seats locked, awaiting payment (has hold_expires_at)
+  'confirmed', // paid, tickets issued
+  'completed', // trip travelled
+  'cancelled', // cancelled by passenger/operator (refund per policy)
+  'expired', // hold lapsed before payment
+  'failed', // creation/payment failed terminally
+] as const;
+export type BookingStatus = (typeof BOOKING_STATUSES)[number];
 
 const TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   pending: ['held', 'failed'],

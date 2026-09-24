@@ -1,26 +1,17 @@
 import { Body, Controller, Get, Post, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { z } from 'zod';
 
 import { Permission } from '@contracts';
 import { ApiStandardErrors, Idempotent, RequirePermission, zodBody } from '@http';
 import { type BookingId, type Uuid } from '@kernel';
 
 import { AncillaryService } from '../application/services/ancillary.service';
-
-const AttachAncillarySchema = z.object({
-  bookingId: z.string().uuid(),
-  items: z
-    .array(z.object({ ancillaryId: z.string().uuid(), quantity: z.number().int().min(1).max(20) }))
-    .min(1),
-});
-const UpsertAncillarySchema = z.object({
-  code: z.string().min(1).max(40),
-  name: z.string().min(1).max(120),
-  kind: z.enum(['insurance', 'meal', 'luggage', 'priority', 'other']),
-  priceMinor: z.number().int().min(0),
-  perPassenger: z.boolean().default(true),
-});
+import {
+  AttachAncillarySchema,
+  UpsertAncillarySchema,
+  type AttachAncillaryDto,
+  type UpsertAncillaryDto,
+} from './dto/ancillary.dto';
 
 /** Customer-facing add-on (insurance, meals, luggage) endpoints, and the operator-facing catalogue-management endpoint. */
 @ApiTags('ancillary')
@@ -42,7 +33,7 @@ export class AncillaryController {
   @Idempotent()
   @RequirePermission(Permission.BOOKING_CREATE)
   @ApiOperation({ summary: 'Attach add-ons to a booking' })
-  async attach(@Body(zodBody(AttachAncillarySchema)) dto: z.infer<typeof AttachAncillarySchema>) {
+  async attach(@Body(zodBody(AttachAncillarySchema)) dto: AttachAncillaryDto) {
     return this.ancillary.attach(
       dto.bookingId as BookingId,
       dto.items.map((i) => ({ ancillaryId: i.ancillaryId as Uuid, quantity: i.quantity })),
@@ -53,9 +44,7 @@ export class AncillaryController {
   @HttpCode(201)
   @RequirePermission(Permission.TENANT_MANAGE)
   @ApiOperation({ summary: 'Operator: create/update an ancillary service' })
-  async upsertAncillary(
-    @Body(zodBody(UpsertAncillarySchema)) dto: z.infer<typeof UpsertAncillarySchema>,
-  ) {
+  async upsertAncillary(@Body(zodBody(UpsertAncillarySchema)) dto: UpsertAncillaryDto) {
     return { id: await this.ancillary.upsert(dto) };
   }
 }

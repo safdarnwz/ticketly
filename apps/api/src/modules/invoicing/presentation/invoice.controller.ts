@@ -1,19 +1,12 @@
 import { Body, Controller, Get, Post, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { z } from 'zod';
 
 import { Permission } from '@contracts';
 import { ApiStandardErrors, Idempotent, RequirePermission, UuidParam, zodBody } from '@http';
 import { type BookingId } from '@kernel';
 
 import { InvoiceService } from '../application/services/invoice.service';
-
-const IssueInvoiceSchema = z.object({
-  bookingId: z.string().uuid(),
-  // NOTE: interState deliberately removed — computed from the booking's
-  // route (see InvoiceService.issueForBooking), never client-supplied.
-  supplierGstin: z.string().min(15).max(15).optional(),
-});
+import { IssueInvoiceSchema, type IssueInvoiceDto } from './dto/invoice.dto';
 
 /**
  * GST invoicing endpoints. Invoices are normally raised automatically on
@@ -39,7 +32,7 @@ export class InvoiceController {
   @Idempotent()
   @RequirePermission(Permission.SETTLEMENT_MANAGE)
   @ApiOperation({ summary: 'Issue a GST tax invoice for a confirmed booking' })
-  async issue(@Body(zodBody(IssueInvoiceSchema)) dto: z.infer<typeof IssueInvoiceSchema>) {
+  async issue(@Body(zodBody(IssueInvoiceSchema)) dto: IssueInvoiceDto) {
     const result = await this.invoices.issueForBooking(
       dto.bookingId as BookingId,
       dto.supplierGstin,

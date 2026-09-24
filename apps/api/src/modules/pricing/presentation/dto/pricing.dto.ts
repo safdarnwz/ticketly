@@ -94,3 +94,34 @@ export const SeatFareOverrideSchema = z.object({
   fareMinor: z.number().int().positive(),
 });
 export type SeatFareOverrideDto = z.infer<typeof SeatFareOverrideSchema>;
+
+export const RouteRulesSchema = z.object({
+  floorMinor: z.number().int().nonnegative().nullable(),
+  ceilingMinor: z.number().int().positive().nullable(),
+  peakWindows: z
+    .array(
+      z.object({
+        startMinute: z.number().int().min(0).max(1439),
+        endMinute: z.number().int().min(0).max(1439),
+        pct: z.number().min(-50).max(100),
+        label: z.string().max(40).optional(),
+      }),
+    )
+    .max(12),
+});
+export type RouteRulesDto = z.infer<typeof RouteRulesSchema>;
+
+export const TripFareAdjustmentSchema = z
+  .object({
+    pct: z
+      .number()
+      .min(-50)
+      .max(100)
+      .refine((n) => n !== 0, 'Use null to clear')
+      .nullable(),
+    reason: z.string().trim().min(5).max(200).optional(),
+  })
+  .refine((d) => d.pct === null || !!d.reason, {
+    message: 'A reason is required for a fare change',
+  });
+export type TripFareAdjustmentDto = z.infer<typeof TripFareAdjustmentSchema>;

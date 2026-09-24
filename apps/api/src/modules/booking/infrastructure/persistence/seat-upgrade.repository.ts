@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { currentTransaction, DatabaseService } from '@database';
 import { AppError, ErrorCode, newId, requireTenantId, type TripId } from '@kernel';
 
-import { SegmentMap } from '../../../scheduling/domain/segment-inventory';
+import { SegmentMap } from '../../../scheduling';
 import { SeatLockRepository } from './seat-lock.repository';
 
 @Injectable()

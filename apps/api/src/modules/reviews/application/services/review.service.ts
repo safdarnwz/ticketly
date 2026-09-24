@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { AppError, ErrorCode, getUserId, type BookingId, type RouteId, type UserId } from '@kernel';
 
-import { BookingRepository } from '../../../booking/infrastructure/persistence/booking.repository';
+import { BookingRepository } from '../../../booking';
 import {
   aggregateRatings,
   bayesianRating,

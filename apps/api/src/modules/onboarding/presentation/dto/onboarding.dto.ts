@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { fileNameQuery } from '@http';
+import { APPLICATION_STATUSES } from '../../domain/application-status';
 
 export const APPLICATION_DOC_TYPES = [
   'gst_certificate',
@@ -80,3 +82,15 @@ export const ApproveSchema = z
   .default({});
 export type ApproveDto = z.infer<typeof ApproveSchema>;
 export type RejectDto = z.infer<typeof RejectSchema>;
+
+/** Raw-body document upload for an application: which document, and its file name. */
+export const ApplicationDocumentQuerySchema = z.object({
+  docType: z.enum(APPLICATION_DOC_TYPES),
+  fileName: fileNameQuery,
+});
+export type ApplicationDocumentQueryDto = z.infer<typeof ApplicationDocumentQuerySchema>;
+
+export const ListApplicationsQuerySchema = z.object({
+  status: z.enum(APPLICATION_STATUSES).optional(),
+});
+export type ListApplicationsQueryDto = z.infer<typeof ListApplicationsQuerySchema>;

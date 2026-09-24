@@ -18,18 +18,12 @@ import {
 } from '@kernel';
 import { Logger, Metrics } from '@observability';
 
-import { TenantRepository } from '../../../tenancy/infrastructure/persistence/tenant.repository';
-import { PricingEngine } from '../../../pricing/domain/pricing-engine';
-import { FareRepository } from '../../../pricing/infrastructure/persistence/fare.repository';
-import {
-  AmenityRepository,
-  type Amenity,
-} from '../../../master-data/infrastructure/persistence/amenity.repository';
+import { TenantRepository } from '../../../tenancy';
+import { PricingEngine, FareRepository } from '../../../pricing';
+import { AmenityRepository, RouteRepository, type Amenity } from '../../../master-data';
 import { PromotionRepository } from '../../../promotions/infrastructure/persistence/promotion.repository';
 import { bubblePromotedToTop } from '../../../promotions/domain/promotion-pricing';
-import { InventoryRepository } from '../../../scheduling/infrastructure/persistence/inventory.repository';
-import { RouteRepository } from '../../../master-data/infrastructure/persistence/route.repository';
-import { TripRepository } from '../../../scheduling/infrastructure/persistence/trip.repository';
+import { InventoryRepository, TripRepository } from '../../../scheduling';
 
 export interface StopRef {
   id: StopId;

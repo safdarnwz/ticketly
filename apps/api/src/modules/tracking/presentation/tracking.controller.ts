@@ -1,22 +1,12 @@
 import { Body, Controller, Get, Param, Post, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { z } from 'zod';
 
 import { Permission } from '@contracts';
 import { ApiStandardErrors, Public, RequirePermission, UuidParam, zodBody } from '@http';
 import { type TripId } from '@kernel';
 
 import { TrackingService } from '../application/services/tracking.service';
-
-const PingSchema = z.object({
-  tripId: z.string().uuid(),
-  vehicleId: z.string().uuid().optional(),
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
-  speedKmph: z.number().min(0).max(200),
-  headingDeg: z.number().min(0).max(360).optional(),
-  distanceCoveredM: z.number().int().min(0),
-});
+import { LocationPingSchema, type LocationPingDto } from './dto/tracking.dto';
 
 @ApiTags('tracking')
 @Controller({ path: 'tracking', version: '1' })
@@ -29,7 +19,7 @@ export class TrackingController {
   @ApiBearerAuth('apiKey')
   @RequirePermission(Permission.TRIP_OPERATE)
   @ApiOperation({ summary: 'Ingest a GPS ping (device/driver app)' })
-  async ping(@Body(zodBody(PingSchema)) dto: z.infer<typeof PingSchema>) {
+  async ping(@Body(zodBody(LocationPingSchema)) dto: LocationPingDto) {
     return this.tracking.ingestPing(dto as never);
   }
 

@@ -2,26 +2,38 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, HttpCode } fr
 import { ApiOperation, ApiTags, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Public, RateLimit, RequirePermission, UuidParam, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  Public,
+  RateLimit,
+  RequirePermission,
+  UuidParam,
+  zodBody,
+  zodQuery,
+} from '@http';
 import { NotFoundError, type CityId, type RouteId, type SeatLayoutId, type StopId } from '@kernel';
 
 import {
-  CreateAmenitySchema,
-  type CreateAmenityDto,
-  CreateRouteSchema,
-  type CreateRouteDto,
-  CreateSeatLayoutSchema,
-  type CreateSeatLayoutDto,
-  CreateStopSchema,
-  type CreateStopDto,
-  CreateVehicleTypeSchema,
-  type CreateVehicleTypeDto,
-  SeatMapSchema,
   BulkImportStopsSchema,
+  CitySearchQuerySchema,
+  CreateAmenitySchema,
+  CreateRouteSchema,
+  CreateSeatLayoutSchema,
+  CreateStopSchema,
+  CreateVehicleTypeSchema,
   DuplicateRouteSchema,
+  ListRoutesQuerySchema,
+  SeatMapSchema,
   UpdateStopSchema,
   type BulkImportStopsDto,
+  type CitySearchQueryDto,
+  type CreateAmenityDto,
+  type CreateRouteDto,
+  type CreateSeatLayoutDto,
+  type CreateStopDto,
+  type CreateVehicleTypeDto,
   type DuplicateRouteDto,
+  type ListRoutesQueryDto,
   type UpdateStopDto,
 } from './dto/master-data.dto';
 import { AmenityRepository } from '../infrastructure/persistence/amenity.repository';
@@ -61,8 +73,8 @@ export class MasterDataController {
   @RateLimit(60, 60_000, 'ip')
   @ApiQuery({ name: 'q', required: true })
   @ApiOperation({ summary: 'Fuzzy city autocomplete (public)' })
-  async searchCities(@Query('q') q: string) {
-    return { items: await this.geography.searchCities(q ?? '') };
+  async searchCities(@Query(zodQuery(CitySearchQuerySchema)) { q }: CitySearchQueryDto) {
+    return { items: await this.geography.searchCities(q) };
   }
 
   @Public()
@@ -262,8 +274,8 @@ export class MasterDataController {
   @Get('routes')
   @RequirePermission(Permission.ROUTE_READ)
   @ApiOperation({ summary: 'List routes' })
-  async listRoutes(@Query('status') status?: string) {
-    return { items: await this.routes.list(status as never) };
+  async listRoutes(@Query(zodQuery(ListRoutesQuerySchema)) q: ListRoutesQueryDto) {
+    return { items: await this.routes.list(q.status) };
   }
 
   @Get('routes/:id')

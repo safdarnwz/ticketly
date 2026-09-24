@@ -18,6 +18,7 @@ import type {
   DocVersion,
   VerificationStatus,
 } from '../../domain/vehicle-verification';
+import { type VehicleStatus } from '../../domain/vehicle';
 
 registerConstraintMessages({
   vehicles_tenant_id_registration_no_key: 'A vehicle with this registration already exists',
@@ -47,7 +48,7 @@ export interface VehicleMedia {
   createdAt: Date;
 }
 
-export type VehicleStatus = 'active' | 'maintenance' | 'retired';
+export type { VehicleStatus };
 
 export interface Vehicle {
   id: VehicleId;

@@ -13,8 +13,9 @@ import {
 } from '@kernel';
 
 import type { Duty } from '../../domain/duty-roster';
+import { type CrewRole } from '../../domain/crew';
 
-export type CrewRole = 'driver' | 'conductor' | 'attendant';
+export type { CrewRole };
 
 export interface Crew {
   id: CrewId;

@@ -1,28 +1,26 @@
 import { Body, Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Idempotent, RequirePermission, UuidParam, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  Idempotent,
+  RequirePermission,
+  UuidParam,
+  zodBody,
+  zodQuery,
+} from '@http';
 import type { TripId } from '@kernel';
 
 import { SeatQuotaService } from '../application/seat-quota.service';
-
-const AllocateSchema = z.object({
-  seatNumbers: z.array(z.string().trim().min(1)).min(1).max(60),
-  holderType: z.enum(['agent', 'branch']),
-  holderId: z.string().uuid(),
-  /** Unsold seats return to general sale this many minutes before departure (30 min – 7 days). */
-  releaseMinutesBefore: z
-    .number()
-    .int()
-    .min(30)
-    .max(7 * 24 * 60),
-});
-const ReleaseSchema = z.object({
-  seatNumbers: z.array(z.string().trim().min(1)).min(1).max(60),
-  reason: z.string().trim().min(5).max(200),
-});
+import {
+  AllocateQuotaSchema,
+  ListQuotasQuerySchema,
+  ReleaseQuotaSchema,
+  type AllocateQuotaDto,
+  type ListQuotasQueryDto,
+  type ReleaseQuotaDto,
+} from './dto/seat-quota.dto';
 
 @ApiTags('seat-quotas')
 @ApiBearerAuth('bearer')
@@ -40,15 +38,18 @@ export class SeatQuotaController {
   })
   async allocate(
     @UuidParam('tripId') tripId: string,
-    @Body(zodBody(AllocateSchema)) dto: z.infer<typeof AllocateSchema>,
+    @Body(zodBody(AllocateQuotaSchema)) dto: AllocateQuotaDto,
   ) {
     return this.quotas.allocate(tripId as TripId, dto);
   }
 
   @Get()
   @RequirePermission(Permission.INVENTORY_MANAGE)
-  async list(@UuidParam('tripId') tripId: string, @Query('all') all?: string) {
-    return { items: await this.quotas.list(tripId as TripId, all !== '1') };
+  async list(
+    @UuidParam('tripId') tripId: string,
+    @Query(zodQuery(ListQuotasQuerySchema)) q: ListQuotasQueryDto,
+  ) {
+    return { items: await this.quotas.list(tripId as TripId, !q.all) };
   }
 
   @Post('release')
@@ -57,7 +58,7 @@ export class SeatQuotaController {
   @ApiOperation({ summary: 'Take allocated seats back into general sale now' })
   async release(
     @UuidParam('tripId') tripId: string,
-    @Body(zodBody(ReleaseSchema)) dto: z.infer<typeof ReleaseSchema>,
+    @Body(zodBody(ReleaseQuotaSchema)) dto: ReleaseQuotaDto,
   ) {
     return this.quotas.release(tripId as TripId, dto.seatNumbers, dto.reason);
   }

@@ -2,15 +2,17 @@ import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, RequirePermission, UuidParam, zodBody } from '@http';
+import { ApiStandardErrors, RequirePermission, UuidParam, zodBody, zodQuery } from '@http';
 import { AppError, ErrorCode, type UserId } from '@kernel';
 
 import { CustomerRepository } from '../infrastructure/persistence/customer.repository';
 import {
   BlacklistCustomerSchema,
   CustomerPreferencesSchema,
+  CustomerSearchQuerySchema,
   type BlacklistCustomerDto,
   type CustomerPreferencesDto,
+  type CustomerSearchQueryDto,
 } from './dto/crm.dto';
 
 @ApiTags('crm')
@@ -23,8 +25,8 @@ export class CrmController {
   @Get('search')
   @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'Search customers by name (partial) or exact phone/email' })
-  async search(@Query('q') q?: string) {
-    if (!q?.trim()) return { items: [] };
+  async search(@Query(zodQuery(CustomerSearchQuerySchema)) { q }: CustomerSearchQueryDto) {
+    if (!q) return { items: [] };
     return { items: await this.customers.search(q) };
   }
 

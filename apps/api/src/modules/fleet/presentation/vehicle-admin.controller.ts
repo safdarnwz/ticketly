@@ -2,7 +2,15 @@ import { Body, Controller, Get, HttpCode, Post, Query, Res } from '@nestjs/commo
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { FastifyReply } from 'fastify';
 
-import { ApiStandardErrors, RequirePlatformAdmin, UuidParam, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  DownloadQuerySchema,
+  RequirePlatformAdmin,
+  UuidParam,
+  zodBody,
+  zodQuery,
+  type DownloadQuery,
+} from '@http';
 import type { VehicleId } from '@kernel';
 
 import { sendStoredFile } from '../../files/presentation/file-response';
@@ -10,8 +18,10 @@ import { VehicleVerificationService } from '../application/services/vehicle-veri
 import {
   OptionalNoteSchema,
   ReasonSchema,
+  VerificationQueueQuerySchema,
   type OptionalNoteDto,
   type ReasonDto,
+  type VerificationQueueQueryDto,
 } from './dto/fleet.dto';
 
 /**
@@ -29,10 +39,8 @@ export class VehicleAdminController {
 
   @Get()
   @ApiOperation({ summary: 'Verification queue (submitted first)' })
-  async list(@Query('verification') verification?: string, @Query('search') search?: string) {
-    return {
-      items: await this.verification.adminList({ verification: verification as never, search }),
-    };
+  async list(@Query(zodQuery(VerificationQueueQuerySchema)) q: VerificationQueueQueryDto) {
+    return { items: await this.verification.adminList(q) };
   }
 
   @Get(':id')
@@ -59,10 +67,10 @@ export class VehicleAdminController {
   async file(
     @UuidParam('id') id: string,
     @UuidParam('docId') docId: string,
-    @Query('download') download: string | undefined,
+    @Query(zodQuery(DownloadQuerySchema)) { download }: DownloadQuery,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const f = await this.verification.adminFileUrl(id as VehicleId, docId, download === '1');
+    const f = await this.verification.adminFileUrl(id as VehicleId, docId, download);
     if (f.url) {
       void reply.header('Cache-Control', 'no-store').redirect(f.url, 302);
       return;
@@ -70,7 +78,7 @@ export class VehicleAdminController {
     sendStoredFile(
       reply,
       { fileName: f.meta.fileName, mimeType: f.meta.mimeType, content: await f.read() },
-      download === '1',
+      download,
     );
   }
 

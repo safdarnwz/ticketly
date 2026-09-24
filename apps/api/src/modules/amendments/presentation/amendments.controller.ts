@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import { Body, Controller, Post, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
@@ -8,21 +7,15 @@ import { type BookingId, type StopId, type TripId } from '@kernel';
 
 import { AmendmentService } from '../application/services/amendment.service';
 import {
+  NameCorrectionSchema,
+  PointChangeSchema,
   RescheduleSchema,
-  type RescheduleDto,
   SeatChangeSchema,
+  type NameCorrectionDto,
+  type PointChangeDto,
+  type RescheduleDto,
   type SeatChangeDto,
 } from './dto/amendments.dto';
-
-const NameCorrectionSchema = z.object({
-  seatNumber: z.string().trim().min(1),
-  fullName: z.string().trim().min(2).max(120),
-});
-const PointChangeSchema = z
-  .object({ fromStopId: z.string().uuid().optional(), toStopId: z.string().uuid().optional() })
-  .refine((d) => d.fromStopId || d.toStopId, {
-    message: 'Choose a new boarding and/or dropping point',
-  });
 
 @ApiTags('amendments')
 @ApiBearerAuth('bearer')
@@ -71,7 +64,7 @@ export class AmendmentsController {
   })
   async changePoints(
     @UuidParam('id') id: string,
-    @Body(zodBody(PointChangeSchema)) dto: z.infer<typeof PointChangeSchema>,
+    @Body(zodBody(PointChangeSchema)) dto: PointChangeDto,
   ) {
     return this.amendments.changePoints(id as BookingId, dto);
   }
@@ -85,7 +78,7 @@ export class AmendmentsController {
   })
   async correctName(
     @UuidParam('id') id: string,
-    @Body(zodBody(NameCorrectionSchema)) dto: z.infer<typeof NameCorrectionSchema>,
+    @Body(zodBody(NameCorrectionSchema)) dto: NameCorrectionDto,
   ) {
     return this.amendments.correctName(id as BookingId, dto.seatNumber, dto.fullName);
   }

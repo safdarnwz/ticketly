@@ -3,7 +3,15 @@ import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
 import { UnitOfWork } from '@database';
-import { ApiStandardErrors, RequirePermission, UuidParam, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  DateRangeQuerySchema,
+  RequirePermission,
+  UuidParam,
+  zodBody,
+  zodQuery,
+  type DateRangeQuery,
+} from '@http';
 import {
   BadRequestError,
   localDate,
@@ -18,26 +26,34 @@ import { CrewRepository } from '../infrastructure/persistence/crew.repository';
 import { CrewService } from '../application/services/crew.service';
 import {
   AssignDutySchema,
-  type AssignDutyDto,
   AttendanceSchema,
-  CrewRulesSchema,
-  CreateCrewSchema,
-  type CreateCrewDto,
-  CreateVehicleSchema,
-  type CreateVehicleDto,
-  MaintenanceLogSchema,
-  type MaintenanceLogDto,
-  UpdateVehicleSchema,
-  type UpdateVehicleDto,
-  UploadDocumentSchema,
-  type UploadDocumentDto,
   BulkImportVehiclesSchema,
+  CreateCrewSchema,
+  CreateVehicleSchema,
+  CrewRulesSchema,
+  ListCrewQuerySchema,
+  ListVehiclesQuerySchema,
+  MaintenanceLogSchema,
+  UpdateVehicleSchema,
+  UploadDocumentSchema,
+  VehicleDocumentUploadQuerySchema,
   VehiclePermitTypeSchema,
   VehiclePhotoNoteSchema,
+  VehiclePhotoUploadQuerySchema,
   VehicleStatusSchema,
+  type AssignDutyDto,
   type BulkImportVehiclesDto,
+  type CreateCrewDto,
+  type CreateVehicleDto,
+  type ListCrewQueryDto,
+  type ListVehiclesQueryDto,
+  type MaintenanceLogDto,
+  type UpdateVehicleDto,
+  type UploadDocumentDto,
+  type VehicleDocumentUploadQueryDto,
   type VehiclePermitTypeDto,
   type VehiclePhotoNoteDto,
+  type VehiclePhotoUploadQueryDto,
   type VehicleStatusDto,
 } from './dto/fleet.dto';
 import { VehicleVerificationService } from '../application/services/vehicle-verification.service';
@@ -88,20 +104,8 @@ export class FleetController {
   @ApiOperation({
     summary: 'List buses (filter by status / verification, search by registration or make/model)',
   })
-  async listVehicles(
-    @Query('status') status?: string,
-    @Query('verification') verification?: string,
-    @Query('search') search?: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
-  ) {
-    return this.vehicles.list({
-      status: status as never,
-      verification: verification as never,
-      search,
-      page: page ? Number(page) : undefined,
-      pageSize: pageSize ? Number(pageSize) : undefined,
-    });
+  async listVehicles(@Query(zodQuery(ListVehiclesQuerySchema)) q: ListVehiclesQueryDto) {
+    return this.vehicles.list(q);
   }
 
   @Get('vehicles/:id')
@@ -202,11 +206,15 @@ export class FleetController {
   })
   async uploadDocumentFile(
     @UuidParam('id') id: string,
-    @Query('docType') docType: string,
-    @Query('fileName') fileName: string | undefined,
+    @Query(zodQuery(VehicleDocumentUploadQuerySchema)) q: VehicleDocumentUploadQueryDto,
     @Body() body: Buffer,
   ) {
-    return this.verification.uploadDocumentFile(id as VehicleId, docType, asBuffer(body), fileName);
+    return this.verification.uploadDocumentFile(
+      id as VehicleId,
+      q.docType,
+      asBuffer(body),
+      q.fileName,
+    );
   }
 
   @Get('vehicles/:id/media')
@@ -225,14 +233,10 @@ export class FleetController {
   })
   async addMedia(
     @UuidParam('id') id: string,
-    @Query('kind') kind: string | undefined,
-    @Query('fileName') fileName: string | undefined,
-    @Query('caption') caption: string | undefined,
+    @Query(zodQuery(VehiclePhotoUploadQuerySchema)) q: VehiclePhotoUploadQueryDto,
     @Body() body: Buffer,
   ) {
-    if (kind && kind !== 'photo')
-      throw new BadRequestError('Only photos can be uploaded — video uploads are not supported');
-    return this.verification.addPhoto(id as VehicleId, asBuffer(body), fileName, caption);
+    return this.verification.addPhoto(id as VehicleId, asBuffer(body), q.fileName, q.caption);
   }
 
   @Delete('vehicles/:id/media/:mediaId')
@@ -332,8 +336,8 @@ export class FleetController {
   @Get('crew')
   @RequirePermission(Permission.CREW_MANAGE)
   @ApiOperation({ summary: 'List crew' })
-  async listCrew(@Query('role') role?: string) {
-    return { items: await this.crew.list(role as never) };
+  async listCrew(@Query(zodQuery(ListCrewQuerySchema)) q: ListCrewQueryDto) {
+    return { items: await this.crew.list(q.role) };
   }
 
   @Post('crew/duties')
@@ -409,14 +413,8 @@ export class FleetController {
   @ApiOperation({
     summary: 'Approved rule exceptions, late / absent / unmarked attendance in a period',
   })
-  async crewCompliance(@Query('from') from: string, @Query('to') to: string) {
-    if (
-      !/^\d{4}-\d{2}-\d{2}$/.test(from ?? '') ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(to ?? '') ||
-      from > to
-    )
-      throw new BadRequestError('Give from/to as YYYY-MM-DD with from ≤ to');
-    return { items: await this.crewService.compliance(from, to) };
+  async crewCompliance(@Query(zodQuery(DateRangeQuerySchema)) q: DateRangeQuery) {
+    return { items: await this.crewService.compliance(q.from, q.to) };
   }
 
   @Get('crew/duties')

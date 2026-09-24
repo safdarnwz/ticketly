@@ -10,6 +10,7 @@ import {
   RequirePermission,
   UuidParam,
   zodBody,
+  zodQuery,
 } from '@http';
 import {
   BadRequestError,
@@ -24,21 +25,25 @@ import { BookingService } from '../application/services/booking.service';
 import { TripOpsService } from '../application/services/trip-ops.service';
 import {
   CancelSchema,
-  type CancelDto,
   CancelSeatsSchema,
-  type CancelSeatsDto,
-  ConfirmSchema,
-  type ConfirmDto,
-  HoldSchema,
-  type HoldDto,
-  PhoneBookingSchema,
-  type PhoneBookingDto,
-  ExtendHoldSchema,
-  type ExtendHoldDto,
-  SelfCancelSchema,
-  type SelfCancelDto,
   CancelTripSchema,
+  ConfirmSchema,
+  ContactMobileQuerySchema,
+  ExtendHoldSchema,
+  HoldSchema,
+  PhoneBookingSchema,
+  SelfCancelSchema,
+  StaffBookingSearchQuerySchema,
+  type CancelDto,
+  type CancelSeatsDto,
   type CancelTripDto,
+  type ConfirmDto,
+  type ContactMobileQueryDto,
+  type ExtendHoldDto,
+  type HoldDto,
+  type PhoneBookingDto,
+  type SelfCancelDto,
+  type StaffBookingSearchQueryDto,
 } from './dto/booking.dto';
 
 /**
@@ -161,16 +166,8 @@ export class BookingController {
     summary:
       'Staff search by PNR, mobile number (any format) or ticket number — at least one is required',
   })
-  async search(
-    @Query('pnr') pnr?: string,
-    @Query('mobile') mobile?: string,
-    @Query('ticket') ticket?: string,
-  ) {
-    if (!pnr && !mobile && !ticket)
-      throw new BadRequestError('Give a PNR, mobile number or ticket number');
-    if (mobile && mobile.replace(/\D/g, '').length < 10)
-      throw new BadRequestError('Enter a 10-digit mobile number');
-    return { items: await this.bookings.search({ pnr, mobile, ticket }) };
+  async search(@Query(zodQuery(StaffBookingSearchQuerySchema)) q: StaffBookingSearchQueryDto) {
+    return { items: await this.bookings.search(q) };
   }
 
   @Get('by-pnr/:pnr')
@@ -180,11 +177,13 @@ export class BookingController {
     summary:
       'Look up a booking by PNR + the contact mobile it was booked with (customer self-service)',
   })
-  async byPnr(@Param('pnr') pnr: string, @Query('mobile') mobile: string) {
+  async byPnr(
+    @Param('pnr') pnr: string,
+    @Query(zodQuery(ContactMobileQuerySchema)) { mobile }: ContactMobileQueryDto,
+  ) {
     // No tenant is bound on www.ticketly.com, and PNR is only unique PER
     // OPERATOR — `mobile` is REQUIRED, both to disambiguate and to prove the
     // caller actually owns this booking (see BookingRepository.getByPnr).
-    if (!mobile?.trim()) throw new BadRequestError('mobile is required');
     const booking = await this.bookings.getByPnr(pnr, mobile);
     const seats = await runAsTenant(booking.tenantId as TenantId, () =>
       this.bookings.loadSeats(booking.id),
@@ -210,8 +209,7 @@ export class BookingController {
   @ApiOperation({
     summary: "All of a phone number's bookings, across every operator (mobile self-service)",
   })
-  async mine(@Query('mobile') mobile: string) {
-    if (!mobile?.trim()) throw new BadRequestError('mobile is required');
+  async mine(@Query(zodQuery(ContactMobileQuerySchema)) { mobile }: ContactMobileQueryDto) {
     const bookings = await this.bookings.listByContactPhone(mobile);
     return { bookings };
   }

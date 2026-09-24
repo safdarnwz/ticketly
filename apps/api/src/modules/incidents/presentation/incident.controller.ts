@@ -1,48 +1,39 @@
 import { Body, Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Idempotent, RequirePermission, UuidParam, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  DateRangeQuerySchema,
+  Idempotent,
+  RequirePermission,
+  UuidParam,
+  zodBody,
+  zodQuery,
+  type DateRangeQuery,
+} from '@http';
 
 import { IncidentService } from '../application/incident.service';
-import { DELAY_CATEGORIES, INCIDENT_TYPES } from '../domain/incident-rules';
-
-const ReportSchema = z.object({
-  tripId: z.string().uuid().optional(),
-  type: z.enum(INCIDENT_TYPES),
-  description: z.string().trim().max(2000).optional(),
-  lat: z.number().optional(),
-  lng: z.number().optional(),
-  delayCategory: z.enum(DELAY_CATEGORIES).optional(),
-  delayMinutes: z.number().int().optional(),
-  diversionVia: z.string().trim().max(300).optional(),
-});
-const SosSchema = z.object({
-  kind: z.enum(['sos', 'medical', 'security', 'accident']).default('sos'),
-  lat: z.number().optional(),
-  lng: z.number().optional(),
-  description: z.string().trim().max(500).optional(),
-});
-const TransitionSchema = z.object({
-  status: z.enum(['acknowledged', 'resolved', 'closed']),
-  note: z.string().trim().max(2000).optional(),
-});
-const ItemSchema = z.object({
-  tripId: z.string().uuid().optional(),
-  description: z.string().trim().min(3).max(500),
-  seatNumber: z.string().trim().max(10).optional(),
-  storedAt: z.string().trim().max(120).optional(),
-});
-const ClaimSchema = z.object({
-  claimantName: z.string().trim().min(2).max(120),
-  pnr: z.string().trim().max(20).optional(),
-});
-const NoteSchema = z.object({
-  scope: z.enum(['dispatch', 'branch']),
-  note: z.string().trim().min(2).max(4000),
-  branchId: z.string().uuid().optional(),
-});
+import {
+  ClaimLostItemSchema,
+  HandoverNoteSchema,
+  HandoverNotesQuerySchema,
+  IncidentTransitionSchema,
+  ListIncidentsQuerySchema,
+  ListLostItemsQuerySchema,
+  LostItemSchema,
+  ReportIncidentSchema,
+  SosSchema,
+  type ClaimLostItemDto,
+  type HandoverNoteDto,
+  type HandoverNotesQueryDto,
+  type IncidentTransitionDto,
+  type ListIncidentsQueryDto,
+  type ListLostItemsQueryDto,
+  type LostItemDto,
+  type ReportIncidentDto,
+  type SosDto,
+} from './dto/incident.dto';
 
 /** Dispatch / branch console: incidents, lost & found, shift handover, dispatch report. */
 @ApiTags('incidents')
@@ -60,7 +51,7 @@ export class IncidentController {
     summary:
       'Report an incident: breakdown, delay (with category), diversion, medical, security, accident, complaint',
   })
-  report(@Body(zodBody(ReportSchema)) dto: z.infer<typeof ReportSchema>) {
+  report(@Body(zodBody(ReportIncidentSchema)) dto: ReportIncidentDto) {
     return this.svc.report(dto);
   }
 
@@ -69,8 +60,8 @@ export class IncidentController {
   @ApiOperation({
     summary: 'Incidents (status=active for open+acknowledged); critical first, with overdue flag',
   })
-  async list(@Query('status') status?: string, @Query('tripId') tripId?: string) {
-    return { items: await this.svc.list({ status, tripId }) };
+  async list(@Query(zodQuery(ListIncidentsQuerySchema)) q: ListIncidentsQueryDto) {
+    return { items: await this.svc.list(q) };
   }
 
   @Post('incidents/:id/status')
@@ -78,7 +69,7 @@ export class IncidentController {
   @RequirePermission(Permission.TRIP_MANAGE)
   transition(
     @UuidParam('id') id: string,
-    @Body(zodBody(TransitionSchema)) dto: z.infer<typeof TransitionSchema>,
+    @Body(zodBody(IncidentTransitionSchema)) dto: IncidentTransitionDto,
   ) {
     return this.svc.transition(id, dto.status, dto.note);
   }
@@ -91,10 +82,7 @@ export class IncidentController {
     summary:
       'Panic button from the crew app — one tap, location optional, alerts the emergency team at once',
   })
-  sos(
-    @UuidParam('tripId') tripId: string,
-    @Body(zodBody(SosSchema)) dto: z.infer<typeof SosSchema>,
-  ) {
+  sos(@UuidParam('tripId') tripId: string, @Body(zodBody(SosSchema)) dto: SosDto) {
     return this.svc.report({
       tripId,
       type: dto.kind,
@@ -107,14 +95,14 @@ export class IncidentController {
   @Post('lost-found')
   @HttpCode(201)
   @RequirePermission(Permission.TRIP_OPERATE)
-  logItem(@Body(zodBody(ItemSchema)) dto: z.infer<typeof ItemSchema>) {
+  logItem(@Body(zodBody(LostItemSchema)) dto: LostItemDto) {
     return this.svc.logItem(dto);
   }
 
   @Get('lost-found')
   @RequirePermission(Permission.TRIP_OPERATE)
-  async items(@Query('status') status?: string) {
-    return { items: await this.svc.listItems(status) };
+  async items(@Query(zodQuery(ListLostItemsQuerySchema)) q: ListLostItemsQueryDto) {
+    return { items: await this.svc.listItems(q.status) };
   }
 
   @Post('lost-found/:id/claim')
@@ -123,7 +111,7 @@ export class IncidentController {
   @ApiOperation({
     summary: 'Hand an item back — claimant must hold a PNR for the trip it was found on',
   })
-  claim(@UuidParam('id') id: string, @Body(zodBody(ClaimSchema)) dto: z.infer<typeof ClaimSchema>) {
+  claim(@UuidParam('id') id: string, @Body(zodBody(ClaimLostItemSchema)) dto: ClaimLostItemDto) {
     return this.svc.claimItem(id, dto);
   }
 
@@ -137,14 +125,14 @@ export class IncidentController {
   @Post('shift-notes')
   @HttpCode(201)
   @RequirePermission(Permission.TRIP_OPERATE)
-  addNote(@Body(zodBody(NoteSchema)) dto: z.infer<typeof NoteSchema>) {
+  addNote(@Body(zodBody(HandoverNoteSchema)) dto: HandoverNoteDto) {
     return this.svc.addNote(dto.scope, dto.note, dto.branchId);
   }
 
   @Get('shift-notes')
   @RequirePermission(Permission.TRIP_OPERATE)
-  async notes(@Query('scope') scope: string, @Query('branchId') branchId?: string) {
-    return { items: await this.svc.notes(scope === 'branch' ? 'branch' : 'dispatch', branchId) };
+  async notes(@Query(zodQuery(HandoverNotesQuerySchema)) q: HandoverNotesQueryDto) {
+    return { items: await this.svc.notes(q.scope, q.branchId) };
   }
 
   @Get('reports/dispatch')
@@ -153,7 +141,7 @@ export class IncidentController {
     summary:
       'On-time %, average delay, delayed trips, bus utilization, crew performance for a period',
   })
-  dispatch(@Query('from') from: string, @Query('to') to: string) {
-    return this.svc.dispatchReport(from, to);
+  dispatch(@Query(zodQuery(DateRangeQuerySchema)) q: DateRangeQuery) {
+    return this.svc.dispatchReport(q.from, q.to);
   }
 }

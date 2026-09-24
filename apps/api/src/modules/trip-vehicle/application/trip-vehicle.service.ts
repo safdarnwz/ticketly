@@ -12,9 +12,8 @@ import {
 } from '@kernel';
 import { EventBus } from '@messaging';
 
-import { FleetService } from '../../fleet/application/services/fleet.service';
-import { VehicleRepository } from '../../fleet/infrastructure/persistence/vehicle.repository';
-import { SeatLayoutRepository } from '../../master-data/infrastructure/persistence/seat-layout.repository';
+import { FleetService, VehicleRepository } from '../../fleet';
+import { SeatLayoutRepository } from '../../master-data';
 import { planVehicleSwap, windowsOverlap } from '../domain/vehicle-swap-plan';
 import { TripVehicleRepository } from '../infrastructure/trip-vehicle.repository';
 

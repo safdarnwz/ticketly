@@ -16,12 +16,12 @@
  *   npm run check:boundaries -- --update
  */
 import { readdirSync, readFileSync, statSync, writeFileSync, existsSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 
 const ROOT = join(__dirname, '..', 'apps', 'api', 'src', 'modules');
 const BASELINE = join(__dirname, 'boundaries.baseline.json');
-const DEEP =
-  /from '((?:\.\.\/)+)([a-z-]+)\/(domain|application|infrastructure|presentation)[^']*'/g;
+const RELATIVE_IMPORT = /from '(\.{1,2}\/[^']+)'/g;
+const LAYERS = new Set(['domain', 'application', 'infrastructure', 'presentation']);
 
 function files(dir: string): string[] {
   return readdirSync(dir).flatMap((n) => {
@@ -35,8 +35,12 @@ const found = new Set<string>();
 for (const f of files(ROOT)) {
   const rel = relative(ROOT, f);
   const own = rel.split('/')[0];
-  for (const m of readFileSync(f, 'utf8').matchAll(DEEP)) {
-    if (m[2] !== own) found.add(`${rel} -> ${m[2]}/${m[3]}`);
+  for (const m of readFileSync(f, 'utf8').matchAll(RELATIVE_IMPORT)) {
+    // Resolve the import against the importing file, then read the target's
+    // module and layer: modules/<module>/<layer>/...
+    const [mod, layer] = relative(ROOT, resolve(dirname(f), m[1])).split('/');
+    if (mod && mod !== own && !mod.startsWith('..') && LAYERS.has(layer ?? ''))
+      found.add(`${rel} -> ${mod}/${layer}`);
   }
 }
 

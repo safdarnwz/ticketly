@@ -1,34 +1,15 @@
 import { Body, Controller, Get, Post, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { z } from 'zod';
 
 import { ApiStandardErrors, Idempotent, Public, UuidParam, zodBody } from '@http';
 
-import { ConfirmConnectionSchema, type ConfirmConnectionDto } from './dto/connection.dto';
+import {
+  ConfirmConnectionSchema,
+  HoldConnectionSchema,
+  type ConfirmConnectionDto,
+  type HoldConnectionDto,
+} from './dto/connection.dto';
 import { ConnectingBookingService } from '../application/services/connecting-booking.service';
-
-const LegSchema = z.object({
-  tenantId: z.string().uuid(),
-  quoteId: z.string(),
-  seatNumbers: z.array(z.string()).min(1),
-  passengers: z
-    .array(
-      z.object({
-        seatNumber: z.string(),
-        fullName: z.string().min(1),
-        age: z.number().int().min(1).max(120).optional(),
-        gender: z.string().optional(),
-      }),
-    )
-    .min(1),
-});
-const HoldConnectionSchema = z.object({
-  leg1: LegSchema,
-  leg2: LegSchema,
-  contactPhone: z.string().min(6),
-  contactEmail: z.string().email().optional(),
-  customerId: z.string().uuid().optional(),
-});
 
 @ApiTags('connections')
 @Controller({ path: 'connections', version: '1' })
@@ -44,7 +25,7 @@ export class ConnectingBookingController {
     summary:
       'Hold seats on both legs of a connecting journey - rolls back leg 1 automatically if leg 2 is unavailable. Pay for each leg separately afterward (each stays its own operator own charge).',
   })
-  async hold(@Body(zodBody(HoldConnectionSchema)) dto: z.infer<typeof HoldConnectionSchema>) {
+  async hold(@Body(zodBody(HoldConnectionSchema)) dto: HoldConnectionDto) {
     return this.connections.holdConnection(dto);
   }
 

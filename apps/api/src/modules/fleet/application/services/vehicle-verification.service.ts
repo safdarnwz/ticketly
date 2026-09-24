@@ -20,7 +20,7 @@ import { Logger } from '@observability';
 
 import { FileService } from '../../../files/application/file.service';
 import { MAX_PHOTOS_PER_BUS } from '../../../files/domain/upload-policy';
-import { quotaExceeded } from '../../../tenancy/domain/entitlements';
+import { quotaExceeded } from '../../../tenancy';
 import {
   ALL_DOC_TYPES,
   DOC_LABELS,

@@ -13,14 +13,14 @@ import {
 import { EventBus } from '@messaging';
 import { Logger, Metrics } from '@observability';
 
-import { BookingRepository } from '../../../booking/infrastructure/persistence/booking.repository';
+import { BookingRepository } from '../../../booking';
 import {
   offlineRefundEntry,
   partnerCommissionReversalEntry,
   refundEntry,
-} from '../../../payment/domain/ledger';
-import { LedgerRepository } from '../../../payment/infrastructure/persistence/ledger.repository';
-import { PaymentGateway } from '../../../payment/infrastructure/gateways/gateway.interface';
+  LedgerRepository,
+  PaymentGateway,
+} from '../../../payment';
 import {
   assertRefundTransition,
   initialStatusFor,

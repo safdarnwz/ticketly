@@ -3,10 +3,9 @@ import { Injectable } from '@nestjs/common';
 import { UnitOfWork } from '@database';
 import { requireTenantId, type BookingId, type Json } from '@kernel';
 
-import { BookingRepository } from '../../../booking/infrastructure/persistence/booking.repository';
-import { RouteRepository } from '../../../master-data/infrastructure/persistence/route.repository';
-import { StopRepository } from '../../../master-data/infrastructure/persistence/stop.repository';
-import { TenantRepository } from '../../../tenancy/infrastructure/persistence/tenant.repository';
+import { BookingRepository } from '../../../booking';
+import { RouteRepository, StopRepository } from '../../../master-data';
+import { TenantRepository } from '../../../tenancy';
 import { PlatformSettingsRepository } from '../../../platform-settings';
 import { Mailer } from '../../../notification';
 import { computeGstInvoice } from '../../domain/gst-invoice';

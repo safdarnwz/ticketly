@@ -63,3 +63,6 @@ export const CreateAnnouncementSchema = z.object({
 export type CreateAnnouncementDto = z.infer<typeof CreateAnnouncementSchema>;
 
 export const PagesQuerySchema = z.object({ kind: z.enum(values(PageKind)).optional() });
+
+export const SetBannerActiveSchema = z.object({ isActive: z.boolean() });
+export type SetBannerActiveDto = z.infer<typeof SetBannerActiveSchema>;

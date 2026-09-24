@@ -3,11 +3,9 @@ import { Injectable } from '@nestjs/common';
 import { UnitOfWork } from '@database';
 import { AppError, ErrorCode, newId, runInNewContext, type TenantId } from '@kernel';
 
-import { BookingService } from '../../../booking/application/services/booking.service';
-import { BookingRepository } from '../../../booking/infrastructure/persistence/booking.repository';
-import { PaymentService } from '../../../payment/application/services/payment.service';
-import { TicketService } from '../../../tickets/application/services/ticket.service';
-import type { TestInstrument } from '../../../payment/domain/test-gateway';
+import { BookingService, BookingRepository } from '../../../booking';
+import { PaymentService, type TestInstrument } from '../../../payment';
+import { TicketService } from '../../../tickets';
 
 export interface HoldConnectionInput {
   leg1: {

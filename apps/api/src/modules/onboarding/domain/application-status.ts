@@ -15,7 +15,8 @@ import { DomainError, ErrorCode } from '@kernel';
  * application can never go back — the operator already exists; reversing
  * that is a tenant suspension, which keeps the audit trail honest.
  */
-export type ApplicationStatus = 'pending' | 'approved' | 'rejected';
+export const APPLICATION_STATUSES = ['pending', 'approved', 'rejected'] as const;
+export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 export type ReviewAction = 'approve' | 'reject' | 'hold' | 'reopen';
 
 const ACTIONS: Record<

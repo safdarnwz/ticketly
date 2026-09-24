@@ -1,17 +1,37 @@
-import { z } from 'zod';
 import { Body, Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Idempotent, RequirePermission, UuidParam, zodBody } from '@http';
-import { BadRequestError, type BookingId } from '@kernel';
+import {
+  ApiStandardErrors,
+  DateRangeQuerySchema,
+  Idempotent,
+  OptionalDateRangeQuerySchema,
+  RequirePermission,
+  UuidParam,
+  zodBody,
+  zodQuery,
+  type DateRangeQuery,
+  type OptionalDateRangeQuery,
+} from '@http';
+import { type BookingId } from '@kernel';
 
-import { AmendmentService } from '../../amendments/application/services/amendment.service';
+import {
+  AmendmentService,
+  NameCorrectionSchema,
+  PointChangeSchema,
+  SeatChangeSchema,
+  type NameCorrectionDto,
+  type PointChangeDto,
+  type SeatChangeDto,
+} from '../../amendments';
 import { AgentService } from '../application/services/agent.service';
 import {
+  AgentBookingsQuerySchema,
   AgentBookSchema,
   AgentCancelSchema,
   type AgentBookDto,
+  type AgentBookingsQueryDto,
   type AgentCancelDto,
 } from './dto/agent.dto';
 
@@ -40,31 +60,24 @@ export class AgentPortalController {
   }
 
   @Get('ledger')
-  async ledger(@Query('from') from?: string, @Query('to') to?: string) {
+  async ledger(@Query(zodQuery(OptionalDateRangeQuerySchema)) q: OptionalDateRangeQuery) {
     const me = await this.agents.me();
-    return { items: await this.agents.ledger(me.id, { from, to, limit: 500 }) };
+    return { items: await this.agents.ledger(me.id, { ...q, limit: 500 }) };
   }
 
   @Get('statement')
-  async statement(@Query('from') from: string, @Query('to') to: string) {
+  async statement(@Query(zodQuery(DateRangeQuerySchema)) q: DateRangeQuery) {
     const me = await this.agents.me();
-    return this.agents.statement(me.id, from, to);
+    return this.agents.statement(me.id, q.from, q.to);
   }
 
   @Get('bookings')
   @ApiOperation({
     summary: 'My bookings; optional from/to (YYYY-MM-DD) for today / week / month history',
   })
-  async bookings(
-    @Query('status') status?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
-    const ymd = /^\d{4}-\d{2}-\d{2}$/;
-    if ((from && !ymd.test(from)) || (to && !ymd.test(to)) || (from && to && from > to))
-      throw new BadRequestError('from/to must be YYYY-MM-DD with from ≤ to');
-    if (from || to) return { items: await this.agents.myBookingsInPeriod(from, to) };
-    return { items: await this.agents.myBookings({ status, limit: 200 }) };
+  async bookings(@Query(zodQuery(AgentBookingsQuerySchema)) q: AgentBookingsQueryDto) {
+    if (q.from || q.to) return { items: await this.agents.myBookingsInPeriod(q.from, q.to) };
+    return { items: await this.agents.myBookings({ status: q.status, limit: 200 }) };
   }
 
   @Post('bookings/:id/change-points')
@@ -73,15 +86,7 @@ export class AgentPortalController {
   @ApiOperation({ summary: 'Change boarding / dropping point on my booking (same fare stage)' })
   async changePoints(
     @UuidParam('id') id: string,
-    @Body(
-      zodBody(
-        z.object({
-          fromStopId: z.string().uuid().optional(),
-          toStopId: z.string().uuid().optional(),
-        }),
-      ),
-    )
-    dto: { fromStopId?: string; toStopId?: string },
+    @Body(zodBody(PointChangeSchema)) dto: PointChangeDto,
   ) {
     await this.agents.assertMyBooking(id as BookingId);
     return this.amendments.changePoints(id as BookingId, dto);
@@ -92,8 +97,7 @@ export class AgentPortalController {
   @Idempotent()
   async changeSeats(
     @UuidParam('id') id: string,
-    @Body(zodBody(z.object({ newSeatNumbers: z.array(z.string().trim().min(1)).min(1).max(10) })))
-    dto: { newSeatNumbers: string[] },
+    @Body(zodBody(SeatChangeSchema)) dto: SeatChangeDto,
   ) {
     await this.agents.assertMyBooking(id as BookingId);
     return this.amendments.changeSeats(id as BookingId, dto.newSeatNumbers);
@@ -104,15 +108,7 @@ export class AgentPortalController {
   @Idempotent()
   async correctName(
     @UuidParam('id') id: string,
-    @Body(
-      zodBody(
-        z.object({
-          seatNumber: z.string().trim().min(1),
-          fullName: z.string().trim().min(2).max(120),
-        }),
-      ),
-    )
-    dto: { seatNumber: string; fullName: string },
+    @Body(zodBody(NameCorrectionSchema)) dto: NameCorrectionDto,
   ) {
     await this.agents.assertMyBooking(id as BookingId);
     return this.amendments.correctName(id as BookingId, dto.seatNumber, dto.fullName);

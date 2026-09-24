@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import { OptionalDateRangeQuerySchema, searchText } from '@http';
+
+import { BOOKING_STATUSES } from '../../../booking';
+import { AGENT_STATUSES } from '../../domain/agent-account';
+
 const phone = z
   .string()
   .trim()
@@ -15,7 +20,6 @@ const pan = z
   .toUpperCase()
   .regex(/^[A-Z]{5}\d{4}[A-Z]$/, 'Invalid PAN');
 const paise = z.number().int('Amount must be whole paise').nonnegative();
-const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD');
 
 export const CreateAgentSchema = z
   .object({
@@ -101,9 +105,22 @@ export const AdjustmentSchema = z.object({
 });
 export type AdjustmentDto = z.infer<typeof AdjustmentSchema>;
 
-export const StatementQuerySchema = z
-  .object({ from: ymd, to: ymd })
-  .refine((q) => q.from <= q.to, { message: '"from" must be on or before "to"' });
+export const ListAgentsQuerySchema = z.object({
+  status: z.enum(AGENT_STATUSES).optional(),
+  search: searchText.optional(),
+});
+export type ListAgentsQueryDto = z.infer<typeof ListAgentsQuerySchema>;
+
+export const AgentLedgerQuerySchema = OptionalDateRangeQuerySchema.and(
+  z.object({ limit: z.coerce.number().int().min(1).max(1000).optional() }),
+);
+export type AgentLedgerQueryDto = z.infer<typeof AgentLedgerQuerySchema>;
+
+/** My bookings: a date window (history), or else the latest 200 in a status. */
+export const AgentBookingsQuerySchema = OptionalDateRangeQuerySchema.and(
+  z.object({ status: z.enum(BOOKING_STATUSES).optional() }),
+);
+export type AgentBookingsQueryDto = z.infer<typeof AgentBookingsQuerySchema>;
 
 export const AgentBookSchema = z.object({
   quoteId: z.string().min(1),

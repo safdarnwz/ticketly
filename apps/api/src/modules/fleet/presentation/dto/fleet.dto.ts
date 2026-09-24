@@ -1,4 +1,13 @@
 import { z } from 'zod';
+import { fileNameQuery, searchText } from '@http';
+import {
+  FUEL_TYPES,
+  MAINTENANCE_KINDS,
+  PERMIT_TYPES,
+  VEHICLE_STATUSES,
+} from '../../domain/vehicle';
+import { ATTENDANCE_STATUSES, CREW_ROLES } from '../../domain/crew';
+import { UPLOADABLE_DOC_TYPES, VERIFICATION_STATUSES } from '../../domain/vehicle-verification';
 
 const uuid = z.string().uuid();
 const localDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
@@ -10,7 +19,7 @@ const vehicleDetails = {
   manufactureYear: z.number().int().min(1980).max(2100).optional(),
   chassisNo: z.string().trim().max(17).optional(),
   engineNo: z.string().trim().max(30).optional(),
-  fuelType: z.enum(['diesel', 'cng', 'electric', 'petrol', 'hybrid', 'lng']).optional(),
+  fuelType: z.enum(FUEL_TYPES).optional(),
   bodyColor: z.string().trim().max(30).optional(),
   registeredOwner: z.string().trim().max(120).optional(),
   registrationState: z.string().trim().max(40).optional(),
@@ -65,7 +74,7 @@ export const OptionalNoteSchema = z
 export type OptionalNoteDto = z.infer<typeof OptionalNoteSchema>;
 
 export const CreateCrewSchema = z.object({
-  role: z.enum(['driver', 'conductor', 'attendant']),
+  role: z.enum(CREW_ROLES),
   fullName: z.string().min(1).max(120),
   phone: z.string().max(20).optional(),
   licenceNo: z.string().max(40).optional(),
@@ -92,7 +101,7 @@ export const AssignDutySchema = z
   });
 export type AssignDutyDto = z.infer<typeof AssignDutySchema>;
 
-export const AttendanceSchema = z.object({ status: z.enum(['present', 'absent']) });
+export const AttendanceSchema = z.object({ status: z.enum(ATTENDANCE_STATUSES) });
 export const CrewRulesSchema = z.object({
   minRestMinutes: z.number().int().min(60).max(1440),
   maxDailyDrivingMinutes: z.number().int().min(60).max(1440),
@@ -101,7 +110,7 @@ export const CrewRulesSchema = z.object({
 });
 
 export const MaintenanceLogSchema = z.object({
-  kind: z.enum(['service', 'repair', 'inspection']),
+  kind: z.enum(MAINTENANCE_KINDS),
   description: z.string().min(1).max(500),
   odometerKm: z.number().int().min(0).optional(),
   costMinor: z.number().int().min(0).default(0),
@@ -116,12 +125,12 @@ export const BulkImportVehiclesSchema = z.object({
 export type BulkImportVehiclesDto = z.infer<typeof BulkImportVehiclesSchema>;
 
 export const VehicleStatusSchema = z.object({
-  status: z.enum(['active', 'maintenance', 'retired']),
+  status: z.enum(VEHICLE_STATUSES),
 });
 export type VehicleStatusDto = z.infer<typeof VehicleStatusSchema>;
 
 export const VehiclePermitTypeSchema = z.object({
-  permitType: z.enum(['aitp', 'stage_carriage', 'state_tourist_permit', 'contract_carriage']),
+  permitType: z.enum(PERMIT_TYPES),
 });
 export type VehiclePermitTypeDto = z.infer<typeof VehiclePermitTypeSchema>;
 
@@ -129,3 +138,37 @@ export const VehiclePhotoNoteSchema = z.object({
   serviceNote: z.string().trim().max(500).optional(),
 });
 export type VehiclePhotoNoteDto = z.infer<typeof VehiclePhotoNoteSchema>;
+
+export const ListVehiclesQuerySchema = z.object({
+  status: z.enum(VEHICLE_STATUSES).optional(),
+  verification: z.enum(VERIFICATION_STATUSES).optional(),
+  search: searchText.optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+});
+export type ListVehiclesQueryDto = z.infer<typeof ListVehiclesQuerySchema>;
+
+/** Platform verification queue. */
+export const VerificationQueueQuerySchema = z.object({
+  verification: z.enum(VERIFICATION_STATUSES).optional(),
+  search: searchText.optional(),
+});
+export type VerificationQueueQueryDto = z.infer<typeof VerificationQueueQuerySchema>;
+
+/** Raw-body upload of one compliance document. */
+export const VehicleDocumentUploadQuerySchema = z.object({
+  docType: z.enum(UPLOADABLE_DOC_TYPES),
+  fileName: fileNameQuery,
+});
+export type VehicleDocumentUploadQueryDto = z.infer<typeof VehicleDocumentUploadQuerySchema>;
+
+/** Raw-body upload of one bus photo (videos are not supported). */
+export const VehiclePhotoUploadQuerySchema = z.object({
+  kind: z.literal('photo').default('photo'),
+  fileName: fileNameQuery,
+  caption: z.string().trim().max(200).optional(),
+});
+export type VehiclePhotoUploadQueryDto = z.infer<typeof VehiclePhotoUploadQuerySchema>;
+
+export const ListCrewQuerySchema = z.object({ role: z.enum(CREW_ROLES).optional() });
+export type ListCrewQueryDto = z.infer<typeof ListCrewQuerySchema>;

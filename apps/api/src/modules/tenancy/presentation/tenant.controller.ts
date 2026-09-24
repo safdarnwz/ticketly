@@ -4,7 +4,14 @@ import { FileService } from '../../files/application/file.service';
 import { BadRequestError } from '@kernel';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, RequirePermission, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  FileUploadQuerySchema,
+  RequirePermission,
+  zodBody,
+  zodQuery,
+  type FileUploadQuery,
+} from '@http';
 import { requireTenantId } from '@kernel';
 
 import {
@@ -24,7 +31,7 @@ import { TenantRepository } from '../infrastructure/persistence/tenant.repositor
 import { PayoutRepository } from '../infrastructure/persistence/payout.repository';
 import { UnitOfWork } from '@database';
 import { getUserId } from '@kernel';
-import { DEFAULT_REFUND_POLICY } from '../../booking/domain/refund-policy';
+import { DEFAULT_REFUND_POLICY } from '../../booking';
 
 /**
  * The operator's own settings surface (tenant-scoped). Unlike the admin
@@ -184,7 +191,10 @@ export class TenantController {
     summary:
       'Upload the operator logo as raw bytes (PNG/JPG/WEBP/SVG ≤ 2 MB) → {operator}/branding/logo.<ext> in object storage',
   })
-  async uploadLogo(@Query('fileName') fileName: string | undefined, @Body() body: Buffer) {
+  async uploadLogo(
+    @Query(zodQuery(FileUploadQuerySchema)) { fileName }: FileUploadQuery,
+    @Body() body: Buffer,
+  ) {
     if (!Buffer.isBuffer(body) || body.length === 0)
       throw new BadRequestError(
         'Send the logo as raw bytes with Content-Type: application/octet-stream',

@@ -1,17 +1,12 @@
 import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { z } from 'zod';
 
 import { Permission } from '@contracts';
 import { ApiStandardErrors, Idempotent, RequirePermission, UuidParam, zodBody } from '@http';
 import type { TripId, VehicleId } from '@kernel';
 
 import { TripVehicleService } from '../application/trip-vehicle.service';
-
-const ChangeVehicleSchema = z.object({
-  vehicleId: z.string().uuid(),
-  reason: z.string().trim().min(5).max(300),
-});
+import { ChangeVehicleSchema, type ChangeVehicleDto } from './dto/trip-vehicle.dto';
 
 @ApiTags('trips')
 @ApiBearerAuth('bearer')
@@ -30,7 +25,7 @@ export class TripVehicleController {
   })
   async change(
     @UuidParam('tripId') tripId: string,
-    @Body(zodBody(ChangeVehicleSchema)) dto: z.infer<typeof ChangeVehicleSchema>,
+    @Body(zodBody(ChangeVehicleSchema)) dto: ChangeVehicleDto,
   ) {
     return this.svc.changeVehicle(tripId as TripId, {
       vehicleId: dto.vehicleId as VehicleId,

@@ -17,7 +17,8 @@
  * Integer minor units throughout; no I/O, so every rule is unit-tested.
  */
 
-export type AgentStatus = 'pending' | 'active' | 'suspended' | 'rejected';
+export const AGENT_STATUSES = ['pending', 'active', 'suspended', 'rejected'] as const;
+export type AgentStatus = (typeof AGENT_STATUSES)[number];
 export type BillingMode = 'prepaid' | 'postpaid';
 
 export type AgentLedgerKind =

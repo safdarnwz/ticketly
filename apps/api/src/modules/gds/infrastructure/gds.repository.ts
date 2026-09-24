@@ -4,6 +4,7 @@ import { currentTransaction, registerConstraintMessages, UnitOfWork } from '@dat
 import { newId, requireTenantId, type BookingId } from '@kernel';
 
 import { signedAmount, type AgentLedgerKind } from '../../agents/domain/agent-account';
+import { type BillingMode, type PartnerKind, type PartnerStatus } from '../domain/gds-partner';
 
 registerConstraintMessages({
   gds_partners_code_key: 'A GDS partner with this code already exists',
@@ -14,10 +15,10 @@ export interface GdsPartner {
   id: string;
   code: string;
   name: string;
-  kind: 'ota' | 'agent';
-  status: 'pending' | 'active' | 'suspended';
+  kind: PartnerKind;
+  status: PartnerStatus;
   statusReason: string | null;
-  billingMode: 'prepaid' | 'postpaid';
+  billingMode: BillingMode;
   creditLimitMinor: number;
   balanceMinor: number;
   defaultCommissionPct: number;
@@ -31,7 +32,7 @@ interface Row {
   id: string;
   code: string;
   name: string;
-  kind: 'ota' | 'agent';
+  kind: PartnerKind;
   status: GdsPartner['status'];
   status_reason: string | null;
   billing_mode: GdsPartner['billingMode'];
@@ -89,8 +90,8 @@ export class GdsRepository {
   async createPartner(i: {
     code: string;
     name: string;
-    kind: 'ota' | 'agent';
-    billingMode: 'prepaid' | 'postpaid';
+    kind: PartnerKind;
+    billingMode: BillingMode;
     creditLimitMinor: number;
     defaultCommissionPct: number;
     contactEmail?: string;
@@ -118,7 +119,7 @@ export class GdsRepository {
     );
     return id;
   }
-  async listPartners(status?: string): Promise<GdsPartner[]> {
+  async listPartners(status?: PartnerStatus): Promise<GdsPartner[]> {
     return (
       await this.run('gds.listPartners', (q) =>
         q<Row>(

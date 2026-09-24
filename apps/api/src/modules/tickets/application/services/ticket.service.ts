@@ -4,12 +4,11 @@ import { AppConfig } from '@config';
 import { AppError, ErrorCode, type BookingId } from '@kernel';
 import { hmacSha256 } from '@security';
 
-import { BookingRepository } from '../../../booking/infrastructure/persistence/booking.repository';
-import { TripRepository } from '../../../scheduling/infrastructure/persistence/trip.repository';
-import { RouteRepository } from '../../../master-data/infrastructure/persistence/route.repository';
-import { StopRepository } from '../../../master-data/infrastructure/persistence/stop.repository';
-import { TenantRepository } from '../../../tenancy/infrastructure/persistence/tenant.repository';
-import { TrackingService } from '../../../tracking/application/services/tracking.service';
+import { BookingRepository } from '../../../booking';
+import { TripRepository } from '../../../scheduling';
+import { RouteRepository, StopRepository } from '../../../master-data';
+import { TenantRepository } from '../../../tenancy';
+import { TrackingService } from '../../../tracking';
 import {
   signingInput,
   encodeToken,

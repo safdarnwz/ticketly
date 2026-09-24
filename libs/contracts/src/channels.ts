@@ -23,3 +23,10 @@ export const CHANNEL_LABELS: Record<BookingChannelValue, string> = {
   ota: 'OTA Partner',
   backoffice: 'Back Office',
 };
+
+/**
+ * The channel families an operator can close per trip ("stop OTA sales, keep
+ * the website selling"). Every booking channel maps to exactly one family.
+ */
+export const SALES_CHANNEL_FAMILIES = ['direct_web', 'agent', 'ota', 'phone'] as const;
+export type SalesChannelFamily = (typeof SALES_CHANNEL_FAMILIES)[number];

@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Put } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { z } from 'zod';
 
 import { ApiStandardErrors, RequirePlatformAdmin, zodBody } from '@http';
 import { AppError, ErrorCode, getUserId } from '@kernel';
@@ -11,13 +10,7 @@ import {
   MaintenanceGuard,
   type MaintenanceState,
 } from './guards/maintenance.guard';
-
-const Schema = z.object({
-  enabled: z.boolean(),
-  message: z.string().trim().max(300).optional(),
-  /** Expected end, ISO date-time — shown to users and used for Retry-After. */
-  until: z.string().datetime({ offset: true }).optional(),
-});
+import { MaintenanceModeSchema, type MaintenanceModeDto } from './dto/maintenance.dto';
 
 @ApiTags('admin-platform')
 @ApiBearerAuth('bearer')
@@ -40,7 +33,7 @@ export class MaintenanceController {
     summary:
       'Turn maintenance mode on/off (writes return 503 + Retry-After; reads, webhooks and platform admins keep working)',
   })
-  async set(@Body(zodBody(Schema)) dto: z.infer<typeof Schema>) {
+  async set(@Body(zodBody(MaintenanceModeSchema)) dto: MaintenanceModeDto) {
     if (dto.enabled && dto.until && Date.parse(dto.until) <= Date.now()) {
       throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
         message: 'The expected end time must be in the future',

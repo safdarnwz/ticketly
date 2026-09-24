@@ -13,17 +13,13 @@ import {
 } from '@kernel';
 import { EventBus } from '@messaging';
 
-import { BookingRepository } from '../../../booking/infrastructure/persistence/booking.repository';
-import { SeatLockRepository } from '../../../booking/infrastructure/persistence/seat-lock.repository';
-import { InventoryRepository } from '../../../scheduling/infrastructure/persistence/inventory.repository';
-import { TripRepository } from '../../../scheduling/infrastructure/persistence/trip.repository';
-import { PricingService } from '../../../pricing/application/services/pricing.service';
+import { BookingRepository, SeatLockRepository, ticketCode } from '../../../booking';
+import { InventoryRepository, TripRepository } from '../../../scheduling';
+import { PricingService, FareRepository } from '../../../pricing';
 import { quoteReschedule } from '../../domain/reschedule-policy';
 import { planSeatChange, SeatChangeError } from '../../domain/seat-change';
 import { PointChangeError, planPointChange, sameFare } from '../../domain/point-change';
 import { checkNameCorrection } from '../../domain/name-correction';
-import { FareRepository } from '../../../pricing/infrastructure/persistence/fare.repository';
-import { ticketCode } from '../../../booking/domain/pnr';
 
 /**
  * ============================================================================

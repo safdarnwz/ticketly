@@ -10,11 +10,12 @@ import {
   RequirePlatformAdmin,
   UuidParam,
   zodBody,
+  zodQuery,
 } from '@http';
 import { BadRequestError, getContext, type TenantId } from '@kernel';
 
 import { AuditService } from '../../iam';
-import { BookingRepository } from '../../booking/infrastructure/persistence/booking.repository';
+import { BookingRepository } from '../../booking';
 import { PayoutRepository } from '../infrastructure/persistence/payout.repository';
 import {
   ProvisionTenantSchema,
@@ -23,6 +24,7 @@ import {
   type SuspendTenantDto,
 } from './dto/tenant.dto';
 import {
+  AuditLogQuerySchema,
   ChangePlanSchema,
   FeatureKeySchema,
   MarkPayoutsSentSchema,
@@ -31,6 +33,7 @@ import {
   ReasonSchema,
   SetFeatureSchema,
   SetPlanActiveSchema,
+  type AuditLogQueryDto,
   type ChangePlanDto,
   type MarkPayoutsSentDto,
   type PlanDto,
@@ -210,12 +213,8 @@ export class TenantAdminController {
   @ApiOperation({
     summary: 'Cross-tenant audit trail — who did what, when (security/money-significant actions)',
   })
-  async auditLog(
-    @Query('tenantId') tenantId?: string,
-    @Query('action') action?: string,
-    @Query('resourceType') resourceType?: string,
-  ) {
-    return { entries: await this.audit.list({ tenantId, action, resourceType }) };
+  async auditLog(@Query(zodQuery(AuditLogQuerySchema)) q: AuditLogQueryDto) {
+    return { entries: await this.audit.list(q) };
   }
 
   /**

@@ -14,9 +14,8 @@ import {
 import { PricingEngine } from '../../domain/pricing-engine';
 import { CouponRepository } from '../../infrastructure/persistence/coupon.repository';
 import { FareRepository } from '../../infrastructure/persistence/fare.repository';
-import { InventoryRepository } from '../../../scheduling/infrastructure/persistence/inventory.repository';
-import { TripRepository } from '../../../scheduling/infrastructure/persistence/trip.repository';
-import { RouteRepository } from '../../../master-data/infrastructure/persistence/route.repository';
+import { InventoryRepository, TripRepository } from '../../../scheduling';
+import { RouteRepository } from '../../../master-data';
 import { adjustmentPct, applyAdjustment } from '../../domain/pricing-rules';
 
 export interface Quote {

@@ -23,6 +23,10 @@
 export const CATEGORIES = ['adult', 'child', 'senior', 'student', 'defence', 'disabled'] as const;
 export type Category = (typeof CATEGORIES)[number];
 
+/** Categories an operator can attach a concession to (every one but a full-fare adult). */
+export const CONCESSION_CATEGORIES = ['child', 'senior', 'student', 'defence', 'disabled'] as const;
+export type ConcessionCategory = (typeof CONCESSION_CATEGORIES)[number];
+
 export interface ConcessionRule {
   category: Category;
   discountPct: number; // 0–100

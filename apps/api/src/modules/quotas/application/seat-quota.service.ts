@@ -10,7 +10,7 @@ import {
   type TripId,
 } from '@kernel';
 
-import { TripRepository } from '../../scheduling/infrastructure/persistence/trip.repository';
+import { TripRepository } from '../../scheduling';
 import {
   QuotaRuleError,
   quotaReleaseAt,

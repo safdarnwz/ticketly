@@ -1,5 +1,4 @@
 import { Body, Controller, Delete, Get, Post, Put, HttpCode } from '@nestjs/common';
-import { z } from 'zod';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
@@ -10,49 +9,25 @@ import { BadRequestError, getUserId, requireTenantId, type StopId, type TripId }
 import { CouponRepository } from '../infrastructure/persistence/coupon.repository';
 import {
   AddFareRuleSchema,
-  type AddFareRuleDto,
   CreateCouponSchema,
-  type CreateCouponDto,
   CreateFarePlanSchema,
-  type CreateFarePlanDto,
   CreatePricingPolicySchema,
-  type CreatePricingPolicyDto,
   QuoteSchema,
-  type QuoteDto,
+  RouteRulesSchema,
   SeatFareOverrideSchema,
+  TripFareAdjustmentSchema,
+  type AddFareRuleDto,
+  type CreateCouponDto,
+  type CreateFarePlanDto,
+  type CreatePricingPolicyDto,
+  type QuoteDto,
+  type RouteRulesDto,
   type SeatFareOverrideDto,
+  type TripFareAdjustmentDto,
 } from './dto/pricing.dto';
 import { FareRepository } from '../infrastructure/persistence/fare.repository';
 import { PricingService } from '../application/services/pricing.service';
 import { validateBounds, validatePeakWindows } from '../domain/pricing-rules';
-
-const RouteRulesSchema = z.object({
-  floorMinor: z.number().int().nonnegative().nullable(),
-  ceilingMinor: z.number().int().positive().nullable(),
-  peakWindows: z
-    .array(
-      z.object({
-        startMinute: z.number().int().min(0).max(1439),
-        endMinute: z.number().int().min(0).max(1439),
-        pct: z.number().min(-50).max(100),
-        label: z.string().max(40).optional(),
-      }),
-    )
-    .max(12),
-});
-const TripAdjSchema = z
-  .object({
-    pct: z
-      .number()
-      .min(-50)
-      .max(100)
-      .refine((n) => n !== 0, 'Use null to clear')
-      .nullable(),
-    reason: z.string().trim().min(5).max(200).optional(),
-  })
-  .refine((d) => d.pct === null || !!d.reason, {
-    message: 'A reason is required for a fare change',
-  });
 
 @ApiTags('pricing')
 @ApiBearerAuth('bearer')
@@ -249,7 +224,7 @@ export class PricingController {
   })
   async routeRules(
     @UuidParam('routeId') routeId: string,
-    @Body(zodBody(RouteRulesSchema)) dto: z.infer<typeof RouteRulesSchema>,
+    @Body(zodBody(RouteRulesSchema)) dto: RouteRulesDto,
   ) {
     const problem =
       validateBounds(dto.floorMinor, dto.ceilingMinor) ?? validatePeakWindows(dto.peakWindows);
@@ -266,7 +241,7 @@ export class PricingController {
   })
   async tripAdjustment(
     @UuidParam('tripId') tripId: string,
-    @Body(zodBody(TripAdjSchema)) dto: z.infer<typeof TripAdjSchema>,
+    @Body(zodBody(TripFareAdjustmentSchema)) dto: TripFareAdjustmentDto,
   ) {
     await this.fares.setTripAdjustment(
       tripId,

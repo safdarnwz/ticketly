@@ -58,16 +58,16 @@ import {
 import { UnitOfWork } from '@database';
 
 import { AppModule } from '../apps/api/src/app.module';
-import { ServiceRepository } from '../apps/api/src/modules/scheduling/infrastructure/persistence/service.repository';
-import { TripRepository } from '../apps/api/src/modules/scheduling/infrastructure/persistence/trip.repository';
-import { RouteRepository } from '../apps/api/src/modules/master-data/infrastructure/persistence/route.repository';
-import { SeatLayoutRepository } from '../apps/api/src/modules/master-data/infrastructure/persistence/seat-layout.repository';
-import { VehicleTypeRepository } from '../apps/api/src/modules/master-data/infrastructure/persistence/vehicle-type.repository';
-import { PricingService } from '../apps/api/src/modules/pricing/application/services/pricing.service';
-import { BookingService } from '../apps/api/src/modules/booking/application/services/booking.service';
-import { PaymentService } from '../apps/api/src/modules/payment/application/services/payment.service';
+import { ServiceRepository, TripRepository } from '../apps/api/src/modules/scheduling';
+import {
+  RouteRepository,
+  SeatLayoutRepository,
+  VehicleTypeRepository,
+} from '../apps/api/src/modules/master-data';
+import { PricingService } from '../apps/api/src/modules/pricing';
+import { BookingService } from '../apps/api/src/modules/booking';
+import { PaymentService, SettlementService } from '../apps/api/src/modules/payment';
 import { RefundService } from '../apps/api/src/modules/refunds/application/services/refund.service';
-import { SettlementService } from '../apps/api/src/modules/payment/application/services/settlement.service';
 import { InvoiceService } from '../apps/api/src/modules/invoicing/application/services/invoice.service';
 import { JourneySearchService } from '../apps/api/src/modules/search';
 import { ConnectingBookingService } from '../apps/api/src/modules/connections/application/services/connecting-booking.service';

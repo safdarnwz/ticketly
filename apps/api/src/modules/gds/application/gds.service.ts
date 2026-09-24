@@ -21,15 +21,20 @@ import {
   checkFunds,
   spendableMinor,
 } from '../../agents/domain/agent-account';
-import { BookingService } from '../../booking/application/services/booking.service';
-import { BookingRepository } from '../../booking/infrastructure/persistence/booking.repository';
-import { PaymentService } from '../../payment/application/services/payment.service';
-import { PricingService } from '../../pricing/application/services/pricing.service';
-import { InventoryRepository } from '../../scheduling/infrastructure/persistence/inventory.repository';
+import { BookingService, BookingRepository } from '../../booking';
+import { PaymentService } from '../../payment';
+import { PricingService } from '../../pricing';
+import { InventoryRepository } from '../../scheduling';
 import { SearchService } from '../../search/application/services/search.service';
 import { generateKey } from '../domain/gds-keys';
 import { WebhookDeliveryService, WebhookRepository } from '../../webhooks';
 import { GdsRepository, type GdsPartner } from '../infrastructure/gds.repository';
+import {
+  type AgreementStatus,
+  type BillingMode,
+  type PartnerStatus,
+  type SettablePartnerStatus,
+} from '../domain/gds-partner';
 
 export interface PartnerCtx {
   partner: GdsPartner;
@@ -367,7 +372,7 @@ export class GdsService {
   createPartner(i: Parameters<GdsRepository['createPartner']>[0]) {
     return this.gds.createPartner(i);
   }
-  listPartners(status?: string) {
+  listPartners(status?: PartnerStatus) {
     return this.gds.listPartners(status);
   }
   async partnerDetail(id: string) {
@@ -380,7 +385,7 @@ export class GdsService {
       ledger: await this.gds.ledger(id, 100),
     };
   }
-  async setStatus(id: string, status: 'active' | 'suspended', reason?: string) {
+  async setStatus(id: string, status: SettablePartnerStatus, reason?: string) {
     if (status === 'suspended' && (reason?.trim().length ?? 0) < 10)
       throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
         message: 'A reason of at least 10 characters is required to suspend',
@@ -391,7 +396,7 @@ export class GdsService {
   async setTerms(
     id: string,
     i: {
-      billingMode?: 'prepaid' | 'postpaid';
+      billingMode?: BillingMode;
       creditLimitMinor?: number;
       defaultCommissionPct?: number;
     },
@@ -457,7 +462,7 @@ export class GdsService {
   partnersForOperator() {
     return this.gds.agreementsOfTenant();
   }
-  async setAgreement(partnerId: string, status: 'active' | 'paused', commissionPct: number) {
+  async setAgreement(partnerId: string, status: AgreementStatus, commissionPct: number) {
     const p = await this.gds.getPartner(partnerId);
     if (!p || p.status !== 'active') throw new NotFoundError('GDS partner', partnerId);
     if (!(commissionPct >= 0 && commissionPct <= 30))

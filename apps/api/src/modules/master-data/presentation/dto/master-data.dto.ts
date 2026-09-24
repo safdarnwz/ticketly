@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { searchText } from '@http';
+import { ROUTE_STATUSES } from '../../domain/route';
 
 /** Shared master-data request schemas. Zod = validation + inferred types. */
 
@@ -92,3 +94,9 @@ export const DuplicateRouteSchema = z.object({
   name: z.string().trim().min(2).max(160),
 });
 export type DuplicateRouteDto = z.infer<typeof DuplicateRouteSchema>;
+
+export const CitySearchQuerySchema = z.object({ q: searchText.default('') });
+export type CitySearchQueryDto = z.infer<typeof CitySearchQuerySchema>;
+
+export const ListRoutesQuerySchema = z.object({ status: z.enum(ROUTE_STATUSES).optional() });
+export type ListRoutesQueryDto = z.infer<typeof ListRoutesQuerySchema>;

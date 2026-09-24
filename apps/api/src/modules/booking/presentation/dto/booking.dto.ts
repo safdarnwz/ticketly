@@ -96,3 +96,26 @@ export type SelfCancelDto = z.infer<typeof SelfCancelSchema>;
 
 export const CancelTripSchema = z.object({ reason: z.string().trim().min(3).max(300) });
 export type CancelTripDto = z.infer<typeof CancelTripSchema>;
+
+/** A contact mobile in any format (spaces, +91, dashes) — at least 10 digits. */
+const mobileQuery = z
+  .string()
+  .trim()
+  .max(20)
+  .refine((v) => v.replace(/\D/g, '').length >= 10, 'Enter a 10-digit mobile number');
+
+/** Self-service lookups prove ownership with the mobile the booking was made with. */
+export const ContactMobileQuerySchema = z.object({ mobile: mobileQuery });
+export type ContactMobileQueryDto = z.infer<typeof ContactMobileQuerySchema>;
+
+/** Staff search: by PNR, mobile or ticket number — at least one. */
+export const StaffBookingSearchQuerySchema = z
+  .object({
+    pnr: z.string().trim().min(1).max(20).optional(),
+    mobile: mobileQuery.optional(),
+    ticket: z.string().trim().min(1).max(40).optional(),
+  })
+  .refine((q) => q.pnr || q.mobile || q.ticket, {
+    message: 'Give a PNR, mobile number or ticket number',
+  });
+export type StaffBookingSearchQueryDto = z.infer<typeof StaffBookingSearchQuerySchema>;

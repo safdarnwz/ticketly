@@ -3,7 +3,15 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { FastifyReply } from 'fastify';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Public, RequirePermission, UuidParam } from '@http';
+import {
+  ApiStandardErrors,
+  DownloadQuerySchema,
+  Public,
+  RequirePermission,
+  UuidParam,
+  zodQuery,
+  type DownloadQuery,
+} from '@http';
 import { UnitOfWork } from '@database';
 import { NotFoundError, runAsTenant, type TenantId } from '@kernel';
 
@@ -53,12 +61,15 @@ export class FileController {
     summary:
       "A short-lived link to one of this operator's files (CDN for public, signed for private)",
   })
-  async url(@UuidParam('id') id: string, @Query('download') download?: string) {
+  async url(
+    @UuidParam('id') id: string,
+    @Query(zodQuery(DownloadQuerySchema)) { download }: DownloadQuery,
+  ) {
     const meta = await this.files.meta(id);
     if (!meta) throw new NotFoundError('File', id);
-    const url = await this.files.urlFor(meta, { download: download === '1' });
+    const url = await this.files.urlFor(meta, { download });
     return {
-      url: url ?? `/api/v1/files/${meta.id}${download === '1' ? '?download=1' : ''}`,
+      url: url ?? `/api/v1/files/${meta.id}${download ? '?download=1' : ''}`,
       fileName: meta.fileName,
       mimeType: meta.mimeType,
       sizeBytes: meta.sizeBytes,
@@ -73,12 +84,12 @@ export class FileController {
   })
   async open(
     @UuidParam('id') id: string,
-    @Query('download') download: string | undefined,
+    @Query(zodQuery(DownloadQuerySchema)) { download }: DownloadQuery,
     @Res() reply: FastifyReply,
   ): Promise<void> {
     const meta = await this.files.meta(id);
     if (!meta) throw new NotFoundError('File', id);
-    const url = await this.files.urlFor(meta, { download: download === '1' });
+    const url = await this.files.urlFor(meta, { download });
     if (url) {
       void reply.header('Cache-Control', 'no-store').redirect(url, 302);
       return;
@@ -86,7 +97,7 @@ export class FileController {
     sendStoredFile(
       reply,
       { fileName: meta.fileName, mimeType: meta.mimeType, content: await this.files.read(meta) },
-      download === '1',
+      download,
     );
   }
 }

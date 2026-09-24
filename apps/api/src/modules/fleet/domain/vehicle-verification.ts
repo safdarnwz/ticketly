@@ -15,7 +15,14 @@
  *     and what only the SUPER ADMIN may do.
  */
 
-export type VerificationStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'suspended';
+export const VERIFICATION_STATUSES = [
+  'draft',
+  'submitted',
+  'approved',
+  'rejected',
+  'suspended',
+] as const;
+export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number];
 export type DocVerification = 'pending' | 'verified' | 'rejected';
 
 export const REQUIRED_DOC_TYPES = [
@@ -38,6 +45,14 @@ export const OPTIONAL_DOC_TYPES = [
   'photo_interior',
 ] as const;
 export const ALL_DOC_TYPES: readonly string[] = [...REQUIRED_DOC_TYPES, ...OPTIONAL_DOC_TYPES];
+/** Documents uploaded as files (photos go through the media endpoint). */
+export const UPLOADABLE_DOC_TYPES = [
+  ...REQUIRED_DOC_TYPES,
+  'passenger_insurance',
+  'speed_governor',
+  'fire_safety',
+  'gps_certificate',
+] as const;
 
 export const DOC_LABELS: Record<string, string> = {
   rc: 'Registration Certificate (RC)',

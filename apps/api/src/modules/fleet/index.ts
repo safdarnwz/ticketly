@@ -1,1 +1,2 @@
-export * from './fleet.module';
+export * from './application/services/fleet.service';
+export * from './infrastructure/persistence/vehicle.repository';

@@ -20,12 +20,8 @@ import { EventBus } from '@messaging';
 import { Logger } from '@observability';
 import { PasswordHasher } from '@security';
 
-import {
-  BookingService,
-  type HoldRequest,
-} from '../../../booking/application/services/booking.service';
-import { BookingRepository } from '../../../booking/infrastructure/persistence/booking.repository';
-import { PaymentService } from '../../../payment/application/services/payment.service';
+import { BookingService, BookingRepository, type HoldRequest } from '../../../booking';
+import { PaymentService } from '../../../payment';
 import { SeatQuotaService } from '../../../quotas/application/seat-quota.service';
 import { User, RoleRepository, UserRepository } from '../../../iam';
 import {

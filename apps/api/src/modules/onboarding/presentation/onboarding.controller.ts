@@ -2,16 +2,28 @@ import { Body, Controller, Get, Param, Post, Query, HttpCode } from '@nestjs/com
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Public, RateLimit, RequirePermission, UuidParam, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  Public,
+  RateLimit,
+  RequirePermission,
+  UuidParam,
+  zodBody,
+  zodQuery,
+} from '@http';
 import { getUserId } from '@kernel';
 
 import { OnboardingService } from '../application/services/onboarding.service';
 import {
+  ApplicationDocumentQuerySchema,
   ApplyOperatorSchema,
-  type ApplyOperatorDto,
   ApproveSchema,
-  type ApproveDto,
+  ListApplicationsQuerySchema,
   RejectSchema,
+  type ApplicationDocumentQueryDto,
+  type ApplyOperatorDto,
+  type ApproveDto,
+  type ListApplicationsQueryDto,
   type RejectDto,
 } from './dto/onboarding.dto';
 
@@ -39,11 +51,10 @@ export class OnboardingController {
     summary: 'Upload one application document as raw bytes (PDF/JPG/PNG/DOC/DOCX ≤ 5 MB)',
   })
   async uploadApplicationDocument(
-    @Query('docType') docType: string,
-    @Query('fileName') fileName: string | undefined,
+    @Query(zodQuery(ApplicationDocumentQuerySchema)) q: ApplicationDocumentQueryDto,
     @Body() body: Buffer,
   ) {
-    return this.onboarding.uploadApplicationDocument(docType, body, fileName);
+    return this.onboarding.uploadApplicationDocument(q.docType, body, q.fileName);
   }
 
   @ApiBearerAuth('bearer')
@@ -67,8 +78,8 @@ export class OnboardingController {
   @Get('admin/operator-applications')
   @RequirePermission(Permission.PLATFORM_OPERATORS)
   @ApiOperation({ summary: 'List operator applications (super/platform admin)' })
-  async list(@Query('status') status?: 'pending' | 'approved' | 'rejected') {
-    return { applications: await this.onboarding.list(status) };
+  async list(@Query(zodQuery(ListApplicationsQuerySchema)) q: ListApplicationsQueryDto) {
+    return { applications: await this.onboarding.list(q.status) };
   }
 
   @ApiBearerAuth('bearer')

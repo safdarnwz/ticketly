@@ -26,7 +26,11 @@ export const INCIDENT_TYPES = [
 ] as const;
 export type IncidentType = (typeof INCIDENT_TYPES)[number];
 export type Severity = 'critical' | 'high' | 'normal';
-export type IncidentStatus = 'open' | 'acknowledged' | 'resolved' | 'closed';
+export const INCIDENT_STATUSES = ['open', 'acknowledged', 'resolved', 'closed'] as const;
+export type IncidentStatus = (typeof INCIDENT_STATUSES)[number];
+/** Handover notes are kept for the dispatch desk, or for one branch. */
+export const HANDOVER_SCOPES = ['dispatch', 'branch'] as const;
+export type HandoverScope = (typeof HANDOVER_SCOPES)[number];
 export const DELAY_CATEGORIES = [
   'traffic',
   'breakdown',
@@ -111,7 +115,8 @@ export function isOverdue(
 
 /* ─────────── lost & found ─────────── */
 
-export type LostItemStatus = 'found' | 'claimed' | 'disposed';
+export const LOST_ITEM_STATUSES = ['found', 'claimed', 'disposed'] as const;
+export type LostItemStatus = (typeof LOST_ITEM_STATUSES)[number];
 export const UNCLAIMED_DISPOSAL_DAYS = 30;
 
 /** A claim must come from a passenger of THAT trip (PNR check) and only while the item is held. */

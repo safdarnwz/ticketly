@@ -1,26 +1,21 @@
 import { Body, Controller, Get, Post, Query, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, RequirePermission, UuidParam, zodBody } from '@http';
+import { ApiStandardErrors, RequirePermission, UuidParam, zodBody, zodQuery } from '@http';
 import { type BookingId, type SupportTicketId, type UserId } from '@kernel';
 
 import { SupportService } from '../application/services/support.service';
-import type { TicketStatus } from '../domain/ticket-state';
-
-const OpenTicketSchema = z.object({
-  subject: z.string().min(1).max(160),
-  body: z.string().min(1).max(4000),
-  category: z.enum(['refund', 'booking', 'payment', 'general']).default('general'),
-  priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
-  bookingId: z.string().uuid().optional(),
-});
-const ReplySchema = z.object({
-  authorKind: z.enum(['customer', 'agent', 'system']).default('customer'),
-  body: z.string().min(1).max(4000),
-});
-const TransitionSchema = z.object({ status: z.enum(['open', 'pending', 'resolved', 'closed']) });
+import {
+  ListSupportTicketsQuerySchema,
+  OpenSupportTicketSchema,
+  SupportReplySchema,
+  SupportTransitionSchema,
+  type ListSupportTicketsQueryDto,
+  type OpenSupportTicketDto,
+  type SupportReplyDto,
+  type SupportTransitionDto,
+} from './dto/support.dto';
 
 @ApiTags('support')
 @ApiBearerAuth('bearer')
@@ -33,7 +28,7 @@ export class SupportController {
   @HttpCode(201)
   @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'Open a support ticket' })
-  async open(@Body(zodBody(OpenTicketSchema)) dto: z.infer<typeof OpenTicketSchema>) {
+  async open(@Body(zodBody(OpenSupportTicketSchema)) dto: OpenSupportTicketDto) {
     return this.support.open({
       subject: dto.subject,
       body: dto.body,
@@ -46,11 +41,11 @@ export class SupportController {
   @Get()
   @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'List support tickets' })
-  async list(@Query('status') status?: string, @Query('customerId') customerId?: string) {
+  async list(@Query(zodQuery(ListSupportTicketsQuerySchema)) q: ListSupportTicketsQueryDto) {
     return {
       tickets: await this.support.list({
-        status: status as TicketStatus | undefined,
-        customerId: customerId as UserId | undefined,
+        status: q.status,
+        customerId: q.customerId as UserId | undefined,
       }),
     };
   }
@@ -68,7 +63,7 @@ export class SupportController {
   @ApiOperation({ summary: 'Reply on a ticket' })
   async reply(
     @UuidParam('id') id: string,
-    @Body(zodBody(ReplySchema)) dto: z.infer<typeof ReplySchema>,
+    @Body(zodBody(SupportReplySchema)) dto: SupportReplyDto,
   ) {
     return this.support.reply(id as SupportTicketId, dto);
   }
@@ -79,7 +74,7 @@ export class SupportController {
   @ApiOperation({ summary: 'Change a ticket status' })
   async transition(
     @UuidParam('id') id: string,
-    @Body(zodBody(TransitionSchema)) dto: z.infer<typeof TransitionSchema>,
+    @Body(zodBody(SupportTransitionSchema)) dto: SupportTransitionDto,
   ) {
     return this.support.transition(id as SupportTicketId, dto.status);
   }

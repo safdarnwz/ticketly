@@ -13,7 +13,7 @@ import {
 import { expandRecurrence, type RecurrenceRule } from '../../domain/recurrence';
 import { MaterializationService } from './materialization.service';
 import { ServiceRepository } from '../../infrastructure/persistence/service.repository';
-import { RouteRepository } from '../../../master-data/infrastructure/persistence/route.repository';
+import { RouteRepository } from '../../../master-data';
 
 /**
  * Service lifecycle: create a recurring service, activate it (which triggers an

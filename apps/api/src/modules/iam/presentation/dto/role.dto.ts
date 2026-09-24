@@ -19,3 +19,13 @@ export const UpdateRolePermissionsSchema = z.object({
   permissions: z.array(z.string().min(1)),
 });
 export type UpdateRolePermissionsDto = z.infer<typeof UpdateRolePermissionsSchema>;
+
+/** Copy a role, with all its permissions, under a new code and name. */
+export const DuplicateRoleSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .regex(/^[a-z][a-z0-9_]{2,40}$/),
+  name: z.string().trim().min(2).max(80),
+});
+export type DuplicateRoleDto = z.infer<typeof DuplicateRoleSchema>;
