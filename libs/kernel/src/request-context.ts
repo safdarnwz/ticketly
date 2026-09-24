@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { InternalError } from './errors';
+import { AppError, InternalError } from './errors';
+import { ErrorCode } from './error-codes';
 import { newId, type TenantId, type UserId, type Uuid } from './ids';
 import type { UnknownRecord } from './types';
 
@@ -127,7 +128,14 @@ export function requireContext(): RequestContext {
 export function requireTenantId(): TenantId {
   const ctx = requireContext();
   if (!ctx.tenantId) {
-    throw new InternalError('Tenant scope required but no tenant is bound to this context');
+    // A caller reached an operator-scoped operation without an operator
+    // (e.g. a platform admin token, or a host that resolved to no tenant).
+    // That's a client error, not a server fault.
+    throw new AppError(ErrorCode.TENANT_NOT_RESOLVED, 400, {
+      message:
+        'This operation belongs to an operator — call it from the operator console (or send X-Tenant-Id)',
+      severity: 'info',
+    });
   }
   return ctx.tenantId;
 }

@@ -3,7 +3,14 @@ import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Public, RequirePermission, RequirePlatformAdmin, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  Public,
+  RequirePermission,
+  RequirePlatformAdmin,
+  zodBody,
+  zodQuery,
+} from '@http';
 
 import { I18nService } from '../application/services/i18n.service';
 
@@ -19,6 +26,12 @@ const RateSchema = z.object({
   asOf: z.string().datetime(),
 });
 
+const ConvertQuerySchema = z.object({
+  amountMinor: z.coerce.number().int().nonnegative(),
+  from: z.string().trim().length(3).toUpperCase(),
+  to: z.string().trim().length(3).toUpperCase(),
+});
+
 @ApiTags('i18n')
 @Controller({ path: 'i18n', version: '1' })
 @ApiStandardErrors()
@@ -28,12 +41,8 @@ export class I18nController {
   @Get('convert')
   @Public()
   @ApiOperation({ summary: 'Convert an amount (minor units) between currencies' })
-  async convert(
-    @Query('amountMinor') amountMinor: string,
-    @Query('from') from: string,
-    @Query('to') to: string,
-  ) {
-    return this.i18n.convert(Number(amountMinor), from, to);
+  async convert(@Query(zodQuery(ConvertQuerySchema)) query: z.infer<typeof ConvertQuerySchema>) {
+    return this.i18n.convert(query.amountMinor, query.from, query.to);
   }
 
   @ApiBearerAuth('bearer')

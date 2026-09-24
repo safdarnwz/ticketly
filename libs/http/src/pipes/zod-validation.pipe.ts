@@ -40,6 +40,11 @@ export function zodBody<T>(schema: ZodSchema<T, ZodTypeDef, unknown>): ZodValida
   return new ZodValidationPipe(schema);
 }
 
+/** Same pipe for a whole query object: `@Query(zodQuery(ConvertQuerySchema))`. */
+export function zodQuery<T>(schema: ZodSchema<T, ZodTypeDef, unknown>): ZodValidationPipe {
+  return new ZodValidationPipe(schema);
+}
+
 export function toValidationError(error: ZodError): ValidationError {
   const issues: FieldIssue[] = error.issues.map((issue) => ({
     path: issue.path.length > 0 ? issue.path.map(segment).join('') : '(root)',
