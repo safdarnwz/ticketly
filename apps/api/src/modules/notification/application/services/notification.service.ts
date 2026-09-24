@@ -8,7 +8,7 @@ import { renderTemplate } from '../../domain/template';
 import { NotificationTemplateRepository } from '../../infrastructure/persistence/notification-template.repository';
 import { ProviderRegistry } from '../../infrastructure/provider-registry';
 import type { Channel } from '../../infrastructure/provider.interface';
-import { PlatformSettingsRepository } from '../../../platform-settings';
+import { PlatformBillingService } from '../../../platform-settings';
 
 /**
  * Notification engine.
@@ -21,7 +21,7 @@ import { PlatformSettingsRepository } from '../../../platform-settings';
  * requires). A provider soft-failure marks the row `failed`; the outbox retries.
  *
  * SMS and WhatsApp are billed to the operator per message (₹0.07 / ₹0.10 plus
- * GST — see PlatformSettingsRepository.chargeNotification) — ONLY on a
+ * GST — see PlatformBillingService.chargeNotification) — ONLY on a
  * successful send, never a failed one. Email is free.
  */
 @Injectable()
@@ -32,7 +32,7 @@ export class NotificationService {
     private readonly db: DatabaseService,
     private readonly templates: NotificationTemplateRepository,
     private readonly providers: ProviderRegistry,
-    private readonly platformSettings: PlatformSettingsRepository,
+    private readonly billing: PlatformBillingService,
     logger: Logger,
   ) {
     this.log = logger.forContext('NotificationService');
@@ -124,11 +124,7 @@ export class NotificationService {
       // we're past it, but a duplicate dispatch of the same event is still
       // possible) can never double-bill for the same message.
       if (template.channel === 'sms' || template.channel === 'whatsapp') {
-        await this.platformSettings.chargeNotification(
-          input.tenantId,
-          template.channel,
-          inserted.id,
-        );
+        await this.billing.chargeNotification(input.tenantId, template.channel, inserted.id);
       }
     }
   }

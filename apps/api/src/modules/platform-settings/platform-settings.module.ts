@@ -4,7 +4,9 @@ import { CacheModule } from '@cache';
 import { DatabaseModule } from '@database';
 
 import { PlatformSettingsRepository } from './infrastructure/platform-settings.repository';
+import { PlatformBillingService } from './application/platform-billing.service';
 import { PlatformPoliciesService } from './application/platform-policies.service';
+import { PlatformChargeRepository } from './infrastructure/platform-charge.repository';
 
 /**
  * Deliberately standalone — depends on nothing but DatabaseModule/CacheModule,
@@ -17,13 +19,27 @@ import { PlatformPoliciesService } from './application/platform-policies.service
  * import either back — so they're left as-is; this module exists purely to
  * break the one cycle that mattered.)
  *
+ * Platform charges (`PlatformChargeRepository`, `PlatformBillingService`)
+ * live here too: settlement, promotions, fleet and notifications all write
+ * them.
+ *
  * `PlatformPoliciesService` (password policy, admin IP allowlist, GST slabs,
  * agent credit and retention policies) lives here for the same reason: IAM,
  * agents and the worker all read it.
  */
 @Module({
   imports: [DatabaseModule, CacheModule],
-  providers: [PlatformSettingsRepository, PlatformPoliciesService],
-  exports: [PlatformSettingsRepository, PlatformPoliciesService],
+  providers: [
+    PlatformSettingsRepository,
+    PlatformChargeRepository,
+    PlatformBillingService,
+    PlatformPoliciesService,
+  ],
+  exports: [
+    PlatformSettingsRepository,
+    PlatformChargeRepository,
+    PlatformBillingService,
+    PlatformPoliciesService,
+  ],
 })
 export class PlatformSettingsModule {}

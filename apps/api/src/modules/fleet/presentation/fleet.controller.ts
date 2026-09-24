@@ -60,7 +60,7 @@ import { VehicleVerificationService } from '../application/services/vehicle-veri
 import { FleetLogsRepository } from '../infrastructure/persistence/logs.repository';
 import { FleetService } from '../application/services/fleet.service';
 import { VehicleRepository } from '../infrastructure/persistence/vehicle.repository';
-import { PlatformSettingsRepository } from '../../platform-settings';
+import { PlatformBillingService } from '../../platform-settings';
 
 @ApiTags('fleet')
 @ApiBearerAuth('bearer')
@@ -74,7 +74,7 @@ export class FleetController {
     private readonly crewService: CrewService,
     private readonly logs: FleetLogsRepository,
     private readonly uow: UnitOfWork,
-    private readonly platformSettings: PlatformSettingsRepository,
+    private readonly billing: PlatformBillingService,
     private readonly verification: VehicleVerificationService,
   ) {}
 
@@ -93,7 +93,7 @@ export class FleetController {
       const vehicleId = await this.verification.create(dto as never);
       // Same transaction as the registration itself — a rolled-back create
       // never leaves an orphaned charge (unique index on the charge too).
-      await this.platformSettings.chargePerBusFee(tenantId, vehicleId);
+      await this.billing.chargePerBusFee(tenantId, vehicleId);
       return vehicleId;
     });
     return { id, verificationStatus: 'draft' };
@@ -139,7 +139,7 @@ export class FleetController {
     return this.verification.bulkCreate((dto?.rows ?? []) as never, (row) =>
       this.uow.run({ name: 'fleet.bulkVehicle', tenantId }, async () => {
         const vehicleId = await this.verification.create(row);
-        await this.platformSettings.chargePerBusFee(tenantId, vehicleId);
+        await this.billing.chargePerBusFee(tenantId, vehicleId);
       }),
     );
   }

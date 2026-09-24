@@ -4,6 +4,7 @@ import { UnitOfWork } from '@database';
 import { newId, NotFoundError, requireTenantId, type LocalDate } from '@kernel';
 import { EventBus } from '@messaging';
 
+import { PlatformChargeRepository } from '../../../platform-settings';
 import { settlementEntry } from '../../domain/ledger';
 import { LedgerRepository } from '../../infrastructure/persistence/ledger.repository';
 import { SettlementRepository } from '../../infrastructure/persistence/settlement.repository';
@@ -30,6 +31,7 @@ import { SettlementRepository } from '../../infrastructure/persistence/settlemen
 export class SettlementService {
   constructor(
     private readonly settlements: SettlementRepository,
+    private readonly charges: PlatformChargeRepository,
     private readonly ledger: LedgerRepository,
     private readonly uow: UnitOfWork,
     private readonly events: EventBus,
@@ -57,7 +59,7 @@ export class SettlementService {
     // Outstanding one-time platform charges (the per-bus fee, an earlier
     // shortfall, …) are netted against THIS payout, whichever period they were
     // charged in — they are not period-bound like booking commission.
-    const chargesMinor = await this.settlements.pendingChargesMinor(tenantId);
+    const chargesMinor = await this.charges.pendingTotalMinor(tenantId);
 
     // operator_payable already nets booking commission and refund clawbacks.
     // A settlement never goes negative, but what it cannot cover is not
@@ -83,11 +85,12 @@ export class SettlementService {
       // Only the call that actually inserted may add the shortfall, or the
       // same debt would be counted twice.
       if (wonId && shortfall > 0)
-        await this.settlements.addShortfallCharge(
+        await this.charges.add({
           tenantId,
-          shortfall,
-          `Refunds exceeded gross for ${periodFrom} to ${periodTo} — carried to next settlement`,
-        );
+          kind: 'settlement_shortfall',
+          amountMinor: shortfall,
+          description: `Refunds exceeded gross for ${periodFrom} to ${periodTo} — carried to next settlement`,
+        });
       return wonId;
     });
     if (!inserted) {
@@ -115,7 +118,9 @@ export class SettlementService {
           }),
         );
       }
-      await this.settlements.settleChargesAccountedFor(tenantId, settlementId);
+      // generate() accounted for every charge pending before the settlement
+      // (deducted, or carried in a new shortfall charge); settle exactly those.
+      await this.charges.settlePendingBefore(tenantId, settlementId);
       await this.settlements.markPaid(tenantId, settlementId);
 
       // Hand off to disbursement — only a non-zero payout needs a bank transfer.

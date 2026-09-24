@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { DatabaseService } from '@database';
-import { newId, type LocalDate, type TenantId } from '@kernel';
+import { type LocalDate, type TenantId } from '@kernel';
 
 import { LedgerAccounts } from '../../domain/ledger';
 
@@ -19,7 +19,7 @@ export interface SettlementForUpdate {
   status: string;
 }
 
-/** settlements, and the platform_charges netted against them. */
+/** settlements — an operator's periodic payout, computed from the ledger. */
 @Injectable()
 export class SettlementRepository {
   constructor(private readonly db: DatabaseService) {}
@@ -75,17 +75,6 @@ export class SettlementRepository {
     };
   }
 
-  /** Sum of the operator's not-yet-settled one-time platform charges. */
-  async pendingChargesMinor(tenantId: TenantId): Promise<number> {
-    const row = await this.db.queryOne<{ total: string }>(
-      `SELECT coalesce(sum(amount_minor), 0) AS total
-         FROM platform_charges WHERE tenant_id = $1 AND status = 'pending'`,
-      [tenantId],
-      { name: 'settlement.pendingCharges', primary: true },
-    );
-    return Number(row?.total ?? 0);
-  }
-
   /**
    * Insert a draft settlement; returns its id, or null when a settlement for
    * the same (tenant, period) already exists (a concurrent generate won).
@@ -120,16 +109,6 @@ export class SettlementRepository {
     return row?.id ?? null;
   }
 
-  /** A pending charge carrying money the operator still owes into the next settlement. */
-  async addShortfallCharge(tenantId: TenantId, amountMinor: number, description: string) {
-    await this.db.execute_(
-      `INSERT INTO platform_charges (id, tenant_id, kind, amount_minor, status, description)
-       VALUES ($1, $2, 'settlement_shortfall', $3, 'pending', $4)`,
-      [newId(), tenantId, amountMinor, description],
-      { name: 'settlement.shortfallCharge', primary: true },
-    );
-  }
-
   async lockForUpdate(
     tenantId: TenantId,
     settlementId: string,
@@ -153,23 +132,6 @@ export class SettlementRepository {
           status: row.status,
         }
       : null;
-  }
-
-  /**
-   * Mark as settled every charge that was pending when this settlement was
-   * generated — generate() accounted for all of them (deducted from gross, or
-   * carried into a new shortfall charge). The shortfall charge itself was
-   * written in the same transaction as the settlement (same created_at), so
-   * the strict `<` leaves it pending for the next settlement, as it must.
-   */
-  async settleChargesAccountedFor(tenantId: TenantId, settlementId: string): Promise<void> {
-    await this.db.execute_(
-      `UPDATE platform_charges SET status = 'settled', settlement_id = $2
-        WHERE tenant_id = $1 AND status = 'pending'
-          AND created_at < (SELECT created_at FROM settlements WHERE id = $2)`,
-      [tenantId, settlementId],
-      { name: 'settlement.settleCharges', primary: true },
-    );
   }
 
   async markPaid(tenantId: TenantId, settlementId: string): Promise<void> {

@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@database';
 
 import { MasterDataModule } from '../master-data/master-data.module';
+import { PlatformSettingsModule } from '../platform-settings/platform-settings.module';
 import { PromotionController } from './presentation/promotion.controller';
 import { PromotionRepository } from './infrastructure/persistence/promotion.repository';
 import { PromotionService } from './application/services/promotion.service';
@@ -17,7 +18,7 @@ import { PromotionService } from './application/services/promotion.service';
  * billing pipeline.
  */
 @Module({
-  imports: [DatabaseModule, MasterDataModule],
+  imports: [DatabaseModule, MasterDataModule, PlatformSettingsModule],
   controllers: [PromotionController],
   providers: [PromotionRepository, PromotionService],
   exports: [PromotionRepository, PromotionService],

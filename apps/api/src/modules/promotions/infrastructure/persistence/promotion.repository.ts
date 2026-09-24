@@ -27,6 +27,8 @@ export interface RoutePromotion {
   autoRenew: boolean;
   createdAt: Date;
   version: number;
+  /** The platform charge that bills it, once active. */
+  platformChargeId: string | null;
 }
 
 @Injectable()
@@ -122,7 +124,7 @@ export class PromotionRepository {
       { name: 'promotion.activeForRoutes', bypassRls: true },
       async (scope) =>
         scope.client.query<Row>(
-          `SELECT id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, status, auto_renew, created_at, version
+          `SELECT id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, status, auto_renew, created_at, version, platform_charge_id
            FROM route_promotions
           WHERE route_id = ANY($1::uuid[]) AND status = 'active' AND starts_at <= $2 AND ends_at > $2`,
           [routeIds, now],
@@ -162,6 +164,19 @@ export class PromotionRepository {
     return id;
   }
 
+  /** Is the route already promoted (active or awaiting payment) during any part of the window? */
+  async hasOverlap(routeId: RouteId, startsAt: Date, endsAt: Date): Promise<boolean> {
+    const row = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM route_promotions
+        WHERE tenant_id = $1 AND route_id = $2 AND status IN ('pending_payment','active')
+          AND starts_at < $4 AND ends_at > $3
+        LIMIT 1`,
+      [requireTenantId(), routeId, startsAt, endsAt],
+      { name: 'promotion.hasOverlap', primary: true },
+    );
+    return !!row;
+  }
+
   async listForTenant(status?: string): Promise<RoutePromotion[]> {
     const params: unknown[] = [requireTenantId()];
     let where = 'tenant_id = $1';
@@ -170,7 +185,7 @@ export class PromotionRepository {
       where += ` AND status = $${params.length}`;
     }
     const rows = await this.db.query<Row>(
-      `SELECT id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, status, auto_renew, created_at, version
+      `SELECT id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, status, auto_renew, created_at, version, platform_charge_id
          FROM route_promotions WHERE ${where} ORDER BY created_at DESC`,
       params,
       { name: 'promotion.listForTenant' },
@@ -180,7 +195,7 @@ export class PromotionRepository {
 
   async findForUpdate(id: string): Promise<RoutePromotion | null> {
     const row = await this.db.queryOne<Row>(
-      `SELECT id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, status, auto_renew, created_at, version
+      `SELECT id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, status, auto_renew, created_at, version, platform_charge_id
          FROM route_promotions WHERE tenant_id = $1 AND id = $2 FOR UPDATE`,
       [requireTenantId(), id],
       { name: 'promotion.findForUpdate', primary: true },
@@ -240,7 +255,7 @@ export class PromotionRepository {
               paused_at = NULL,
               version = version + 1
         WHERE tenant_id = $1 AND id = $2 AND version = $3 AND status = 'paused'
-        RETURNING id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, status, auto_renew, created_at, version`,
+        RETURNING id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, status, auto_renew, created_at, version, platform_charge_id`,
       [requireTenantId(), id, expectedVersion],
       { name: 'promotion.resume', primary: true },
     );
@@ -271,6 +286,7 @@ interface Row {
   auto_renew: boolean;
   created_at: Date;
   version: number;
+  platform_charge_id: string | null;
 }
 function map(r: Row): RoutePromotion {
   return {
@@ -287,5 +303,6 @@ function map(r: Row): RoutePromotion {
     autoRenew: r.auto_renew,
     createdAt: r.created_at,
     version: r.version,
+    platformChargeId: r.platform_charge_id,
   };
 }

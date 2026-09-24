@@ -12,15 +12,18 @@ import {
   validateDateRange,
   dateRangeToWindow,
   computeBucketPrice,
+  earlyCancelCredit,
   type PromotionBillingCycle,
 } from '../../domain/promotion-pricing';
 import { RouteRepository } from '../../../master-data';
+import { PlatformChargeRepository } from '../../../platform-settings';
 
 @Injectable()
 export class PromotionService {
   constructor(
     private readonly promotions: PromotionRepository,
     private readonly routes: RouteRepository,
+    private readonly charges: PlatformChargeRepository,
     private readonly uow: UnitOfWork,
   ) {}
 
@@ -125,7 +128,7 @@ export class PromotionService {
 
     const groupId = newId();
 
-    return this.uow.run({ name: 'promotion.purchase', tenantId }, async (scope) => {
+    return this.uow.run({ name: 'promotion.purchase', tenantId }, async () => {
       // A route already promoted during any part of this SAME window
       // blocks the purchase — not a blanket "any active promotion ever"
       // check, since date-ranges are now explicit and non-overlapping
@@ -134,14 +137,7 @@ export class PromotionService {
       // festival week two months from now). Overlap, not mere existence,
       // is what actually double-sells the same search-result slot.
       for (const routeId of uniqueRouteIds) {
-        const overlap = await scope.client.query<{ id: string }>(
-          `SELECT id FROM route_promotions
-            WHERE tenant_id = $1 AND route_id = $2 AND status IN ('pending_payment','active')
-              AND starts_at < $4 AND ends_at > $3
-            LIMIT 1`,
-          [tenantId, routeId, window.startsAt, window.endsAt],
-        );
-        if (overlap.rows[0]) {
+        if (await this.promotions.hasOverlap(routeId, window.startsAt, window.endsAt)) {
           throw new AppError(ErrorCode.COMMON_CONFLICT, 409, {
             message: `Route ${routeId} already has a promotion overlapping these dates`,
           });
@@ -168,18 +164,14 @@ export class PromotionService {
       // already use, rather than building a parallel billing pipeline for
       // what is, from the settlement engine's point of view, just another
       // kind of platform charge against the operator.
-      const chargeRow = await scope.client.query<{ id: string }>(
-        `INSERT INTO platform_charges (id, tenant_id, kind, amount_minor, currency, status, description)
-         VALUES ($1,$2,'route_promotion',$3,$4,'pending',$5) RETURNING id`,
-        [
-          newId(),
-          tenantId,
-          totalMinor,
-          currency,
-          `Route promotion — ${days} day(s), ${input.startDate} to ${input.endDate}, ${uniqueRouteIds.length} route${uniqueRouteIds.length > 1 ? 's' : ''}`,
-        ],
-      );
-      const platformChargeId = chargeRow.rows[0].id;
+      const platformChargeId = await this.charges.add({
+        tenantId,
+        kind: 'route_promotion',
+        amountMinor: totalMinor,
+        currency,
+        description: `Route promotion — ${days} day(s), ${input.startDate} to ${input.endDate}, ${uniqueRouteIds.length} route${uniqueRouteIds.length > 1 ? 's' : ''}`,
+      });
+      if (!platformChargeId) throw new Error('Promotion charge was not recorded');
 
       // Activated immediately — platform_charges are settled against a
       // FUTURE payout, not paid upfront by card, so there's no separate
@@ -189,12 +181,7 @@ export class PromotionService {
       // startsAt simply means the row is active but not yet SHOWING in
       // search (see SearchService.activePromotionsForRoutes' own
       // starts_at <= now check) — no separate "scheduled" status needed.
-      for (const id of promotionIds) {
-        await scope.client.query(
-          `UPDATE route_promotions SET status = 'active', platform_charge_id = $2, version = version + 1 WHERE id = $1`,
-          [id, platformChargeId],
-        );
-      }
+      for (const id of promotionIds) await this.promotions.activate(id, platformChargeId, 0);
 
       return { groupId, promotionIds, totalMinor, currency, days };
     });
@@ -227,21 +214,8 @@ export class PromotionService {
    */
   async cancel(id: string): Promise<{ adjustedMinor: number }> {
     const tenantId = requireTenantId();
-    return this.uow.run({ name: 'promotion.cancel', tenantId }, async (scope) => {
-      const row = await scope.client.query<{
-        id: string;
-        status: string;
-        price_minor: string;
-        starts_at: Date;
-        ends_at: Date;
-        billing_cycle: PromotionBillingCycle | null;
-        version: number;
-        platform_charge_id: string | null;
-      }>(
-        `SELECT id, status, price_minor, starts_at, ends_at, billing_cycle, version, platform_charge_id FROM route_promotions WHERE tenant_id = $1 AND id = $2 FOR UPDATE`,
-        [tenantId, id],
-      );
-      const promo = row.rows[0];
+    return this.uow.run({ name: 'promotion.cancel', tenantId }, async () => {
+      const promo = await this.promotions.findForUpdate(id);
       if (!promo)
         throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Promotion not found' });
       if (promo.status !== 'active' && promo.status !== 'pending_payment') {
@@ -251,77 +225,42 @@ export class PromotionService {
       }
 
       let adjustedMinor = 0;
-      if (promo.status === 'active' && promo.platform_charge_id) {
-        const now = new Date();
-        // Total days from the actual purchased window, not
-        // cycleDays(billing_cycle) — billing_cycle is null for a
-        // mixed-bucket purchase (e.g. "1 week + 5 days"), and even for a
-        // single-bucket purchase the ACTUAL window is the authoritative
-        // source, never a label that could in principle drift from it.
-        const totalDays = Math.round(
-          (promo.ends_at.getTime() - promo.starts_at.getTime()) / 86_400_000,
+      if (promo.status === 'active' && promo.platformChargeId) {
+        // Whole days, cut at midnight IST; the cancellation day is charged
+        // (see earlyCancelCredit).
+        const nextMidnight = new Date(
+          new Date(`${todayIn()}T00:00:00+05:30`).getTime() + 86_400_000,
         );
-        // Calendar-midnight (IST) day-boundary — deliberately NOT anchored
-        // to this promotion's own starts_at clock-time, to stay consistent
-        // with every other daily/settlement boundary on the platform
-        // (settlements, invoices, reports all cut over at midnight IST).
-        // Two different "what counts as a day" conventions living side by
-        // side — one midnight-based everywhere else, one start-time-based
-        // just for promotions — would be a genuinely confusing
-        // inconsistency, not a feature. The day cancellation happens ON is
-        // chargeable, never adjusted away — whatever visibility the
-        // promotion got today (or was about to get for the rest of today)
-        // already happened/was committed to, so the unused portion is
-        // counted from the START OF TOMORROW (midnight IST), not from the
-        // exact cancel-instant. Cancelling at 12:01am and at 11:59pm on
-        // the same calendar day charge identically for today.
-        const startOfTomorrow = new Date(todayIn() + 'T00:00:00+05:30').getTime() + 86_400_000;
-        const effectiveCancelAt = Math.min(
-          Math.max(now.getTime(), startOfTomorrow),
-          promo.ends_at.getTime(),
-        );
-
-        const unusedMs = Math.max(0, promo.ends_at.getTime() - effectiveCancelAt);
-        const unusedFullDays = Math.round(unusedMs / 86_400_000);
-        // Floor, never ceil — the operator never gets MORE taken off than
-        // the unused fraction actually remaining (rounding always favours
-        // the platform by a few paise, the same conservative direction
-        // every other proration in this codebase rounds).
-        const unusedMinor = Math.floor((Number(promo.price_minor) * unusedFullDays) / totalDays);
-        const usedMinor = Number(promo.price_minor) - unusedMinor;
+        const { unusedDays: unusedFullDays, creditMinor: unusedMinor } = earlyCancelCredit({
+          priceMinor: promo.priceMinor,
+          startsAt: promo.startsAt,
+          endsAt: promo.endsAt,
+          nextMidnight,
+        });
+        const usedMinor = promo.priceMinor - unusedMinor;
 
         if (unusedMinor > 0) {
-          const directAdjust = await scope.client.query<{ id: string }>(
-            `UPDATE platform_charges SET amount_minor = $3, description = description || ' (adjusted: cancelled early, today charged in full)'
-              WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
-              RETURNING id`,
-            [promo.platform_charge_id, tenantId, usedMinor],
+          const reduced = await this.charges.reducePending(
+            promo.platformChargeId,
+            tenantId,
+            usedMinor,
+            ' (adjusted: cancelled early, today charged in full)',
           );
-          if (directAdjust.rows[0]) {
-            adjustedMinor = unusedMinor;
-          } else {
-            // Already rolled into a completed settlement — that
-            // settlement is never rewritten; instead, a negative charge
-            // reduces the NEXT one by the unused amount.
-            await scope.client.query(
-              `INSERT INTO platform_charges (id, tenant_id, kind, amount_minor, status, description)
-               VALUES ($1,$2,'route_promotion_adjustment',$3,'pending',$4)`,
-              [
-                newId(),
-                tenantId,
-                -unusedMinor,
-                `Promotion ${id} cancelled early — ${unusedFullDays} unused full day(s) credited against your next settlement`,
-              ],
-            );
-            adjustedMinor = unusedMinor;
+          if (!reduced) {
+            // Already rolled into a completed settlement — that settlement is
+            // never rewritten; a negative charge credits the NEXT one instead.
+            await this.charges.add({
+              tenantId,
+              kind: 'route_promotion_adjustment',
+              amountMinor: -unusedMinor,
+              description: `Promotion ${id} cancelled early — ${unusedFullDays} unused full day(s) credited against your next settlement`,
+            });
           }
+          adjustedMinor = unusedMinor;
         }
       }
 
-      await scope.client.query(
-        `UPDATE route_promotions SET status = 'cancelled', cancelled_at = now(), version = version + 1 WHERE id = $1 AND version = $2`,
-        [id, promo.version],
-      );
+      await this.promotions.cancel(id, promo.version);
       return { adjustedMinor };
     });
   }

@@ -224,3 +224,34 @@ export function bubblePromotedToTop<T extends { tripId: string; routeId: string 
   );
   return [...promoted, ...rest];
 }
+
+/**
+ * What an early cancel takes off a promotion's price.
+ *
+ * Days are cut at midnight IST like every other daily boundary on the
+ * platform, and the day of cancellation is charged in full (its visibility was
+ * already committed), so the unused part starts at the later of the next
+ * midnight and the promotion's own start — a promotion cancelled before it
+ * begins is unused in full. Whole days only, rounded down: the refund never
+ * exceeds the unused fraction, and never the price.
+ */
+export function earlyCancelCredit(input: {
+  priceMinor: number;
+  startsAt: Date;
+  endsAt: Date;
+  /** Start of the day after the cancellation, midnight IST. */
+  nextMidnight: Date;
+}): { unusedDays: number; creditMinor: number } {
+  const DAY = 86_400_000;
+  const totalDays = Math.round((input.endsAt.getTime() - input.startsAt.getTime()) / DAY);
+  if (totalDays <= 0) return { unusedDays: 0, creditMinor: 0 };
+  const unusedFrom = Math.min(
+    Math.max(input.nextMidnight.getTime(), input.startsAt.getTime()),
+    input.endsAt.getTime(),
+  );
+  const unusedDays = Math.min(totalDays, Math.round((input.endsAt.getTime() - unusedFrom) / DAY));
+  return {
+    unusedDays,
+    creditMinor: Math.floor((input.priceMinor * unusedDays) / totalDays),
+  };
+}
