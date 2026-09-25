@@ -1,0 +1,360 @@
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus, MapPin, Route as RouteIcon, Trash2, CheckCircle2, Archive, Copy, PauseCircle, PlayCircle, Upload } from 'lucide-react';
+
+import { Button, Card, CardBody, Badge, statusTone, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
+import { PageHeader } from '@/components/common/PageHeader';
+import { masterDataApi, type RouteRow, type City, type Stop } from '@/lib/api/masterData';
+
+interface StopDraft { stopId: string; stopName: string; sequence: number; distanceFromOriginM: number; departOffsetMin: number }
+
+export function RoutesPage() {
+  const [view, setView] = useState<'routes' | 'stops'>('routes');
+  return (
+    <>
+      <PageHeader title="Routes & Stops" subtitle="Your network — origins, destinations, and boarding/dropping points" />
+      <div className="mb-6 flex gap-2 border-b border-border">
+        {([{ key: 'routes', label: 'Routes', icon: RouteIcon }, { key: 'stops', label: 'Stops', icon: MapPin }] as const).map(({ key, label, icon: Icon }) => (
+          <button key={key} onClick={() => setView(key)}
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium ${view === key ? 'border-primary text-text' : 'border-transparent text-text-muted hover:text-text'}`}>
+            <Icon className="h-4 w-4" /> {label}
+          </button>
+        ))}
+      </div>
+      {view === 'routes' ? <RoutesTab /> : <StopsTab />}
+    </>
+  );
+}
+
+function RoutesTab() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [adding, setAdding] = useState(false);
+  const [duplicating, setDuplicating] = useState<RouteRow | null>(null);
+  const [dupCode, setDupCode] = useState('');
+  const [dupName, setDupName] = useState('');
+
+  const routes = useQuery({ queryKey: ['routes'], queryFn: () => masterDataApi.listRoutes() });
+
+  // ── route form state ──
+  const [code, setCode] = useState('');
+  const [name, setName] = useState('');
+  const [startTime, setStartTime] = useState('06:00');
+  const [originQuery, setOriginQuery] = useState('');
+  const [destQuery, setDestQuery] = useState('');
+  const [origin, setOrigin] = useState<City | null>(null);
+  const [dest, setDest] = useState<City | null>(null);
+  const [originResults, setOriginResults] = useState<City[]>([]);
+  const [destResults, setDestResults] = useState<City[]>([]);
+  const [stops, setStops] = useState<StopDraft[]>([]);
+  const [stopCityQuery, setStopCityQuery] = useState('');
+  const [stopCity, setStopCity] = useState<City | null>(null);
+  const [stopCityResults, setStopCityResults] = useState<City[]>([]);
+  const [cityStops, setCityStops] = useState<Stop[]>([]);
+  const [newStopName, setNewStopName] = useState('');
+
+  const searchOrigin = async (q: string) => { setOriginQuery(q); if (q.length >= 2) setOriginResults((await masterDataApi.searchCities(q)).items); };
+  const searchDest = async (q: string) => { setDestQuery(q); if (q.length >= 2) setDestResults((await masterDataApi.searchCities(q)).items); };
+  const searchStopCity = async (q: string) => { setStopCityQuery(q); if (q.length >= 2) setStopCityResults((await masterDataApi.searchCities(q)).items); };
+
+  const pickStopCity = async (c: City) => {
+    setStopCity(c); setStopCityQuery(c.name); setStopCityResults([]);
+    setCityStops((await masterDataApi.stopsForCity(c.id)).items);
+  };
+
+  const createStop = useMutation({
+    mutationFn: () => masterDataApi.createStop({ cityId: stopCity!.id, name: newStopName, kind: 'both' }),
+    onSuccess: async () => { toast.success('Stop created'); setNewStopName(''); setCityStops((await masterDataApi.stopsForCity(stopCity!.id)).items); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not create stop'),
+  });
+
+  const addStopToRoute = (s: Stop) => {
+    if (stops.some((x) => x.stopId === s.id)) return;
+    const seq = stops.length;
+    setStops((arr) => [...arr, { stopId: s.id, stopName: s.name, sequence: seq, distanceFromOriginM: seq * 50000, departOffsetMin: seq * 60 }]);
+  };
+  const removeStop = (stopId: string) => setStops((arr) => arr.filter((s) => s.stopId !== stopId).map((s, i) => ({ ...s, sequence: i })));
+  const updateStop = (stopId: string, patch: Partial<StopDraft>) => setStops((arr) => arr.map((s) => (s.stopId === stopId ? { ...s, ...patch } : s)));
+
+  const resetForm = () => {
+    setCode(''); setName(''); setStartTime('06:00'); setOrigin(null); setDest(null); setOriginQuery(''); setDestQuery('');
+    setStops([]); setStopCity(null); setStopCityQuery(''); setCityStops([]);
+  };
+
+  const createRoute = useMutation({
+    mutationFn: () => masterDataApi.createRoute({
+      code, name, originCityId: origin!.id, destCityId: dest!.id, startTime,
+      stops: stops.map((s) => ({ stopId: s.stopId, sequence: s.sequence, distanceFromOriginM: s.distanceFromOriginM, departOffsetMin: s.departOffsetMin })),
+    }),
+    onSuccess: () => { toast.success('Route created (draft — publish to make it schedulable)'); setAdding(false); resetForm(); void qc.invalidateQueries({ queryKey: ['routes'] }); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not create route'),
+  });
+
+  const publish = useMutation({
+    mutationFn: (id: string) => masterDataApi.publishRoute(id),
+    onSuccess: () => { toast.success('Route published'); void qc.invalidateQueries({ queryKey: ['routes'] }); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Publish failed'),
+  });
+  const archive = useMutation({
+    mutationFn: (id: string) => masterDataApi.archiveRoute(id),
+    onSuccess: () => { toast.success('Route archived'); void qc.invalidateQueries({ queryKey: ['routes'] }); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Archive failed'),
+  });
+  const duplicate = useMutation({
+    mutationFn: () => masterDataApi.duplicateRoute(duplicating!.id, dupCode, dupName),
+    onSuccess: () => { toast.success('Route duplicated as a new draft'); setDuplicating(null); setDupCode(''); setDupName(''); void qc.invalidateQueries({ queryKey: ['routes'] }); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not duplicate'),
+  });
+
+  const columns: Column<RouteRow>[] = [
+    { key: 'code', header: 'Code', render: (r) => <span className="font-mono text-xs">{r.code}</span> },
+    { key: 'name', header: 'Route', render: (r) => <span className="font-medium text-text">{r.name}</span> },
+    { key: 'status', header: 'Status', render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge> },
+    {
+      key: 'actions', header: '', render: (r) => (
+        <div className="flex justify-end gap-2">
+          {r.status === 'draft' && <Button size="sm" variant="outline" leftIcon={<CheckCircle2 className="h-4 w-4" />} loading={publish.isPending} onClick={() => publish.mutate(r.id)}>Publish</Button>}
+          {r.status === 'published' && <Button size="sm" variant="ghost" leftIcon={<Archive className="h-4 w-4" />} loading={archive.isPending} onClick={() => archive.mutate(r.id)}>Archive</Button>}
+          <Button size="sm" variant="ghost" leftIcon={<Copy className="h-4 w-4" />} onClick={() => { setDuplicating(r); setDupCode(`${r.code}-COPY`); setDupName(`${r.name} (copy)`); }}>Duplicate</Button>
+        </div>
+      ),
+    },
+  ];
+
+  const canCreate = code && name && origin && dest && stops.length >= 2;
+
+  return (
+    <>
+      <div className="mb-4 flex justify-end"><Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setAdding(true)}>New route</Button></div>
+
+      {routes.isLoading ? <PageLoader /> : routes.isError ? <ErrorState error={routes.error} onRetry={routes.refetch} /> :
+        (routes.data?.items.length ? <Table columns={columns} rows={routes.data.items} /> : <EmptyState title="No routes yet" icon={<RouteIcon className="h-10 w-10" />} />)}
+
+      <Modal open={adding} onClose={() => { setAdding(false); resetForm(); }} title="Create a route" size="lg"
+        footer={(
+          <>
+            <Button variant="ghost" onClick={() => { setAdding(false); resetForm(); }}>Cancel</Button>
+            <Button loading={createRoute.isPending} disabled={!canCreate} onClick={() => createRoute.mutate()}>Create route (draft)</Button>
+          </>
+        )}>
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Route code" placeholder="DEL-JAI-01" value={code} onChange={(e) => setCode(e.target.value)} />
+            <Input label="Departure time" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+          </div>
+          <Input label="Route name" placeholder="Delhi – Jaipur Express" value={name} onChange={(e) => setName(e.target.value)} />
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="relative">
+              <Input label="Origin city" value={originQuery} onChange={(e) => void searchOrigin(e.target.value)} leftIcon={<MapPin className="h-4 w-4" />} />
+              {originResults.length > 0 && !origin && (
+                <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-surface shadow-lg">
+                  {originResults.map((c) => (
+                    <button key={c.id} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-surface-muted"
+                      onClick={() => { setOrigin(c); setOriginQuery(c.name); setOriginResults([]); }}>{c.name}{c.state ? `, ${c.state}` : ''}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="relative">
+              <Input label="Destination city" value={destQuery} onChange={(e) => void searchDest(e.target.value)} leftIcon={<MapPin className="h-4 w-4" />} />
+              {destResults.length > 0 && !dest && (
+                <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-surface shadow-lg">
+                  {destResults.map((c) => (
+                    <button key={c.id} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-surface-muted"
+                      onClick={() => { setDest(c); setDestQuery(c.name); setDestResults([]); }}>{c.name}{c.state ? `, ${c.state}` : ''}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t border-border pt-3">
+            <div className="mb-2 text-sm font-semibold text-text">Stops (min. 2 — first is boarding, last is dropping)</div>
+            {stops.length > 0 && (
+              <div className="mb-3 flex flex-col gap-2">
+                {stops.map((s) => (
+                  <div key={s.stopId} className="flex items-center gap-2 rounded-md border border-border p-2">
+                    <span className="w-6 text-center text-xs text-text-muted">{s.sequence + 1}</span>
+                    <span className="flex-1 text-sm font-medium text-text">{s.stopName}</span>
+                    <Input value={s.distanceFromOriginM} onChange={(e) => updateStop(s.stopId, { distanceFromOriginM: Number(e.target.value) || 0 })}
+                      className="w-28" hint="dist. (m)" />
+                    <Input value={s.departOffsetMin} onChange={(e) => updateStop(s.stopId, { departOffsetMin: Number(e.target.value) || 0 })}
+                      className="w-28" hint="offset (min)" />
+                    <button type="button" onClick={() => removeStop(s.stopId)} className="text-danger"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="relative mb-2">
+              <Input label="Find a city to add its stops" value={stopCityQuery} onChange={(e) => void searchStopCity(e.target.value)} leftIcon={<MapPin className="h-4 w-4" />} />
+              {stopCityResults.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-surface shadow-lg">
+                  {stopCityResults.map((c) => (
+                    <button key={c.id} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-surface-muted" onClick={() => void pickStopCity(c)}>{c.name}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {stopCity && (
+              <Card className="mb-2">
+                <CardBody className="flex flex-col gap-2">
+                  <div className="text-xs font-semibold text-text-muted">Stops in {stopCity.name}</div>
+                  <div className="flex flex-wrap gap-2">
+                    {cityStops.map((s) => (
+                      <button key={s.id} type="button" onClick={() => addStopToRoute(s)}
+                        className="rounded-full border border-border px-3 py-1 text-xs hover:border-primary">{s.name}</button>
+                    ))}
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1"><Input label="New stop name" value={newStopName} onChange={(e) => setNewStopName(e.target.value)} placeholder="Kashmere Gate" /></div>
+                    <Button size="sm" disabled={!newStopName.trim()} loading={createStop.isPending} onClick={() => createStop.mutate()}>Add stop</Button>
+                  </div>
+                </CardBody>
+              </Card>
+            )}
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={!!duplicating} onClose={() => setDuplicating(null)} title={`Duplicate — ${duplicating?.name ?? ''}`}
+        footer={<><Button variant="ghost" onClick={() => setDuplicating(null)}>Cancel</Button><Button loading={duplicate.isPending} disabled={!dupCode || !dupName} onClick={() => duplicate.mutate()}>Duplicate as draft</Button></>}>
+        <div className="flex flex-col gap-3">
+          <Input label="New route code" value={dupCode} onChange={(e) => setDupCode(e.target.value)} />
+          <Input label="New route name" value={dupName} onChange={(e) => setDupName(e.target.value)} />
+          <p className="text-xs text-text-muted">Same stops, distances, and timing — starts as a draft so you can tweak it before publishing.</p>
+        </div>
+      </Modal>
+    </>
+  );
+}
+
+function StopsTab() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<Stop | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importText, setImportText] = useState('cityId,name,kind,landmark,address,pincode\n');
+  const [importResult, setImportResult] = useState<{ imported: number; failed: { row: number; error: string }[] } | null>(null);
+  const [form, setForm] = useState({ cityId: '', name: '', kind: 'both', landmark: '', address: '', pincode: '' });
+  const [cityQuery, setCityQuery] = useState('');
+  const [cityResults, setCityResults] = useState<City[]>([]);
+  const [pickedCity, setPickedCity] = useState<City | null>(null);
+
+  const stops = useQuery({ queryKey: ['all-stops'], queryFn: () => masterDataApi.listAllStops() });
+
+  const searchCity = async (q: string) => { setCityQuery(q); if (q.length >= 2) setCityResults((await masterDataApi.searchCities(q)).items); };
+
+  const create = useMutation({
+    mutationFn: () => masterDataApi.createStop({ ...form, cityId: pickedCity!.id }),
+    onSuccess: () => { toast.success('Stop created'); setAdding(false); setForm({ cityId: '', name: '', kind: 'both', landmark: '', address: '', pincode: '' }); setPickedCity(null); setCityQuery(''); void qc.invalidateQueries({ queryKey: ['all-stops'] }); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  });
+  const update = useMutation({
+    mutationFn: () => masterDataApi.updateStop(editing!.id, form),
+    onSuccess: () => { toast.success('Stop updated'); setEditing(null); void qc.invalidateQueries({ queryKey: ['all-stops'] }); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  });
+  const activate = useMutation({
+    mutationFn: (id: string) => masterDataApi.activateStop(id),
+    onSuccess: () => { toast.success('Stop activated'); void qc.invalidateQueries({ queryKey: ['all-stops'] }); },
+  });
+  const deactivate = useMutation({
+    mutationFn: (id: string) => masterDataApi.deactivateStop(id),
+    onSuccess: () => { toast.success('Stop deactivated — hidden from customer search'); void qc.invalidateQueries({ queryKey: ['all-stops'] }); },
+  });
+  const bulkImport = useMutation({
+    mutationFn: () => {
+      const lines = importText.trim().split('\n').filter(Boolean);
+      const [header, ...rows] = lines;
+      const cols = header.split(',').map((c) => c.trim());
+      const parsed = rows.map((line) => {
+        const vals = line.split(',').map((v) => v.trim());
+        const obj: Record<string, string> = {};
+        cols.forEach((c, i) => { obj[c] = vals[i] ?? ''; });
+        return obj as never;
+      });
+      return masterDataApi.bulkImportStops(parsed);
+    },
+    onSuccess: (res) => { setImportResult(res); void qc.invalidateQueries({ queryKey: ['all-stops'] }); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Import failed'),
+  });
+
+  const openEdit = (s: Stop) => { setEditing(s); setForm({ cityId: s.cityId ?? '', name: s.name, kind: s.kind, landmark: s.landmark ?? '', address: s.address ?? '', pincode: s.pincode ?? '' }); };
+
+  const columns: Column<Stop>[] = [
+    { key: 'name', header: 'Stop', render: (s) => <button className="font-medium text-text underline decoration-dotted" onClick={() => openEdit(s)}>{s.name}</button> },
+    { key: 'kind', header: 'Type', render: (s) => <Badge>{s.kind}</Badge> },
+    { key: 'landmark', header: 'Landmark', render: (s) => s.landmark ?? '—' },
+    { key: 'pincode', header: 'Pincode', render: (s) => s.pincode ?? '—' },
+    { key: 'status', header: 'Status', render: (s) => <Badge tone={s.isActive === false ? 'neutral' : 'success'}>{s.isActive === false ? 'Inactive' : 'Active'}</Badge> },
+    {
+      key: 'actions', header: '', render: (s) => (
+        <div className="flex justify-end gap-2">
+          {s.isActive === false
+            ? <Button size="sm" variant="outline" leftIcon={<PlayCircle className="h-4 w-4" />} loading={activate.isPending} onClick={() => activate.mutate(s.id)}>Activate</Button>
+            : <Button size="sm" variant="ghost" leftIcon={<PauseCircle className="h-4 w-4" />} loading={deactivate.isPending} onClick={() => deactivate.mutate(s.id)}>Deactivate</Button>}
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <>
+      <div className="mb-4 flex justify-end gap-2">
+        <Button variant="outline" leftIcon={<Upload className="h-4 w-4" />} onClick={() => { setImporting(true); setImportResult(null); }}>Bulk import</Button>
+        <Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setAdding(true)}>New stop</Button>
+      </div>
+
+      {stops.isLoading ? <PageLoader /> : stops.isError ? <ErrorState error={stops.error} onRetry={stops.refetch} /> :
+        (stops.data?.items.length ? <Table columns={columns} rows={stops.data.items} /> : <EmptyState title="No stops yet" icon={<MapPin className="h-10 w-10" />} />)}
+
+      <Modal open={adding || !!editing} onClose={() => { setAdding(false); setEditing(null); }} title={editing ? `Edit — ${editing.name}` : 'New stop'}
+        footer={<><Button variant="ghost" onClick={() => { setAdding(false); setEditing(null); }}>Cancel</Button><Button loading={create.isPending || update.isPending} disabled={editing ? !form.name : !form.name || !pickedCity} onClick={() => (editing ? update.mutate() : create.mutate())}>{editing ? 'Save' : 'Create'}</Button></>}>
+        <div className="flex flex-col gap-3">
+          {!editing && (
+            <div className="relative">
+              <Input label="City" value={cityQuery} onChange={(e) => void searchCity(e.target.value)} placeholder="Search city…" />
+              {cityResults.length > 0 && !pickedCity && (
+                <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-surface shadow-lg">
+                  {cityResults.map((c) => (
+                    <button key={c.id} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-surface-muted"
+                      onClick={() => { setPickedCity(c); setCityQuery(c.name); setCityResults([]); }}>{c.name}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <Input label="Stop name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Kashmere Gate" />
+          <Select label="Type" value={form.kind} onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value }))}
+            options={[{ label: 'Both', value: 'both' }, { label: 'Boarding only', value: 'boarding' }, { label: 'Dropping only', value: 'dropping' }]} />
+          <Input label="Landmark" value={form.landmark} onChange={(e) => setForm((f) => ({ ...f, landmark: e.target.value }))} placeholder="Near Metro station" />
+          <Input label="Address" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
+          <Input label="Pincode" value={form.pincode} onChange={(e) => setForm((f) => ({ ...f, pincode: e.target.value }))} />
+        </div>
+      </Modal>
+
+      <Modal open={importing} onClose={() => setImporting(false)} title="Bulk import stops" size="lg"
+        footer={<><Button variant="ghost" onClick={() => setImporting(false)}>Close</Button><Button loading={bulkImport.isPending} onClick={() => bulkImport.mutate()}>Import</Button></>}>
+        <div className="flex flex-col gap-3">
+          <p className="text-xs text-text-muted">CSV format — first row is the header. Each row imports independently; a bad row is skipped and reported, not the whole batch.</p>
+          <textarea value={importText} onChange={(e) => setImportText(e.target.value)} rows={10}
+            className="w-full rounded-md border border-border bg-surface-muted p-3 font-mono text-xs text-text" spellCheck={false} />
+          {importResult && (
+            <div className="rounded-md border border-border p-3 text-sm">
+              <p className="font-medium text-success">{importResult.imported} imported</p>
+              {importResult.failed.length > 0 && (
+                <div className="mt-2 text-xs text-danger">
+                  {importResult.failed.map((f) => <div key={f.row}>Row {f.row}: {f.error}</div>)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </Modal>
+    </>
+  );
+}

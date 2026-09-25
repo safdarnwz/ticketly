@@ -1,0 +1,500 @@
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { Building2, Ticket, XCircle, IndianRupee, TrendingUp, Plus, Package, ScrollText, Search, Settings, Percent, Landmark, Download, CheckCircle2 } from 'lucide-react';
+
+import { Button, Card, CardBody, Badge, statusTone, Table, type Column, Modal, Input, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
+import { PageHeader } from '@/components/common/PageHeader';
+import { tenantsApi, type Plan } from '@/lib/api/tenants';
+import { auditApi, type AuditEntry } from '@/lib/api/audit';
+import { promotionsApi } from '@/lib/api/promotions';
+import { payoutsApi, type PayoutInstruction, type BankChangeRequest } from '@/lib/api/payouts';
+import { formatMoney, cn } from '@/lib/utils';
+
+type Tab = 'analytics' | 'plans' | 'audit' | 'settings' | 'payouts';
+
+export function AnalyticsPage() {
+  const [tab, setTab] = useState<Tab>('analytics');
+  return (
+    <>
+      <PageHeader title="Analytics & Billing" subtitle="Platform-wide numbers across every operator, the plan catalogue, and the audit trail" />
+      <div className="mb-6 flex gap-2 border-b border-border">
+        {([
+          { key: 'analytics', label: 'Analytics', icon: TrendingUp },
+          { key: 'payouts', label: 'Payouts', icon: Landmark },
+          { key: 'plans', label: 'Plans', icon: Package },
+          { key: 'settings', label: 'Platform Settings', icon: Settings },
+          { key: 'audit', label: 'Audit Log', icon: ScrollText },
+        ] as const).map(({ key, label, icon: Icon }) => (
+          <button key={key} onClick={() => setTab(key)}
+            className={cn('flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium', tab === key ? 'border-primary text-text' : 'border-transparent text-text-muted hover:text-text')}>
+            <Icon className="h-4 w-4" /> {label}
+          </button>
+        ))}
+      </div>
+      {tab === 'analytics' && <AnalyticsTab />}
+      {tab === 'payouts' && <PayoutsTab />}
+      {tab === 'plans' && <PlansTab />}
+      {tab === 'settings' && <SettingsTab />}
+      {tab === 'audit' && <AuditTab />}
+    </>
+  );
+}
+
+function AnalyticsTab() {
+  const analytics = useQuery({ queryKey: ['platform-analytics'], queryFn: tenantsApi.analytics });
+
+  if (analytics.isLoading) return <PageLoader />;
+  if (analytics.isError) return <ErrorState error={analytics.error} onRetry={analytics.refetch} />;
+  const d = analytics.data!;
+
+  const kpis = [
+    { label: 'Active operators', value: `${d.operators.active} / ${d.operators.total}`, icon: Building2 },
+    { label: 'Total bookings', value: d.totalBookings, icon: Ticket },
+    { label: "Today's bookings", value: d.todayBookings, icon: TrendingUp },
+    { label: 'Total cancelled', value: d.totalCancelled, icon: XCircle },
+    { label: 'Total revenue', value: formatMoney(d.totalRevenueMinor, 'INR'), icon: IndianRupee },
+  ];
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        {kpis.map((k) => (
+          <Card key={k.label}>
+            <CardBody>
+              <div className="flex items-center gap-1.5 text-xs text-text-muted"><k.icon className="h-3.5 w-3.5" /> {k.label}</div>
+              <div className="mt-2 text-2xl font-semibold text-text">{k.value}</div>
+            </CardBody>
+          </Card>
+        ))}
+      </div>
+
+      <Card>
+        <CardBody>
+          <div className="mb-4 text-sm font-semibold text-text">Bookings — last 14 days</div>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={d.trend}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--yb-color-border)" />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(v: string) => v.slice(5)} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v: number) => [v, 'Bookings']} labelFormatter={(v: string) => v} />
+                <Line type="monotone" dataKey="bookings" stroke="var(--yb-color-primary, #111827)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </CardBody>
+      </Card>
+    </div>
+  );
+}
+
+function PlansTab() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ code: '', name: '', monthlyPrice: 0 });
+
+  const plans = useQuery({ queryKey: ['all-plans'], queryFn: tenantsApi.plans });
+
+  const create = useMutation({
+    mutationFn: () => tenantsApi.createPlan({ code: form.code, name: form.name, monthlyPrice: Math.round(form.monthlyPrice * 100) }),
+    onSuccess: () => { toast.success('Plan saved'); setAdding(false); setForm({ code: '', name: '', monthlyPrice: 0 }); void qc.invalidateQueries({ queryKey: ['all-plans'] }); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  });
+  const toggle = useMutation({
+    mutationFn: (p: Plan) => tenantsApi.togglePlanActive(p.id, !p.isActive),
+    onSuccess: () => { toast.success('Plan updated'); void qc.invalidateQueries({ queryKey: ['all-plans'] }); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  });
+
+  const columns: Column<Plan>[] = [
+    { key: 'name', header: 'Plan', render: (p) => <span className="font-medium text-text">{p.name}</span> },
+    { key: 'code', header: 'Code', render: (p) => <span className="font-mono text-xs">{p.code}</span> },
+    { key: 'price', header: 'Price / month', render: (p) => formatMoney(p.monthlyPrice, p.currency) },
+    { key: 'status', header: 'Status', render: (p) => <Badge tone={p.isActive ? 'success' : 'neutral'}>{p.isActive ? 'Active' : 'Retired'}</Badge> },
+    {
+      key: 'actions', header: '', render: (p) => (
+        <Button size="sm" variant="ghost" onClick={() => toggle.mutate(p)}>{p.isActive ? 'Retire' : 'Reactivate'}</Button>
+      ),
+    },
+  ];
+
+  return (
+    <>
+      <div className="mb-4 flex justify-end"><Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setAdding(true)}>New plan</Button></div>
+      {plans.isLoading ? <PageLoader /> : plans.isError ? <ErrorState error={plans.error} onRetry={plans.refetch} /> : <Table columns={columns} rows={plans.data?.items ?? []} />}
+
+      <Modal open={adding} onClose={() => setAdding(false)} title="Create a plan"
+        footer={<><Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button><Button loading={create.isPending} disabled={!form.code || !form.name} onClick={() => create.mutate()}>Create</Button></>}>
+        <div className="flex flex-col gap-3">
+          <Input label="Code" placeholder="growth" value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toLowerCase() }))} />
+          <Input label="Name" placeholder="Growth" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+          <Input label="Monthly price (₹)" type="number" value={form.monthlyPrice} onChange={(e) => setForm((f) => ({ ...f, monthlyPrice: Number(e.target.value) || 0 }))} />
+        </div>
+      </Modal>
+    </>
+  );
+}
+
+function AuditTab() {
+  const [action, setAction] = useState('');
+  const [resourceType, setResourceType] = useState('');
+  const [applied, setApplied] = useState({ action: '', resourceType: '' });
+
+  const log = useQuery({ queryKey: ['audit-log', applied], queryFn: () => auditApi.list(applied) });
+
+  const columns: Column<AuditEntry>[] = [
+    { key: 'when', header: 'When', render: (e) => new Date(e.occurredAt).toLocaleString() },
+    { key: 'action', header: 'Action', render: (e) => <Badge>{e.action}</Badge> },
+    { key: 'resource', header: 'Resource', render: (e) => <span className="text-text-muted">{e.resourceType}{e.resourceId ? ` · ${e.resourceId.slice(0, 8)}…` : ''}</span> },
+    { key: 'actor', header: 'Actor', render: (e) => <span className="font-mono text-xs">{e.actorId ? `${e.actorId.slice(0, 8)}…` : e.actorType}</span> },
+    { key: 'tenant', header: 'Tenant', render: (e) => e.tenantId ? <span className="font-mono text-xs">{e.tenantId.slice(0, 8)}…</span> : <span className="text-text-muted">platform</span> },
+  ];
+
+  return (
+    <>
+      <div className="mb-4 flex items-end gap-3">
+        <div className="w-56"><Input label="Filter by action" placeholder="tenant.suspended" value={action} onChange={(e) => setAction(e.target.value)} /></div>
+        <div className="w-56"><Input label="Filter by resource type" placeholder="tenant" value={resourceType} onChange={(e) => setResourceType(e.target.value)} /></div>
+        <Button leftIcon={<Search className="h-4 w-4" />} onClick={() => setApplied({ action, resourceType })}>Filter</Button>
+      </div>
+      {log.isLoading ? <PageLoader /> : log.isError ? <ErrorState error={log.error} onRetry={log.refetch} /> :
+        (log.data?.entries.length ? <Table columns={columns} rows={log.data.entries} /> : <EmptyState title="No audit entries match" icon={<ScrollText className="h-10 w-10" />} />)}
+    </>
+  );
+}
+
+function SettingsTab() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const settings = useQuery({ queryKey: ['platform-settings'], queryFn: tenantsApi.platformSettings });
+  const [commissionPercent, setCommissionPercent] = useState('');
+  const [perBusFee, setPerBusFee] = useState('');
+  const [gstRate, setGstRate] = useState('');
+  const [commissionGstRate, setCommissionGstRate] = useState('');
+  const [smsFee, setSmsFee] = useState('');
+  const [whatsappFee, setWhatsappFee] = useState('');
+
+  const save = useMutation({
+    mutationFn: () => tenantsApi.setPlatformSettings({
+      defaultCommissionPercent: commissionPercent ? Number(commissionPercent) : undefined,
+      perBusFeeMinor: perBusFee ? Math.round(Number(perBusFee) * 100) : undefined,
+      gstRatePercent: gstRate ? Number(gstRate) : undefined,
+      commissionGstRatePercent: commissionGstRate ? Number(commissionGstRate) : undefined,
+      smsFeeMinor: smsFee ? Math.round(Number(smsFee) * 100) : undefined,
+      whatsappFeeMinor: whatsappFee ? Math.round(Number(whatsappFee) * 100) : undefined,
+    }),
+    onSuccess: () => {
+      toast.success('Platform settings updated');
+      setCommissionPercent(''); setPerBusFee(''); setGstRate(''); setCommissionGstRate(''); setSmsFee(''); setWhatsappFee('');
+      void qc.invalidateQueries({ queryKey: ['platform-settings'] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  });
+
+  if (settings.isLoading) return <PageLoader />;
+  if (settings.isError) return <ErrorState error={settings.error} onRetry={settings.refetch} />;
+
+  return (
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <Card>
+        <CardBody className="flex flex-col gap-3">
+          <div className="flex items-center gap-1.5 font-semibold text-text"><Percent className="h-4 w-4" /> Default commission</div>
+          <p className="text-sm text-text-muted">
+            Charged on every booking fare (excluding GST) unless an operator has a negotiated override (set per-operator from the Operators page).
+            Current: <b className="text-text">{settings.data?.defaultCommissionPercent}%</b>
+          </p>
+          <div className="flex items-end gap-2">
+            <div className="flex-1"><Input label="New default %" type="number" placeholder={String(settings.data?.defaultCommissionPercent)} value={commissionPercent} onChange={(e) => setCommissionPercent(e.target.value)} /></div>
+            <Button size="sm" loading={save.isPending} disabled={!commissionPercent} onClick={() => save.mutate()}>Save</Button>
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardBody className="flex flex-col gap-3">
+          <div className="flex items-center gap-1.5 font-semibold text-text"><Percent className="h-4 w-4" /> GST on commission</div>
+          <p className="text-sm text-text-muted">
+            The platform OWN facilitation service is a taxable supply — this is the (standard-rate, typically 18%) GST charged on the platform commission itself, separate from the ticket own GST.
+            Current: <b className="text-text">{settings.data?.commissionGstRatePercent}%</b>
+          </p>
+          <div className="flex items-end gap-2">
+            <div className="flex-1"><Input label="New rate %" type="number" placeholder={String(settings.data?.commissionGstRatePercent)} value={commissionGstRate} onChange={(e) => setCommissionGstRate(e.target.value)} /></div>
+            <Button size="sm" loading={save.isPending} disabled={!commissionGstRate} onClick={() => save.mutate()}>Save</Button>
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardBody className="flex flex-col gap-3">
+          <div className="flex items-center gap-1.5 font-semibold text-text"><Percent className="h-4 w-4" /> Ticket GST rate</div>
+          <p className="text-sm text-text-muted">
+            Government-mandated rate on the passenger fare itself. This amount is collected from the customer and passed straight through to the operator (they remit it) — the platform never keeps it.
+            Current: <b className="text-text">{settings.data?.gstRatePercent}%</b>
+          </p>
+          <div className="flex items-end gap-2">
+            <div className="flex-1"><Input label="New rate %" type="number" placeholder={String(settings.data?.gstRatePercent)} value={gstRate} onChange={(e) => setGstRate(e.target.value)} /></div>
+            <Button size="sm" loading={save.isPending} disabled={!gstRate} onClick={() => save.mutate()}>Save</Button>
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardBody className="flex flex-col gap-3">
+          <div className="flex items-center gap-1.5 font-semibold text-text"><IndianRupee className="h-4 w-4" /> Per-bus one-time fee</div>
+          <p className="text-sm text-text-muted">
+            Charged ONCE when an operator registers a new vehicle — the SAME amount for every operator (not negotiable per-operator, unlike commission).
+            Current: <b className="text-text">{settings.data && formatMoney(settings.data.perBusFeeMinor, 'INR')}</b>
+          </p>
+          <div className="flex items-end gap-2">
+            <div className="flex-1"><Input label="New fee (₹)" type="number" placeholder={settings.data ? String(settings.data.perBusFeeMinor / 100) : ''} value={perBusFee} onChange={(e) => setPerBusFee(e.target.value)} /></div>
+            <Button size="sm" loading={save.isPending} disabled={!perBusFee} onClick={() => save.mutate()}>Save</Button>
+          </div>
+          <p className="text-xs text-text-muted">Changing this affects newly-registered vehicles only — buses already charged keep their original amount.</p>
+        </CardBody>
+      </Card>
+
+      <Card className="lg:col-span-2">
+        <CardBody className="flex flex-col gap-3">
+          <div className="flex items-center gap-1.5 font-semibold text-text"><IndianRupee className="h-4 w-4" /> Per-message notification fees</div>
+          <p className="text-sm text-text-muted">Charged to the operator per message sent, plus GST on the fee (the platform own service — same as commission GST). Email is free.</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-end gap-2">
+              <div className="flex-1"><Input label={`SMS fee (₹) — current ${settings.data ? (settings.data.smsFeeMinor / 100).toFixed(2) : ''}`} type="number" step="0.01" placeholder={settings.data ? String(settings.data.smsFeeMinor / 100) : ''} value={smsFee} onChange={(e) => setSmsFee(e.target.value)} /></div>
+              <Button size="sm" loading={save.isPending} disabled={!smsFee} onClick={() => save.mutate()}>Save</Button>
+            </div>
+            <div className="flex items-end gap-2">
+              <div className="flex-1"><Input label={`WhatsApp fee (₹) — current ${settings.data ? (settings.data.whatsappFeeMinor / 100).toFixed(2) : ''}`} type="number" step="0.01" placeholder={settings.data ? String(settings.data.whatsappFeeMinor / 100) : ''} value={whatsappFee} onChange={(e) => setWhatsappFee(e.target.value)} /></div>
+              <Button size="sm" loading={save.isPending} disabled={!whatsappFee} onClick={() => save.mutate()}>Save</Button>
+            </div>
+          </div>
+        </CardBody>
+      </Card>
+
+      <PromotionRatesCard />
+
+      <Card className="lg:col-span-2">
+        <CardBody className="flex flex-col gap-2 text-sm text-text-muted">
+          <div className="font-semibold text-text">How a booking splits</div>
+          <p>Customer pays: <b className="text-text">fare + ticket GST</b>. The platform takes ONLY <b className="text-text">commission + GST on that commission</b>, plus any <b className="text-text">SMS/WhatsApp fees + their GST</b> — everything else (fare + ticket GST) is paid to the operator, who remits the ticket GST themselves as the actual transport supplier.</p>
+        </CardBody>
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * The rate card for the "Prio" sponsored-listing feature — separate query/
+ * mutation from the rest of this tab since it hits promotionsApi, not
+ * tenantsApi.platformSettings (a different underlying table: individual
+ * rate rows, not a single settings object). Operators purchase promotion
+ * for their own routes entirely self-service (pick dates, get charged via
+ * their own settlement) — nothing here creates or manages promotions on
+ * an operator's behalf; this card only sets what they'll be charged.
+ */
+function PromotionRatesCard() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const rates = useQuery({ queryKey: ['promotion-rates'], queryFn: promotionsApi.rates });
+  const [draft, setDraft] = useState<Record<string, string>>({});
+
+  const save = useMutation({
+    mutationFn: (input: { billingCycle: 'daily' | 'weekly' | 'monthly'; isMultiRoute: boolean; priceMinor: number }) => promotionsApi.setRate(input),
+    onSuccess: () => { toast.success('Rate updated'); void qc.invalidateQueries({ queryKey: ['promotion-rates'] }); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  });
+
+  const cycles: { key: 'daily' | 'weekly' | 'monthly'; label: string }[] = [
+    { key: 'daily', label: 'Daily' }, { key: 'weekly', label: 'Weekly' }, { key: 'monthly', label: 'Monthly' },
+  ];
+  const currentRate = (cycle: string, isMulti: boolean) => rates.data?.rates.find((r) => r.billingCycle === cycle && r.isMultiRoute === isMulti);
+
+  return (
+    <Card className="lg:col-span-2">
+      <CardBody className="flex flex-col gap-3">
+        <div className="flex items-center gap-1.5 font-semibold text-text"><TrendingUp className="h-4 w-4" /> Route promotion rate card ("Prio" sponsored listings)</div>
+        <p className="text-sm text-text-muted">
+          What operators pay to bubble a route into the top of search results, regardless of the customer&apos;s own sort/filter. Operators pick their own start/end dates
+          from a calendar — the exact day-count is priced from the best combination of these three rates, never rounded up to a full cycle. Billed via the operator&apos;s
+          own settlement, same as commission — no separate invoice for this.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {[false, true].map((isMulti) => (
+            <div key={String(isMulti)} className="flex flex-col gap-2 rounded-lg border border-border p-3">
+              <div className="text-xs font-medium text-text-muted">{isMulti ? 'Multi-route (2+ routes in one purchase)' : 'Single route'}</div>
+              {cycles.map((c) => {
+                const key = `${c.key}:${isMulti}`;
+                const current = currentRate(c.key, isMulti);
+                return (
+                  <div key={key} className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <Input label={`${c.label} rate (₹/route) — current ${current ? (current.priceMinor / 100).toFixed(2) : 'not set'}`}
+                        type="number" step="0.01" value={draft[key] ?? ''}
+                        onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))} />
+                    </div>
+                    <Button size="sm" loading={save.isPending} disabled={!draft[key]}
+                      onClick={() => save.mutate({ billingCycle: c.key, isMultiRoute: isMulti, priceMinor: Math.round(Number(draft[key]) * 100) })}>
+                      Save
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
+function PayoutsTab() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [view, setView] = useState<'pending' | 'all'>('pending');
+  const [generatedCsv, setGeneratedCsv] = useState<{ csv: string; count: number; totalMinor: number; instructionIds: string[] } | null>(null);
+  const [failingId, setFailingId] = useState<PayoutInstruction | null>(null);
+  const [failReason, setFailReason] = useState('');
+  const [rejectingChange, setRejectingChange] = useState<BankChangeRequest | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+
+  const bankChanges = useQuery({ queryKey: ['bank-changes-pending'], queryFn: payoutsApi.pendingBankChanges });
+  const approveChange = useMutation({
+    mutationFn: (id: string) => payoutsApi.approveBankChange(id),
+    onSuccess: () => { toast.success('Bank account updated — active immediately'); void qc.invalidateQueries({ queryKey: ['bank-changes-pending'] }); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  });
+  const rejectChange = useMutation({
+    mutationFn: () => payoutsApi.rejectBankChange(rejectingChange!.id, rejectReason),
+    onSuccess: () => { toast.success('Change request rejected'); setRejectingChange(null); setRejectReason(''); void qc.invalidateQueries({ queryKey: ['bank-changes-pending'] }); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  });
+
+  const pending = useQuery({ queryKey: ['payouts-pending'], queryFn: payoutsApi.pending, enabled: view === 'pending' });
+  const all = useQuery({ queryKey: ['payouts-all'], queryFn: payoutsApi.all, enabled: view === 'all' });
+  const data = view === 'pending' ? pending : all;
+
+  const generate = useMutation({
+    mutationFn: payoutsApi.generateBankFile,
+    onSuccess: (res) => {
+      if (res.count === 0) { toast.success('Nothing pending — every payout is already in a batch'); return; }
+      setGeneratedCsv(res);
+      void qc.invalidateQueries({ queryKey: ['payouts-pending'] });
+      void qc.invalidateQueries({ queryKey: ['payouts-all'] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  });
+  const markSent = useMutation({
+    mutationFn: (ids: string[]) => payoutsApi.markSent(ids),
+    onSuccess: () => {
+      toast.success('Marked as sent to bank');
+      setGeneratedCsv(null);
+      void qc.invalidateQueries({ queryKey: ['payouts-all'] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  });
+  const markConfirmed = useMutation({
+    mutationFn: (id: string) => payoutsApi.markConfirmed(id),
+    onSuccess: () => { toast.success('Payout confirmed'); void qc.invalidateQueries({ queryKey: ['payouts-all'] }); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  });
+  const markFailed = useMutation({
+    mutationFn: () => payoutsApi.markFailed(failingId!.id, failReason),
+    onSuccess: () => { toast.success('Marked as failed'); setFailingId(null); setFailReason(''); void qc.invalidateQueries({ queryKey: ['payouts-all'] }); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  });
+
+  const downloadCsv = () => {
+    if (!generatedCsv) return;
+    const blob = new Blob([generatedCsv.csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `ticketly-payout-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const columns: Column<PayoutInstruction>[] = [
+    { key: 'when', header: 'Created', render: (p) => new Date(p.createdAt).toLocaleString() },
+    { key: 'beneficiary', header: 'Beneficiary', render: (p) => <span className="font-medium text-text">{p.beneficiaryName}</span> },
+    { key: 'account', header: 'Account', render: (p) => <span className="font-mono text-xs text-text-muted">••••{p.bankAccountNumber.slice(-4)} · {p.bankIfsc}</span> },
+    { key: 'amount', header: 'Amount', render: (p) => formatMoney(p.amountMinor, p.currency) },
+    { key: 'status', header: 'Status', render: (p) => <Badge tone={statusTone(p.status)}>{p.status.replace('_', ' ')}</Badge> },
+    {
+      key: 'actions', header: '', render: (p) => (
+        <div className="flex justify-end gap-2">
+          {(p.status === 'sent' || p.status === 'in_batch') && (
+            <Button size="sm" variant="outline" leftIcon={<CheckCircle2 className="h-4 w-4" />} loading={markConfirmed.isPending} onClick={() => markConfirmed.mutate(p.id)}>Confirm</Button>
+          )}
+          {p.status !== 'confirmed' && p.status !== 'failed' && (
+            <Button size="sm" variant="ghost" className="text-danger" onClick={() => setFailingId(p)}>Mark failed</Button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <>
+      {!!bankChanges.data?.items.length && (
+        <Card className="mb-6 border-warning/40">
+          <CardBody className="flex flex-col gap-3">
+            <div className="text-sm font-semibold text-text">Bank-account change requests awaiting review</div>
+            {bankChanges.data.items.map((r) => (
+              <div key={r.id} className="flex items-center justify-between rounded-md border border-border p-3">
+                <div>
+                  <div className="text-sm font-medium text-text">{r.tenantName}</div>
+                  <div className="text-xs text-text-muted">{r.accountHolder} · ••••{r.accountNumber.slice(-4)} · {r.ifsc}{r.bankName ? ` · ${r.bankName}` : ''}</div>
+                  <div className="text-[11px] text-text-muted">Submitted {new Date(r.createdAt).toLocaleString()}</div>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" loading={approveChange.isPending} onClick={() => approveChange.mutate(r.id)}>Approve</Button>
+                  <Button size="sm" variant="ghost" className="text-danger" onClick={() => setRejectingChange(r)}>Reject</Button>
+                </div>
+              </div>
+            ))}
+          </CardBody>
+        </Card>
+      )}
+
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex gap-2">
+          <button onClick={() => setView('pending')} className={cn('rounded-md border px-3 py-1.5 text-xs font-medium', view === 'pending' ? 'border-primary bg-surface-muted' : 'border-border')}>Pending</button>
+          <button onClick={() => setView('all')} className={cn('rounded-md border px-3 py-1.5 text-xs font-medium', view === 'all' ? 'border-primary bg-surface-muted' : 'border-border')}>All history</button>
+        </div>
+        {view === 'pending' && <Button leftIcon={<Download className="h-4 w-4" />} loading={generate.isPending} onClick={() => generate.mutate()}>Generate bank file</Button>}
+      </div>
+
+      {data.isLoading ? <PageLoader /> : data.isError ? <ErrorState error={data.error} onRetry={data.refetch} /> :
+        (data.data?.items.length ? <Table columns={columns} rows={data.data.items} /> : <EmptyState title="Nothing here" icon={<Landmark className="h-10 w-10" />} />)}
+
+      <Modal open={!!rejectingChange} onClose={() => setRejectingChange(null)} title={`Reject change — ${rejectingChange?.tenantName ?? ''}`}
+        footer={<><Button variant="ghost" onClick={() => setRejectingChange(null)}>Cancel</Button><Button variant="danger" loading={rejectChange.isPending} disabled={!rejectReason} onClick={() => rejectChange.mutate()}>Reject</Button></>}>
+        <Input label="Reason" placeholder="Could not verify account ownership" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
+      </Modal>
+
+      <Modal open={!!generatedCsv} onClose={() => setGeneratedCsv(null)} title="Bank file ready" size="lg"
+        footer={(
+          <>
+            <Button variant="ghost" onClick={() => setGeneratedCsv(null)}>Close</Button>
+            <Button loading={markSent.isPending} onClick={() => generatedCsv && markSent.mutate(generatedCsv.instructionIds)}>Uploaded — mark as sent</Button>
+          </>
+        )}>
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-text-muted">
+            <b className="text-text">{generatedCsv?.count}</b> payouts, totalling <b className="text-text">{generatedCsv && formatMoney(generatedCsv.totalMinor, 'INR')}</b>.
+            Download this CSV and upload it to your bank corporate-netbanking bulk-payment feature (NEFT/IMPS/RTGS) — the bank executes the actual transfers.
+          </p>
+          <Button variant="outline" leftIcon={<Download className="h-4 w-4" />} onClick={downloadCsv}>Download CSV</Button>
+          <pre className="max-h-48 overflow-auto rounded-md border border-border bg-surface-muted p-3 text-[11px]">{generatedCsv?.csv}</pre>
+          <p className="text-xs text-text-muted">These are marked "in batch" now — click "mark as sent" once you've actually uploaded the file to the bank, so they don't get pulled into the next batch by mistake.</p>
+        </div>
+      </Modal>
+
+      <Modal open={!!failingId} onClose={() => setFailingId(null)} title={`Mark payout as failed — ${failingId?.beneficiaryName ?? ''}`}
+        footer={<><Button variant="ghost" onClick={() => setFailingId(null)}>Cancel</Button><Button variant="danger" loading={markFailed.isPending} disabled={!failReason} onClick={() => markFailed.mutate()}>Mark failed</Button></>}>
+        <Input label="Reason" placeholder="Bounced — wrong account number" value={failReason} onChange={(e) => setFailReason(e.target.value)} />
+      </Modal>
+    </>
+  );
+}

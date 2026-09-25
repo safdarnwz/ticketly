@@ -1,0 +1,59 @@
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { Loader2 } from 'lucide-react';
+
+import { cn } from '@/lib/utils';
+
+type Variant = 'primary' | 'accent' | 'secondary' | 'outline' | 'ghost' | 'danger';
+type Size = 'sm' | 'md' | 'lg';
+
+export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: Variant;
+  size?: Size;
+  loading?: boolean;
+  fullWidth?: boolean;
+  leftIcon?: ReactNode;
+  rightIcon?: ReactNode;
+}
+
+const variants: Record<Variant, string> = {
+  primary: 'btn-primary-flat',
+  accent: 'btn-accent-flat',
+  secondary: 'bg-surface-muted text-text hover:bg-border',
+  outline: 'hairline bg-surface text-text hover:bg-surface-muted',
+  ghost: 'bg-transparent text-text hover:bg-surface-muted',
+  danger: 'bg-danger text-white hover:opacity-90',
+};
+
+// One height token drives EVERY button in the app → uniform sizing by construction.
+const sizes: Record<Size, string> = {
+  sm: 'h-9 px-3.5 text-[13px] min-w-[84px] gap-1.5',
+  md: 'h-btn px-btn-x text-sm min-w-[104px] gap-2',
+  lg: 'h-12 px-7 text-[15px] min-w-[120px] gap-2',
+};
+
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { variant = 'primary', size = 'md', loading, fullWidth, leftIcon, rightIcon, className, children, disabled, ...rest },
+  ref,
+) {
+  return (
+    <button
+      ref={ref}
+      disabled={disabled || loading}
+      className={cn(
+        'inline-flex select-none items-center justify-center rounded-btn font-semibold tracking-[-0.01em]',
+        'transition-all duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50',
+        'focus-visible:focus-ring',
+        variants[variant],
+        sizes[size],
+        fullWidth && 'w-full',
+        className,
+      )}
+      style={{ fontWeight: 'var(--yb-btn-font-weight)' }}
+      {...rest}
+    >
+      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : leftIcon}
+      {children}
+      {!loading && rightIcon}
+    </button>
+  );
+});
