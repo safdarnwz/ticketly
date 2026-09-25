@@ -1,362 +1,481 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import {
-  CreditCard, Phone, Mail, User, Lock, ShieldCheck, Loader2, Smartphone, Landmark, Info,
-} from 'lucide-react';
+import { Lock, Mail, Minus, Phone, Plus, ShieldCheck, Tag, X } from 'lucide-react';
 
-import { Button, Card, CardBody, CardHeader, Input, Select, useToast } from '@/components/ui';
-import { useBooking, type PassengerDraft } from '@/stores/booking';
-import { useAuth } from '@/stores/auth';
-import { authApi } from '@/lib/api/auth';
+import { Button, Card, CardBody, CardHeader, Input, Skeleton, useToast } from '@/components/ui';
+import { CheckoutSignIn } from '@/components/customer/CheckoutSignIn';
+import { HoldTimer } from '@/components/customer/HoldTimer';
+import { PaymentMethodForm } from '@/components/customer/PaymentMethodForm';
 import { bookingsApi } from '@/lib/api/bookings';
-import { paymentsApi, openRazorpayCheckout, type PaymentMethod, type ChargeInstrument } from '@/lib/api/payments';
+import { flowApi, type Ancillary } from '@/lib/api/booking-flow';
 import { ApiError } from '@/lib/api/client';
-import { formatMoney, cn } from '@/lib/utils';
+import { legalApi } from '@/lib/api/legal';
+import { openRazorpayCheckout, paymentsApi, type ChargeInstrument } from '@/lib/api/payments';
+import {
+  CATEGORY_LABEL,
+  isEmail,
+  normalizeMobile,
+  validatePassengers,
+  type Category,
+  type PassengerForm,
+} from '@/lib/checkout';
+import { useAuth } from '@/stores/auth';
+import { useBooking } from '@/stores/booking';
+import { SEAT_TYPE_LABEL, cn, formatDateLabel, formatMoney, formatTime, localDateOf } from '@/lib/utils';
 
-type AuthStep = 'mobile' | 'password' | 'register' | 'otp' | 'done';
-
-const METHOD_META: { value: PaymentMethod; label: string; icon: typeof CreditCard }[] = [
-  { value: 'upi', label: 'UPI', icon: Smartphone },
-  { value: 'credit_card', label: 'Credit Card', icon: CreditCard },
-  { value: 'debit_card', label: 'Debit Card', icon: CreditCard },
-  { value: 'net_banking', label: 'Net Banking', icon: Landmark },
-];
+const QUOTE_MARGIN_MS = 30_000;
 
 export function CheckoutPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const b = useBooking();
   const token = useAuth((s) => s.token);
-  const doLogin = useAuth((s) => s.login);
-  const setSession = useAuth((s) => s.setSession);
+  const trip = b.trip;
+  const quote = b.quote;
+
   useEffect(() => {
-    if (!b.quote || b.seatNumbers.length === 0) navigate('/', { replace: true });
-  }, [b.quote, b.seatNumbers.length, navigate]);
+    if (!trip || !quote || b.seatNumbers.length === 0) navigate('/', { replace: true });
+  }, [trip, quote, b.seatNumbers.length, navigate]);
 
-  // ── passenger + contact ────────────────────────────────────────────────
-  const [passengers, setPassengers] = useState<PassengerDraft[]>(
-    b.seatNumbers.map((seatNumber) => ({ seatNumber, fullName: '', age: undefined, gender: 'male' })),
+  const journeyDate = trip ? localDateOf(trip.departsAt) : undefined;
+  const rules = useQuery({ queryKey: ['concessions', trip?.tenantId, journeyDate], queryFn: () => flowApi.concessions(journeyDate), enabled: Boolean(trip) });
+  const legal = useQuery({ queryKey: ['legal-pages'], queryFn: legalApi.list, staleTime: 10 * 60_000 });
+
+  // ── details ───────────────────────────────────────────────────────────
+  const [passengers, setPassengers] = useState<PassengerForm[]>(() =>
+    b.seatNumbers.map((seatNumber) => {
+      const prev = b.passengers.find((p) => p.seatNumber === seatNumber);
+      return {
+        seatNumber,
+        fullName: prev?.fullName ?? '',
+        age: prev?.age ? String(prev.age) : '',
+        gender: (prev?.gender as PassengerForm['gender']) ?? '',
+        category: 'adult',
+        idProof: '',
+      };
+    }),
   );
-  const [email, setEmail] = useState(b.contactEmail);
   const [mobile, setMobile] = useState(b.contactPhone);
+  const [email, setEmail] = useState(b.contactEmail || useAuth.getState().user?.email || '');
+  const [showErrors, setShowErrors] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
+  const [coupon, setCoupon] = useState(quote?.couponCode ?? '');
+  const [couponBusy, setCouponBusy] = useState(false);
+  const [couponMsg, setCouponMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [holding, setHolding] = useState(false);
+  const [holdError, setHoldError] = useState<{ text: string; reselect?: boolean } | null>(null);
 
-  // ── pay-time auth fork ──────────────────────────────────────────────────
-  const [authStep, setAuthStep] = useState<AuthStep>(token ? 'done' : 'mobile');
-  const [password, setPassword] = useState('');
-  const [regName, setRegName] = useState('');
-  const [regEmail, setRegEmail] = useState('');
-  const [otp, setOtp] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  // Synchronous, render-independent double-click guard. React's `busy` state
-  // disables the button, but a state update only takes effect on the NEXT
-  // render — a genuinely rapid double-click/double-tap can fire this handler
-  // twice before that render happens, each call reading the SAME stale
-  // `busy === false` from its own closure. A ref is mutated and read
-  // immediately, with no render in between, so it closes that gap: money
-  // must never move twice because of a UI timing race, not just usually.
-  const inFlight = useRef(false);
+  const concessions = useMemo(() => rules.data?.concessions ?? [], [rules.data]);
+  const errors = useMemo(
+    () => validatePassengers(passengers, { concessions, policy: rules.data?.policy, ladiesSeats: b.ladiesSeats ?? [] }),
+    [passengers, concessions, rules.data?.policy, b.ladiesSeats],
+  );
+  const mobileOk = normalizeMobile(mobile);
+  const contactErrors: Record<string, string> = {};
+  if (!mobileOk) contactErrors.mobile = 'Enter a 10-digit Indian mobile number';
+  if (email.trim() && !isEmail(email)) contactErrors.email = 'Enter a valid email or leave it empty';
+  const detailsValid = Object.keys(errors).length === 0 && Object.keys(contactErrors).length === 0;
+  const showErr = (k: string) => (showErrors ? errors[k] : undefined);
+  const patch = (i: number, p: Partial<PassengerForm>) => setPassengers((a) => a.map((x, j) => (j === i ? { ...x, ...p } : x)));
 
-  // ── payment method ────────────────────────────────────────────────────────
-  const [method, setMethod] = useState<PaymentMethod>('upi');
-  const [vpa, setVpa] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiry, setExpiry] = useState('');
-  const [cvv, setCvv] = useState('');
-  const [holder, setHolder] = useState('');
-  const [bank, setBank] = useState('');
-  const [nbUser, setNbUser] = useState('');
-  const [nbPass, setNbPass] = useState('');
+  const requote = useCallback(async (couponCode?: string) => {
+    const q = await flowApi.quote({
+      tripId: trip!.tripId,
+      fromStopId: b.fromStopId!,
+      toStopId: b.toStopId!,
+      seatType: b.seatType,
+      seatNumbers: b.seatNumbers,
+      couponCode: couponCode || undefined,
+    });
+    b.setQuote(q);
+    return q;
+  }, [trip, b]);
 
-  const testMethods = useQuery({ queryKey: ['test-methods'], queryFn: () => paymentsApi.testMethods(), retry: 0, staleTime: 60_000 });
-  const banks = testMethods.data?.banks ?? [];
-  const hints = testMethods.data?.hints ?? null;
-
-  const totalMinor = b.quote?.totalMinor ?? 0;
-  const currency = b.quote?.currency ?? 'INR';
-
-  const passengersValid = passengers.every((p) => p.fullName.trim()) && mobile.trim().length >= 6;
-
-  const buildInstrument = (): ChargeInstrument | null => {
-    if (method === 'upi') return vpa.trim() ? { method, vpa: vpa.trim() } : null;
-    if (method === 'net_banking') return bank && nbUser.trim() && nbPass ? { method, bank, username: nbUser.trim(), password: nbPass } : null;
-    // credit/debit
-    return cardNumber.trim() && expiry.trim() && cvv.trim()
-      ? { method, cardNumber: cardNumber.trim(), expiry: expiry.trim(), cvv: cvv.trim(), holder: holder.trim() || undefined }
-      : null;
-  };
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const instrument = buildInstrument();
-  const canPay = passengersValid && authStep === 'done' && !busy && termsAccepted && !!instrument;
-
-  const proceedAuth = async () => {
-    setErr(null); setBusy(true);
+  const applyCoupon = async (code: string) => {
+    setCouponBusy(true);
+    setCouponMsg(null);
     try {
-      if (authStep === 'mobile') {
-        const res = await authApi.checkIdentity(mobile.trim());
-        setAuthStep(res.registered ? 'password' : 'register');
-      } else if (authStep === 'password') {
-        await doLogin(mobile.trim(), password);
-        setAuthStep('done');
-        toast.success('Signed in');
-      } else if (authStep === 'register') {
-        await authApi.register({ fullName: regName.trim(), email: regEmail.trim(), mobile: mobile.trim(), password });
-        setAuthStep('otp');
-        toast.info('We emailed you a 6-digit code');
-      } else if (authStep === 'otp') {
-        const tokens = await authApi.verifyRegistration(regEmail.trim(), otp.trim());
-        setSession(tokens, regEmail.trim());
-        setAuthStep('done');
-        toast.success('Account created');
-      }
+      // The saving is measured against the price without any coupon.
+      const withoutCoupon = (quote?.totalMinor ?? 0) + (b.couponSavingMinor ?? 0);
+      const q = await requote(code.trim().toUpperCase());
+      const saved = code ? Math.max(0, withoutCoupon - q.totalMinor) : 0;
+      useBooking.setState({ couponSavingMinor: saved });
+      setCouponMsg(code ? { ok: true, text: saved > 0 ? `Applied — you save ${formatMoney(saved, q.currency)}` : 'Applied' } : null);
     } catch (e) {
-      setErr(e instanceof ApiError ? e.message : 'Something went wrong');
+      setCouponMsg({ ok: false, text: e instanceof ApiError ? e.message : 'Could not apply this code' });
+      await requote().catch(() => undefined);
+      useBooking.setState({ couponSavingMinor: 0 });
     } finally {
-      setBusy(false);
+      setCouponBusy(false);
     }
   };
+
+  const holdSeats = async (fallbackEmail?: string) => {
+    setShowErrors(true);
+    if (!detailsValid) {
+      document.querySelector('[aria-invalid="true"], .text-danger')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    // Read the live session: this also runs right after signing in, before a re-render.
+    if (!useAuth.getState().token) { setSigningIn(true); return; }
+    if (holding) return;
+    setHolding(true);
+    setHoldError(null);
+    const body = (quoteId: string) => ({
+      quoteId,
+      seatNumbers: b.seatNumbers,
+      passengers: passengers.map((p) => ({
+        seatNumber: p.seatNumber,
+        fullName: p.fullName.trim().replace(/\s+/g, ' '),
+        age: Number(p.age),
+        gender: p.gender || undefined,
+        category: p.category === 'adult' ? undefined : p.category,
+        idProof: p.idProof.trim() || undefined,
+      })),
+      contactPhone: mobileOk!,
+      contactEmail: email.trim() || fallbackEmail || undefined,
+    });
+    try {
+      // A quote lives a few minutes; refresh it rather than fail the hold.
+      let q = quote!;
+      if (Date.parse(q.expiresAt) - Date.now() < QUOTE_MARGIN_MS) q = await requote(q.couponCode ?? undefined);
+      let hold;
+      try {
+        hold = await bookingsApi.hold(body(q.quoteId));
+      } catch (e) {
+        if (!(e instanceof ApiError && e.code === 'PRICING.QUOTE_EXPIRED')) throw e;
+        q = await requote(q.couponCode ?? undefined);
+        hold = await bookingsApi.hold(body(q.quoteId));
+      }
+      b.setPassengers(passengers.map((p) => ({ seatNumber: p.seatNumber, fullName: p.fullName.trim(), age: Number(p.age), gender: p.gender })));
+      b.setContact(email.trim() || fallbackEmail || '', mobileOk!);
+      b.setHold(hold);
+    } catch (e) {
+      const code = e instanceof ApiError ? e.code : '';
+      setHoldError({
+        text: e instanceof ApiError ? e.message : 'Could not hold your seats — please try again',
+        reselect: ['INVENTORY.SEAT_UNAVAILABLE', 'INVENTORY.HOLD_EXPIRED', 'INVENTORY.TRIP_CLOSED'].includes(code),
+      });
+    } finally {
+      setHolding(false);
+    }
+  };
+
+  // ── payment step ──────────────────────────────────────────────────────
+  const hold = b.hold;
+  const [expired, setExpired] = useState(() => Boolean(hold && Date.parse(hold.holdExpiresAt) <= Date.now()));
+  const addonCatalogue = useQuery({ queryKey: ['ancillaries', trip?.tenantId], queryFn: flowApi.ancillaries, enabled: Boolean(hold) });
+  const addons = hold?.addons ?? {};
+  const addonTotal = hold?.addonTotalMinor ?? 0;
+  const [addonBusy, setAddonBusy] = useState(false);
+  const addonSeq = useRef(0);
+  const [instrument, setInstrument] = useState<ChargeInstrument | null>(null);
+  const [terms, setTerms] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState('');
+  const inFlight = useRef(false);
+  const testMode = useQuery({ queryKey: ['test-methods'], queryFn: paymentsApi.testMethods, staleTime: 60_000, enabled: Boolean(hold) });
+  const realGateway = testMode.data && !testMode.data.testMode;
+
+  const onExpire = useCallback(() => setExpired(true), []);
+
+  const changeAddon = (a: Ancillary, qty: number) => {
+    const before = { ...addons };
+    const next = { ...addons };
+    if (qty <= 0) delete next[a.id];
+    else next[a.id] = qty;
+    b.setHold({ ...hold!, addons: next });
+    const seq = ++addonSeq.current;
+    setAddonBusy(true);
+    setPayError('');
+    flowApi
+      .setAncillaries(hold!.bookingId, Object.entries(next).map(([ancillaryId, quantity]) => ({ ancillaryId, quantity })))
+      .then((r) => {
+        if (seq !== addonSeq.current) return; // a newer change is on its way
+        const cur = useBooking.getState().hold;
+        if (cur) b.setHold({ ...cur, addons: next, addonTotalMinor: r.totalMinor, payableMinor: r.bookingTotalMinor });
+      })
+      .catch((e) => {
+        if (seq !== addonSeq.current) return;
+        toast.error(e instanceof ApiError ? e.message : 'Could not update add-ons');
+        const cur = useBooking.getState().hold;
+        if (cur) b.setHold({ ...cur, addons: before });
+      })
+      .finally(() => { if (seq === addonSeq.current) setAddonBusy(false); });
+  };
+
+  const payable = hold?.payableMinor ?? hold?.totalMinor ?? 0;
+  const currency = quote?.currency ?? 'INR';
 
   const pay = async () => {
-    if (!instrument) return;
-    if (inFlight.current) return; // synchronous guard — see the ref's comment above
+    if (!hold || inFlight.current) return;
     inFlight.current = true;
-    setErr(null); setBusy(true);
+    setPaying(true);
+    setPayError('');
     try {
-      b.setContact(email || regEmail, mobile);
-      b.setPassengers(passengers);
-      const hold = await bookingsApi.hold({
-        quoteId: b.quote!.quoteId,
-        seatNumbers: b.seatNumbers,
-        passengers: passengers.map((p) => ({ seatNumber: p.seatNumber, fullName: p.fullName.trim(), age: p.age, gender: p.gender })),
-        contactEmail: (email || regEmail) || undefined,
-        contactPhone: mobile || undefined,
-      });
-      const charged = await paymentsApi.charge(hold.bookingId, instrument);
-      b.setConfirmed(hold.bookingId, charged.pnr ?? hold.pnr);
-      toast.success('Payment successful');
+      let pnr: string;
+      if (realGateway) {
+        const intent = await paymentsApi.createIntent(hold.bookingId, payable);
+        const callback = await openRazorpayCheckout(intent.clientPayload);
+        pnr = (await paymentsApi.verify(hold.bookingId, callback)).pnr;
+      } else {
+        if (!instrument) return;
+        const attempt = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+        pnr = (await paymentsApi.charge(hold.bookingId, instrument, attempt)).pnr;
+      }
+      b.setConfirmed(hold.bookingId, pnr);
+      b.setHold(undefined);
+      toast.success('Payment successful — your ticket is booked');
       navigate('/confirmation', { replace: true });
     } catch (e) {
-      setErr(e instanceof ApiError ? e.message : 'Payment could not be completed');
-      setBusy(false);
+      setPayError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : 'Payment could not be completed');
+    } finally {
       inFlight.current = false;
+      setPaying(false);
     }
   };
 
-  /** REAL payment path — Razorpay Checkout, used once PAYMENT_TEST_MODE is off. */
-  const payWithRazorpay = async () => {
-    if (inFlight.current) return; // synchronous guard — see the ref's comment above
-    inFlight.current = true;
-    setErr(null); setBusy(true);
-    try {
-      b.setContact(email || regEmail, mobile);
-      b.setPassengers(passengers);
-      const hold = await bookingsApi.hold({
-        quoteId: b.quote!.quoteId,
-        seatNumbers: b.seatNumbers,
-        passengers: passengers.map((p) => ({ seatNumber: p.seatNumber, fullName: p.fullName.trim(), age: p.age, gender: p.gender })),
-        contactEmail: (email || regEmail) || undefined,
-        contactPhone: mobile || undefined,
-      });
-      const intent = await paymentsApi.createIntent(hold.bookingId);
-      const callback = await openRazorpayCheckout(intent.clientPayload);
-      // Cryptographically verified server-side — see PaymentService.verifyAndCapture.
-      // The webhook confirms the same booking too (defence in depth); whichever
-      // arrives first wins, the second is a no-op.
-      const result = await paymentsApi.verify(hold.bookingId, callback);
-      b.setConfirmed(hold.bookingId, result.pnr);
-      toast.success('Payment successful');
-      navigate('/confirmation', { replace: true });
-    } catch (e) {
-      setErr(e instanceof ApiError ? e.message : e instanceof Error ? e.message : 'Payment could not be completed');
-      setBusy(false);
-      inFlight.current = false;
-    }
+  // The seat page releases the hold (if any) as it opens.
+  const reselect = () => {
+    navigate('/trip', { state: { trip } });
   };
 
-  const isRealGateway = testMethods.data && !testMethods.data.testMode;
-  const canPayReal = passengersValid && authStep === 'done' && !busy && termsAccepted;
+  if (!trip || !quote) return null;
+  const seatCount = b.seatNumbers.length;
+  const discount = b.couponSavingMinor ?? 0;
+
+  const summary = (
+    <Card className="sticky top-20">
+      <CardHeader title="Booking summary" />
+      <CardBody className="flex flex-col gap-3 text-sm">
+        <div>
+          <div className="font-semibold text-text">{trip.operatorName}</div>
+          <div className="text-xs text-text-muted">
+            {formatDateLabel(localDateOf(trip.departsAt), { weekday: 'short', day: '2-digit', month: 'short' })} · {SEAT_TYPE_LABEL[b.seatType ?? ''] ?? b.seatType}
+          </div>
+        </div>
+        {b.points && (
+          <div className="rounded-md bg-surface-muted p-3 text-xs">
+            <div><b>{formatTime(b.points.fromAt)}</b> {b.points.from}</div>
+            <div className="mt-1"><b>{formatTime(b.points.toAt)}</b> {b.points.to}</div>
+          </div>
+        )}
+        <div className="flex justify-between"><span className="text-text-muted">Seats</span><span className="font-medium">{b.seatNumbers.join(', ')}</span></div>
+        <div className="flex justify-between"><span className="text-text-muted">Fare ({seatCount} × incl. GST)</span><span>{formatMoney(quote.totalMinor + discount, currency)}</span></div>
+        {discount > 0 && <div className="flex justify-between text-success"><span>Coupon {quote.couponCode}</span><span>− {formatMoney(discount, currency)}</span></div>}
+        {hold && hold.totalMinor !== quote.totalMinor && (
+          <div className="flex justify-between text-success"><span>Concessions</span><span>− {formatMoney(quote.totalMinor - hold.totalMinor, currency)}</span></div>
+        )}
+        {addonTotal > 0 && <div className="flex justify-between"><span className="text-text-muted">Add-ons (incl. GST)</span><span>{formatMoney(addonTotal, currency)}</span></div>}
+        <div className="flex justify-between border-t border-border pt-3 text-base font-semibold">
+          <span>{hold ? 'Total to pay' : 'Estimated total'}</span>
+          <span>{formatMoney(hold ? payable : quote.totalMinor, currency)}</span>
+        </div>
+      </CardBody>
+    </Card>
+  );
+
+  // ── expired hold ──────────────────────────────────────────────────────
+  if (hold && expired) {
+    return (
+      <div className="mx-auto max-w-xl px-4 py-10">
+        <Card><CardBody className="flex flex-col items-center gap-3 text-center">
+          <h1 className="text-lg font-semibold text-text">Your seat hold has expired</h1>
+          <p className="text-sm text-text-muted">The seats were released so others can book them. Nothing was charged. Pick your seats again to continue.</p>
+          <Button onClick={reselect}>Choose seats again</Button>
+        </CardBody></Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6">
+    <div className="mx-auto max-w-6xl px-4 pb-10 pt-4">
+      <ol className="mb-4 flex items-center gap-2 text-xs font-medium text-text-muted" aria-label="Checkout steps">
+        <li>
+          {/* Going back gives up the hold (the seat page releases it). Not while a payment is in flight. */}
+          <button type="button" onClick={reselect} disabled={paying} className="text-text underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50">1. Seats (change)</button>
+        </li><li>›</li>
+        <li className={cn(!hold && 'text-primary')}>2. Passengers</li><li>›</li>
+        <li className={cn(hold && 'text-primary')}>3. Add-ons & payment</li>
+      </ol>
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
-          {/* Passengers */}
-          <Card>
-            <CardHeader title="Passenger details" />
-            <CardBody className="flex flex-col gap-4">
-              {passengers.map((p, i) => (
-                <div key={p.seatNumber} className="rounded-md border border-border p-3">
-                  <div className="mb-2 text-sm font-semibold text-text">Seat {p.seatNumber}</div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <Input label="Full name" value={p.fullName} onChange={(e) => setPassengers((a) => a.map((x, j) => j === i ? { ...x, fullName: e.target.value } : x))} />
-                    <Input label="Age" type="number" value={p.age ?? ''} onChange={(e) => setPassengers((a) => a.map((x, j) => j === i ? { ...x, age: Number(e.target.value) || undefined } : x))} />
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-sm font-medium text-text">Gender</label>
-                      <select value={p.gender} onChange={(e) => setPassengers((a) => a.map((x, j) => j === i ? { ...x, gender: e.target.value } : x))}
-                        className="h-input rounded-input border border-border bg-surface px-input-x text-sm focus-ring">
-                        <option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
-                      </select>
+          {!hold ? (
+            <>
+              <Card>
+                <CardHeader title="Passenger details" subtitle="As on a government photo ID" />
+                <CardBody className="flex flex-col gap-4">
+                  {rules.isLoading ? <Skeleton className="h-32" /> : passengers.map((p, i) => {
+                    const rule = concessions.find((c) => c.category === p.category);
+                    return (
+                      <div key={p.seatNumber} className="rounded-md border border-border p-3">
+                        <div className="mb-2 flex items-center justify-between text-sm">
+                          <span className="font-semibold text-text">Passenger {i + 1} · Seat {p.seatNumber}</span>
+                          {(b.ladiesSeats ?? []).includes(p.seatNumber) && <span className="rounded bg-pink-50 px-1.5 py-0.5 text-xs text-pink-700">Ladies seat</span>}
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-6">
+                          <div className="sm:col-span-3">
+                            <Input label="Full name" autoComplete="name" value={p.fullName} onChange={(e) => patch(i, { fullName: e.target.value })} error={showErr(`${i}.fullName`)} aria-invalid={Boolean(showErr(`${i}.fullName`))} />
+                          </div>
+                          <div className="sm:col-span-1">
+                            <Input label="Age" inputMode="numeric" value={p.age} onChange={(e) => patch(i, { age: e.target.value.replace(/\D/g, '').slice(0, 3) })} error={showErr(`${i}.age`)} aria-invalid={Boolean(showErr(`${i}.age`))} />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <span className="mb-1.5 block text-sm font-medium text-text">Gender</span>
+                            <div className="flex gap-1" role="radiogroup" aria-label={`Gender of passenger ${i + 1}`}>
+                              {(['male', 'female', 'other'] as const).map((g) => (
+                                <button key={g} type="button" role="radio" aria-checked={p.gender === g} onClick={() => patch(i, { gender: g })}
+                                  className={cn('h-input flex-1 rounded-input border text-xs capitalize', p.gender === g ? 'border-primary bg-primary/10 text-primary' : 'border-border text-text hover:bg-surface-muted')}>
+                                  {g}
+                                </button>
+                              ))}
+                            </div>
+                            {showErr(`${i}.gender`) && <p className="mt-1 text-xs text-danger">{showErr(`${i}.gender`)}</p>}
+                          </div>
+                          {concessions.length > 0 && (
+                            <div className="sm:col-span-3">
+                              <label className="mb-1.5 block text-sm font-medium text-text" htmlFor={`cat-${i}`}>Concession</label>
+                              <select id={`cat-${i}`} value={p.category} onChange={(e) => patch(i, { category: e.target.value as Category })}
+                                className="h-input w-full rounded-input border border-border bg-surface px-input-x text-sm focus-ring">
+                                <option value="adult">None (adult)</option>
+                                {concessions.map((c) => (
+                                  <option key={c.category} value={c.category}>{CATEGORY_LABEL[c.category] ?? c.category} — {c.discountPct}% off</option>
+                                ))}
+                              </select>
+                              {showErr(`${i}.category`) && <p className="mt-1 text-xs text-danger">{showErr(`${i}.category`)}</p>}
+                            </div>
+                          )}
+                          {rule?.requiresIdProof && (
+                            <div className="sm:col-span-3">
+                              <Input label="ID number (shown at boarding)" value={p.idProof} onChange={(e) => patch(i, { idProof: e.target.value.slice(0, 40) })} error={showErr(`${i}.idProof`)} />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {showErrors && errors.form && <p role="alert" className="text-sm text-danger">{errors.form}</p>}
+                </CardBody>
+              </Card>
+
+              <Card>
+                <CardHeader title="Contact details" subtitle="Your ticket and updates are sent here" />
+                <CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Input label="Mobile number" inputMode="tel" autoComplete="tel" value={mobile} onChange={(e) => setMobile(e.target.value.slice(0, 16))} leftIcon={<Phone className="h-4 w-4" />} placeholder="98xxxxxxxx" error={showErrors ? contactErrors.mobile : undefined} />
+                  <Input label="Email (optional)" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} leftIcon={<Mail className="h-4 w-4" />} error={showErrors ? contactErrors.email : undefined} />
+                </CardBody>
+              </Card>
+
+              <Card>
+                <CardHeader title="Offers" />
+                <CardBody>
+                  {quote.couponCode ? (
+                    <div className="flex items-center justify-between rounded-md border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">
+                      <span className="flex items-center gap-2"><Tag className="h-4 w-4" /> {quote.couponCode} applied</span>
+                      <button type="button" onClick={() => { setCoupon(''); void applyCoupon(''); }} disabled={couponBusy} aria-label="Remove coupon"><X className="h-4 w-4" /></button>
                     </div>
-                  </div>
+                  ) : (
+                    <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (coupon.trim()) void applyCoupon(coupon); }}>
+                      <div className="flex-1"><Input placeholder="Coupon code" value={coupon} onChange={(e) => setCoupon(e.target.value.toUpperCase().replace(/\s/g, '').slice(0, 40))} leftIcon={<Tag className="h-4 w-4" />} aria-label="Coupon code" /></div>
+                      <Button type="submit" variant="outline" loading={couponBusy} disabled={!coupon.trim()}>Apply</Button>
+                    </form>
+                  )}
+                  {couponMsg && <p className={cn('mt-2 text-xs', couponMsg.ok ? 'text-success' : 'text-danger')}>{couponMsg.text}</p>}
+                </CardBody>
+              </Card>
+
+              {signingIn && !token && mobileOk && (
+                <Card>
+                  <CardHeader title="Sign in to continue" subtitle="Your ticket is kept in your Ticketly account" />
+                  <CardBody><CheckoutSignIn mobile={mobileOk} onDone={(signedUpEmail) => {
+                    setSigningIn(false);
+                    if (signedUpEmail && !email.trim()) setEmail(signedUpEmail);
+                    void holdSeats(signedUpEmail);
+                  }} /></CardBody>
+                </Card>
+              )}
+
+              {holdError && (
+                <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
+                  <span>{holdError.text}</span>
+                  {holdError.reselect && <Button size="sm" variant="outline" onClick={reselect}>Choose other seats</Button>}
                 </div>
-              ))}
-              <Input label="Contact mobile" value={mobile} onChange={(e) => setMobile(e.target.value)} leftIcon={<Phone className="h-4 w-4" />} placeholder="+9198…" />
-              <Input label="Contact email (optional)" value={email} onChange={(e) => setEmail(e.target.value)} leftIcon={<Mail className="h-4 w-4" />} />
-            </CardBody>
-          </Card>
+              )}
 
-          {/* Pay-time auth fork */}
-          {authStep !== 'done' && (
-            <Card>
-              <CardHeader title="Sign in to pay" subtitle="Your ticket is linked to your Ticketly account" />
-              <CardBody className="flex flex-col gap-3">
-                {authStep === 'mobile' && (
-                  <>
-                    <Input label="Mobile number" value={mobile} onChange={(e) => setMobile(e.target.value)} leftIcon={<Phone className="h-4 w-4" />} placeholder="Enter your mobile" />
-                    <p className="text-xs text-text-muted">We’ll check if you already have an account.</p>
-                  </>
-                )}
-                {authStep === 'password' && (
-                  <>
-                    <p className="text-sm text-text">Welcome back! Enter your password for <b>{mobile}</b>.</p>
-                    <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} leftIcon={<Lock className="h-4 w-4" />} />
-                  </>
-                )}
-                {authStep === 'register' && (
-                  <>
-                    <p className="text-sm text-text">New here — let’s create your account.</p>
-                    <Input label="Full name" value={regName} onChange={(e) => setRegName(e.target.value)} leftIcon={<User className="h-4 w-4" />} />
-                    <Input label="Email" type="email" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} leftIcon={<Mail className="h-4 w-4" />} />
-                    <Input label="Create password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} leftIcon={<Lock className="h-4 w-4" />} hint="At least 8 characters" />
-                  </>
-                )}
-                {authStep === 'otp' && (
-                  <>
-                    <p className="text-sm text-text">Enter the 6-digit code sent to <b>{regEmail}</b>.</p>
-                    <Input label="Email OTP" value={otp} onChange={(e) => setOtp(e.target.value)} leftIcon={<ShieldCheck className="h-4 w-4" />} placeholder="••••••" />
-                  </>
-                )}
-                {err && <p className="text-xs text-danger">{err}</p>}
-                <Button onClick={proceedAuth} disabled={busy} fullWidth>
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> :
-                    authStep === 'mobile' ? 'Continue' : authStep === 'password' ? 'Sign in' : authStep === 'register' ? 'Create account & send OTP' : 'Verify & continue'}
-                </Button>
-              </CardBody>
-            </Card>
-          )}
+              <Button size="lg" onClick={() => void holdSeats()} loading={holding} disabled={couponBusy || (signingIn && !token)}>
+                Continue to payment
+              </Button>
+            </>
+          ) : (
+            <>
+              <HoldTimer expiresAt={hold.holdExpiresAt} onExpire={onExpire} />
 
-          {/* Payment method — shown once signed in. Real gateway (Razorpay) needs
-              none of this: its own Checkout modal collects UPI/card/etc. */}
-          {authStep === 'done' && isRealGateway && (
-            <Card>
-              <CardHeader title="Payment" subtitle="You'll choose UPI, card, or net banking in the next step" />
-              <CardBody className="flex items-center gap-3 rounded-md border border-border bg-surface-muted p-4 text-sm text-text-muted">
-                <ShieldCheck className="h-5 w-5 shrink-0 text-success" />
-                Secured by Razorpay — your card/UPI details never touch Ticketly servers.
-              </CardBody>
-            </Card>
-          )}
+              <Card>
+                <CardHeader title="Add-ons" subtitle="Optional — added to this booking" />
+                <CardBody className="flex flex-col gap-2">
+                  {addonCatalogue.isLoading ? <Skeleton className="h-16" /> : (addonCatalogue.data?.items ?? []).length === 0 ? (
+                    <p className="text-sm text-text-muted">No add-ons on this bus.</p>
+                  ) : addonCatalogue.data!.items.map((a) => {
+                    const qty = addons[a.id] ?? 0;
+                    const max = a.perPassenger ? seatCount : 5;
+                    return (
+                      <div key={a.id} className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
+                        <div>
+                          <div className="text-sm font-medium text-text">{a.name}</div>
+                          <div className="text-xs text-text-muted">{formatMoney(a.priceMinor, currency)} {a.perPassenger ? 'per passenger' : 'each'} + GST</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button type="button" aria-label={`Fewer ${a.name}`} disabled={qty === 0 || paying} onClick={() => changeAddon(a, qty - 1)} className="rounded-full border border-border p-1 disabled:opacity-40"><Minus className="h-3.5 w-3.5" /></button>
+                          <span className="w-5 text-center text-sm font-semibold" aria-live="polite">{qty}</span>
+                          <button type="button" aria-label={`More ${a.name}`} disabled={qty >= max || paying} onClick={() => changeAddon(a, qty + 1)} className="rounded-full border border-border p-1 disabled:opacity-40"><Plus className="h-3.5 w-3.5" /></button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </CardBody>
+              </Card>
 
-          {authStep === 'done' && !isRealGateway && (
-            <Card>
-              <CardHeader title="Payment method" subtitle="Choose how you’d like to pay" />
-              <CardBody className="flex flex-col gap-4">
-                {/* Method selector */}
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {METHOD_META.map(({ value, label, icon: Icon }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setMethod(value)}
-                      className={cn(
-                        'flex flex-col items-center gap-1.5 rounded-md border p-3 text-xs font-medium transition-colors',
-                        method === value ? 'border-primary bg-surface-muted text-text' : 'border-border text-text-muted hover:border-primary/40 hover:text-text',
-                      )}
-                    >
-                      <Icon className="h-5 w-5" />
-                      {label}
-                    </button>
-                  ))}
-                </div>
+              <Card>
+                <CardHeader title="Payment" />
+                <CardBody>
+                  {realGateway ? (
+                    <p className="flex items-center gap-2 text-sm text-text-muted"><ShieldCheck className="h-5 w-5 text-success" /> You will choose UPI, card or net banking on the secure Razorpay window.</p>
+                  ) : (
+                    <PaymentMethodForm onChange={setInstrument} disabled={paying} />
+                  )}
+                </CardBody>
+              </Card>
 
-                {/* Test-mode credential hint */}
-                {testMethods.data?.testMode && hints && (
-                  <div className="flex items-start gap-2 rounded-md border border-border bg-surface-muted p-3 text-xs text-text-muted">
-                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
-                    <div>
-                      <span className="font-semibold text-text">Test mode.</span>{' '}
-                      {method === 'upi' && <>Use UPI ID <b className="text-text">{hints.upi}</b> to succeed (or <b>{hints.upiFailure}</b> to see a decline).</>}
-                      {(method === 'credit_card' || method === 'debit_card') && <>Use card <b className="text-text">{hints.card}</b>, expiry <b className="text-text">{hints.cardExpiry}</b>, CVV <b className="text-text">{hints.cardCvv}</b>.</>}
-                      {method === 'net_banking' && <>Any bank + username <b className="text-text">{hints.netbankingUser}</b>, password <b className="text-text">{hints.netbankingPassword}</b>.</>}
-                    </div>
-                  </div>
-                )}
-
-                {/* Method-specific fields */}
-                {method === 'upi' && (
-                  <Input label="UPI ID" value={vpa} onChange={(e) => setVpa(e.target.value)} placeholder="name@bank" leftIcon={<Smartphone className="h-4 w-4" />} />
-                )}
-
-                {(method === 'credit_card' || method === 'debit_card') && (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="sm:col-span-2">
-                      <Input label="Card number" value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="4111 1111 1111 1111" inputMode="numeric" leftIcon={<CreditCard className="h-4 w-4" />} />
-                    </div>
-                    <Input label="Expiry (MM/YY)" value={expiry} onChange={(e) => setExpiry(e.target.value)} placeholder="12/30" />
-                    <Input label="CVV" value={cvv} onChange={(e) => setCvv(e.target.value)} placeholder="123" inputMode="numeric" type="password" />
-                    <div className="sm:col-span-2">
-                      <Input label="Name on card (optional)" value={holder} onChange={(e) => setHolder(e.target.value)} leftIcon={<User className="h-4 w-4" />} />
-                    </div>
-                  </div>
-                )}
-
-                {method === 'net_banking' && (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="sm:col-span-2">
-                      <Select label="Bank" value={bank} onChange={(e) => setBank(e.target.value)} placeholder="Select your bank"
-                        options={banks.map((x) => ({ label: x, value: x }))} />
-                    </div>
-                    <Input label="Net-banking username" value={nbUser} onChange={(e) => setNbUser(e.target.value)} leftIcon={<User className="h-4 w-4" />} />
-                    <Input label="Password" type="password" value={nbPass} onChange={(e) => setNbPass(e.target.value)} leftIcon={<Lock className="h-4 w-4" />} />
-                  </div>
-                )}
-              </CardBody>
-            </Card>
-          )}
-        </div>
-
-        {/* Fare summary + pay */}
-        <div className="lg:col-span-1">
-          <Card className="sticky top-20">
-            <CardHeader title="Fare summary" />
-            <CardBody className="flex flex-col gap-3 text-sm">
-              <div className="flex justify-between"><span className="text-text-muted">Seats</span><span className="font-medium">{b.seatNumbers.join(', ')}</span></div>
-              <div className="flex justify-between border-t border-border pt-3 text-base"><span className="font-semibold">Total</span><span className="font-semibold">{formatMoney(totalMinor, currency)}</span></div>
               <label className="flex items-start gap-2 text-xs text-text-muted">
-                <input type="checkbox" className="mt-0.5" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} />
+                <input type="checkbox" className="mt-0.5" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
                 <span>
-                  I agree to the <Link to="/legal/terms" target="_blank" className="text-primary underline">Terms of Service</Link>,{' '}
-                  <Link to="/legal/privacy" target="_blank" className="text-primary underline">Privacy Policy</Link>, and{' '}
-                  <Link to="/legal/refund-policy" target="_blank" className="text-primary underline">Cancellation & Refund Policy</Link>.
+                  I agree to{' '}
+                  {(legal.data?.items ?? []).map((p, i, arr) => (
+                    <span key={p.slug}>
+                      <Link to={`/legal/${p.slug}`} target="_blank" className="text-primary underline">{p.title}</Link>
+                      {i < arr.length - 2 ? ', ' : i === arr.length - 2 ? ' and ' : ''}
+                    </span>
+                  ))}
+                  {(legal.data?.items ?? []).length === 0 && 'the terms of travel'}.
                 </span>
               </label>
-              {err && authStep === 'done' && <p className="text-xs text-danger">{err}</p>}
+              {payError && <p role="alert" className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{payError}</p>}
               <Button
-                className="mt-1"
-                fullWidth
-                disabled={isRealGateway ? !canPayReal : !canPay}
-                onClick={isRealGateway ? payWithRazorpay : pay}
-                leftIcon={busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+                size="lg"
+                onClick={() => void pay()}
+                loading={paying}
+                disabled={!terms || addonBusy || (!realGateway && !instrument)}
+                leftIcon={<Lock className="h-4 w-4" />}
               >
-                Pay {formatMoney(totalMinor, currency)}
+                {addonBusy ? 'Updating total…' : `Pay ${formatMoney(payable, currency)}`}
               </Button>
-              <p className="text-center text-[11px] text-text-muted">
-                {authStep !== 'done' ? 'Sign in above to continue' : isRealGateway ? 'Secured checkout · Razorpay' : 'Secured checkout · sandbox payment'}
-              </p>
-            </CardBody>
-          </Card>
+              <p className="-mt-3 text-center text-[11px] text-text-muted">Your seats stay held until the timer runs out.</p>
+            </>
+          )}
         </div>
+        <div>{summary}</div>
       </div>
     </div>
   );

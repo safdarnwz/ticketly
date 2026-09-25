@@ -2,10 +2,11 @@ import type { ReactNode } from 'react';
 import { useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ticket, ExternalLink, ShieldCheck, XCircle, ArrowUpCircle } from 'lucide-react';
+import { Ticket, ShieldCheck, XCircle, ArrowUpCircle } from 'lucide-react';
 
 import { Button, Card, CardBody, CardHeader, Badge, statusTone, Modal, Input, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
+import { PrintTicketButton } from '@/components/customer/PrintTicketButton';
 import { bookingsApi } from '@/lib/api/bookings';
 import { paymentsApi, openRazorpayCheckout } from '@/lib/api/payments';
 import { refundsApi } from '@/lib/api/ops';
@@ -105,7 +106,7 @@ export function BookingDetailPage() {
         <Card className="lg:col-span-2">
           <CardHeader
             title={<span className="flex items-center gap-2"><Ticket className="h-4 w-4" /> Tickets</span>}
-            action={id ? <a href={bookingsApi.ticketHtmlUrl(id)} target="_blank" rel="noreferrer"><Button variant="outline" size="sm" leftIcon={<ExternalLink className="h-4 w-4" />}>Print</Button></a> : null}
+            action={id ? <PrintTicketButton bookingId={id} /> : null}
           />
           <CardBody>
             {tickets.isLoading ? <PageLoader /> : tickets.data?.tickets?.length ? (

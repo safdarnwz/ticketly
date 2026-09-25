@@ -53,12 +53,14 @@ export const paymentsApi = {
    * details (e.g. card declined, customer tries UPI instead) isn't blocked
    * by a cached rejection from the first attempt — only an exact re-click
    * with the SAME details dedupes. */
-  charge: (bookingId: string, instrument: ChargeInstrument) =>
-    post<ChargeResult>('/v1/payments/charge', { bookingId, ...instrument }, withIdempotency(`charge-${bookingId}-${JSON.stringify(instrument)}`)),
+  /** `attemptKey` identifies one press of Pay (retries of it replay); card details never go in a header. */
+  charge: (bookingId: string, instrument: ChargeInstrument, attemptKey: string) =>
+    post<ChargeResult>('/v1/payments/charge', { bookingId, ...instrument }, withIdempotency(`charge-${bookingId}-${attemptKey}`)),
 
   /** REAL payment: create a gateway (Razorpay) order for a held booking. */
-  createIntent: (bookingId: string) =>
-    post<{ intentId: string; clientPayload: RazorpayClientPayload }>('/v1/payments/intent', { bookingId }, withIdempotency(`intent-${bookingId}`)),
+  /** Keyed on the amount too: after add-ons change the total, a new gateway order is made instead of replaying the old one. */
+  createIntent: (bookingId: string, totalMinor: number) =>
+    post<{ intentId: string; clientPayload: RazorpayClientPayload }>('/v1/payments/intent', { bookingId }, withIdempotency(`intent-${bookingId}-${totalMinor}`)),
 
   /** REAL payment: verify Razorpay's client-side checkout callback and confirm the booking immediately. */
   verify: (bookingId: string, callback: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>

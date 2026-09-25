@@ -1,12 +1,21 @@
 import { get, post, withIdempotency } from './client';
-import type { Booking, Ticket } from './types';
+import type { Booking, TicketsResponse } from './types';
 
 export interface HoldInput {
   quoteId: string;
   seatNumbers: string[];
-  passengers: { seatNumber: string; fullName: string; age?: number; gender?: string }[];
+  passengers: {
+    seatNumber: string;
+    fullName: string;
+    age?: number;
+    gender?: string;
+    category?: string;
+    idProof?: string;
+  }[];
   contactEmail?: string;
   contactPhone?: string;
+  /** 'backoffice' for staff counter sales (needs booking:create); storefront omits it. */
+  channel?: 'direct_web' | 'direct_app' | 'backoffice';
 }
 
 export const bookingsApi = {
@@ -16,6 +25,9 @@ export const bookingsApi = {
     post<{ bookingId: string; pnr: string; holdExpiresAt: string; totalMinor: number }>(
       '/v1/bookings/hold', input, withIdempotency(`hold-${input.quoteId}`),
     ),
+  /** Free an unpaid hold now (the customer went back to change seats). The holder only: signed in, or the booking mobile. */
+  releaseHold: (bookingId: string, mobile?: string) =>
+    post<{ released: boolean }>(`/v1/bookings/${bookingId}/release-hold`, { mobile }),
   confirm: (bookingId: string, paidMinor: number, reference?: string) =>
     post<{ pnr: string; tickets: { seatNumber: string; boardingCode: string }[] }>(
       `/v1/bookings/${bookingId}/confirm`, { paidMinor, reference }, withIdempotency(`confirm-${bookingId}`),
@@ -34,12 +46,16 @@ export const bookingsApi = {
   // shape is { booking, seats }, NOT a bare Booking.
   getByPnr: (pnr: string, mobile: string) =>
     get<{ booking: Booking; seats: string[] }>(`/v1/bookings/by-pnr/${encodeURIComponent(pnr)}?mobile=${encodeURIComponent(mobile)}`),
-  /** Every booking for a phone number, across every operator. */
-  mine: (mobile: string) => get<{ bookings: Booking[] }>(`/v1/bookings/mine?mobile=${encodeURIComponent(mobile)}`),
+  /** The signed-in customer's own bookings. */
+  mine: () => get<{ bookings: Booking[] }>('/v1/bookings/mine'),
 
   // Tickets (Part 15)
-  tickets: (bookingId: string) => get<{ pnr: string; tickets: Ticket[] }>(`/v1/bookings/${bookingId}/tickets`),
-  ticketHtmlUrl: (bookingId: string) => `/api/v1/bookings/${bookingId}/ticket.html`,
+  /** Staff and the booking's own signed-in customer need nothing else; a guest proves it with the booking's mobile. */
+  tickets: (bookingId: string, mobile?: string) =>
+    get<TicketsResponse>(`/v1/bookings/${bookingId}/tickets${mobile ? `?mobile=${encodeURIComponent(mobile)}` : ''}`),
+  /** The printable e-ticket, fetched with the caller's credentials (a plain link would carry none). */
+  ticketHtml: (bookingId: string, mobile?: string) =>
+    get<string>(`/v1/bookings/${bookingId}/ticket.html${mobile ? `?mobile=${encodeURIComponent(mobile)}` : ''}`, { responseType: 'text' }),
   verifyTicket: (token: string) => post<{ valid: boolean; payload: unknown }>('/v1/tickets/verify', { token }),
 
   // Invoices (Part 13)

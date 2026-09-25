@@ -1,45 +1,16 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { Armchair, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { useMutation } from '@tanstack/react-query';
+import { CheckCircle2, AlertTriangle } from 'lucide-react';
 
-import { Button, Card, CardBody, CardHeader, Input, PageLoader, ErrorState, useToast } from '@/components/ui';
+import { Button, Card, CardBody, CardHeader, Input, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { flowApi } from '@/lib/api/booking-flow';
+import { SeatSelector, type SeatSelection } from '@/components/customer/SeatSelector';
 import { connectionsApi, type ConnectingOption, type ConnectionPassenger } from '@/lib/api/connections';
 import { formatMoney } from '@/lib/utils';
 
 type Step = 'seats' | 'payment' | 'done';
-
-function LegSeatPicker({ label, tripId, fromStopId, toStopId, selected, onToggle }: {
-  label: string; tripId: string; fromStopId: string; toStopId: string;
-  selected: string[]; onToggle: (seat: string) => void;
-}) {
-  const avail = useQuery({ queryKey: ['conn-avail', tripId], queryFn: () => flowApi.availability(tripId, fromStopId, toStopId) });
-  if (avail.isLoading) return <PageLoader />;
-  if (avail.isError) return <ErrorState error={avail.error} onRetry={avail.refetch} />;
-  return (
-    <div>
-      <div className="mb-2 text-sm font-semibold text-text">{label}</div>
-      <div className="flex flex-wrap gap-2">
-        {(avail.data?.seats ?? []).map((s) => {
-          const isSel = selected.includes(s.seatNumber);
-          return (
-            <button key={s.seatNumber} onClick={() => s.available && onToggle(s.seatNumber)} disabled={!s.available} title={s.seatNumber}
-              className={[
-                'flex h-10 w-10 items-center justify-center rounded-md border text-xs font-medium transition',
-                !s.available ? 'cursor-not-allowed border-border bg-surface-muted text-text-muted/50'
-                  : isSel ? 'border-primary bg-primary text-primary-fg'
-                  : 'border-success/40 bg-success/10 text-success hover:border-success',
-              ].join(' ')}>
-              <Armchair className="h-3.5 w-3.5" />
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 export function ConnectingCheckoutPage() {
   const location = useLocation();
@@ -64,15 +35,15 @@ function ConnectingCheckout({ option }: { option: ConnectingOption }) {
   const toast = useToast();
 
   const [step, setStep] = useState<Step>('seats');
-  const [leg1Seats, setLeg1Seats] = useState<string[]>([]);
-  const [leg2Seats, setLeg2Seats] = useState<string[]>([]);
+  const [leg1, setLeg1] = useState<SeatSelection>({ seats: [] });
+  const [leg2, setLeg2] = useState<SeatSelection>({ seats: [] });
+  const leg1Seats = leg1.seats.map((s) => s.seatNumber);
+  const leg2Seats = leg2.seats.map((s) => s.seatNumber);
   const [names, setNames] = useState<Record<string, string>>({});
   const [contactPhone, setContactPhone] = useState('');
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [confirmResult, setConfirmResult] = useState<{ leg1: { status: string; pnr?: string }; leg2: { status: string; pnr?: string; error?: string } } | null>(null);
 
-  const toggleLeg1 = (seat: string) => setLeg1Seats((cur) => cur.includes(seat) ? cur.filter((s) => s !== seat) : [...cur, seat]);
-  const toggleLeg2 = (seat: string) => setLeg2Seats((cur) => cur.includes(seat) ? cur.filter((s) => s !== seat) : [...cur, seat]);
 
   // Edge case: both legs of a connecting journey must carry the SAME
   // number of passengers — a group travelling together doesn't split
@@ -90,8 +61,8 @@ function ConnectingCheckout({ option }: { option: ConnectingOption }) {
   const hold = useMutation({
     mutationFn: async () => {
       const [q1, q2] = await Promise.all([
-        flowApi.quote({ tripId: option.leg1.tripId, fromStopId: option.leg1.fromStopId, toStopId: option.leg1.toStopId, seatType: 'seater', seatNumbers: leg1Seats }),
-        flowApi.quote({ tripId: option.leg2.tripId, fromStopId: option.leg2.fromStopId, toStopId: option.leg2.toStopId, seatType: 'seater', seatNumbers: leg2Seats }),
+        flowApi.quote({ tripId: option.leg1.tripId, fromStopId: option.leg1.fromStopId, toStopId: option.leg1.toStopId, seatType: leg1.seatType, seatNumbers: leg1Seats }, option.leg1.tenantId),
+        flowApi.quote({ tripId: option.leg2.tripId, fromStopId: option.leg2.fromStopId, toStopId: option.leg2.toStopId, seatType: leg2.seatType, seatNumbers: leg2Seats }, option.leg2.tenantId),
       ]);
       return connectionsApi.hold({
         leg1: { tenantId: option.leg1.tenantId, quoteId: q1.quoteId, seatNumbers: leg1Seats, passengers: buildPassengers(leg1Seats) },
@@ -126,8 +97,14 @@ function ConnectingCheckout({ option }: { option: ConnectingOption }) {
 
       {step === 'seats' && (
         <div className="flex flex-col gap-4">
-          <Card><CardBody><LegSeatPicker label={`Leg 1 — ${option.leg1.fromStopName} to ${option.leg1.toStopName} (${option.leg1.operatorName})`} tripId={option.leg1.tripId} fromStopId={option.leg1.fromStopId} toStopId={option.leg1.toStopId} selected={leg1Seats} onToggle={toggleLeg1} /></CardBody></Card>
-          <Card><CardBody><LegSeatPicker label={`Leg 2 — ${option.leg2.fromStopName} to ${option.leg2.toStopName} (${option.leg2.operatorName})`} tripId={option.leg2.tripId} fromStopId={option.leg2.fromStopId} toStopId={option.leg2.toStopId} selected={leg2Seats} onToggle={toggleLeg2} /></CardBody></Card>
+          {([['Leg 1', option.leg1, setLeg1], ['Leg 2', option.leg2, setLeg2]] as const).map(([label, leg, set]) => (
+            <Card key={label}>
+              <CardHeader title={`${label} — ${leg.operatorName}`} subtitle={`${leg.fromStopName} → ${leg.toStopName}`} />
+              <CardBody>
+                <SeatSelector tripId={leg.tripId} tenantId={leg.tenantId} initialFromStopId={leg.fromStopId} initialToStopId={leg.toStopId} lockStops priceOf={() => undefined} onChange={set} />
+              </CardBody>
+            </Card>
+          ))}
 
           {seatCountMismatch && (
             <div className="flex items-center gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-warning">

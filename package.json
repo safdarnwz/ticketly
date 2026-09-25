@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Ticketly operator console \u2014 React + TypeScript + Tailwind frontend",
+  "description": "Ticketly operator console — React + TypeScript + Tailwind frontend",
   "engines": {
     "node": ">=20.11.0",
     "npm": ">=10.0.0"
@@ -21,16 +21,18 @@
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "lucide-react": "^0.417.0",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
-    "recharts": "^2.12.7",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.25.1",
+    "recharts": "^2.12.7",
     "tailwind-merge": "^2.4.0",
     "zod": "^3.23.8",
     "zustand": "^4.5.4"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^7.16.1",

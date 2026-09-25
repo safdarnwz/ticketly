@@ -26,6 +26,8 @@ export interface SearchResult {
   currency: string;
   /** seater / sleeper / semi_sleeper */
   seatTypes: string[];
+  /** Price per seat for each seat type that has a fare. */
+  fares: { seatType: string; priceMinor: number }[];
   /** Average stars of the route's reviews; null until the first review. */
   rating: number | null;
   ratingCount: number;
@@ -53,4 +55,11 @@ export interface Ticket {
   seat: string;
   ticketId?: string | null;
   boardingToken: string;
+}
+
+export interface TicketsResponse {
+  pnr: string;
+  tickets: Ticket[];
+  /** The one QR printed on the e-ticket, scanned at boarding. */
+  bookingQrToken: string;
 }

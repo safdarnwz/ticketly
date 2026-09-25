@@ -1,8 +1,9 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Search, Ticket, ExternalLink, ShieldCheck, Phone, List, XCircle } from 'lucide-react';
+import { Search, Ticket, ShieldCheck, Phone, List, XCircle } from 'lucide-react';
 
 import { Button, Card, CardBody, CardHeader, Input, Badge, statusTone, useToast, EmptyState, Modal } from '@/components/ui';
+import { PrintTicketButton } from '@/components/customer/PrintTicketButton';
 import { bookingsApi } from '@/lib/api/bookings';
 import { LiveTrackingCard } from '@/components/customer/LiveTrackingCard';
 import { useBooking } from '@/stores/booking';
@@ -34,7 +35,7 @@ export function AccountPage() {
     mutationFn: async () => {
       const { booking: bk, seats: st } = await bookingsApi.getByPnr(pnr.trim().toUpperCase(), mobile.trim());
       setViewedBookingTenant(bk.tenantId);
-      const tk = await bookingsApi.tickets(bk.id).catch(() => ({ pnr: bk.pnr, tickets: [] as T[] }));
+      const tk = await bookingsApi.tickets(bk.id, mobile.trim()).catch(() => ({ pnr: bk.pnr, tickets: [] as T[] }));
       return { bk, st, tk };
     },
     onSuccess: ({ bk, st, tk }) => { setBooking(bk); setSeats(st); setTickets(tk.tickets ?? []); setBookings(null); setLookupMobile(mobile.trim()); },
@@ -43,7 +44,7 @@ export function AccountPage() {
 
   // Mobile only → every booking across every operator for that number.
   const lookupByMobile = useMutation({
-    mutationFn: () => bookingsApi.mine(mobile.trim()),
+    mutationFn: () => bookingsApi.mine(),
     onSuccess: (res) => { setBookings(res.bookings); setBooking(null); setLookupMobile(mobile.trim()); },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not load bookings'),
   });
@@ -133,7 +134,7 @@ export function AccountPage() {
             <CardHeader
               title={`PNR ${booking.pnr}`}
               subtitle={<Badge tone={statusTone(booking.status)}>{booking.status}</Badge>}
-              action={<a href={bookingsApi.ticketHtmlUrl(booking.id)} target="_blank" rel="noreferrer"><Button variant="outline" size="sm" leftIcon={<ExternalLink className="h-4 w-4" />}>Print</Button></a>}
+              action={<PrintTicketButton bookingId={booking.id} mobile={lookupMobile || undefined} />}
             />
             <CardBody className="flex flex-col gap-3 text-sm">
               <div className="flex justify-between"><span className="text-text-muted">Seats</span><span className="font-medium">{seats.length > 0 ? seats.join(', ') : booking.seatCount}</span></div>

@@ -67,6 +67,12 @@ export function configureBookingTenant(fn: () => string | null): void {
   getBookingTenantId = fn;
 }
 
+/** Storefront calls that span every operator and must never carry a booking's tenant. */
+const CROSS_OPERATOR = ['/v1/search', '/v1/master-data/cities', '/v1/content', '/v1/auth', '/v1/bookings/mine', '/v1/bookings/by-pnr/'];
+function isCrossOperator(url: string): boolean {
+  return CROSS_OPERATOR.some((p) => url.startsWith(p));
+}
+
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE ?? '/api',
   headers: { Accept: 'application/json' },
@@ -83,7 +89,12 @@ api.interceptors.request.use((config) => {
   if (tenant) config.headers['x-tenant-slug'] = tenant;
   // The real, production-meaningful header for the customer storefront flow —
   // takes priority since it names an exact tenant UUID, not a dev alias.
-  if (bookingTenantId) config.headers['X-Tenant-Id'] = bookingTenantId;
+  // …but only on calls about that trip/booking. Search, city lookup, site
+  // content and sign-in are across every operator: a tenant header there
+  // would narrow the whole storefront to the last operator booked.
+  if (bookingTenantId && !config.headers['X-Tenant-Id'] && !isCrossOperator(config.url ?? '')) {
+    config.headers['X-Tenant-Id'] = bookingTenantId;
+  }
   return config;
 });
 

@@ -1,105 +1,84 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { Armchair, Smartphone, CheckCircle2 } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useMutation } from '@tanstack/react-query';
+import { CheckCircle2, Smartphone } from 'lucide-react';
 
-import { Button, Card, CardBody, CardHeader, Select, Input, PageLoader, ErrorState, useToast } from '@/components/ui';
-import { flowApi, type SeatCell } from '@/lib/api/booking-flow';
+import { Button, Card, CardBody, CardHeader, Input, useToast } from '@/components/ui';
+import { SeatSelector, type SeatSelection } from '@/components/customer/SeatSelector';
+import { flowApi } from '@/lib/api/booking-flow';
 import { bookingsApi } from '@/lib/api/bookings';
+import { ApiError } from '@/lib/api/client';
 import { paymentsApi } from '@/lib/api/payments';
 import type { SearchResult } from '@/lib/api/types';
+import { normalizeMobile, validatePassengers, type PassengerForm } from '@/lib/checkout';
 import { formatMoney } from '@/lib/utils';
 
+/**
+ * Counter sale by operator staff: seats, passengers, and the customer pays
+ * by UPI through the same verified gateway charge a website customer uses —
+ * there is no cash shortcut. Booked on the back-office channel.
+ */
 export function StaffTripPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
   const trip = (location.state as { trip?: SearchResult } | null)?.trip;
-  // Same reasoning as the customer TripPage: the trip's UUID travels only
-  // in navigation state, never the URL. Landing here directly (refresh,
-  // bookmark) has nothing to resolve a trip from, by design.
-  const tripId = trip?.tripId ?? '';
   useEffect(() => {
-    if (!tripId) navigate('/search', { replace: true });
-  }, [tripId, navigate]);
+    if (!trip) navigate('/search', { replace: true });
+  }, [trip, navigate]);
+
+  const [sel, setSel] = useState<SeatSelection>({ seats: [] });
+  const [forms, setForms] = useState<Record<string, PassengerForm>>({});
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [vpa, setVpa] = useState('');
+  const [showErrors, setShowErrors] = useState(false);
+  const [confirmedPnr, setConfirmedPnr] = useState<string | null>(null);
   const inFlight = useRef(false);
 
-  // Staff-assisted sale — the customer pays via UPI at the counter, staff
-  // enters their VPA, and it goes through the SAME verified sandbox-gateway
-  // charge a self-service customer would use. No cash-shortcut anywhere.
-  const [customerVpa, setCustomerVpa] = useState('');
-
-  const detail = useQuery({ queryKey: ['trip', tripId], queryFn: () => flowApi.trip(tripId), enabled: Boolean(tripId) });
-  const stops: any[] = detail.data?.stops ?? [];
-
-  const [fromStopId, setFromStopId] = useState('');
-  const [toStopId, setToStopId] = useState('');
-  useEffect(() => {
-    if (stops.length >= 2 && !fromStopId) {
-      setFromStopId(stops[0].id ?? stops[0].stopId ?? '');
-      setToStopId(stops[stops.length - 1].id ?? stops[stops.length - 1].stopId ?? '');
-    }
-  }, [stops, fromStopId]);
-
-  const avail = useQuery({
-    queryKey: ['availability', tripId, fromStopId, toStopId],
-    queryFn: () => flowApi.availability(tripId, fromStopId, toStopId),
-    enabled: Boolean(tripId && fromStopId && toStopId),
-  });
-
-  const [selected, setSelected] = useState<string[]>([]);
-  const toggle = (s: SeatCell) => {
-    if (!s.available) return;
-    setSelected((cur) => cur.includes(s.seatNumber) ? cur.filter((x) => x !== s.seatNumber) : cur.length >= 6 ? cur : [...cur, s.seatNumber]);
-  };
-
-  const [contactPhone, setContactPhone] = useState('');
-  const [contactEmail, setContactEmail] = useState('');
-  const [passengers, setPassengers] = useState<Record<string, { fullName: string; age: string; gender: 'male' | 'female' | 'other' }>>({});
-  const setPassenger = (seat: string, patch: Partial<{ fullName: string; age: string; gender: 'male' | 'female' | 'other' }>) =>
-    setPassengers((p) => ({ ...p, [seat]: { ...(p[seat] ?? { fullName: '', age: '', gender: 'male' }), ...patch } }));
-
-  const [confirmedPnr, setConfirmedPnr] = useState<string | null>(null);
-
-  const quote = useQuery({
-    queryKey: ['staff-quote', tripId, fromStopId, toStopId, selected.join(',')],
-    queryFn: () => flowApi.quote({ tripId, fromStopId, toStopId, seatType: 'seater', seatNumbers: selected }),
-    enabled: selected.length > 0 && !!fromStopId && !!toStopId,
-  });
-
-  const canConfirm = selected.length > 0 && contactPhone.trim().length >= 6
-    && selected.every((s) => passengers[s]?.fullName?.trim() && passengers[s]?.age)
-    && customerVpa.trim().length >= 3;
+  const passengers: PassengerForm[] = sel.seats.map((s) => forms[s.seatNumber] ?? { seatNumber: s.seatNumber, fullName: '', age: '', gender: '', category: 'adult', idProof: '' });
+  const patch = (seat: string, p: Partial<PassengerForm>) =>
+    setForms((f) => ({ ...f, [seat]: { ...(f[seat] ?? { seatNumber: seat, fullName: '', age: '', gender: '', category: 'adult', idProof: '' }), ...p } }));
+  const errors = useMemo(
+    () => validatePassengers(passengers, { concessions: [], ladiesSeats: sel.seats.filter((s) => s.ladiesOnly).map((s) => s.seatNumber) }),
+    [passengers, sel.seats],
+  );
+  const mobile = normalizeMobile(phone);
+  const priceOf = (t: string) => trip?.fares?.find((f) => f.seatType === t)?.priceMinor;
+  const estimate = sel.seats.reduce((a, s) => a + (priceOf(s.seatType) ?? 0), 0);
+  const ready = sel.seats.length > 0 && Object.keys(errors).length === 0 && mobile && /^[\w.-]{2,}@[a-zA-Z]{2,}$/.test(vpa.trim());
 
   const confirm = useMutation({
     mutationFn: async () => {
-      const hold = await bookingsApi.hold({
-        quoteId: quote.data!.quoteId, seatNumbers: selected,
-        passengers: selected.map((s) => ({ seatNumber: s, fullName: passengers[s].fullName.trim(), age: Number(passengers[s].age), gender: passengers[s].gender })),
-        contactPhone: contactPhone.trim(), contactEmail: contactEmail.trim() || undefined,
+      const q = await flowApi.quote({
+        tripId: trip!.tripId,
+        fromStopId: sel.fromStop!.stopId,
+        toStopId: sel.toStop!.stopId,
+        seatType: sel.seatType,
+        seatNumbers: sel.seats.map((s) => s.seatNumber),
       });
-      return paymentsApi.chargeTest(hold.bookingId, customerVpa.trim());
+      const hold = await bookingsApi.hold({
+        quoteId: q.quoteId,
+        seatNumbers: sel.seats.map((s) => s.seatNumber),
+        passengers: passengers.map((p) => ({ seatNumber: p.seatNumber, fullName: p.fullName.trim(), age: Number(p.age), gender: p.gender || undefined })),
+        contactPhone: mobile!,
+        contactEmail: email.trim() || undefined,
+        channel: 'backoffice',
+      });
+      return paymentsApi.chargeTest(hold.bookingId, vpa.trim());
     },
     onSuccess: (res) => { setConfirmedPnr(res.pnr); toast.success('Booking confirmed'); },
-    onError: (e) => { toast.error(e instanceof Error ? e.message : 'Could not complete booking'); inFlight.current = false; },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Could not complete the booking'),
+    onSettled: () => { inFlight.current = false; },
   });
-  const handleConfirm = () => {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    confirm.mutate();
-  };
 
-  const stopOptions = useMemo(() => stops.map((s) => ({ label: s.name ?? s.stopName ?? 'Stop', value: s.id ?? s.stopId ?? '' })), [stops]);
-
-  if (detail.isLoading) return <div className="mx-auto max-w-4xl px-4 py-8"><PageLoader /></div>;
-  if (detail.isError) return <div className="mx-auto max-w-4xl px-4 py-8"><ErrorState error={detail.error} onRetry={detail.refetch} /></div>;
-
+  if (!trip) return null;
   if (confirmedPnr) {
     return (
       <div className="mx-auto flex max-w-lg flex-col items-center gap-4 px-4 py-16 text-center">
         <CheckCircle2 className="h-14 w-14 text-success" />
         <h1 className="font-display text-2xl text-text">Booking confirmed</h1>
-        <p className="text-text-muted">PNR <b className="text-text">{confirmedPnr}</b> — paid via UPI.</p>
+        <p className="text-text-muted">PNR <b className="text-text">{confirmedPnr}</b> — paid by UPI.</p>
         <div className="flex gap-3">
           <Button variant="outline" onClick={() => navigate('/search')}>Book another</Button>
           <Button onClick={() => navigate(`/bookings/${confirmedPnr}`)}>View booking</Button>
@@ -109,81 +88,63 @@ export function StaffTripPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6">
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 flex flex-col gap-4">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="flex flex-col gap-4 lg:col-span-2">
+        <Card>
+          <CardHeader title={`${trip.operatorName} — choose seats`} />
+          <CardBody>
+            <SeatSelector tripId={trip.tripId} initialFromStopId={trip.boardingStop.id} initialToStopId={trip.droppingStop.id} priceOf={priceOf} currency={trip.currency} onChange={setSel} />
+          </CardBody>
+        </Card>
+        {sel.seats.length > 0 && (
           <Card>
-            <CardHeader title="Choose seats" subtitle="Green seats are available" />
-            <CardBody>
-              {stopOptions.length >= 2 && (
-                <div className="mb-4 grid grid-cols-2 gap-3">
-                  <Select label="Boarding" value={fromStopId} onChange={(e) => setFromStopId(e.target.value)} options={stopOptions} />
-                  <Select label="Dropping" value={toStopId} onChange={(e) => setToStopId(e.target.value)} options={stopOptions} />
-                </div>
-              )}
-              {avail.isLoading ? <PageLoader /> : avail.isError ? <ErrorState error={avail.error} onRetry={avail.refetch} /> : (
-                <div className="flex flex-wrap gap-2">
-                  {(avail.data?.seats ?? []).map((s) => {
-                    const isSel = selected.includes(s.seatNumber);
-                    return (
-                      <button key={s.seatNumber} onClick={() => toggle(s)} disabled={!s.available} title={s.seatNumber}
-                        className={[
-                          'flex h-11 w-11 items-center justify-center rounded-md border text-xs font-medium transition',
-                          !s.available ? 'cursor-not-allowed border-border bg-surface-muted text-text-muted/50'
-                            : isSel ? 'border-primary bg-primary text-primary-fg'
-                            : 'border-success/40 bg-success/10 text-success hover:border-success',
-                        ].join(' ')}>
-                        <Armchair className="h-4 w-4" />
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </CardBody>
-          </Card>
-
-          {selected.length > 0 && (
-            <Card>
-              <CardHeader title="Passenger & contact details" />
-              <CardBody className="flex flex-col gap-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <Input label="Contact phone" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="9876543210" />
-                  <Input label="Contact email (optional)" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
-                </div>
-                <Input label="Customer's UPI ID" value={customerVpa} onChange={(e) => setCustomerVpa(e.target.value)} placeholder="customer@upi" hint="Charged live — enter the VPA the customer wants to pay from" />
-                {selected.map((s) => (
-                  <div key={s} className="grid grid-cols-3 gap-3 rounded-md border border-border p-3">
-                    <Input label={`Seat ${s} — name`} value={passengers[s]?.fullName ?? ''} onChange={(e) => setPassenger(s, { fullName: e.target.value })} />
-                    <Input label="Age" type="number" value={passengers[s]?.age ?? ''} onChange={(e) => setPassenger(s, { age: e.target.value })} />
-                    <Select label="Gender" value={passengers[s]?.gender ?? 'male'} onChange={(e) => setPassenger(s, { gender: e.target.value as any })}
-                      options={[{ label: 'Male', value: 'male' }, { label: 'Female', value: 'female' }, { label: 'Other', value: 'other' }]} />
+            <CardHeader title="Passengers" />
+            <CardBody className="flex flex-col gap-3">
+              {passengers.map((p, i) => (
+                <div key={p.seatNumber} className="grid grid-cols-1 gap-2 rounded-md border border-border p-3 sm:grid-cols-6">
+                  <div className="text-sm font-semibold sm:col-span-6">Seat {p.seatNumber}</div>
+                  <div className="sm:col-span-3"><Input label="Full name" value={p.fullName} onChange={(e) => patch(p.seatNumber, { fullName: e.target.value })} error={showErrors ? errors[`${i}.fullName`] : undefined} /></div>
+                  <div className="sm:col-span-1"><Input label="Age" inputMode="numeric" value={p.age} onChange={(e) => patch(p.seatNumber, { age: e.target.value.replace(/\D/g, '').slice(0, 3) })} error={showErrors ? errors[`${i}.age`] : undefined} /></div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1.5 block text-sm font-medium text-text" htmlFor={`g-${i}`}>Gender</label>
+                    <select id={`g-${i}`} value={p.gender} onChange={(e) => patch(p.seatNumber, { gender: e.target.value as PassengerForm['gender'] })} className="h-input w-full rounded-input border border-border bg-surface px-input-x text-sm focus-ring">
+                      <option value="">Choose</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
+                    </select>
+                    {showErrors && errors[`${i}.gender`] && <p className="mt-1 text-xs text-danger">{errors[`${i}.gender`]}</p>}
                   </div>
-                ))}
-              </CardBody>
-            </Card>
-          )}
-        </div>
-
-        <div className="lg:col-span-1">
-          <Card className="sticky top-20">
-            <CardHeader title="Summary" />
-            <CardBody className="flex flex-col gap-3 text-sm">
-              <div className="flex justify-between"><span className="text-text-muted">Seats</span><span className="font-medium">{selected.join(', ') || '—'}</span></div>
-              {quote.data && (
-                <>
-                  {quote.data.seatFares?.map((f) => (
-                    <div key={f.seatNumber} className="flex justify-between text-xs text-text-muted"><span>Seat {f.seatNumber}</span><span>{formatMoney(f.totalMinor, quote.data.currency)}</span></div>
-                  ))}
-                  <div className="flex justify-between border-t border-border pt-2 font-semibold text-text"><span>Total</span><span>{formatMoney(quote.data.totalMinor, quote.data.currency)}</span></div>
-                </>
-              )}
-              <Button className="mt-2" fullWidth loading={confirm.isPending} disabled={!canConfirm || !quote.data} leftIcon={<Smartphone className="h-4 w-4" />} onClick={handleConfirm}>
-                Charge via UPI
-              </Button>
+                </div>
+              ))}
+              {showErrors && errors.form && <p className="text-sm text-danger">{errors.form}</p>}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Input label="Customer mobile" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} error={showErrors && !mobile ? 'Enter a 10-digit mobile' : undefined} />
+                <Input label="Customer email (optional)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </div>
             </CardBody>
           </Card>
-        </div>
+        )}
       </div>
+
+      <Card className="h-fit lg:sticky lg:top-20">
+        <CardHeader title="Payment" subtitle="Customer pays by UPI" />
+        <CardBody className="flex flex-col gap-3 text-sm">
+          <div className="flex justify-between"><span className="text-text-muted">Seats</span><span className="font-medium">{sel.seats.map((s) => s.seatNumber).join(', ') || '—'}</span></div>
+          <div className="flex justify-between"><span className="text-text-muted">Estimated fare</span><span className="font-semibold">{sel.seats.length ? formatMoney(estimate, trip.currency) : '—'}</span></div>
+          <Input label="Customer UPI ID" value={vpa} onChange={(e) => setVpa(e.target.value)} leftIcon={<Smartphone className="h-4 w-4" />} placeholder="name@bank" />
+          <Button
+            fullWidth
+            loading={confirm.isPending}
+            disabled={sel.seats.length === 0}
+            onClick={() => {
+              setShowErrors(true);
+              if (!ready || inFlight.current) return;
+              inFlight.current = true;
+              confirm.mutate();
+            }}
+          >
+            Confirm booking
+          </Button>
+        </CardBody>
+      </Card>
     </div>
   );
 }
