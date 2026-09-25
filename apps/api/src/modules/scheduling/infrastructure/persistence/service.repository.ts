@@ -13,6 +13,7 @@ import {
 } from '@kernel';
 
 import type { RecurrenceRule } from '../../domain/recurrence';
+import type { ServiceSalesRules } from '../../domain/sales-rules';
 
 registerConstraintMessages({
   services_tenant_id_code_key: 'A service with this code already exists',
@@ -71,6 +72,26 @@ export class ServiceRepository {
     );
     if (!row) throw new NotFoundError('Service', id);
     return map(row);
+  }
+
+  async salesRules(id: ServiceId): Promise<ServiceSalesRules> {
+    const row = await this.db.queryOne<{ sales_rules: ServiceSalesRules }>(
+      `SELECT sales_rules FROM services WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+      [requireTenantId(), id],
+      { name: 'service.salesRules' },
+    );
+    if (!row) throw new NotFoundError('Service', id);
+    return row.sales_rules;
+  }
+
+  async setSalesRules(id: ServiceId, rules: ServiceSalesRules): Promise<void> {
+    const n = await this.db.execute_(
+      `UPDATE services SET sales_rules = $3, version = version + 1, updated_at = now()
+        WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+      [requireTenantId(), id, JSON.stringify(rules)],
+      { name: 'service.setSalesRules', primary: true },
+    );
+    if (n === 0) throw new NotFoundError('Service', id);
   }
 
   async setStatus(id: ServiceId, status: ServiceStatus): Promise<void> {

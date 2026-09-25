@@ -38,6 +38,7 @@ const SeatCellSchema = z.object({
   ladiesOnly: z.boolean().optional(),
   bookable: z.boolean().optional(),
   position: z.enum(['front', 'aisle', 'window']).optional(),
+  accessible: z.boolean().optional(),
 });
 
 export const SeatMapSchema = z.object({
@@ -100,3 +101,19 @@ export type CitySearchQueryDto = z.infer<typeof CitySearchQuerySchema>;
 
 export const ListRoutesQuerySchema = z.object({ status: z.enum(ROUTE_STATUSES).optional() });
 export type ListRoutesQueryDto = z.infer<typeof ListRoutesQuerySchema>;
+
+/** #136 / #137 / #141 — set attributes on many seats of a layout at once. */
+export const MarkSeatsSchema = z
+  .object({
+    seatNumbers: z.array(z.string().trim().min(1).max(6)).min(1).max(100),
+    position: z.enum(['front', 'aisle', 'window']).nullable().optional(),
+    ladiesOnly: z.boolean().optional(),
+    accessible: z.boolean().optional(),
+  })
+  .refine(
+    (v) => v.position !== undefined || v.ladiesOnly !== undefined || v.accessible !== undefined,
+    {
+      message: 'Set at least one of position, ladiesOnly, accessible',
+    },
+  );
+export type MarkSeatsDto = z.infer<typeof MarkSeatsSchema>;

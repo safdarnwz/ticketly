@@ -64,7 +64,7 @@ async function build(app: NestFastifyApplication): Promise<E2eFixtures> {
     throw new Error(`Demo operator '${DEMO_SLUG}' not found — run npm run db:seed:demo first`);
   const tenantId = tenant.id;
 
-  const journeyDate = addDays(todayIn(config.domain.timezone), 3);
+  const earliest = addDays(todayIn(config.domain.timezone), 3);
   const trip = await runAsTenant(tenantId, async () => {
     const services = await uow.run(
       { name: 'e2e.services', readOnly: true },
@@ -76,7 +76,7 @@ async function build(app: NestFastifyApplication): Promise<E2eFixtures> {
           )
         ).rows,
     );
-    for (const svc of services) await app.get(MaterializationService).materialiseService(svc.id, 7);
+    for (const svc of services) await app.get(MaterializationService).materialiseService(svc.id, 14);
     return uow.run({ name: 'e2e.trip', readOnly: true }, async (s) => {
       const r = await s.client.query<{
         id: string;
@@ -84,17 +84,21 @@ async function build(app: NestFastifyApplication): Promise<E2eFixtures> {
         dest_city_id: string;
         from_stop: string;
         to_stop: string;
+        journey_date: string;
       }>(
-        `SELECT t.id, r.origin_city_id, r.dest_city_id,
+        `SELECT t.id, t.journey_date::text AS journey_date, r.origin_city_id, r.dest_city_id,
                 (SELECT stop_id FROM route_stops WHERE route_id = r.id ORDER BY sequence ASC LIMIT 1) AS from_stop,
                 (SELECT stop_id FROM route_stops WHERE route_id = r.id ORDER BY sequence DESC LIMIT 1) AS to_stop
            FROM trips t JOIN routes r ON r.id = t.route_id
-          WHERE t.tenant_id = $2 AND t.journey_date = $1 AND t.status = 'open'
-          ORDER BY t.departs_at LIMIT 1`,
-        [journeyDate, tenantId],
+          WHERE t.tenant_id = $2 AND t.journey_date BETWEEN $1::date AND $1::date + 9 AND t.status = 'open'
+          -- the emptiest trip of the next days: every run books seats, so one trip fills up
+          ORDER BY (SELECT count(*) FROM trip_seats ts WHERE ts.trip_id = t.id AND ts.is_bookable
+                      AND ts.occupied_legs = 0 AND ts.blocked_legs = 0) DESC, t.departs_at
+          LIMIT 1`,
+        [earliest, tenantId],
       );
       const row = r.rows[0];
-      if (!row) throw new Error(`No open demo trip on ${journeyDate}`);
+      if (!row) throw new Error(`No open demo trip from ${earliest}`);
       const seats = await s.client.query<{ seat_number: string }>(
         `SELECT ts.seat_number FROM trip_seats ts
           WHERE ts.trip_id = $1 AND ts.is_bookable AND NOT ts.ladies_only
@@ -133,7 +137,7 @@ async function build(app: NestFastifyApplication): Promise<E2eFixtures> {
     tenantSlug: DEMO_SLUG,
     originCityId: trip.origin_city_id,
     destCityId: trip.dest_city_id,
-    journeyDate,
+    journeyDate: trip.journey_date,
     tripId: trip.id,
     fromStopId: trip.from_stop,
     toStopId: trip.to_stop,

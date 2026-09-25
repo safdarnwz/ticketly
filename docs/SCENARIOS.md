@@ -12,8 +12,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Status | Count |
 |---|---|
 | OPEN | 2714 |
-| DONE | 931 |
-| GAP | 331 |
+| DONE | 941 |
+| GAP | 321 |
 | CONFLICT | 76 |
 | INFRA | 20 |
 | DUP | 9 |
@@ -22,7 +22,7 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 ## #1–#500
 
-CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 345, GAP 121, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -67,7 +67,7 @@ CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
 | 39 | Enable MakeMyTrip integration | DONE | verified manually: existing module/API |
 | 40 | Enable Goibibo integration | DONE | verified manually: existing module/API |
 | 41 | Enable ixigo integration | DONE | verified manually: existing module/API |
-| 42 | Set global default inventory release percentage for OTAs | GAP | verified manually: not built yet |
+| 42 | Set global default inventory release percentage for OTAs | DONE | PUT /scheduling/services/:id/sales-rules {otaReleasePct}; platform default PUT /admin/policies/ota-release; enforced on hold |
 | 43 | Define commission slab structures | DONE | verified manually: existing module/API |
 | 44 | Set default agent credit limit policy | DONE | PUT /admin/policies/agent-credit (default + cap applied on agent create) |
 | 45 | Publish system-wide announcement banner | DONE | verified manually: existing module/API |
@@ -161,12 +161,12 @@ CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
 | 133 | Select bus type (Seater, Sleeper, Semi-Sleeper, Multi-Axle) | DONE | verified manually: existing module/API |
 | 134 | Enter total seat capacity | DONE | verified manually: existing module/API |
 | 135 | Design seat layout visually | DONE | verified manually: existing module/API |
-| 136 | Mark window seats | GAP | verified manually: not built yet |
-| 137 | Mark aisle seats | GAP | verified manually: not built yet |
+| 136 | Mark window seats | DONE | POST /master-data/seat-layouts/:id/seats/auto-positions / seats/mark (position) |
+| 137 | Mark aisle seats | DONE | POST /master-data/seat-layouts/:id/seats/auto-positions / seats/mark (position) |
 | 138 | Mark lower berths | DONE | verified manually: existing module/API |
 | 139 | Mark upper berths | DONE | verified manually: existing module/API |
 | 140 | Mark ladies seats | DONE | verified manually: existing module/API |
-| 141 | Mark disabled-friendly seats | GAP | verified manually: not built yet |
+| 141 | Mark disabled-friendly seats | DONE | seats/mark {accessible}; trip_seats.accessible; kept for 'disabled' passengers |
 | 142 | Set bus amenities list | DONE | verified manually: existing module/API |
 | 143 | Enable AC amenity | DONE | verified manually: existing module/API |
 | 144 | Enable WiFi amenity | DONE | verified manually: existing module/API |
@@ -195,11 +195,11 @@ CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
 | 167 | Temporarily cancel a service | DONE | verified manually: existing module/API |
 | 168 | Set cancellation reason | DONE | verified manually: existing module/API |
 | 169 | Permanently delete a service | GAP | verified manually: not built yet |
-| 170 | Set OTA inventory release percentage per service | GAP | verified manually: not built yet |
+| 170 | Set OTA inventory release percentage per service | DONE | PUT /scheduling/services/:id/sales-rules {otaReleasePct}; platform default PUT /admin/policies/ota-release; enforced on hold |
 | 171 | Set agent-wise inventory quota | DONE | verified manually: existing module/API |
-| 172 | Set branch-wise inventory allocation percentage | GAP | verified manually: not built yet |
-| 173 | Set ladies quota percentage or seats | GAP | verified manually: not built yet |
-| 174 | Set senior citizen quota | GAP | verified manually: not built yet |
+| 172 | Set branch-wise inventory allocation percentage | DONE | POST /trips/:tripId/quotas/percentage (branch/agent) |
+| 173 | Set ladies quota percentage or seats | DONE | sales-rules categoryQuotas.female/senior (seats or pct, releaseHours), enforced on hold |
+| 174 | Set senior citizen quota | DONE | sales-rules categoryQuotas.female/senior (seats or pct, releaseHours), enforced on hold |
 | 175 | Enable dynamic pricing on selected routes | DONE | verified manually: existing module/API |
 | 176 | Create percentage based coupon | DONE | verified manually: existing module/API |
 | 177 | Create flat amount coupon | DONE | verified manually: existing module/API |
@@ -319,7 +319,7 @@ CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
 | 291 | Configure defense personnel concession | DONE | verified manually: existing module/API |
 | 292 | Set child fare rules by age | DONE | verified manually: existing module/API |
 | 293 | Set infant policy (free or charged) | DONE | verified manually: existing module/API |
-| 294 | Configure disability-friendly seat rules | GAP | verified manually: not built yet |
+| 294 | Configure disability-friendly seat rules | DONE | PUT /concessions/accessible-seats (release hours), enforced on hold |
 | 295 | Upload and manage bus permit documents | DONE | verified manually: existing module/API |
 | 296 | Upload and manage insurance documents | DONE | verified manually: existing module/API |
 | 297 | Upload and manage fitness certificate | DONE | verified manually: existing module/API |
@@ -446,7 +446,7 @@ CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
 | 418 | View complete passenger travel history | DONE | verified manually: existing module/API |
 | 419 | Manually apply senior citizen discount | DONE | verified manually: existing module/API |
 | 420 | Manually apply student discount | DONE | verified manually: existing module/API |
-| 421 | Override ladies seat restriction with proper reason | GAP | verified manually: not built yet |
+| 421 | Override ladies seat restriction with proper reason | DONE | POST /bookings/hold ladiesSeatOverrideReason (staff only, event booking.ladies_seat_override) |
 | 422 | Show cancellation charges to passenger before confirming | DONE | verified manually: existing module/API |
 | 423 | Process refund back to original payment method | DONE | verified manually: existing module/API |
 | 424 | Process refund in cash | CONFLICT | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
@@ -777,7 +777,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 345, GAP 121, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -892,7 +892,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 345, GAP 121, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1007,7 +1007,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 345, GAP 121, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1102,7 +1102,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 345, GAP 121, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1217,7 +1217,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 345, GAP 121, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1292,7 +1292,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 345, GAP 121, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|

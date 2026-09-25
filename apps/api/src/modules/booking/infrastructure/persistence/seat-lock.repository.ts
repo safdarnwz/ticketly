@@ -21,11 +21,18 @@ export interface SeatLockRequest {
    * the check below for why that direction of ambiguity is the safe one.
    */
   passengerGenderBySeat?: Record<string, string | undefined>;
+  /**
+   * Staff override of the ladies-only restriction (#421) — the caller has
+   * checked who may do it and records the reason.
+   */
+  ladiesOverride?: boolean;
 }
 
 export interface LockedSeat {
   seatNumber: string;
   legMask: bigint;
+  /** Disability-friendly seat (#141) — the caller applies the release rule. */
+  accessible?: boolean;
 }
 
 /**
@@ -83,8 +90,9 @@ export class SeatLockRepository {
       blocked_legs: string;
       is_bookable: boolean;
       ladies_only: boolean;
+      accessible: boolean;
     }>(
-      `SELECT seat_number, occupied_legs, blocked_legs, is_bookable, ladies_only
+      `SELECT seat_number, occupied_legs, blocked_legs, is_bookable, ladies_only, accessible
          FROM trip_seats
         WHERE trip_id = $1 AND seat_number = ANY($2)
         ORDER BY seat_number
@@ -106,7 +114,7 @@ export class SeatLockRepository {
           details: { seat: row.seat_number },
         });
       }
-      if (row.ladies_only) {
+      if (row.ladies_only && !req.ladiesOverride) {
         // Per-seat, not per-booking: THIS specific seat is ladies-only, so
         // whoever is assigned to it must be. An unknown/missing gender
         // (booking flow didn't collect one, or this seat wasn't in the
@@ -152,7 +160,12 @@ export class SeatLockRepository {
       });
     }
 
-    return req.seatNumbers.map((seatNumber) => ({ seatNumber, legMask: mask }));
+    const accessible = new Set(seatRows.rows.filter((r) => r.accessible).map((r) => r.seat_number));
+    return req.seatNumbers.map((seatNumber) => ({
+      seatNumber,
+      legMask: mask,
+      accessible: accessible.has(seatNumber),
+    }));
   }
 
   /**

@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
-import { getUserId, requireTenantId, type SeatLayoutId } from '@kernel';
+import { NotFoundError, getUserId, requireTenantId, type SeatLayoutId } from '@kernel';
 
-import { SeatMap, type SeatMapProps } from '../../seat-layout/domain/seat-map';
+import {
+  SeatMap,
+  type SeatAttributePatch,
+  type SeatMapProps,
+} from '../../seat-layout/domain/seat-map';
 import { SeatLayoutRepository } from '../../infrastructure/persistence/seat-layout.repository';
 
 /**
@@ -68,7 +72,7 @@ export class SeatLayoutService {
     versionNumber: number,
   ): Promise<{ summary: SeatMap['summary'] }> {
     const version = await this.layouts.getVersion(id, versionNumber);
-    if (!version) throw new Error(`Version ${versionNumber} not found`);
+    if (!version) throw new NotFoundError('Layout version', String(versionNumber));
     const seatMap = SeatMap.create(version.layout as SeatMapProps);
     await this.uow.run({ name: 'layout.restore', tenantId: requireTenantId() }, async () => {
       await this.layouts.update(id, version.name, seatMap);
@@ -81,6 +85,24 @@ export class SeatLayoutService {
       );
     });
     return { summary: seatMap.summary };
+  }
+
+  /** Set position / ladies-only / accessible on some seats (#136, #137, #141) — a new version. */
+  async markSeats(id: SeatLayoutId, seatNumbers: string[], patch: SeatAttributePatch) {
+    const layout = await this.layouts.getById(id);
+    const next = layout.seatMap.withSeatAttributes(seatNumbers, patch);
+    return this.update(id, layout.name, next.toJSON(), `Marked seats ${seatNumbers.join(', ')}`);
+  }
+
+  /** Derive window / aisle for every seat from the grid — a new version. */
+  async autoPositions(id: SeatLayoutId) {
+    const layout = await this.layouts.getById(id);
+    return this.update(
+      id,
+      layout.name,
+      layout.seatMap.withAutoPositions().toJSON(),
+      'Window / aisle seats derived from the grid',
+    );
   }
 
   /** Preview endpoint: validate + summarise without persisting. */

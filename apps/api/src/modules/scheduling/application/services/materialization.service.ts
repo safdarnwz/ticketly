@@ -106,6 +106,7 @@ export class MaterializationService {
       seatType: s.type,
       isBookable: s.bookable !== false,
       ladiesOnly: s.ladiesOnly === true,
+      accessible: s.accessible === true,
     }));
 
     let created = 0;
@@ -272,6 +273,7 @@ export class MaterializationService {
       seatType: s.type,
       isBookable: s.bookable !== false,
       ladiesOnly: input.ladiesSpecial || s.ladiesOnly === true,
+      accessible: s.accessible === true,
     }));
     const tz = this.config.domain.timezone;
     const today = todayIn(tz);

@@ -7,6 +7,8 @@ export interface SeatAvailability {
   seatNumber: string;
   seatType: string;
   ladiesOnly: boolean;
+  /** Disability-friendly seat (#141). */
+  accessible: boolean;
   available: boolean;
 }
 
@@ -77,9 +79,10 @@ export class InventoryRepository {
       seat_number: string;
       seat_type: string;
       ladies_only: boolean;
+      accessible: boolean;
       available: boolean;
     }>(
-      `SELECT seat_number, seat_type, ladies_only,
+      `SELECT seat_number, seat_type, ladies_only, accessible,
               (is_bookable AND ((occupied_legs | blocked_legs) & segment_mask($3, $4)) = 0) AS available
          FROM trip_seats
         WHERE tenant_id = $1 AND trip_id = $2
@@ -91,6 +94,7 @@ export class InventoryRepository {
       seatNumber: r.seat_number,
       seatType: r.seat_type,
       ladiesOnly: r.ladies_only,
+      accessible: r.accessible,
       available: r.available,
     }));
   }

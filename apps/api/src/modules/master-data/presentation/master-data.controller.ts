@@ -19,6 +19,8 @@ import {
   CreateAmenitySchema,
   CreateRouteSchema,
   CreateSeatLayoutSchema,
+  MarkSeatsSchema,
+  type MarkSeatsDto,
   CreateStopSchema,
   CreateVehicleTypeSchema,
   DuplicateRouteSchema,
@@ -178,6 +180,28 @@ export class MasterDataController {
     @Body(zodBody(CreateSeatLayoutSchema)) dto: CreateSeatLayoutDto,
   ) {
     return this.layoutService.update(id as SeatLayoutId, dto.name, dto.layout);
+  }
+
+  @Post('seat-layouts/:id/seats/mark')
+  @HttpCode(200)
+  @RequirePermission(Permission.LAYOUT_MANAGE)
+  @ApiOperation({
+    summary:
+      'Mark seats window / aisle, ladies-only or disability-friendly (saved as a new version)',
+  })
+  markSeats(@UuidParam('id') id: string, @Body(zodBody(MarkSeatsSchema)) dto: MarkSeatsDto) {
+    const { seatNumbers, ...patch } = dto;
+    return this.layoutService.markSeats(id as SeatLayoutId, seatNumbers, patch);
+  }
+
+  @Post('seat-layouts/:id/seats/auto-positions')
+  @HttpCode(200)
+  @RequirePermission(Permission.LAYOUT_MANAGE)
+  @ApiOperation({
+    summary: 'Mark every window and aisle seat from the grid (saved as a new version)',
+  })
+  autoPositions(@UuidParam('id') id: string) {
+    return this.layoutService.autoPositions(id as SeatLayoutId);
   }
 
   @Get('seat-layouts/:id/versions')

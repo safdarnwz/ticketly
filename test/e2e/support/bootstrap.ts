@@ -21,6 +21,7 @@ export type Principal = 'customer' | 'operator' | 'platformAdmin' | 'anonymous';
 
 export interface TestApp {
   post(path: string, body: unknown, opts?: CallOptions): Promise<HttpResult>;
+  put(path: string, body: unknown, opts?: CallOptions): Promise<HttpResult>;
   get(path: string, opts?: CallOptions): Promise<HttpResult>;
   close(): Promise<void>;
   fixtures: E2eFixtures;
@@ -75,7 +76,7 @@ export async function bootstrapTestApp(): Promise<TestApp> {
   };
 
   const call = async (
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'PUT',
     path: string,
     body?: unknown,
     opts: CallOptions = {},
@@ -97,6 +98,7 @@ export async function bootstrapTestApp(): Promise<TestApp> {
 
   return {
     post: (p, b, o) => call('POST', p, b, o),
+    put: (p, b, o) => call('PUT', p, b, o),
     get: (p, o) => call('GET', p, undefined, o),
     close: () => app.close(),
     fixtures,

@@ -162,7 +162,18 @@ export class TripVehicleService {
         }
       }
 
-      await this.repo.rebuildInventory(tripId, v.id, v.seatLayoutId, plan.newSeats);
+      const accessible = new Set(
+        layout.seatMap
+          .toJSON()
+          .seats.filter((s) => s.accessible)
+          .map((s) => s.number),
+      );
+      await this.repo.rebuildInventory(
+        tripId,
+        v.id,
+        v.seatLayoutId,
+        plan.newSeats.map((s) => ({ ...s, accessible: accessible.has(s.seatNumber) })),
+      );
       const affected = await this.repo.moveSeats(tripId, plan.moves);
       await this.repo.audit({
         tripId,

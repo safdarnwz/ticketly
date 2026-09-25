@@ -11,6 +11,7 @@ import {
 } from '@kernel';
 
 import { expandRecurrence, type RecurrenceRule } from '../../domain/recurrence';
+import { salesRulesErrors, type ServiceSalesRules } from '../../domain/sales-rules';
 import { MaterializationService } from './materialization.service';
 import { ServiceRepository } from '../../infrastructure/persistence/service.repository';
 import { RouteRepository } from '../../../master-data';
@@ -60,6 +61,14 @@ export class SchedulingService {
   }
 
   /** Activate and immediately materialise the horizon. */
+  /** OTA release % and women / senior seat quotas of a service (#170, #173, #174). */
+  async setSalesRules(serviceId: ServiceId, rules: ServiceSalesRules): Promise<ServiceSalesRules> {
+    const errors = salesRulesErrors(rules);
+    if (errors.length > 0) throw new DomainError(ErrorCode.COMMON_VALIDATION, errors.join('; '));
+    await this.services.setSalesRules(serviceId, rules);
+    return rules;
+  }
+
   async activate(serviceId: ServiceId): Promise<{ trips: number }> {
     await this.uow.run({ name: 'service.activate', tenantId: requireTenantId() }, async () => {
       await this.services.setStatus(serviceId, 'active');

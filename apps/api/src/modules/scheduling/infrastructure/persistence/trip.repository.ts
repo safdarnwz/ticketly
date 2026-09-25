@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
+import type { ServiceSalesRules } from '../../domain/sales-rules';
 import { DatabaseService } from '@database';
 import {
   newId,
@@ -44,6 +45,8 @@ export interface SeatInit {
   seatType: string;
   isBookable: boolean;
   ladiesOnly: boolean;
+  /** Disability-friendly seat (#141). */
+  accessible?: boolean;
 }
 
 /**
@@ -125,12 +128,20 @@ export class TripRepository {
     // Initialise seat inventory (occupied_legs = 0).
     const seatParams: unknown[] = [];
     const seatSql = input.seats.map((s, i) => {
-      const b = i * 6;
-      seatParams.push(tripId, tenantId, s.seatNumber, s.seatType, s.isBookable, s.ladiesOnly);
-      return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6})`;
+      const b = i * 7;
+      seatParams.push(
+        tripId,
+        tenantId,
+        s.seatNumber,
+        s.seatType,
+        s.isBookable,
+        s.ladiesOnly,
+        s.accessible === true,
+      );
+      return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7})`;
     });
     await this.db.execute_(
-      `INSERT INTO trip_seats (trip_id, tenant_id, seat_number, seat_type, is_bookable, ladies_only)
+      `INSERT INTO trip_seats (trip_id, tenant_id, seat_number, seat_type, is_bookable, ladies_only, accessible)
        VALUES ${seatSql.join(',')}`,
       seatParams,
       { name: 'trip.insertSeats', primary: true },
@@ -229,6 +240,17 @@ export class TripRepository {
       { name: 'trip.closedChannels' },
     );
     return row?.closed ?? [];
+  }
+
+  /** The sales rules of the trip's service ({} for a trip without one). */
+  async salesRules(tripId: TripId): Promise<ServiceSalesRules> {
+    const row = await this.db.queryOne<{ rules: ServiceSalesRules | null }>(
+      `SELECT s.sales_rules AS rules FROM trips t LEFT JOIN services s ON s.id = t.service_id
+        WHERE t.tenant_id = $1 AND t.id = $2`,
+      [requireTenantId(), tripId],
+      { name: 'trip.salesRules' },
+    );
+    return row?.rules ?? {};
   }
 
   /** Open/close sales for channels on one trip (the service-level list still applies on top). */

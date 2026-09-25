@@ -47,6 +47,19 @@ export class SeatQuotaRepository {
   }
 
   /** Lock the seats; report the ones that are missing, occupied, blocked or mid-checkout. */
+  /** Every bookable seat of the trip, in seat-number order. */
+  async bookableSeats(tripId: TripId): Promise<string[]> {
+    const t = this.tx();
+    const rows = (
+      await t.client.query<{ seat_number: string }>(
+        `SELECT seat_number FROM trip_seats WHERE tenant_id = $1 AND trip_id = $2 AND is_bookable
+          ORDER BY length(seat_number), seat_number`,
+        [requireTenantId(), tripId],
+      )
+    ).rows;
+    return rows.map((r) => r.seat_number);
+  }
+
   async lockAndInspect(
     tripId: TripId,
     seats: string[],

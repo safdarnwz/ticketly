@@ -8,9 +8,11 @@ import { ConcessionRepository } from '../infrastructure/persistence/concession.r
 import {
   BookingWindowSchema,
   ConcessionRuleSchema,
+  AccessibleSeatRuleSchema,
   PassengerPolicySchema,
   type BookingWindowDto,
   type ConcessionRuleDto,
+  type AccessibleSeatRuleDto,
   type PassengerPolicyDto,
 } from './dto/concession.dto';
 
@@ -29,6 +31,7 @@ export class ConcessionController {
       rules: await this.repo.rules(),
       policy: await this.repo.policy(),
       bookingWindow: await this.repo.bookingWindow(),
+      accessibleSeats: { releaseHours: await this.repo.accessibleReleaseHours() },
     };
   }
 
@@ -52,6 +55,17 @@ export class ConcessionController {
   async bookingWindow(@Body(zodBody(BookingWindowSchema)) dto: BookingWindowDto) {
     await this.repo.setBookingWindow(dto);
     return { ok: true };
+  }
+
+  @Put('accessible-seats')
+  @RequirePermission(Permission.FARE_MANAGE)
+  @ApiOperation({
+    summary:
+      'Disability-friendly seats are kept for passengers in the disabled category until this many hours before departure (null = always)',
+  })
+  async accessibleSeats(@Body(zodBody(AccessibleSeatRuleSchema)) dto: AccessibleSeatRuleDto) {
+    await this.repo.setAccessibleReleaseHours(dto.releaseHours);
+    return { ok: true, releaseHours: dto.releaseHours };
   }
 
   @Put('policy')

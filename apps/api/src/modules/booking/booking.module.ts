@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+
+import { PlatformSettingsModule } from '../platform-settings/platform-settings.module';
 import { ConcessionRepository } from './infrastructure/persistence/concession.repository';
 import { ConcessionController } from './presentation/concession.controller';
 
@@ -34,6 +36,7 @@ import { OperatorPolicyRepository } from './infrastructure/persistence/operator-
     PricingModule,
     SchedulingModule,
     CrmModule,
+    PlatformSettingsModule,
   ],
   controllers: [BookingController, ConcessionController],
   providers: [

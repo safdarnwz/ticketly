@@ -108,6 +108,20 @@ All require a platform (tenant-less) principal.
   /admin/tenants/:id/favicon` (`{dataUri}` or `null`); public
   `GET /operator/branding` for the site a request is served on.
 
+## Seats and sales rules (scenario tracker #42, #136–#141, #170–#174, #294, #421)
+- `POST /master-data/seat-layouts/:id/seats/mark` (`{seatNumbers, position?, ladiesOnly?, accessible?}`)
+  and `POST /master-data/seat-layouts/:id/seats/auto-positions` — each saves a new layout version.
+  Seat maps and `GET /scheduling/trips/:id/availability` carry `accessible`.
+- `GET|PUT /scheduling/services/:id/sales-rules` — `otaReleasePct` (share of each
+  trip OTAs / GDS partners may sell; default = platform policy) and
+  `categoryQuotas.female|senior` (`seats` or `pct`, `releaseHours`).
+- `PUT /concessions/accessible-seats` (`{releaseHours}`, null = never released).
+- `POST /trips/:tripId/quotas/percentage` — reserve a % of a trip for a branch / agent.
+- `POST /bookings/hold` accepts `ladiesSeatOverrideReason` (operator staff only).
+  A hold can now be refused with 422 `INVENTORY.SEAT_UNAVAILABLE` for an
+  accessible seat, the OTA share being used up, or seats kept for women /
+  senior citizens.
+
 ## Plan quotas are enforced
 Creating a staff user, route, bus, branch or agent (and reactivating a
 branch) beyond the operator's plan quota (`max_users`, `max_routes`,

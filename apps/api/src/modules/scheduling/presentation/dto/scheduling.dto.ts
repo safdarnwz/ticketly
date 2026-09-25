@@ -61,3 +61,19 @@ export type ReleaseHoldsDto = z.infer<typeof ReleaseHoldsSchema>;
 /** An internal (staff-only) remark on a trip. */
 export const TripRemarkSchema = z.object({ remark: z.string().trim().min(2).max(1000) });
 export type TripRemarkDto = z.infer<typeof TripRemarkSchema>;
+
+const categoryQuota = z.object({
+  seats: z.number().int().min(1).max(100).optional(),
+  pct: z.number().min(1).max(100).optional(),
+  releaseHours: z.number().int().min(0).max(720),
+});
+
+/** #170 / #173 / #174 — OTA release and women / senior seat quotas of a service. */
+export const SalesRulesSchema = z.object({
+  /** null or omitted = the platform default. */
+  otaReleasePct: z.number().int().min(0).max(100).nullable().optional(),
+  categoryQuotas: z
+    .object({ female: categoryQuota.optional(), senior: categoryQuota.optional() })
+    .optional(),
+});
+export type SalesRulesDto = z.infer<typeof SalesRulesSchema>;

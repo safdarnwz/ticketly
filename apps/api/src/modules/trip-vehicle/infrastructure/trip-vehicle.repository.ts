@@ -26,6 +26,8 @@ export interface NewSeat {
   seatType: string;
   bookable: boolean;
   ladiesOnly: boolean;
+  /** Disability-friendly on the NEW bus's layout (#141). */
+  accessible?: boolean;
   occupied: bigint;
   blocked: bigint;
 }
@@ -111,9 +113,9 @@ export class TripVehicleRepository {
       { name: 'tripVehicle.clearSeats' },
     );
     await this.db.execute_(
-      `INSERT INTO trip_seats (trip_id, tenant_id, seat_number, seat_type, is_bookable, ladies_only, occupied_legs, blocked_legs)
-       SELECT $1, $2, s.n, s.t, s.b, s.l, s.o, s.k
-         FROM unnest($3::text[], $4::text[], $5::boolean[], $6::boolean[], $7::bigint[], $8::bigint[]) AS s(n, t, b, l, o, k)`,
+      `INSERT INTO trip_seats (trip_id, tenant_id, seat_number, seat_type, is_bookable, ladies_only, occupied_legs, blocked_legs, accessible)
+       SELECT $1, $2, s.n, s.t, s.b, s.l, s.o, s.k, s.a
+         FROM unnest($3::text[], $4::text[], $5::boolean[], $6::boolean[], $7::bigint[], $8::bigint[], $9::boolean[]) AS s(n, t, b, l, o, k, a)`,
       [
         tripId,
         tenantId,
@@ -123,6 +125,7 @@ export class TripVehicleRepository {
         seats.map((s) => s.ladiesOnly),
         seats.map((s) => s.occupied.toString()),
         seats.map((s) => s.blocked.toString()),
+        seats.map((s) => s.accessible === true),
       ],
       { name: 'tripVehicle.insertSeats' },
     );

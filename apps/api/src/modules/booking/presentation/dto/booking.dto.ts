@@ -30,6 +30,8 @@ export const HoldSchema = z.object({
   channel: z.enum(['direct_web', 'direct_app', 'ota', 'backoffice']).optional(),
   contactEmail: z.string().email().optional(),
   contactPhone: z.string().max(20).optional(),
+  /** Staff only (#421): put a passenger who is not female on a ladies-only seat, with the reason. */
+  ladiesSeatOverrideReason: z.string().trim().min(5).max(300).optional(),
 });
 export type HoldDto = z.infer<typeof HoldSchema>;
 

@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 
 import { AppConfig } from '@config';
-import { type SalesChannelFamily } from '@contracts';
+import { Permission, type SalesChannelFamily } from '@contracts';
 import { isUniqueViolation, UnitOfWork } from '@database';
 import {
   AppError,
   ErrorCode,
   getUserId,
+  hasPermission,
   requireTenantId,
   type BookingId,
   type TripId,
@@ -15,7 +16,7 @@ import { EventBus } from '@messaging';
 import { Logger, Metrics } from '@observability';
 
 import { PricingService, CouponRepository } from '../../../pricing';
-import { TripRepository } from '../../../scheduling';
+import { TripRepository, type ServiceSalesRules } from '../../../scheduling';
 import { CustomerRepository } from '../../../crm';
 import { assertTransition, isCancellable } from '../../domain/booking-state';
 import {
@@ -25,7 +26,12 @@ import {
 } from '../../domain/refund-policy';
 import { generatePnr, ticketCode } from '../../domain/pnr';
 import { BookingRepository } from '../../infrastructure/persistence/booking.repository';
-import { SeatLockRepository } from '../../infrastructure/persistence/seat-lock.repository';
+import {
+  SeatLockRepository,
+  type LockedSeat,
+} from '../../infrastructure/persistence/seat-lock.repository';
+import { accessibleSeatViolation, salesRuleViolation } from '../../domain/sales-rules';
+import { PlatformPoliciesService } from '../../../platform-settings';
 import {
   HoldValidationError,
   normaliseSeat,
@@ -65,6 +71,11 @@ export interface HoldRequest {
   channel?: string;
   contactEmail?: string;
   contactPhone?: string;
+  /**
+   * Staff only (#421): seat a passenger who is not female on a ladies-only
+   * seat, with the reason. Recorded on the booking's event trail.
+   */
+  ladiesSeatOverrideReason?: string;
 }
 
 /**
@@ -108,6 +119,7 @@ export class BookingService {
     private readonly operatorPolicy: OperatorPolicyRepository,
     logger: Logger,
     private readonly metrics: Metrics,
+    private readonly policies: PlatformPoliciesService,
   ) {
     this.log = logger.forContext('BookingService');
   }
@@ -159,11 +171,18 @@ export class BookingService {
 
     const trip = await this.trips.getById(quote.tripId);
     // Passenger categories & concessions — the same rules on every channel.
-    const [concessionRules, passengerPolicy, bookingWindow] = await Promise.all([
-      this.concessions.rules(),
-      this.concessions.policy(),
-      this.concessions.bookingWindow(),
-    ]);
+    const [concessionRules, passengerPolicy, bookingWindow, accessibleReleaseHours, salesRules] =
+      await Promise.all([
+        this.concessions.rules(),
+        this.concessions.policy(),
+        this.concessions.bookingWindow(),
+        this.concessions.accessibleReleaseHours(),
+        this.trips.salesRules(trip.id),
+      ]);
+    if (req.ladiesSeatOverrideReason && !hasPermission(Permission.BOOKING_CREATE))
+      throw new AppError(ErrorCode.COMMON_FORBIDDEN, 403, {
+        message: 'Only operator staff can override a ladies-only seat',
+      });
     // The operator's booking window applies on EVERY channel (web, agent, OTA, phone).
     const windowProblem = checkBookingWindow(trip.departsAt, bookingWindow);
     if (windowProblem)
@@ -234,6 +253,16 @@ export class BookingService {
           passengerGenderBySeat: Object.fromEntries(
             req.passengers.map((p) => [p.seatNumber, p.gender]),
           ),
+          ladiesOverride: Boolean(req.ladiesSeatOverrideReason),
+        });
+        await this.assertSalesRules({
+          tripId: trip.id,
+          departsAt: trip.departsAt,
+          locked,
+          passengers: req.passengers,
+          family,
+          salesRules,
+          accessibleReleaseHours,
         });
 
         // Each seat records what IT cost (seat overrides differ), so a partial
@@ -274,6 +303,19 @@ export class BookingService {
           }),
         );
 
+        if (req.ladiesSeatOverrideReason)
+          this.events.publish({
+            type: 'booking.ladies_seat_override',
+            aggregateType: 'booking',
+            aggregateId: pnr.bookingId,
+            payload: {
+              pnr: pnr.pnr,
+              tripId: quote.tripId,
+              seats: req.seatNumbers,
+              reason: req.ladiesSeatOverrideReason,
+              by: userId,
+            },
+          });
         this.metrics.seatHolds.inc({ outcome: 'ok' });
         this.events.publish({
           type: 'booking.seats_held',
@@ -290,6 +332,62 @@ export class BookingService {
         };
       },
     );
+  }
+
+  /**
+   * Accessible seats (#141, #294), OTA release (#42, #170) and women / senior
+   * quotas (#173, #174). Runs in the hold's transaction after the seats are
+   * locked; the trip row is locked before counting only when a count-based
+   * rule applies.
+   */
+  private async assertSalesRules(input: {
+    tripId: TripId;
+    departsAt: Date;
+    locked: LockedSeat[];
+    passengers: HoldRequest['passengers'];
+    family: SalesChannelFamily;
+    salesRules: ServiceSalesRules;
+    accessibleReleaseHours: number | null;
+  }): Promise<void> {
+    const hoursToDeparture = (input.departsAt.getTime() - Date.now()) / 3_600_000;
+    const accessibleProblem = accessibleSeatViolation({
+      seats: input.locked.map((s) => ({
+        seatNumber: s.seatNumber,
+        accessible: s.accessible === true,
+      })),
+      categoryBySeat: Object.fromEntries(input.passengers.map((p) => [p.seatNumber, p.category])),
+      hoursToDeparture,
+      releaseHours: input.accessibleReleaseHours,
+    });
+    if (accessibleProblem)
+      throw new AppError(ErrorCode.INVENTORY_SEAT_UNAVAILABLE, 422, { message: accessibleProblem });
+
+    const isOta = input.family === 'ota';
+    const hasQuotas = Object.values(input.salesRules.categoryQuotas ?? {}).some(Boolean);
+    if (!isOta && !hasQuotas) return;
+    const platformPct = isOta ? (await this.policies.otaReleasePolicy()).defaultReleasePct : 100;
+    if (isOta && !hasQuotas && (input.salesRules.otaReleasePct ?? platformPct) >= 100) return;
+
+    const state = await this.bookings.tripSalesState(input.tripId, input.locked[0].legMask);
+    const otaSeats = Object.entries(state.seatsByChannel)
+      .filter(([channel]) => channelFamily(channel) === 'ota')
+      .reduce((n, [, count]) => n + count, 0);
+    // The rows of THIS hold are not written yet: the counts are "before".
+    const problem = salesRuleViolation({
+      rules: input.salesRules,
+      platformOtaReleasePct: platformPct,
+      isOta,
+      passengers: input.passengers,
+      hoursToDeparture,
+      state: {
+        capacity: state.capacity,
+        freeSeats: state.freeSeats,
+        otaSeats,
+        categorySeats: { female: state.femaleSeats, senior: state.seniorSeats },
+      },
+    });
+    if (problem)
+      throw new AppError(ErrorCode.INVENTORY_SEAT_UNAVAILABLE, 422, { message: problem });
   }
 
   /**

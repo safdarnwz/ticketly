@@ -712,6 +712,60 @@ export class BookingRepository {
     );
   }
 
+  /**
+   * What the per-service sales rules need to know about a trip, read inside
+   * the hold's transaction after its seats are locked (#170, #173, #174). The
+   * trip row is locked first so two holds cannot both take the last quota /
+   * OTA seat.
+   */
+  async tripSalesState(
+    tripId: TripId,
+    segmentMask: bigint,
+  ): Promise<{
+    capacity: number;
+    freeSeats: number;
+    seatsByChannel: Record<string, number>;
+    femaleSeats: number;
+    seniorSeats: number;
+  }> {
+    await this.db.query(`SELECT 1 FROM trips WHERE id = $1 FOR UPDATE`, [tripId], {
+      name: 'booking.salesState.lockTrip',
+      primary: true,
+    });
+    const live = `(b.status IN ('confirmed', 'completed') OR (b.status = 'held' AND b.hold_expires_at > now()))`;
+    const [seats] = await this.db.query<{ capacity: string; free: string }>(
+      `SELECT count(*) AS capacity,
+              count(*) FILTER (WHERE ((ts.occupied_legs | ts.blocked_legs) & $2) = 0
+                AND NOT EXISTS (SELECT 1 FROM booking_seats bs JOIN bookings b ON b.id = bs.booking_id
+                                 WHERE bs.trip_id = ts.trip_id AND bs.seat_number = ts.seat_number
+                                   AND b.status = 'held' AND b.hold_expires_at > now() AND (bs.leg_mask & $2) <> 0)) AS free
+         FROM trip_seats ts WHERE ts.trip_id = $1 AND ts.is_bookable`,
+      [tripId, segmentMask.toString()],
+      { name: 'booking.salesState.seats', primary: true },
+    );
+    const channels = await this.db.query<{ channel: string; n: string }>(
+      `SELECT b.channel, count(*) AS n FROM booking_seats bs JOIN bookings b ON b.id = bs.booking_id
+        WHERE bs.trip_id = $1 AND ${live} GROUP BY b.channel`,
+      [tripId],
+      { name: 'booking.salesState.channels', primary: true },
+    );
+    const [people] = await this.db.query<{ female: string; senior: string }>(
+      `SELECT count(*) FILTER (WHERE lower(p.gender) = 'female') AS female,
+              count(*) FILTER (WHERE p.category = 'senior') AS senior
+         FROM passengers p JOIN bookings b ON b.id = p.booking_id
+        WHERE b.trip_id = $1 AND ${live}`,
+      [tripId],
+      { name: 'booking.salesState.passengers', primary: true },
+    );
+    return {
+      capacity: Number(seats?.capacity ?? 0),
+      freeSeats: Number(seats?.free ?? 0),
+      seatsByChannel: Object.fromEntries(channels.map((c) => [c.channel, Number(c.n)])),
+      femaleSeats: Number(people?.female ?? 0),
+      seniorSeats: Number(people?.senior ?? 0),
+    };
+  }
+
   /** Every still-live booking on a trip — for cascading cancellation when the OPERATOR cancels the whole trip (bus breakdown, etc.), never for a customer cancelling their own single seat. */
   async listActiveByTrip(tripId: TripId): Promise<{ id: BookingId; pnr: string }[]> {
     return this.db.query(

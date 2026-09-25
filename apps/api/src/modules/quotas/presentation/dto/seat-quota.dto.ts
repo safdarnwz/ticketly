@@ -14,6 +14,12 @@ export const AllocateQuotaSchema = z.object({
 });
 export type AllocateQuotaDto = z.infer<typeof AllocateQuotaSchema>;
 
+/** #172 — a share of the trip instead of named seats. */
+export const AllocatePercentSchema = AllocateQuotaSchema.omit({ seatNumbers: true }).extend({
+  percent: z.number().min(1).max(100),
+});
+export type AllocatePercentDto = z.infer<typeof AllocatePercentSchema>;
+
 export const ReleaseQuotaSchema = z.object({
   seatNumbers: z.array(z.string().trim().min(1)).min(1).max(60),
   reason: z.string().trim().min(5).max(200),

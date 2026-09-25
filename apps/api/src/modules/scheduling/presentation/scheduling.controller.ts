@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Query, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
@@ -25,12 +25,14 @@ import {
 
 import {
   BlockSeatsSchema,
+  SalesRulesSchema,
   CreateServiceSchema,
   ExtraTripsSchema,
   PreviewDatesSchema,
   ReleaseHoldsSchema,
   TripRemarkSchema,
   type BlockSeatsDto,
+  type SalesRulesDto,
   type CreateServiceDto,
   type ExtraTripsDto,
   type PreviewDatesDto,
@@ -84,6 +86,22 @@ export class SchedulingController {
   async pause(@UuidParam('id') id: string) {
     await this.scheduling.pause(id as ServiceId);
     return { ok: true };
+  }
+
+  @Get('services/:id/sales-rules')
+  @RequirePermission(Permission.SERVICE_READ)
+  async salesRules(@UuidParam('id') id: string) {
+    return this.services.salesRules(id as ServiceId);
+  }
+
+  @Put('services/:id/sales-rules')
+  @RequirePermission(Permission.SERVICE_MANAGE)
+  @ApiOperation({
+    summary:
+      'OTA release % (share of each trip partners may sell) and seats kept for women / senior citizens until a release time',
+  })
+  setSalesRules(@UuidParam('id') id: string, @Body(zodBody(SalesRulesSchema)) dto: SalesRulesDto) {
+    return this.scheduling.setSalesRules(id as ServiceId, dto);
   }
 
   @Post('services/:id/materialise')

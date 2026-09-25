@@ -94,6 +94,25 @@ export class ConcessionRepository {
     );
   }
 
+  /** Hours before departure accessible seats open to everyone (#294); null = never. Default 24. */
+  async accessibleReleaseHours(): Promise<number | null> {
+    const r = await this.db.queryOne<{ accessible_release_hours: number | null }>(
+      `SELECT accessible_release_hours FROM passenger_policies WHERE tenant_id = $1`,
+      [requireTenantId()],
+      { name: 'policy.accessibleReleaseHours' },
+    );
+    return r ? r.accessible_release_hours : 24;
+  }
+
+  async setAccessibleReleaseHours(hours: number | null): Promise<void> {
+    await this.db.execute_(
+      `INSERT INTO passenger_policies (tenant_id, accessible_release_hours) VALUES ($1, $2)
+       ON CONFLICT (tenant_id) DO UPDATE SET accessible_release_hours = EXCLUDED.accessible_release_hours, updated_at = now()`,
+      [requireTenantId(), hours],
+      { name: 'policy.setAccessibleReleaseHours', primary: true },
+    );
+  }
+
   async upsertRule(r: ConcessionRule): Promise<void> {
     await this.db.execute_(
       `INSERT INTO concession_rules (tenant_id, category, discount_pct, min_age, max_age, requires_id_proof, valid_from, valid_to, max_per_booking, active)

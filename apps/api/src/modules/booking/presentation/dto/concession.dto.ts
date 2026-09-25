@@ -40,3 +40,9 @@ export const PassengerPolicySchema = z.object({
   allowUnaccompaniedMinors: z.boolean(),
 });
 export type PassengerPolicyDto = z.infer<typeof PassengerPolicySchema>;
+
+/** #294 — accessible seats open to everyone this many hours before departure (null = never). */
+export const AccessibleSeatRuleSchema = z.object({
+  releaseHours: z.number().int().min(0).max(720).nullable(),
+});
+export type AccessibleSeatRuleDto = z.infer<typeof AccessibleSeatRuleSchema>;

@@ -142,3 +142,41 @@ describe('SeatMap — negative & edge cases', () => {
     expect(map.summary.sleeper).toBe(2);
   });
 });
+
+describe('SeatMap — seat attributes (#136, #137, #141)', () => {
+  /** 2+2 coach: columns 0,1 | aisle at 2 | 3,4; a driver cell in row 0. */
+  const coach = (): SeatMapProps => ({
+    decks: 1,
+    rows: 2,
+    columns: 5,
+    seats: [
+      { number: 'D', deck: 0, row: 0, column: 4, type: 'crew', bookable: false },
+      { number: '1', deck: 0, row: 1, column: 0, type: 'seater' },
+      { number: '2', deck: 0, row: 1, column: 1, type: 'seater' },
+      { number: '3', deck: 0, row: 1, column: 3, type: 'seater' },
+      { number: '4', deck: 0, row: 1, column: 4, type: 'seater' },
+    ],
+  });
+
+  it('derives window and aisle seats from the grid', () => {
+    const map = SeatMap.create(coach()).withAutoPositions();
+    expect(['1', '2', '3', '4'].map((n) => map.get(n)?.position)).toEqual([
+      'window',
+      'aisle',
+      'aisle',
+      'window',
+    ]);
+    expect(map.get('D')?.position).toBeUndefined();
+    expect(map.summary.window).toBe(2);
+    expect(map.summary.aisle).toBe(2);
+  });
+
+  it('marks seats accessible / ladies-only in bulk and rejects unknown or crew seats', () => {
+    const map = SeatMap.create(coach()).withSeatAttributes(['1', '2'], { accessible: true });
+    expect(map.isAccessible('1')).toBe(true);
+    expect(map.summary.accessible).toBe(2);
+    expect(map.withSeatAttributes(['2'], { accessible: false }).summary.accessible).toBe(1);
+    expect(() => map.withSeatAttributes(['9'], { ladiesOnly: true })).toThrow(/No such seat/);
+    expect(() => map.withSeatAttributes(['D'], { ladiesOnly: true })).toThrow(/crew/);
+  });
+});

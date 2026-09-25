@@ -88,6 +88,47 @@ export class SeatQuotaService {
     });
   }
 
+  /**
+   * Allocate a share of a trip (#172): `percent` % of its bookable seats go to
+   * one branch or agent, taken from the seats still free (lowest numbers
+   * first). All-or-nothing: 409 when not enough seats are free.
+   */
+  async allocatePercent(
+    tripId: TripId,
+    input: {
+      percent: number;
+      holderType: QuotaHolderType;
+      holderId: string;
+      releaseMinutesBefore: number;
+    },
+  ) {
+    return this.uow.run(
+      { name: 'quota.allocatePercent', tenantId: requireTenantId() },
+      async () => {
+        const all = await this.quotas.bookableSeats(tripId);
+        const wanted = Math.floor((all.length * input.percent) / 100);
+        if (wanted < 1)
+          throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+            message: `${input.percent}% of ${all.length} seats is less than one seat`,
+          });
+        const { busy } = await this.quotas.lockAndInspect(tripId, all);
+        const taken = new Set(busy);
+        const free = all.filter((n) => !taken.has(n));
+        if (free.length < wanted)
+          throw new AppError(ErrorCode.INVENTORY_SEAT_UNAVAILABLE, 409, {
+            message: `Only ${free.length} seat(s) are free; ${input.percent}% needs ${wanted}`,
+          });
+        const result = await this.allocate(tripId, {
+          seatNumbers: free.slice(0, wanted),
+          holderType: input.holderType,
+          holderId: input.holderId,
+          releaseMinutesBefore: input.releaseMinutesBefore,
+        });
+        return { ...result, seatNumbers: free.slice(0, wanted) };
+      },
+    );
+  }
+
   list(tripId: TripId, liveOnly = true) {
     return this.quotas.list(tripId, liveOnly);
   }

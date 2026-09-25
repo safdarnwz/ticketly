@@ -47,7 +47,17 @@ export interface SeatCell {
   ladiesOnly?: boolean;
   /** Disabled/crew/unavailable cell that still occupies grid space. */
   bookable?: boolean;
+  /** Window / aisle (#136, #137) — set by hand or derived with `withAutoPositions`. */
   position?: SeatFacing;
+  /** Disability-friendly seat (#141): kept for passengers in the 'disabled' category until release (#294). */
+  accessible?: boolean;
+}
+
+/** Attributes an operator can set on many seats at once. */
+export interface SeatAttributePatch {
+  position?: SeatFacing | null;
+  ladiesOnly?: boolean;
+  accessible?: boolean;
 }
 
 export interface SeatMapProps {
@@ -66,6 +76,9 @@ export interface SeatMapSummary {
   /** Driver/conductor cells — occupy grid space but are NEVER sellable, and excluded from every other count (not seater/sleeper/semi, never in inventory). */
   crewSeats: number;
   ladiesOnly: number;
+  accessible: number;
+  window: number;
+  aisle: number;
   decks: number;
 }
 
@@ -163,6 +176,73 @@ export class SeatMap {
     return this.index.get(seatNumber)?.ladiesOnly === true;
   }
 
+  isAccessible(seatNumber: string): boolean {
+    return this.index.get(seatNumber)?.accessible === true;
+  }
+
+  /**
+   * Set attributes on the given seats (#136, #137, #141). Unknown seat
+   * numbers are an error, not ignored; crew cells cannot take passenger
+   * attributes. Returns a new, validated map.
+   */
+  withSeatAttributes(seatNumbers: string[], patch: SeatAttributePatch): SeatMap {
+    const wanted = new Set(seatNumbers);
+    const unknown = seatNumbers.filter((n) => !this.index.has(n));
+    if (unknown.length > 0) fail(`No such seat(s): ${unknown.join(', ')}`);
+    const seats = this.props.seats.map((seat) => {
+      if (!wanted.has(seat.number)) return seat;
+      if (seat.type === 'crew') fail(`Seat '${seat.number}' is a crew cell`);
+      const next: SeatCell = { ...seat };
+      if (patch.position !== undefined) {
+        if (patch.position === null) delete next.position;
+        else next.position = patch.position;
+      }
+      if (patch.ladiesOnly !== undefined) next.ladiesOnly = patch.ladiesOnly;
+      if (patch.accessible !== undefined) next.accessible = patch.accessible;
+      return next;
+    });
+    return SeatMap.create({ ...this.props, seats });
+  }
+
+  /**
+   * Mark every passenger seat as window or aisle from the grid: in each row
+   * of each deck, the outermost seats are window seats and a seat next to an
+   * empty column inside the row (the aisle gap) is an aisle seat. Seats in
+   * between keep no position. Crew cells are left alone.
+   */
+  withAutoPositions(): SeatMap {
+    const rows = new Map<string, SeatCell[]>();
+    for (const seat of this.props.seats) {
+      if (seat.type === 'crew') continue;
+      const key = `${seat.deck}:${seat.row}`;
+      rows.set(key, [...(rows.get(key) ?? []), seat]);
+    }
+    const position = new Map<string, SeatFacing>();
+    for (const rowSeats of rows.values()) {
+      const taken = new Set<number>();
+      for (const s of rowSeats)
+        for (let c = s.column; c < s.column + (s.colSpan ?? 1); c += 1) taken.add(c);
+      const minCol = Math.min(...taken);
+      const maxCol = Math.max(...taken);
+      for (const s of rowSeats) {
+        const left = s.column - 1;
+        const right = s.column + (s.colSpan ?? 1);
+        if (s.column === minCol || right - 1 === maxCol) position.set(s.number, 'window');
+        else if ((left >= minCol && !taken.has(left)) || (right <= maxCol && !taken.has(right)))
+          position.set(s.number, 'aisle');
+      }
+    }
+    const seats = this.props.seats.map((seat) => {
+      const p = position.get(seat.number);
+      if (seat.type === 'crew') return seat;
+      const next: SeatCell = { ...seat };
+      if (p) next.position = p;
+      else delete next.position;
+      return next;
+    });
+    return SeatMap.create({ ...this.props, seats });
+  }
+
   seatType(seatNumber: string): SeatType | undefined {
     return this.index.get(seatNumber)?.type;
   }
@@ -190,10 +270,16 @@ export class SeatMap {
     let semiSleeper = 0;
     let crewSeats = 0;
     let ladiesOnly = 0;
+    let accessible = 0;
+    let window = 0;
+    let aisle = 0;
     let bookable = 0;
     for (const seat of this.props.seats) {
       if (seat.bookable !== false) bookable += 1;
       if (seat.ladiesOnly) ladiesOnly += 1;
+      if (seat.accessible) accessible += 1;
+      if (seat.position === 'window') window += 1;
+      else if (seat.position === 'aisle') aisle += 1;
       if (seat.type === 'seater') seater += 1;
       else if (seat.type === 'sleeper') sleeper += 1;
       else if (seat.type === 'semi_sleeper') semiSleeper += 1;
@@ -207,6 +293,9 @@ export class SeatMap {
       semiSleeper,
       crewSeats,
       ladiesOnly,
+      accessible,
+      window,
+      aisle,
       decks: this.props.decks,
     };
   }

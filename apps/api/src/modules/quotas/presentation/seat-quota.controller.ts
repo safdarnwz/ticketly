@@ -14,9 +14,11 @@ import type { TripId } from '@kernel';
 
 import { SeatQuotaService } from '../application/seat-quota.service';
 import {
+  AllocatePercentSchema,
   AllocateQuotaSchema,
   ListQuotasQuerySchema,
   ReleaseQuotaSchema,
+  type AllocatePercentDto,
   type AllocateQuotaDto,
   type ListQuotasQueryDto,
   type ReleaseQuotaDto,
@@ -41,6 +43,20 @@ export class SeatQuotaController {
     @Body(zodBody(AllocateQuotaSchema)) dto: AllocateQuotaDto,
   ) {
     return this.quotas.allocate(tripId as TripId, dto);
+  }
+
+  @Post('percentage')
+  @HttpCode(201)
+  @Idempotent()
+  @RequirePermission(Permission.INVENTORY_MANAGE)
+  @ApiOperation({
+    summary: 'Reserve a percentage of this trip for one branch or agent (free seats, lowest first)',
+  })
+  async allocatePercent(
+    @UuidParam('tripId') tripId: string,
+    @Body(zodBody(AllocatePercentSchema)) dto: AllocatePercentDto,
+  ) {
+    return this.quotas.allocatePercent(tripId as TripId, dto);
   }
 
   @Get()
