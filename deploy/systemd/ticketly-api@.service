@@ -1,20 +1,20 @@
-# YooBus-GDS API — systemd unit (NO Docker).
+# Ticketly API — systemd unit (NO Docker).
 #
 # Deploy: build once (`npm run build`), then run N instances behind the load
-# balancer via a templated unit (yoobus-api@1, @2, …), each on its own port.
+# balancer via a templated unit (ticketly-api@1, @2, …), each on its own port.
 # systemd handles restart, log capture (journald), and graceful reload.
 [Unit]
-Description=YooBus API (instance %i)
+Description=Ticketly API (instance %i)
 After=network.target postgresql.service
 Wants=postgresql.service
 
 [Service]
 Type=simple
-User=gds
-Group=gds
-WorkingDirectory=/opt/yoobus
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/ticketly/current
 # Config from an EnvironmentFile — never bake secrets into the unit.
-EnvironmentFile=/opt/yoobus/.env
+EnvironmentFile=/opt/ticketly/shared/.env
 # Each templated instance gets its own port: 3001, 3002, …
 Environment=HTTP_PORT=30%i
 Environment=NODE_ENV=production
@@ -29,7 +29,7 @@ RestartSec=2
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/yoobus/logs
+ReadWritePaths=/opt/ticketly/logs
 PrivateTmp=true
 LimitNOFILE=65535
 

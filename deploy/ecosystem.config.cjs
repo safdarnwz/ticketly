@@ -6,7 +6,7 @@
 module.exports = {
   apps: [
     {
-      name: 'yoobus-api',
+      name: 'ticketly-api',
       script: 'dist/apps/api/src/main.js',
       instances: 'max',        // one per CPU core
       exec_mode: 'cluster',
@@ -16,7 +16,7 @@ module.exports = {
       env_production: { NODE_ENV: 'production' },
     },
     {
-      name: 'yoobus-worker',
+      name: 'ticketly-worker',
       script: 'dist/apps/worker/src/main.js',
       instances: 2,
       exec_mode: 'fork',

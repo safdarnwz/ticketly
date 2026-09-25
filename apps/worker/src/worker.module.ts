@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { CacheModule } from '@cache';
 import { ConfigModule } from '@config';
 import { DatabaseModule } from '@database';
+import { TenantRateLimitsModule } from '@http';
 import { MessagingModule } from '@messaging';
 import { ObservabilityModule } from '@observability';
 
@@ -70,6 +71,8 @@ import { ConnectionMonitorScheduler } from './schedulers/connection-monitor.sche
     QuotasModule,
     DemandModule,
     PlatformSettingsModule,
+    // The tenancy module registers operator rate limits here; no HTTP layer in the worker.
+    TenantRateLimitsModule,
   ],
   providers: [
     EventDispatcher,

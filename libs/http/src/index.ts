@@ -9,6 +9,7 @@ export * from './middleware/request-context.middleware';
 export * from './pipes/zod-validation.pipe';
 export * from './ratelimit/rate-limiter';
 export * from './ratelimit/tenant-rate-limits';
+export * from './ratelimit/tenant-rate-limits.module';
 export * from './dto/pagination.dto';
 export * from './dto/query.dto';
 export * from './decorators';

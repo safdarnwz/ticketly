@@ -1,17 +1,17 @@
-# YooBus-GDS background worker — outbox dispatch, schedulers, jobs.
+# Ticketly background worker — outbox dispatch, schedulers, jobs.
 # Runs SEPARATELY from the API so a slow provider never touches request latency.
 # Scale independently (worker@1, @2, …); FOR UPDATE SKIP LOCKED coordinates them.
 [Unit]
-Description=YooBus Worker (instance %i)
+Description=Ticketly Worker (instance %i)
 After=network.target postgresql.service
 Wants=postgresql.service
 
 [Service]
 Type=simple
-User=gds
-Group=gds
-WorkingDirectory=/opt/yoobus
-EnvironmentFile=/opt/yoobus/.env
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/ticketly/current
+EnvironmentFile=/opt/ticketly/shared/.env
 Environment=NODE_ENV=production
 Environment=WORKER_ENABLED=true
 Environment=INSTANCE_ID=worker-%i

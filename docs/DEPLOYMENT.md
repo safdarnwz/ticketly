@@ -36,7 +36,7 @@ cat deploy/postgres/postgresql.tuning.conf >> $PGDATA/postgresql.conf   # then r
 npm run db:migrate
 
 # 4. Configure. .env points DB_USER at gds_app (NOT postgres).
-cp .env.example /opt/ticketly/.env && edit it
+cp .env.example /opt/ticketly/shared/.env && edit it
 
 # 5. Install services.
 cp deploy/systemd/*.service /etc/systemd/system/
@@ -56,7 +56,7 @@ Each server is prepared once:
 ```bash
 # A deploy user that owns /opt/ticketly and may restart the services only.
 useradd --system --create-home deploy
-mkdir -p /opt/ticketly/{releases,shared,incoming} && chown -R deploy /opt/ticketly
+mkdir -p /opt/ticketly/{releases,shared,incoming,logs} && chown -R deploy /opt/ticketly
 echo 'deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart ticketly-api@*, /usr/bin/systemctl restart ticketly-worker@*' \
   > /etc/sudoers.d/ticketly-deploy
 # Config + secrets live outside every release:
