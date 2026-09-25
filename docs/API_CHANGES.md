@@ -283,3 +283,9 @@ an unknown id is now 404 (was 200).
   this operator only, by account and by mobile (hold → 403); other operators are unaffected, existing
   bookings stay. Removed: `/customers/search`, `/customers/:id/bookings`, `/blacklist`, `/unblacklist`,
   `/preferences` (it wrote to the customer's platform account). Migration 0092 (`customer_blocks`).
+- **Reports:** the reporting views are rebuilt (migration 0093). Revenue is grouped by the operator's own
+  day (it used the UTC day — sales before 05:30 IST landed on the day before); occupancy and route
+  performance sum seats per trip (a trip's capacity was counted once per booking, so occupancy showed ~1 %)
+  and leave out cancelled trips; route performance covers the last 30 days up to today (it counted every
+  future trip). `GET /reports/occupancy` rows carry `routeName`; numbers are numbers, not strings. The
+  cancellation rate is over sold bookings (unpaid holds were counted). A report period is at most 366 days.

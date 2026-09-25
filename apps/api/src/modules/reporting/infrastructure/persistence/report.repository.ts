@@ -36,8 +36,8 @@ export class ReportRepository {
     }[]
   > {
     return this.db.query(
-      `SELECT revenue_date AS "date", bookings, gross_minor AS "grossMinor",
-              cancelled_minor AS "cancelledMinor", seats_sold AS "seatsSold"
+      `SELECT to_char(revenue_date, 'YYYY-MM-DD') AS "date", bookings::int AS bookings, gross_minor::float8 AS "grossMinor",
+              cancelled_minor::float8 AS "cancelledMinor", seats_sold::int AS "seatsSold"
          FROM mv_operator_revenue_daily
         WHERE tenant_id = $1 AND revenue_date BETWEEN $2 AND $3
         ORDER BY revenue_date`,
@@ -50,8 +50,8 @@ export class ReportRepository {
   routePerformance(tenantId: string): Promise<unknown[]> {
     return this.db.query(
       `SELECT mv.route_id AS "routeId", r.name AS "routeName", r.code AS "routeCode", mv.trips,
-              mv.total_capacity AS "totalCapacity", mv.seats_sold AS "seatsSold",
-              mv.occupancy_pct AS "occupancyPct", mv.revenue_minor AS "revenueMinor"
+              mv.total_capacity::int AS "totalCapacity", mv.seats_sold::int AS "seatsSold",
+              mv.occupancy_pct::float8 AS "occupancyPct", mv.revenue_minor::float8 AS "revenueMinor"
          FROM mv_route_performance mv
          JOIN routes r ON r.id = mv.route_id AND r.tenant_id = mv.tenant_id
         WHERE mv.tenant_id = $1
@@ -63,13 +63,13 @@ export class ReportRepository {
 
   occupancyDaily(tenantId: string, from: LocalDate, to: LocalDate): Promise<unknown[]> {
     return this.db.query(
-      `SELECT journey_date AS "date", route_id AS "routeId", trips, total_seats AS "totalSeats",
-              sold_seats AS "soldSeats",
-              CASE WHEN total_seats > 0 THEN round(100.0 * sold_seats / total_seats, 1) ELSE 0 END AS "occupancyPct",
-              revenue_minor AS "revenueMinor"
-         FROM mv_trip_daily
-        WHERE tenant_id = $1 AND journey_date BETWEEN $2 AND $3
-        ORDER BY journey_date`,
+      `SELECT to_char(mv.journey_date, 'YYYY-MM-DD') AS "date", mv.route_id AS "routeId", r.name AS "routeName",
+              mv.trips::int AS trips, mv.total_seats::int AS "totalSeats", mv.sold_seats::int AS "soldSeats",
+              CASE WHEN mv.total_seats > 0 THEN round(100.0 * mv.sold_seats / mv.total_seats, 1) ELSE 0 END::float8 AS "occupancyPct",
+              mv.revenue_minor::float8 AS "revenueMinor"
+         FROM mv_trip_daily mv JOIN routes r ON r.id = mv.route_id
+        WHERE mv.tenant_id = $1 AND mv.journey_date BETWEEN $2 AND $3
+        ORDER BY mv.journey_date, r.name`,
       [tenantId, from, to],
       { name: 'report.occupancy' },
     );
@@ -93,7 +93,11 @@ export class ReportRepository {
     );
   }
 
-  /** Bookings made in the period, and how many of them are now cancelled. */
+  /**
+   * Sold bookings made in the period, and how many of them are now cancelled.
+   * Holds that were never paid are not sales — counting them made the
+   * cancellation rate look far lower than it is.
+   */
   async bookingsAndCancelled(
     tenantId: string,
     from: LocalDate,
@@ -102,7 +106,8 @@ export class ReportRepository {
     const row = await this.db.queryOne<{ total: string; cancelled: string }>(
       `SELECT count(*) AS total, count(*) FILTER (WHERE status = 'cancelled') AS cancelled
          FROM bookings
-        WHERE tenant_id = $1 AND (created_at AT TIME ZONE $4)::date BETWEEN $2 AND $3`,
+        WHERE tenant_id = $1 AND (created_at AT TIME ZONE $4)::date BETWEEN $2 AND $3
+          AND status IN ('confirmed', 'completed', 'cancelled')`,
       [tenantId, from, to, this.tz],
       { name: 'report.cancellationRate' },
     );
