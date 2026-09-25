@@ -129,3 +129,16 @@ export async function del<T>(url: string, config?: AxiosRequestConfig): Promise<
 export function withIdempotency(key: string): AxiosRequestConfig {
   return { headers: { 'idempotency-key': key } };
 }
+
+/** Fetch a file with the signed-in session and save it — a plain link would go without the token. */
+export async function download(url: string, filename: string): Promise<void> {
+  const res = await api.get<Blob>(url, { responseType: 'blob' });
+  const href = URL.createObjectURL(res.data);
+  const a = document.createElement('a');
+  a.href = href;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 1000);
+}
