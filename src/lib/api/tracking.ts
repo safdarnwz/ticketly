@@ -28,5 +28,5 @@ export const trackingApi = {
   /** Public — no login/tenant header needed, matches the ticket the customer holds. */
   live: (tripId: string) => get<LiveTripState | null>(`/v1/tracking/trips/${tripId}/live`),
   /** Public, signed-token version — for the shareable /track/:token link sent with the e-ticket/PNR (no tripId or login needed, the token IS the access). */
-  byToken: (token: string) => get<LiveLocation>(`/v1/track/${token}`),
+  byToken: (token: string) => get<LiveLocation>(`/v1/tracking/token/${encodeURIComponent(token)}`),
 };

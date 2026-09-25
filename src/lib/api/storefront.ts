@@ -32,9 +32,9 @@ export interface ConnectingJourney {
 }
 
 export const storefrontApi = {
-  search: (input: SearchInput) => post<{ results: SearchResult[]; count: number }>('/v1/storefront/search', input),
+  search: (input: SearchInput) => post<{ results: SearchResult[]; count: number }>('/v1/search', input),
   roundTrip: (input: SearchInput & { onwardDate: string; returnDate: string }) =>
-    post<{ onward: SearchResult[]; return: SearchResult[] }>('/v1/storefront/round-trip', input),
-  connecting: (input: { originCityId: string; hubCityId: string; destCityId: string; journeyDate: string; minLayoverMin?: number; maxLayoverMin?: number }) =>
-    post<{ journeys: ConnectingJourney[]; count: number }>('/v1/storefront/connecting', input),
+    post<{ onward: SearchResult[]; return: SearchResult[] }>('/v1/search/round-trip', input),
+  connecting: (input: { originCityId: string; hubCityId?: string; destCityId: string; journeyDate: string; minLayoverMin?: number; maxLayoverMin?: number }) =>
+    post<{ journeys: ConnectingJourney[]; count: number }>('/v1/search/connecting', input),
 };

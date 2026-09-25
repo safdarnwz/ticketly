@@ -79,7 +79,7 @@ export function LegalPage() {
       {page.isLoading ? <PageLoader /> : page.isError ? <ErrorState error={page.error} onRetry={page.refetch} /> : page.data && (
         <>
           <div className="mb-2 flex items-center gap-2 text-text-muted"><Scale className="h-4 w-4" /> <span className="text-xs">Legal · Ticketly</span></div>
-          <article>{renderMarkdown(page.data.bodyMd)}</article>
+          <article>{renderMarkdown(page.data.body)}</article>
         </>
       )}
     </div>

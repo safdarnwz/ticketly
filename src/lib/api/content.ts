@@ -1,4 +1,4 @@
-import { get, post } from './client';
+import { get, post, put } from './client';
 
 // Reviews (Part 14)
 export const reviewsApi = {
@@ -27,11 +27,11 @@ export const supportApi = {
 
 // CMS + offers (Part 14)
 export const cmsApi = {
-  banners: () => get<{ banners: { id: string; title: string; imageUrl: string; linkUrl: string | null; sortOrder: number }[] }>('/v1/content/banners'),
-  offers: () => get<{ offers: { code: string; title: string; description: string | null; couponCode: string | null; bannerUrl: string | null; validFrom: string; validTo: string }[] }>('/v1/content/offers'),
+  banners: () => get<{ items: { id: string; title: string; imageUrl: string; linkUrl: string | null; sortOrder: number }[] }>('/v1/content/banners'),
+  offers: () => get<{ items: { code: string; title: string; description: string | null; couponCode: string | null; bannerUrl: string | null; validFrom: string; validTo: string }[] }>('/v1/content/offers'),
   page: (slug: string) => get<unknown>(`/v1/content/pages/${slug}`),
-  upsertPage: (body: { slug: string; title: string; body: string; status?: 'draft' | 'published' }) =>
-    post<{ id: string }>('/v1/content/pages', body),
+  upsertPage: ({ slug, ...body }: { slug: string; title: string; body: string; kind?: string; status?: 'draft' | 'published' }) =>
+    put<unknown>(`/v1/content/admin/pages/${encodeURIComponent(slug)}`, body),
   upsertOffer: (body: { code: string; title: string; description?: string; couponCode?: string; validFrom: string; validTo: string }) =>
-    post<{ id: string }>('/v1/content/offers', body),
+    put<{ id: string }>(`/v1/content/admin/offers/${encodeURIComponent(body.code)}`, body),
 };

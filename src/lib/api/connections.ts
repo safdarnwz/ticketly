@@ -1,4 +1,5 @@
 import { get, post } from './client';
+import type { ConnectingJourney } from './storefront';
 
 export interface ConnectingLeg {
   tenantId: string;
@@ -31,8 +32,37 @@ export interface ConnectionPassenger {
 }
 
 export const connectionsApi = {
-  search: (originCityId: string, destinationCityId: string, date: string) =>
-    get<{ options: ConnectingOption[] }>(`/v1/search/connecting?originCityId=${originCityId}&destinationCityId=${destinationCityId}&date=${date}`),
+  /** Two-leg journeys via a hub city (the backend discovers the hub). */
+  search: async (originCityId: string, destinationCityId: string, date: string): Promise<{ options: ConnectingOption[] }> => {
+    const r = await post<{ journeys: ConnectingJourney[] }>('/v1/search/connecting', {
+      originCityId,
+      destCityId: destinationCityId,
+      journeyDate: date,
+    });
+    const leg = (l: ConnectingJourney['legs'][number]): ConnectingLeg => ({
+      tenantId: l.tenantId,
+      operatorName: l.operatorName,
+      tripId: l.tripId,
+      routeId: l.routeId,
+      fromStopId: l.boardingStop.id,
+      fromStopName: l.boardingStop.name,
+      toStopId: l.droppingStop.id,
+      toStopName: l.droppingStop.name,
+      departsAt: l.departsAt,
+      arrivesAt: l.arrivesAt,
+      baseFareMinor: l.fromPriceMinor,
+      availableSeats: l.availableSeats,
+    });
+    return {
+      options: r.journeys.map((j) => ({
+        connectionCityId: j.hub,
+        connectionCityName: j.legs[0].droppingStop.name,
+        layoverMinutes: j.layoverMin,
+        leg1: leg(j.legs[0]),
+        leg2: leg(j.legs[1]),
+      })),
+    };
+  },
 
   hold: (input: {
     leg1: { tenantId: string; quoteId: string; seatNumbers: string[]; passengers: ConnectionPassenger[] };

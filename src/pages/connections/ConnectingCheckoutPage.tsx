@@ -44,17 +44,7 @@ function LegSeatPicker({ label, tripId, fromStopId, toStopId, selected, onToggle
 export function ConnectingCheckoutPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const toast = useToast();
   const option = (location.state as { option?: ConnectingOption } | null)?.option;
-
-  const [step, setStep] = useState<Step>('seats');
-  const [leg1Seats, setLeg1Seats] = useState<string[]>([]);
-  const [leg2Seats, setLeg2Seats] = useState<string[]>([]);
-  const [names, setNames] = useState<Record<string, string>>({});
-  const [contactPhone, setContactPhone] = useState('');
-  const [connectionId, setConnectionId] = useState<string | null>(null);
-  const [confirmResult, setConfirmResult] = useState<{ leg1: { status: string; pnr?: string }; leg2: { status: string; pnr?: string; error?: string } } | null>(null);
-
   if (!option) {
     return (
       <div className="mx-auto max-w-xl px-4 py-10 text-center">
@@ -64,6 +54,22 @@ export function ConnectingCheckoutPage() {
       </div>
     );
   }
+
+  return <ConnectingCheckout option={option} />;
+}
+
+/** The checkout itself — only mounted once an option exists, so its hooks always run in the same order. */
+function ConnectingCheckout({ option }: { option: ConnectingOption }) {
+  const navigate = useNavigate();
+  const toast = useToast();
+
+  const [step, setStep] = useState<Step>('seats');
+  const [leg1Seats, setLeg1Seats] = useState<string[]>([]);
+  const [leg2Seats, setLeg2Seats] = useState<string[]>([]);
+  const [names, setNames] = useState<Record<string, string>>({});
+  const [contactPhone, setContactPhone] = useState('');
+  const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [confirmResult, setConfirmResult] = useState<{ leg1: { status: string; pnr?: string }; leg2: { status: string; pnr?: string; error?: string } } | null>(null);
 
   const toggleLeg1 = (seat: string) => setLeg1Seats((cur) => cur.includes(seat) ? cur.filter((s) => s !== seat) : [...cur, seat]);
   const toggleLeg2 = (seat: string) => setLeg2Seats((cur) => cur.includes(seat) ? cur.filter((s) => s !== seat) : [...cur, seat]);

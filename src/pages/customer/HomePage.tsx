@@ -80,11 +80,11 @@ export function HomePage() {
           ))}
         </div>
 
-        {Array.isArray(offers.data?.offers) && offers.data!.offers.length > 0 && (
+        {Array.isArray(offers.data?.items) && offers.data!.items.length > 0 && (
           <div className="mt-10">
             <h2 className="mb-3 font-display text-2xl tracking-tight text-text">Live offers</h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {(offers.data!.offers as any[]).map((o, i) => (
+              {(offers.data!.items as any[]).map((o, i) => (
                 <Card key={i}><CardBody>
                   <div className="flex items-center gap-2 text-accent"><Percent className="h-4 w-4" /><span className="font-semibold">{o.title ?? o.code}</span></div>
                   {o.description && <p className="mt-1 text-sm text-text-muted">{o.description}</p>}

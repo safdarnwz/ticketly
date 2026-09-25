@@ -36,9 +36,9 @@ export function CmsPage() {
           <CardHeader title={<span className="flex items-center gap-2"><Megaphone className="h-4 w-4" /> Live offers</span>} />
           <CardBody>
             {offers.isLoading ? <PageLoader /> : offers.isError ? <ErrorState error={offers.error} onRetry={offers.refetch} /> :
-              offers.data?.offers?.length ? (
+              offers.data?.items?.length ? (
                 <div className="flex flex-col gap-2">
-                  {offers.data.offers.map((o) => (
+                  {offers.data.items.map((o) => (
                     <div key={o.code} className="flex items-center justify-between rounded-md border border-border p-3 text-sm">
                       <div>
                         <div className="font-medium text-text">{o.title}</div>
@@ -55,9 +55,9 @@ export function CmsPage() {
           <CardHeader title="Active banners" />
           <CardBody>
             {banners.isLoading ? <PageLoader /> :
-              banners.data?.banners?.length ? (
+              banners.data?.items?.length ? (
                 <div className="flex flex-col gap-2">
-                  {banners.data.banners.map((b) => (
+                  {banners.data.items.map((b) => (
                     <div key={b.id} className="flex items-center justify-between rounded-md border border-border p-3 text-sm">
                       <div className="flex items-center gap-3">
                         <img src={b.imageUrl} alt={b.title} className="h-10 w-16 rounded object-cover" />

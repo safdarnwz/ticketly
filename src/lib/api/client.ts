@@ -1,23 +1,44 @@
 import axios, { AxiosError, type AxiosRequestConfig } from 'axios';
 
-/** The RFC-9457-ish error envelope the backend returns. */
+/** The RFC 9457 problem document the backend returns on every error. */
 export interface ApiErrorBody {
   code: string;
-  message: string;
+  title?: string;
+  detail?: string;
+  /** Older shape / network errors. */
+  message?: string;
   details?: unknown;
-  traceId?: string;
+  /** Validation failures: one entry per bad field. */
+  errors?: { issues?: { path: string; rule?: string; message: string }[] };
+  requestId?: string;
+  retryable?: boolean;
 }
 
 export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
   readonly details?: unknown;
+  readonly requestId?: string;
+  /** Field → message, for showing validation errors next to form inputs. */
+  readonly fieldErrors: Record<string, string>;
   constructor(status: number, body: Partial<ApiErrorBody>) {
-    super(body.message ?? 'Request failed');
+    const issues = body.errors?.issues ?? [];
+    const summary = issues.length
+      ? issues.map((i) => (i.path ? `${i.path}: ${i.message}` : i.message)).join(' · ')
+      : undefined;
+    super(
+      (body.detail && body.detail !== body.title ? body.detail : summary) ??
+        body.detail ??
+        body.message ??
+        body.title ??
+        (status === 0 ? 'Cannot reach the server — check your connection' : 'Request failed'),
+    );
     this.name = 'ApiError';
     this.status = status;
     this.code = body.code ?? 'COMMON.INTERNAL_ERROR';
     this.details = body.details;
+    this.requestId = body.requestId;
+    this.fieldErrors = Object.fromEntries(issues.map((i) => [i.path, i.message]));
   }
 }
 

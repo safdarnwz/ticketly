@@ -15,6 +15,9 @@ export interface SearchResult {
   /** The operator this trip belongs to — carried forward as X-Tenant-Id on every later call. */
   tenantId: string;
   operatorName: string;
+  /** Pass these to the quote call. */
+  boardingStop: { id: string; name: string };
+  droppingStop: { id: string; name: string };
   departsAt: string;
   arrivesAt: string;
   durationMin: number;
@@ -24,6 +27,8 @@ export interface SearchResult {
   operatorRating?: number;
   seatTypes?: string[];
   amenities: { id: string; code: string; name: string; icon: string | null }[];
+  /** A paid promotion is running on this route. */
+  isPromoted?: boolean;
 }
 
 export interface Booking {
