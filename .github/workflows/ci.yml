@@ -1,7 +1,9 @@
 name: CI
 on:
   push: { branches: [main] }
-  pull_request:
+  # Every change reaches main through a PR; pipeline.yml merges it when this passes
+  # and promotes main → stage → uat → prod.
+  pull_request: { branches: [main] }
 
 jobs:
   check:
