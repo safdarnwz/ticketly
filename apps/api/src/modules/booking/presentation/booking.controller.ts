@@ -47,6 +47,8 @@ import {
   type PhoneBookingDto,
   type SelfCancelDto,
   type StaffBookingSearchQueryDto,
+  ReleaseHoldSchema,
+  type ReleaseHoldDto,
 } from './dto/booking.dto';
 
 /**
@@ -218,6 +220,29 @@ export class BookingController {
     const userId = getUserId();
     if (!userId) throw new UnauthenticatedError();
     return { bookings: await this.bookings.listForCustomer(userId) };
+  }
+
+  /** Free the seats of an unpaid hold now (customer changed their mind); idempotent. */
+  @Post(':id/release-hold')
+  @HttpCode(200)
+  @Public()
+  @RateLimit(20, 60_000, 'ip')
+  @ApiOperation({
+    summary: 'Release an unpaid hold early — the booking customer, or the booking mobile as proof',
+  })
+  async releaseHold(
+    @UuidParam('id') id: string,
+    @Body(zodBody(ReleaseHoldSchema)) dto: ReleaseHoldDto,
+  ) {
+    const mobileDigits = dto.mobile?.replace(/\D/g, '').slice(-10);
+    const customerId = getUserId();
+    if (!customerId && (!mobileDigits || mobileDigits.length !== 10))
+      throw new BadRequestError('Give the mobile number the booking was made with');
+    const released = await this.bookings.releaseHold(id, {
+      customerId: customerId ?? undefined,
+      mobileDigits: mobileDigits?.length === 10 ? mobileDigits : undefined,
+    });
+    return { released };
   }
 
   @Get(':id/refund-preview')

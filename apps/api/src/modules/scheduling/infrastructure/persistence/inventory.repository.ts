@@ -27,6 +27,18 @@ export interface SeatAvailability {
  * seat lock at booking time in Part 7 re-checks on the primary under a row
  * lock, which is the authoritative gate against double-selling).
  */
+/**
+ * A seat someone is paying for right now: an unexpired hold overlapping the
+ * segment. Holds live on booking_seats, not in occupied_legs (which only a
+ * confirmed booking sets), so without this a held seat looks free and the
+ * next customer only finds out when their own hold is refused.
+ */
+const LIVE_HOLD = (tripCol: string, seatCol: string, mask: string) => `EXISTS (
+  SELECT 1 FROM booking_seats bs JOIN bookings b ON b.id = bs.booking_id
+   WHERE bs.trip_id = ${tripCol} AND bs.seat_number = ${seatCol}
+     AND b.status = 'held' AND b.hold_expires_at > now()
+     AND (bs.leg_mask & ${mask}) <> 0)`;
+
 @Injectable()
 export class InventoryRepository {
   constructor(private readonly db: DatabaseService) {}
@@ -60,6 +72,7 @@ export class InventoryRepository {
          FROM (VALUES ${values.join(',')}) AS q(trip_id, from_seq, to_seq)
          JOIN trip_seats s ON s.trip_id = q.trip_id AND s.tenant_id = $1 AND s.is_bookable
           AND ((s.occupied_legs | s.blocked_legs) & segment_mask(q.from_seq, q.to_seq)) = 0
+          AND NOT ${LIVE_HOLD('s.trip_id', 's.seat_number', 'segment_mask(q.from_seq, q.to_seq)')}
         GROUP BY q.trip_id`,
       params,
       { name: 'inventory.availableCountForTrips' },
@@ -99,8 +112,9 @@ export class InventoryRepository {
       available: boolean;
     }>(
       `SELECT seat_number, seat_type, ladies_only, accessible,
-              (is_bookable AND ((occupied_legs | blocked_legs) & segment_mask($3, $4)) = 0) AS available
-         FROM trip_seats
+              (is_bookable AND ((occupied_legs | blocked_legs) & segment_mask($3, $4)) = 0
+               AND NOT ${LIVE_HOLD('ts.trip_id', 'ts.seat_number', 'segment_mask($3, $4)')}) AS available
+         FROM trip_seats ts
         WHERE tenant_id = $1 AND trip_id = $2
         ORDER BY seat_number`,
       [requireTenantId(), tripId, fromSeq, toSeq],

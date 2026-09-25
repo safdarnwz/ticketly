@@ -24,9 +24,9 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3127 |
-| TODO | 949 |
+| TODO | 940 |
+| DONE | 11 |
 | DUP | 9 |
-| DONE | 2 |
 
 
 ## #1–#500
@@ -527,7 +527,7 @@ CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 | 490 | View list of available services | DONE | TODO | verified manually: existing module/API |
 | 491 | View departure and arrival timings | DONE | TODO | verified manually: existing module/API |
 | 492 | View fare for each service | DONE | TODO | verified manually: existing module/API |
-| 493 | View seat map of selected service | DONE | TODO | verified manually: existing module/API |
+| 493 | View seat map of selected service | DONE | DONE | verified manually: existing module/API · UI: trip seat map: SeatSelector (live refresh, taken seats drop out, ladies/accessible) |
 | 494 | View agent special discounted fare | GAP | — | verified manually: not built yet |
 | 495 | Select one or more seats | DONE | TODO | verified manually: existing module/API |
 | 496 | Enter first passenger name | DONE | TODO | verified manually: existing module/API |
@@ -674,7 +674,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 | 630 | Verify passenger ticket or PNR | DONE | TODO | verified manually: existing module/API |
 | 631 | Mark passenger as successfully boarded | DONE | TODO | verified manually: existing module/API |
 | 632 | Guide passenger to correct seat | PROCESS | — | on-ground practice, not software |
-| 633 | Prevent male passenger from sitting on ladies seat | DONE | TODO | verified manually: existing module/API |
+| 633 | Prevent male passenger from sitting on ladies seat | DONE | DONE | verified manually: existing module/API · UI: checkout: ladies seat + gender validation |
 | 634 | Issue ticket to passenger without prior booking | CONFLICT | — | way-side / conductor cash — earlier decision |
 | 635 | Issue ticket to way-side passenger | CONFLICT | — | way-side / conductor cash — earlier decision |
 | 636 | Create way-side booking in offline mode | CONFLICT | — | way-side / conductor cash — earlier decision |
@@ -799,12 +799,12 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
 | 901 | Two different users select the same seat at the same second | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 902 | User A holds seat and User B tries to book it | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 902 | User A holds seat and User B tries to book it | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: seat map shows held seats as booked; hold refused → 'Choose other seats' |
 | 903 | Payment is being processed while another user books same seat | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 904 | OTA booking and direct booking hit same seat together | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 905 | Agent booking and branch booking conflict on same seat | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 906 | Waitlist confirmation and new booking race for last seat | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 907 | Seat hold timer expires exactly during payment | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 907 | Seat hold timer expires exactly during payment | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: checkout HoldTimer: expiry screen, re-pick seats; changing seats releases the hold |
 | 908 | User opens multiple browser tabs and books same seat | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 909 | User refreshes page during payment processing | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 910 | User presses browser back button after successful payment | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
@@ -842,7 +842,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 | 942 | System shows negative available seats due to race | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 943 | Eventual consistency causes temporary overselling | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 944 | Seat appears available but booking is rejected | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 945 | Booking is successful but seat map still shows free | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 945 | Booking is successful but seat map still shows free | DONE | DONE | seat map excludes live holds (inventory LIVE_HOLD); POST /bookings/:id/release-hold frees the holder's own hold early; e2e hold-release · UI: seat map shows held seats as booked; hold refused → 'Choose other seats' |
 | 946 | Booking record is created without actual seat assignment | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 947 | Two cancellations for same booking arrive together | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 948 | Refund and new booking on same seat happen together | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
@@ -869,7 +869,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 | 969 | Senior quota and general quota race | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 970 | Group booking splits under concurrent load | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 971 | Multi-seat selection partially fails | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 972 | Temporary hold is not released properly | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 972 | Temporary hold is not released properly | DONE | DONE | seat map excludes live holds (inventory LIVE_HOLD); POST /bookings/:id/release-hold frees the holder's own hold early; e2e hold-release · UI: checkout HoldTimer: expiry screen, re-pick seats; changing seats releases the hold |
 | 973 | Hold expiry job and booking job conflict | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 974 | Cleanup job runs during active booking | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 975 | Report generation locks tables during booking | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
@@ -1135,7 +1135,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 | 1210 | Boarding point change after service departed | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1211 | Drop point change after service departed | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1212 | Ladies seat wrongly assigned to male passenger | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 1213 | Male passenger tries to force sit on ladies seat | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 1213 | Male passenger tries to force sit on ladies seat | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: checkout: ladies seat + gender validation |
 | 1214 | Child fare applied to adult passenger | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1215 | Adult fare applied to child passenger | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1216 | Infant travels without adult companion | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
@@ -1150,9 +1150,9 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 | 1225 | Dynamic price goes below defined floor | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1226 | Coupon and dynamic pricing applied together | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1227 | More than one coupon applied on same booking | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 1228 | Expired coupon is accepted by system | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 1228 | Expired coupon is accepted by system | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: checkout coupon: backend message shown, saving vs coupon-less price |
 | 1229 | Coupon meant for different route is used | GAP | — | verified manually: not built yet |
-| 1230 | Coupon usage limit already exhausted | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 1230 | Coupon usage limit already exhausted | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: checkout coupon: backend message shown, saving vs coupon-less price |
 | 1231 | Insufficient loyalty points for redemption | CONFLICT | — | branch wallet / cash / loyalty / way-side — earlier decision |
 | 1232 | Loyalty points already expired | CONFLICT | — | branch wallet / cash / loyalty / way-side — earlier decision |
 | 1233 | Free cancellation window boundary condition | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |

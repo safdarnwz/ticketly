@@ -41,12 +41,15 @@ export class Mailer {
 
   private smtp?: { key: string; transporter: Transporter; from: string; fromAddress: string };
 
+  private readonly devPreview: boolean;
+
   constructor(
     logger: Logger,
     private readonly credentials: IntegrationCredentialStore,
     config: AppConfig,
   ) {
     this.log = logger.forContext('Mailer');
+    this.devPreview = config.isDevelopment;
     const { gmailUser: user, gmailAppPassword: pass } = config.mail;
     this.from =
       config.mail.from || (user ? `Ticketly <${user}>` : 'Ticketly <no-reply@ticketly.com>');
@@ -76,7 +79,21 @@ export class Mailer {
     const transporter = saved?.transporter ?? this.transporter;
     if (!transporter) {
       this.log.info(
-        { to: input.to, subject: input.subject, from, attachments: input.attachments?.length ?? 0 },
+        {
+          to: input.to,
+          subject: input.subject,
+          from,
+          attachments: input.attachments?.length ?? 0,
+          // Local development only, so sign-up codes and tickets can be
+          // tried without a mail account. Never outside NODE_ENV=development.
+          ...(this.devPreview
+            ? {
+                preview: (input.text ?? input.html.replace(/<[^>]+>/g, ' '))
+                  .replace(/\s+/g, ' ')
+                  .slice(0, 600),
+              }
+            : {}),
+        },
         'Email (dev, not sent)',
       );
       return;

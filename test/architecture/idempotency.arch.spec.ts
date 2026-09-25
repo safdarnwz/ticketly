@@ -38,11 +38,14 @@ const GUARDED_CONTROLLERS = GUARDED_MODULES.flatMap((m) => {
 //    and no money or seat moves: commission config, settlement ops (internally
 //    idempotent on status), stop/resume sales, no-show flag, partner/agent
 //    status, webhook registration/test, partner API key issue.
+//  - release-hold: held → expired guarded by the status, so a replay finds
+//    nothing to release; no money moves and seats only ever become free.
 // The genuine double-charge/double-book surfaces — hold, extend-hold, confirm,
 // cancel, intent, receipts — are NOT exempt and must carry @Idempotent().
 const EXEMPT = new Set([
   'webhook',
   'reconcile',
+  'releaseHold',
   'testWebhook',
   'catalogue',
   'byPnr',

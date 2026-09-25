@@ -312,6 +312,28 @@ export class BookingRepository {
     );
   }
 
+  /**
+   * Let go of an unpaid hold early (the customer went back to change seats),
+   * exactly as the expiry sweeper does. Only the holder: the booking's
+   * customer or its contact mobile. The status re-check makes a payment that
+   * confirmed it a moment earlier win — a confirmed booking is never touched.
+   */
+  async releaseHold(
+    bookingId: string,
+    who: { customerId?: string; mobileDigits?: string },
+  ): Promise<boolean> {
+    return this.uow.run({ name: 'booking.releaseHold', bypassRls: true }, async (scope) => {
+      const r = await scope.client.query(
+        `UPDATE bookings SET status = 'expired', updated_at = now()
+          WHERE id = $1 AND status = 'held'
+            AND (($2::uuid IS NOT NULL AND customer_id = $2::uuid)
+                 OR ($3::text IS NOT NULL AND right(regexp_replace(coalesce(contact_phone, ''), '\\D', '', 'g'), 10) = $3))`,
+        [bookingId, who.customerId ?? null, who.mobileDigits ?? null],
+      );
+      return (r.rowCount ?? 0) > 0;
+    });
+  }
+
   /** Who may see a booking's tickets: its operator, its customer, its contact phone. */
   async accessInfo(
     bookingId: string,

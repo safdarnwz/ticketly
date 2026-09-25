@@ -121,3 +121,7 @@ export const StaffBookingSearchQuerySchema = z
     message: 'Give a PNR, mobile number or ticket number',
   });
 export type StaffBookingSearchQueryDto = z.infer<typeof StaffBookingSearchQuerySchema>;
+
+/** Release an unpaid hold: the booking mobile proves it is yours (not needed when signed in). */
+export const ReleaseHoldSchema = z.object({ mobile: z.string().trim().max(20).optional() });
+export type ReleaseHoldDto = z.infer<typeof ReleaseHoldSchema>;
