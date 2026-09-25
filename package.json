@@ -25,6 +25,7 @@
     "test:cov": "vitest run --coverage",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "setup": "tsx scripts/setup-local.ts",
+    "demo:onboarding": "node scripts/demo-onboarding.mjs",
     "db:migrate": "tsx scripts/migrate.ts up",
     "db:migrate:down": "tsx scripts/migrate.ts down",
     "db:migrate:status": "tsx scripts/migrate.ts status",

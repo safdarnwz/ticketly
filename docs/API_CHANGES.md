@@ -164,3 +164,4 @@ an unknown id is now 404 (was 200).
   Role permissions must be catalogue permissions, never `*` / `platform:*`,
   and a user can only put into a role — or give someone a role holding —
   permissions they hold themselves (403 otherwise).
+- `POST /admin/tenants/:id/suspend` and `/activate` now answer **200** (were 201); body unchanged.

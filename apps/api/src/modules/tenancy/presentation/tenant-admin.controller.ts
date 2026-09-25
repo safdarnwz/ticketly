@@ -125,6 +125,7 @@ export class TenantAdminController {
   }
 
   @Post(':id/suspend')
+  @HttpCode(200)
   @ApiOperation({ summary: 'Suspend an operator' })
   async suspend(
     @UuidParam('id') id: string,
@@ -135,6 +136,7 @@ export class TenantAdminController {
   }
 
   @Post(':id/activate')
+  @HttpCode(200)
   @ApiOperation({ summary: 'Re-activate a suspended operator' })
   async activate(@UuidParam('id') id: string) {
     await this.provisioning.activate(id as TenantId);
