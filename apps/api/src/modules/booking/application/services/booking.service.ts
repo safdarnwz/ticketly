@@ -148,14 +148,13 @@ export class BookingService {
   ): Promise<{ bookingId: BookingId; pnr: string; holdExpiresAt: string; totalMinor: number }> {
     // Independent reads in parallel: one round-trip of latency, not two.
     const [blocked, cachedQuote] = await Promise.all([
-      req.contactPhone
-        ? this.customers.isBlacklistedByPhone(req.contactPhone)
-        : Promise.resolve(false),
+      // Blocked by this operator — by the signed-in account or the booking mobile.
+      this.customers.isBlocked(getUserId(), req.contactPhone),
       this.pricing.getQuote(req.quoteId),
     ]);
     if (blocked)
       throw new AppError(ErrorCode.COMMON_VALIDATION, 403, {
-        message: 'This account cannot make new bookings — please contact support',
+        message: 'This operator is not taking bookings from you — please contact the operator',
       });
     if (!cachedQuote)
       throw new AppError(ErrorCode.PRICING_QUOTE_EXPIRED, 422, {

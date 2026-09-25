@@ -274,3 +274,12 @@ an unknown id is now 404 (was 200).
   operator's staff). `GET /support/tickets` filters by `status` (or `active`), `priority`, `category`,
   `assigned=me|none`, `q` (subject or PNR), and returns PNR, customer, assignee, message count, who wrote
   last; most urgent first. Customer-set priority is ignored.
+- **Customers (CRM):** customers hold one platform-wide account, but the customer list searched accounts of
+  the operator's own tenant — it was always empty, and blacklisting updated nobody. Replaced:
+  `GET /customers?q&filter=all|frequent|blocked&page&limit` lists who booked with the operator (account,
+  or guest by mobile), with trips, cancellations, spend, last journey; `q` matches name, mobile (4+
+  digits), exact email or PNR. `GET /customers/:key` (key = account id or 10-digit mobile) returns the
+  totals, `block` and `history`. `POST /customers/:key/block { reason }` / `unblock` stop new bookings with
+  this operator only, by account and by mobile (hold → 403); other operators are unaffected, existing
+  bookings stay. Removed: `/customers/search`, `/customers/:id/bookings`, `/blacklist`, `/unblacklist`,
+  `/preferences` (it wrote to the customer's platform account). Migration 0092 (`customer_blocks`).

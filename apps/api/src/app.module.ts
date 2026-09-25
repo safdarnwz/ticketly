@@ -125,7 +125,7 @@ import { KycModule } from './modules/kyc/kyc.module';
     DemandModule, // waitlist + occupancy forecast
     GdsModule, // platform GDS: OTAs / multi-operator agents
     IncidentsModule, // incidents, SOS, lost & found, shift notes, dispatch reports
-    CrmModule, // customer search, profile, blacklist, preferences
+    CrmModule, // the operator's customers (from its bookings) and per-operator blocks
     ConnectionsModule, // cross-operator connecting-journey search + booking (e.g. Delhi -> Kolkata -> Bhubaneswar)
     KycModule, // PAN format-check + DigiLocker document verification for operator onboarding
   ],

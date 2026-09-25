@@ -1,18 +1,15 @@
 import { z } from 'zod';
-import { searchText } from '@http';
 
-export const BlacklistCustomerSchema = z.object({ reason: z.string().trim().min(3).max(500) });
-export type BlacklistCustomerDto = z.infer<typeof BlacklistCustomerSchema>;
+export const BlockCustomerSchema = z.object({
+  reason: z.string().trim().min(5, 'Say why, in a few words').max(500),
+});
+export type BlockCustomerDto = z.infer<typeof BlockCustomerSchema>;
 
-/** Saved travel preferences; merged into what is stored. Values are small scalars. */
-export const CustomerPreferencesSchema = z
-  .record(
-    z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]{0,40}$/),
-    z.union([z.string().max(200), z.number(), z.boolean(), z.null()]),
-  )
-  .refine((v) => Object.keys(v).length <= 50, 'At most 50 preferences');
-export type CustomerPreferencesDto = z.infer<typeof CustomerPreferencesSchema>;
-
-/** Name (partial), or an exact phone / email. */
-export const CustomerSearchQuerySchema = z.object({ q: searchText.optional() });
-export type CustomerSearchQueryDto = z.infer<typeof CustomerSearchQuerySchema>;
+export const CustomerListQuerySchema = z.object({
+  /** Name (part), mobile (part, 4+ digits), exact email, or a PNR. */
+  q: z.string().trim().max(80).optional(),
+  filter: z.enum(['all', 'frequent', 'blocked']).default('all'),
+  page: z.coerce.number().int().min(1).max(1000).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(30),
+});
+export type CustomerListQueryDto = z.infer<typeof CustomerListQuerySchema>;
