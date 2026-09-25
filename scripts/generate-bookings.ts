@@ -368,12 +368,21 @@ async function main(): Promise<void> {
       }
       process.stdout.write(`  [${t.slug}] crew duties assigned: ${dutiesAssigned}\n`);
 
-      const stopRows = (
-        await client.query<{ stop_id: string; sequence: number }>(
-          `SELECT rs.stop_id, rs.sequence FROM route_stops rs WHERE rs.tenant_id = $1 ORDER BY rs.sequence`,
+      // Stops per route, in order — an operator can run several routes.
+      const stopsByRoute = new Map<string, { stop_id: string; sequence: number }[]>();
+      for (const r of (
+        await client.query<{ route_id: string; stop_id: string; sequence: number }>(
+          `SELECT rs.route_id, rs.stop_id, rs.sequence FROM route_stops rs WHERE rs.tenant_id = $1 ORDER BY rs.route_id, rs.sequence`,
           [t.id],
         )
-      ).rows;
+      ).rows) {
+        const list = stopsByRoute.get(r.route_id) ?? [];
+        list.push(r);
+        stopsByRoute.set(r.route_id, list);
+      }
+      // Only trips that can still be sold (departure beyond the booking cut-off).
+      const cutoffMs = Date.now() + (config.domain.bookingCutoffMinutes + 60) * 60_000;
+      const sellableTrips = tripRows.filter((tr) => tr.departs_at.getTime() > cutoffMs);
 
       // ---- Ancillary services (insurance/meal/luggage) — once per tenant ----
       const ancillaryRows = (
@@ -415,8 +424,9 @@ async function main(): Promise<void> {
       }
 
       for (let b = 0; b < perTenantTarget; b++) {
-        const trip = pick(tripRows);
-        const tripStops = stopRows; // single route per tenant in this seed — first and last stop by sequence
+        if (sellableTrips.length === 0) break;
+        const trip = pick(sellableTrips);
+        const tripStops = stopsByRoute.get(trip.route_id) ?? []; // whole route: first → last stop
         const fromStop = tripStops[0];
         const toStop = tripStops[tripStops.length - 1];
         if (!fromStop || !toStop) continue;
@@ -523,9 +533,12 @@ async function main(): Promise<void> {
               'demo-data: customer cancelled',
             );
             if (cancelled.refundMinor > 0) {
+              // Same cancellation id as the booking.cancelled event, so the
+              // worker's RefundConsumer sees this refund and does not repeat it.
               await refunds.initiate({
                 bookingId: hold.bookingId,
                 amountMinor: cancelled.refundMinor,
+                cancellationId: cancelled.cancellationId,
                 destination: 'source',
               });
             }
@@ -672,7 +685,9 @@ async function main(): Promise<void> {
     for (const [fromCity, toCity, label] of connectingRuns) {
       if (!fromCity || !toCity) continue;
       for (let d = 0; d < 5; d++) {
-        const day = localDate(new Date(Date.now() - d * 86_400_000).toISOString().slice(0, 10));
+        const day = localDate(
+          new Date(Date.now() + (d + 1) * 86_400_000).toISOString().slice(0, 10),
+        );
         const options = await journeySearch
           .connecting({
             originCityId: fromCity as CityId,
@@ -837,8 +852,11 @@ async function main(): Promise<void> {
     // Agent bookings — as the agent's own login (AgentService resolves "me" from the user).
     const tripsForAgents = (
       await client.query<{ id: string; route_id: string }>(
-        `SELECT id, route_id FROM trips WHERE tenant_id = $1 AND status IN ('scheduled','open','departed','closed') ORDER BY random() LIMIT 10`,
-        [t.id],
+        `SELECT id, route_id FROM trips
+          WHERE tenant_id = $1 AND status IN ('scheduled','open')
+            AND departs_at > now() + make_interval(mins => $2)
+          ORDER BY random() LIMIT 10`,
+        [t.id, config.domain.bookingCutoffMinutes + 60],
       )
     ).rows;
     for (const [i, trip] of tripsForAgents.entries()) {
@@ -884,14 +902,12 @@ async function main(): Promise<void> {
             b2b.agentBookings += 1;
             if (i === 3) {
               // one cancellation → refund credited back to the agent's account
-              const c = (await bookings.cancel(
-                sold.bookingId,
-                'Passenger changed plans (agent)',
-              )) as { refundMinor?: number };
-              if (c?.refundMinor && c.refundMinor > 0)
+              const c = await bookings.cancel(sold.bookingId, 'Passenger changed plans (agent)');
+              if (c.refundMinor > 0)
                 await refunds.initiate({
                   bookingId: sold.bookingId,
                   amountMinor: c.refundMinor,
+                  cancellationId: c.cancellationId,
                   destination: 'source',
                 });
               b2b.agentCancels += 1;

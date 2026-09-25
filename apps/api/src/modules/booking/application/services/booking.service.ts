@@ -598,7 +598,7 @@ export class BookingService {
       ifsc: string;
       bankName?: string;
     },
-  ): Promise<{ refundMinor: number; refundPct: number }> {
+  ): Promise<{ refundMinor: number; refundPct: number; cancellationId: string }> {
     return this.uow.run(
       { name: 'booking.cancel', tenantId: requireTenantId(), isolation: 'read committed' },
       async () => {
@@ -660,7 +660,11 @@ export class BookingService {
           },
         });
 
-        return { refundMinor: refund.refund.minor, refundPct: refund.refundPct };
+        return {
+          refundMinor: refund.refund.minor,
+          refundPct: refund.refundPct,
+          cancellationId,
+        };
       },
     );
   }
