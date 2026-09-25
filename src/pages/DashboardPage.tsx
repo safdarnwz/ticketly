@@ -105,13 +105,13 @@ export function DashboardPage() {
 
       <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-5">
         <Card className="xl:col-span-3">
-          <CardHeader title="Today’s departures" subtitle="Click a bus to see its bookings" />
+          <CardHeader title="Today’s departures" subtitle="Click a bus for its reservation chart" />
           <CardBody>
             {trips.isLoading ? <Skeleton className="h-40" /> : trips.isError ? <ErrorState error={trips.error} onRetry={trips.refetch} /> : (
               <Table
                 columns={tripColumns}
                 rows={trips.data?.items ?? []}
-                onRowClick={(t) => navigate(`/bookings?tripId=${t.id}&basis=journey&from=${t.journeyDate}&to=${t.journeyDate}&route=${encodeURIComponent(`${t.routeName} ${formatTime(t.departsAt)}`)}`)}
+                onRowClick={(t) => navigate(`/trips/${t.id}`)}
                 empty="No bus leaves today."
               />
             )}

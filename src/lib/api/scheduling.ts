@@ -24,7 +24,39 @@ export const schedulingApi = {
   listTrips: (date?: string) => get<{ items: TripRow[] }>(`/v1/scheduling/trips${date ? `?date=${date}` : ''}`),
 };
 
+export interface ChartOccupant {
+  seatNumber: string; name: string; age: number | null; gender: string | null;
+  bookingId: string; pnr: string; status: string;
+  /** A customer is paying for this seat right now. */
+  onHold: boolean; holdExpiresAt: string | null;
+  fromSeq: number; toSeq: number; from: string | null; to: string | null;
+  contactPhone: string | null; channel: string;
+  ticketStatus: string | null;
+}
+export interface ChartSeat {
+  seatNumber: string; seatType: string; deck: number; row: number; column: number; rowSpan: number; colSpan: number;
+  ladiesOnly: boolean; blocked: boolean; bookable: boolean;
+  occupants: ChartOccupant[];
+}
+export interface TripChart {
+  trip: { id: string; routeId: string; journeyDate: string; departsAt: string; arrivesAt: string; totalSeats: number; status: string; vehicleId: string | null; hasRun: boolean };
+  stops: { sequence: number; stopId: string; name: string | null; arrivesAt: string; departsAt: string; canBoard: boolean; canAlight: boolean }[];
+  layout: { decks: number; rows: number; columns: number };
+  seats: ChartSeat[];
+  totals: { seats: number; seatsWithPassengers: number; passengers: number; bookings: number; onHold: number; blocked: number; boarded: number; free: number };
+}
+
 export const tripOpsApi = {
+  /** The reservation chart: layout, passengers seat by seat, holds, blocked seats, totals. */
+  chart: (tripId: string) => get<TripChart>(`/v1/bookings/trips/${tripId}/chart`),
+  blockSeats: (tripId: string, input: { seatNumbers: string[]; fromStopId: string; toStopId: string; block: boolean }) =>
+    post<{ affected: number }>(`/v1/scheduling/trips/${tripId}/block-seats`, input),
+  releaseHolds: (tripId: string, includePhoneHolds = false) =>
+    post<{ released: number }>(`/v1/scheduling/trips/${tripId}/release-holds`, { includePhoneHolds }),
+  remarks: (tripId: string) => get<{ items: { id: string; remark: string; createdAt: string; by: string | null }[] }>(`/v1/scheduling/trips/${tripId}/remarks`),
+  addRemark: (tripId: string, remark: string) => post<{ ok: boolean }>(`/v1/scheduling/trips/${tripId}/remarks`, { remark }),
+  retime: (tripId: string, newDepartsAt: string, reason: string) =>
+    post<{ oldDepartsAt: string; newDepartsAt: string; shiftMinutes: number }>(`/v1/scheduling/trips/${tripId}/retime`, { newDepartsAt, reason }),
   cancel: (tripId: string, reason: string) =>
     post<{ cancelledBookings: number; failed: number }>(`/v1/bookings/trips/${tripId}/cancel`, { reason }, withIdempotency(`cancel-trip-${tripId}`)),
   stopSales: (tripId: string) => post<{ ok: boolean }>(`/v1/bookings/trips/${tripId}/stop-sales`, {}),

@@ -12,6 +12,7 @@ import { isSuperAdmin, SURFACE_TENANT_SLUG } from '@/lib/host';
 /** app.<slug>.ticketly.com — one operator's own console. Purely their own trading operations. */
 const tenantAdminNav = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/trips', label: 'Trips & Charts', icon: Bus },
   { to: '/routes', label: 'Routes & Stops', icon: RouteIcon },
   { to: '/fleet', label: 'Fleet & Crew', icon: Truck },
   { to: '/schedule', label: 'Schedule', icon: Calendar },

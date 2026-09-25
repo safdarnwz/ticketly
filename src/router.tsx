@@ -27,6 +27,8 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 
 // Tenant admin (app.<slug>.ticketly.com) — one operator's own trading operations
+import { TripsPage } from '@/pages/trips/TripsPage';
+import { TripChartPage } from '@/pages/trips/TripChartPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { RoutesPage } from '@/pages/routes/RoutesPage';
 import { FleetPage } from '@/pages/fleet/FleetPage';
@@ -102,6 +104,8 @@ const tenantAdminRouter = createBrowserRouter([
         children: [
           { path: '/', element: <Navigate to="/dashboard" replace /> },
           { path: '/dashboard', element: <DashboardPage /> },
+          { path: '/trips', element: <TripsPage /> },
+          { path: '/trips/:id', element: <TripChartPage /> },
           { path: '/routes', element: <RoutesPage /> },
           { path: '/fleet', element: <FleetPage /> },
           { path: '/schedule', element: <SchedulePage /> },
