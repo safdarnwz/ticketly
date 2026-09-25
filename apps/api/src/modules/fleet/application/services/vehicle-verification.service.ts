@@ -11,7 +11,6 @@ import {
   runAsTenant,
   todayIn,
   type Json,
-  type TenantId,
   type VehicleId,
   type VehicleTypeId,
 } from '@kernel';
@@ -442,27 +441,11 @@ export class VehicleVerificationService {
 
   /* ───────────────────────── super admin (cross-tenant) ───────────────────────── */
 
-  async adminList(filter: { verification?: VerificationStatus; search?: string; limit?: number }) {
-    return this.uow.run({ name: 'vehicle.admin.list', bypassRls: true }, async (scope) => {
-      const res = await scope.client.query<Record<string, unknown>>(
-        `SELECT v.id, v.registration_no AS "registrationNo", v.make, v.model, v.manufacture_year AS "manufactureYear",
-                v.verification_status AS "verificationStatus", v.verification_reason AS "verificationReason",
-                v.submitted_at AS "submittedAt", v.verified_at AS "verifiedAt", v.status,
-                t.id AS "tenantId", t.display_name AS "operatorName", t.slug AS "operatorSlug",
-                (SELECT count(*) FROM vehicle_documents d WHERE d.vehicle_id = v.id AND d.superseded_at IS NULL AND d.verification_status = 'pending')::int AS "pendingDocuments"
-           FROM vehicles v JOIN tenants t ON t.id = v.tenant_id
-          WHERE v.deleted_at IS NULL
-            AND ($1::text IS NULL OR v.verification_status = $1)
-            AND ($2::text IS NULL OR v.registration_no ILIKE '%' || $2 || '%' OR t.display_name ILIKE '%' || $2 || '%')
-          ORDER BY (v.verification_status = 'submitted') DESC, v.submitted_at NULLS LAST, v.created_at DESC
-          LIMIT $3`,
-        [
-          filter.verification ?? null,
-          filter.search?.trim() || null,
-          Math.min(filter.limit ?? 100, 500),
-        ],
-      );
-      return res.rows;
+  adminList(filter: { verification?: VerificationStatus; search?: string; limit?: number }) {
+    return this.vehicles.adminQueue({
+      verification: filter.verification ?? null,
+      search: filter.search?.trim() || null,
+      limit: Math.min(filter.limit ?? 100, 500),
     });
   }
 
@@ -606,52 +589,36 @@ export class VehicleVerificationService {
 
   /** Suspends every approved bus that no longer has valid verified papers. Returns count per tenant. */
   async suspendExpired(): Promise<number> {
-    const rows = await this.uow.run(
-      { name: 'vehicle.expirySweep.scan', bypassRls: true },
-      async (scope) =>
-        (
-          await scope.client.query<{ id: string; tenant_id: string }>(
-            `SELECT DISTINCT v.id, v.tenant_id FROM vehicles v
-           JOIN vehicle_documents d ON d.vehicle_id = v.id
-          WHERE v.verification_status = 'approved' AND v.deleted_at IS NULL
-            AND d.verification_status = 'verified' AND d.superseded_at IS NULL AND d.expires_on < current_date
-            AND d.doc_type = ANY($1)`,
-            [REQUIRED_DOC_TYPES as unknown as string[]],
-          )
-        ).rows,
-    );
+    const rows = await this.vehicles.approvedWithExpiredDocuments(REQUIRED_DOC_TYPES);
     let suspended = 0;
     for (const r of rows) {
       try {
-        await runAsTenant(r.tenant_id as TenantId, () =>
-          this.uow.run(
-            { name: 'vehicle.expirySweep', tenantId: r.tenant_id as TenantId },
-            async () => {
-              const v = await this.vehicles.lockById(r.id as VehicleId);
-              if (v.verificationStatus !== 'approved') return;
-              const c = computeCompliance(await this.vehicles.documentVersions(v.id), todayIn());
-              if (c.compliant) return; // a renewal was verified in the meantime
-              const reason = `Automatically suspended: ${approvalBlockers(c).join('; ')}`;
-              await this.vehicles.setVerification(v.id, {
-                status: 'suspended',
+        await runAsTenant(r.tenantId, () =>
+          this.uow.run({ name: 'vehicle.expirySweep', tenantId: r.tenantId }, async () => {
+            const v = await this.vehicles.lockById(r.id);
+            if (v.verificationStatus !== 'approved') return;
+            const c = computeCompliance(await this.vehicles.documentVersions(v.id), todayIn());
+            if (c.compliant) return; // a renewal was verified in the meantime
+            const reason = `Automatically suspended: ${approvalBlockers(c).join('; ')}`;
+            await this.vehicles.setVerification(v.id, {
+              status: 'suspended',
+              reason,
+              actorId: null,
+            });
+            const detachedTrips = await this.vehicles.detachFromFutureService(v.id);
+            this.events.publish({
+              type: 'vehicle.suspended',
+              aggregateType: 'vehicle',
+              aggregateId: v.id,
+              payload: {
+                registrationNo: v.registrationNo,
                 reason,
-                actorId: null,
-              });
-              const detachedTrips = await this.vehicles.detachFromFutureService(v.id);
-              this.events.publish({
-                type: 'vehicle.suspended',
-                aggregateType: 'vehicle',
-                aggregateId: v.id,
-                payload: {
-                  registrationNo: v.registrationNo,
-                  reason,
-                  detachedTrips,
-                  automatic: true,
-                },
-              });
-              suspended += 1;
-            },
-          ),
+                detachedTrips,
+                automatic: true,
+              },
+            });
+            suspended += 1;
+          }),
         );
       } catch (e) {
         this.log.error(
@@ -666,18 +633,9 @@ export class VehicleVerificationService {
   /* ───────────────────────── helpers ───────────────────────── */
 
   private async asOwner<T>(vehicleId: VehicleId, fn: () => Promise<T>): Promise<T> {
-    const tenantId = await this.uow.run(
-      { name: 'vehicle.admin.owner', bypassRls: true },
-      async (scope) =>
-        (
-          await scope.client.query<{ tenant_id: string }>(
-            `SELECT tenant_id FROM vehicles WHERE id = $1 AND deleted_at IS NULL`,
-            [vehicleId],
-          )
-        ).rows[0]?.tenant_id,
-    );
+    const tenantId = await this.vehicles.ownerOf(vehicleId);
     if (!tenantId) throw new NotFoundError('Vehicle', vehicleId);
-    return runAsTenant(tenantId as TenantId, fn);
+    return runAsTenant(tenantId, fn);
   }
 
   private validateDetails(input: VehicleDetailsInput): void {

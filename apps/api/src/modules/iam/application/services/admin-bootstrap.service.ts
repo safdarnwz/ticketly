@@ -77,7 +77,7 @@ export class AdminBootstrapService implements OnApplicationBootstrap {
         }
 
         await this.uow.run({ name: 'bootstrap.superAdminRole' }, async () => {
-          const role = await this.roles.findByCode('super_admin');
+          const role = await this.roles.findPlatformRole('super_admin');
           if (!role) {
             this.log.error(
               { email },

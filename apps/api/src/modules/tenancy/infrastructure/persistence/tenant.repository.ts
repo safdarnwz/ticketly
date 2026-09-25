@@ -58,6 +58,58 @@ export class TenantRepository {
   }
 
   /** Resolve by slug or verified custom domain — used by the resolver. Cached upstream. */
+  /**
+   * An operator approved from an onboarding application: active at once,
+   * with the bank, GST and registered address given on the application.
+   */
+  async insertApproved(t: {
+    id: string;
+    slug: string;
+    name: string;
+    contactEmail: string;
+    contactPhone: string | null;
+    bank: {
+      holder: string | null;
+      accountNumber: string | null;
+      ifsc: string | null;
+      name: string | null;
+    };
+    gstin: string | null;
+    registeredAddress: string | null;
+  }): Promise<void> {
+    await this.db.execute_(
+      `INSERT INTO tenants (id, slug, legal_name, display_name, status, contact_email, contact_phone,
+                           bank_account_holder, bank_account_number, bank_ifsc, bank_name, bank_details_updated_at,
+                           gstin, registered_address)
+       VALUES ($1,$2,$3,$3,'active',$4,$5,$6,$7,$8,$9,
+               CASE WHEN $7::text IS NOT NULL THEN now() ELSE NULL END,
+               $10,$11)`,
+      [
+        t.id,
+        t.slug,
+        t.name,
+        t.contactEmail,
+        t.contactPhone,
+        t.bank.holder,
+        t.bank.accountNumber,
+        t.bank.ifsc,
+        t.bank.name,
+        t.gstin,
+        t.registeredAddress,
+      ],
+      { name: 'tenant.insertApproved', primary: true },
+    );
+  }
+
+  async displayName(tenantId: string): Promise<string | null> {
+    const row = await this.db.queryOne<{ display_name: string }>(
+      `SELECT display_name FROM tenants WHERE id = $1`,
+      [tenantId],
+      { name: 'tenant.displayName', primary: true },
+    );
+    return row?.display_name ?? null;
+  }
+
   async findBySlugOrDomain(value: string): Promise<Tenant | null> {
     const normalised = value.trim().toLowerCase();
     const row = await this.db.queryOne<TenantRow>(

@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { DatabaseService } from '@database';
-import { newId, type TenantId, type Uuid } from '@kernel';
+import { type TenantId, type Uuid } from '@kernel';
 import { Logger } from '@observability';
 
 import { renderTemplate } from '../../domain/template';
@@ -9,6 +8,7 @@ import { NotificationTemplateRepository } from '../../infrastructure/persistence
 import { ProviderRegistry } from '../../infrastructure/provider-registry';
 import type { Channel } from '../../infrastructure/provider.interface';
 import { PlatformBillingService } from '../../../platform-settings';
+import { NotificationLogRepository } from '../../infrastructure/persistence/notification-log.repository';
 
 /**
  * Notification engine.
@@ -29,7 +29,7 @@ export class NotificationService {
   private readonly log: Logger;
 
   constructor(
-    private readonly db: DatabaseService,
+    private readonly deliveries: NotificationLogRepository,
     private readonly templates: NotificationTemplateRepository,
     private readonly providers: ProviderRegistry,
     private readonly billing: PlatformBillingService,
@@ -52,11 +52,7 @@ export class NotificationService {
     // ONLY for the email channel's From display-name, so a customer's
     // inbox shows the operator they actually booked with, not the
     // platform's own name for every single tenant's mail.
-    const tenantRow = await this.db.queryOne<{ display_name: string }>(
-      `SELECT display_name FROM tenants WHERE id = $1`,
-      [input.tenantId],
-      { name: 'notify.tenantDisplayName' },
-    );
+    const senderName = await this.deliveries.operatorDisplayName(input.tenantId);
 
     for (const template of templates) {
       const recipient = input.recipients[template.channel];
@@ -67,15 +63,14 @@ export class NotificationService {
 
       // Idempotent insert: if this (event, channel, recipient) was already
       // logged, we've already sent it — skip.
-      const inserted = await this.db.queryOne<{ id: string }>(
-        `INSERT INTO notifications (id, tenant_id, event_id, channel, recipient, subject, body, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,'pending')
-         ON CONFLICT (event_id, channel, recipient) DO UPDATE SET status = 'pending'
-           WHERE notifications.status = 'failed'
-         RETURNING id`,
-        [newId(), input.tenantId, input.eventId, template.channel, recipient, subject, body],
-        { name: 'notify.logInsert', primary: true },
-      );
+      const logId = await this.deliveries.claim({
+        tenantId: input.tenantId,
+        eventId: input.eventId,
+        channel: template.channel,
+        recipient,
+        subject,
+        body,
+      });
       // No row back means one of two DIFFERENT things, not one: either
       // this exact notification was never attempted before (the INSERT
       // half just handled that — inserted would be set), OR a previous
@@ -84,7 +79,7 @@ export class NotificationService {
       // skip — a 'failed' row is exactly what the UPDATE half exists to
       // pick back up and retry, never to leave stuck as "already
       // processed" forever the way a bare ON CONFLICT DO NOTHING would.
-      if (!inserted) continue;
+      if (!logId) continue;
 
       const provider = this.providers.forChannel(template.channel);
       const result = await provider.send({
@@ -92,14 +87,14 @@ export class NotificationService {
         recipient,
         subject: subject ?? undefined,
         body,
-        fromName: template.channel === 'email' ? tenantRow?.display_name : undefined,
+        fromName: template.channel === 'email' ? (senderName ?? undefined) : undefined,
       });
 
-      await this.db.execute_(
-        `UPDATE notifications SET status = $2, provider = $3, provider_ref = $4, sent_at = now(), attempts = attempts + 1 WHERE id = $1`,
-        [inserted.id, result.ok ? 'sent' : 'failed', provider.name, result.providerRef ?? null],
-        { name: 'notify.logUpdate', primary: true },
-      );
+      await this.deliveries.recordResult(logId, {
+        ok: result.ok,
+        provider: provider.name,
+        providerRef: result.providerRef ?? null,
+      });
       if (!result.ok) {
         this.log.warn(
           {
@@ -124,7 +119,7 @@ export class NotificationService {
       // we're past it, but a duplicate dispatch of the same event is still
       // possible) can never double-bill for the same message.
       if (template.channel === 'sms' || template.channel === 'whatsapp') {
-        await this.billing.chargeNotification(input.tenantId, template.channel, inserted.id);
+        await this.billing.chargeNotification(input.tenantId, template.channel, logId);
       }
     }
   }

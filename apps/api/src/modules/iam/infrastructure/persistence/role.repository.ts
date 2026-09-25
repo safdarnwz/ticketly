@@ -201,6 +201,18 @@ export class RoleRepository {
     return { ...mapRole(row), permissions: await this.permissionsOf(row.id) };
   }
 
+  /** A platform-level role (tenant_id IS NULL), whatever tenant is in context. */
+  async findPlatformRole(code: string): Promise<Role | null> {
+    const row = await this.db.queryOne<RoleRow>(
+      `SELECT id, tenant_id, code, name, description, is_system, conditions
+         FROM roles WHERE tenant_id IS NULL AND code = $1 AND deleted_at IS NULL`,
+      [code],
+      { name: 'rbac.findPlatformRole', primary: true },
+    );
+    if (!row) return null;
+    return { ...mapRole(row), permissions: await this.permissionsOf(row.id) };
+  }
+
   async list(): Promise<Role[]> {
     const rows = await this.db.query<RoleRow>(
       `SELECT id, tenant_id, code, name, description, is_system, conditions

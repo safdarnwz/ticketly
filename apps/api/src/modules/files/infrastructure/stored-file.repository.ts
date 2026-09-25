@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { DatabaseService } from '@database';
+import { DatabaseService, UnitOfWork } from '@database';
 import { getTenantId, type UserId } from '@kernel';
 
 import type { AllowedMime } from '../domain/file-validation';
@@ -23,7 +23,25 @@ export interface StoredFileMeta {
 
 @Injectable()
 export class StoredFileRepository {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly uow: UnitOfWork,
+  ) {}
+
+  /**
+   * A PUBLIC file (logo, bus photo, banner) by id, whichever operator owns
+   * it — so RLS is bypassed; private files are never returned.
+   */
+  findPublic(id: string): Promise<StoredFileMeta | null> {
+    return this.uow.run({ name: 'file.public', bypassRls: true }, async (scope) => {
+      const r = await scope.client.query<Row>(
+        `SELECT ${COLS} FROM stored_files
+          WHERE id = $1 AND visibility = 'public' AND deleted_at IS NULL`,
+        [id],
+      );
+      return r.rows[0] ? map(r.rows[0]) : null;
+    });
+  }
 
   async insert(
     input: Omit<StoredFileMeta, 'tenantId' | 'createdAt'> & { uploadedBy: UserId | null },
@@ -99,11 +117,8 @@ function scopeTenant(): string | null {
 }
 
 /** Platform-level lookup (RLS bypassed by the caller) — used only for PUBLIC files. */
-export const PUBLIC_FILE_SQL = `SELECT id, tenant_id, purpose, provider, bucket, object_key, visibility, file_name, mime_type, size_bytes, sha256, created_at
-  FROM stored_files WHERE id = $1 AND visibility = 'public' AND deleted_at IS NULL`;
-
 const COLS = `id, tenant_id, purpose, provider, bucket, object_key, visibility, file_name, mime_type, size_bytes, sha256, created_at`;
-export interface Row {
+interface Row {
   id: string;
   tenant_id: string | null;
   purpose: string;
@@ -117,7 +132,7 @@ export interface Row {
   sha256: string;
   created_at: Date;
 }
-export function map(r: Row): StoredFileMeta {
+function map(r: Row): StoredFileMeta {
   return {
     id: r.id,
     tenantId: r.tenant_id,

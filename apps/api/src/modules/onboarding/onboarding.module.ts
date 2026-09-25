@@ -10,6 +10,7 @@ import { OnboardingService } from './application/services/onboarding.service';
 import { OperatorApplicationRepository } from './infrastructure/persistence/operator-application.repository';
 import { OnboardingController } from './presentation/onboarding.controller';
 import { PlatformSettingsModule } from '../platform-settings/platform-settings.module';
+import { TenancyModule } from '../tenancy/tenancy.module';
 
 /**
  * Operator onboarding: the public "Become an Operator" application + the
@@ -25,6 +26,7 @@ import { PlatformSettingsModule } from '../platform-settings/platform-settings.m
     NotificationModule,
     FilesModule,
     PlatformSettingsModule,
+    TenancyModule,
   ],
   controllers: [OnboardingController],
   providers: [OperatorApplicationRepository, OnboardingService],

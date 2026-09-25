@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { CacheNamespace, CacheService, CacheTtl } from '@cache';
-import { DatabaseService, registerConstraintMessages } from '@database';
+import { DatabaseService, registerConstraintMessages, UnitOfWork } from '@database';
 import { stateFromGstin } from '../../domain/gst-state-codes';
 import {
   minuteOfDay,
@@ -11,6 +11,7 @@ import {
   type CityId,
   type RouteId,
   type StopId,
+  type TenantId,
 } from '@kernel';
 
 import { RoutePath, type RouteStopInput } from '../../routes/domain/route-path';
@@ -48,6 +49,7 @@ export class RouteRepository {
   constructor(
     private readonly db: DatabaseService,
     private readonly cache: CacheService,
+    private readonly uow: UnitOfWork,
   ) {}
 
   /** Persist a route and its stops. `startTime` is HH:MM origin departure. */
@@ -269,6 +271,27 @@ export class RouteRepository {
     const operatorState = stateFromGstin(row?.operator_gstin);
     if (!operatorState || !row) return true;
     return operatorState !== row.origin_state_code;
+  }
+
+  /**
+   * Active operators with a published route between two cities — across all
+   * tenants (search fans out to each), so RLS is bypassed; returns ids only.
+   */
+  tenantsServingOd(originCityId: CityId, destCityId: CityId): Promise<TenantId[]> {
+    return this.uow.run(
+      { name: 'route.tenantsServingOd', bypassRls: true, readOnly: true },
+      async (scope) => {
+        const r = await scope.client.query<{ tenant_id: TenantId }>(
+          `SELECT DISTINCT r.tenant_id
+             FROM routes r
+             JOIN tenants t ON t.id = r.tenant_id AND t.status = 'active' AND t.deleted_at IS NULL
+            WHERE r.origin_city_id = $1 AND r.dest_city_id = $2
+              AND r.status = 'published' AND r.deleted_at IS NULL`,
+          [originCityId, destCityId],
+        );
+        return r.rows.map((x) => x.tenant_id);
+      },
+    );
   }
 
   /** The route's stops in order with their timing offset and board/alight rules. */

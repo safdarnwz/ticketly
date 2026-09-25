@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { AppConfig } from '@config';
-import { DatabaseService, UnitOfWork } from '@database';
+import { UnitOfWork } from '@database';
 import {
   AppError,
   ErrorCode,
@@ -14,7 +14,7 @@ import {
 } from '@kernel';
 import { PasswordHasher } from '@security';
 
-import { User, UserRepository } from '../../../iam';
+import { RoleRepository, User, UserRepository } from '../../../iam';
 import { Mailer, renderOperatorStatusEmail, NotificationService } from '../../../notification';
 import { FileService } from '../../../files/application/file.service';
 import { defaultLogoSvg } from '../../../files/domain/default-logo';
@@ -26,6 +26,7 @@ import {
 } from '../../domain/application-status';
 import { OperatorApplicationRepository } from '../../infrastructure/persistence/operator-application.repository';
 import { PlatformPoliciesService } from '../../../platform-settings';
+import { TenantRepository } from '../../../tenancy';
 
 export interface ApplyInput {
   firstName: string;
@@ -77,7 +78,8 @@ export class OnboardingService {
     private readonly users: UserRepository,
     private readonly hasher: PasswordHasher,
     private readonly mailer: Mailer,
-    private readonly db: DatabaseService,
+    private readonly tenants: TenantRepository,
+    private readonly roles: RoleRepository,
     private readonly uow: UnitOfWork,
     private readonly config: AppConfig,
     private readonly notifications: NotificationService,
@@ -212,7 +214,7 @@ export class OnboardingService {
       email: string;
       name: string;
       slug: string;
-    }>({ name: 'onboarding.approve' }, async (scope) => {
+    }>({ name: 'onboarding.approve' }, async () => {
       // Row lock: a concurrent reject/hold of the same application waits,
       // then sees 'approved' and fails cleanly — never two decisions.
       const app = await this.repo.findForUpdate(id);
@@ -251,28 +253,21 @@ export class OnboardingService {
           .map((part) => (typeof part === 'string' ? part.trim() : ''))
           .filter((part) => part.length > 0)
           .join(', ') || null;
-      await scope.client.query(
-        `INSERT INTO tenants (id, slug, legal_name, display_name, status, contact_email, contact_phone,
-                                 bank_account_holder, bank_account_number, bank_ifsc, bank_name, bank_details_updated_at,
-                                 gstin, registered_address)
-           VALUES ($1,$2,$3,$4,'active',$5,$6,$7,$8,$9,$10,
-                   CASE WHEN $8::text IS NOT NULL THEN now() ELSE NULL END,
-                   $11,$12)`,
-        [
-          tenantId,
-          slug,
-          app.companyName,
-          app.companyName,
-          app.officialEmail ?? app.email,
-          app.companyMobile ?? app.mobile,
-          app.bankAccountHolder ?? null,
-          app.bankAccountNumber ?? null,
-          app.bankIfsc ?? null,
-          app.bankName ?? null,
-          app.gstNumber ?? null,
-          registeredAddress,
-        ],
-      );
+      await this.tenants.insertApproved({
+        id: tenantId,
+        slug,
+        name: app.companyName,
+        contactEmail: app.officialEmail ?? app.email,
+        contactPhone: app.companyMobile ?? app.mobile,
+        bank: {
+          holder: app.bankAccountHolder ?? null,
+          accountNumber: app.bankAccountNumber ?? null,
+          ifsc: app.bankIfsc ?? null,
+          name: app.bankName ?? null,
+        },
+        gstin: app.gstNumber ?? null,
+        registeredAddress,
+      });
 
       // 1b) Default notification templates — WITHOUT this, notify()
       // silently sends NOTHING for this tenant forever (it looks up a
@@ -403,15 +398,8 @@ export class OnboardingService {
       );
 
       // 3) Grant the operator_admin system role.
-      const role = await scope.client.query<{ id: string }>(
-        `SELECT id FROM roles WHERE code = 'operator_admin' AND tenant_id IS NULL AND deleted_at IS NULL LIMIT 1`,
-      );
-      if (role.rows[0]) {
-        await scope.client.query(
-          `INSERT INTO user_roles (user_id, role_id, granted_by) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
-          [operatorUser.id, role.rows[0].id, reviewerId],
-        );
-      }
+      const role = await this.roles.findPlatformRole('operator_admin');
+      if (role) await this.roles.grantToUser(operatorUser.id, role.id, reviewerId);
 
       await this.repo.markApproved(id, tenantId, reviewerId);
       await this.repo.recordEvent({
@@ -462,14 +450,7 @@ export class OnboardingService {
   ): Promise<void> {
     try {
       await runWithContext(createContext({ tenantId, actorType: 'system' }), async () => {
-        const company =
-          (
-            await this.db.queryOne<{ display_name: string }>(
-              `SELECT display_name FROM tenants WHERE id = $1`,
-              [tenantId],
-              { name: 'onboarding.companyName', primary: true },
-            )
-          )?.display_name ?? 'Operator';
+        const company = (await this.tenants.displayName(tenantId)) ?? 'Operator';
         const logo = await this.files.store({
           purpose: 'tenant_logo',
           folder: 'branding',
@@ -480,12 +461,11 @@ export class OnboardingService {
           allowSvg: true,
           allowedMimes: ['image/svg+xml'],
         });
-        await this.db.execute_(
-          `UPDATE tenants SET settings = coalesce(settings, '{}'::jsonb) || jsonb_build_object('logoFileId', $2::text, 'logoObjectKey', $3::text, 'logoCdnUrl', $4::text)
-            WHERE id = $1`,
-          [tenantId, logo.id, logo.objectKey, logo.url],
-          { name: 'onboarding.setDefaultLogo', primary: true },
-        );
+        await this.tenants.setLogoFile({
+          fileId: logo.id,
+          objectKey: logo.objectKey,
+          url: logo.url,
+        });
       });
     } catch (e) {
       this.logger

@@ -12,12 +12,12 @@ Measured at the end of the 2026-09 cleanup (the starting numbers are in brackets
 | Area | Now | Was |
 |---|---|---|
 | Feature modules | 45 — every feature lives in exactly one | 48, with 4 duplicated features (below) |
-| Cross-module deep imports | 15 (ratchet baseline) | 190 |
+| Cross-module deep imports | 14 (ratchet baseline) | 190 |
 | Request bodies validated | all (zod DTOs in `presentation/dto`) | ~20 bodies read raw |
 | Query strings validated | all (`zodQuery`) | 62 raw `@Query('x')` strings |
 | Id route params validated | all (`@UuidParam`) | none |
 | Schemas declared inside controllers | 0 | 26 controllers |
-| Application-layer files with SQL | 22 | 26 |
+| Files with SQL outside `infrastructure/` | 0 (enforced by `test/architecture/sql-location.arch.spec.ts`) | 26 |
 
 Duplicates removed (one implementation kept, the richer one, with the missing
 parts of the other merged in):
@@ -31,6 +31,7 @@ parts of the other merged in):
 | partner webhooks stored twice (`partner_webhooks`, columns on `gds_partners`) | `webhooks` module, one table, one delivery engine |
 | `channel_partners` (unused) | dropped |
 | `health` + `system` | `system` (health, readiness, metrics) |
+| `platform_charges` written from four places (fees, promotions, settlement) | `PlatformChargeRepository` + `PlatformBillingService` |
 | Status vocabularies repeated as string unions in DTOs, services and SQL | one `*_STATUSES` const per vocabulary in the owning module's `domain/` |
 
 ## 3. Bounded contexts
@@ -104,8 +105,8 @@ contexts/<name>/
 | 0 | Auth decorators in `@http`, boundary ratchet | done |
 | 1 | Remove duplicated features (table in §2) | done |
 | 2 | Validated DTOs for every body, query and id param; enums in domain | done |
-| 3 | Route deep imports through `index.ts` (190 → 15) | 15 left: files, promotions, quotas, crm, agents/domain, search |
-| 4 | Move the SQL still in 22 application services into repositories | open — largest remaining item |
+| 3 | Route deep imports through `index.ts` (190 → 14) | 14 left: files, promotions, quotas, crm, agents/domain, search |
+| 4 | Move all SQL into repositories (22 services, 1 controller, the worker's connection monitor) | done; an architecture test keeps it there |
 | 5 | Split payment / auth / booking services into use-case classes | open |
 | 6 | `TemplateRegistry` + `Entitlements` everywhere | open |
 

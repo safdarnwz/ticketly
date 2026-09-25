@@ -205,6 +205,11 @@ export class FileService {
     return this.files.get(id);
   }
 
+  /** A public file's metadata, whichever operator owns it (for the no-CDN public route). */
+  publicMeta(id: string): Promise<StoredFileMeta | null> {
+    return this.files.findPublic(id);
+  }
+
   /**
    * PUBLIC → CDN URL (Cloudflare custom domain) with a content-hash version,
    * so a replaced logo is never served stale from the edge cache.

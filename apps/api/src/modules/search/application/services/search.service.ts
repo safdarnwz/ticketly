@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
 import { CacheNamespace, CacheService, CacheTtl } from '@cache';
-import { UnitOfWork } from '@database';
 import {
   daysBetween,
   getTenantId,
@@ -110,7 +109,6 @@ export class SearchService {
     private readonly promotions: PromotionRepository,
     private readonly cache: CacheService,
     private readonly metrics: Metrics,
-    private readonly uow: UnitOfWork,
     logger: Logger,
   ) {
     this.log = logger.forContext('SearchService');
@@ -230,22 +228,9 @@ export class SearchService {
     return out;
   }
 
-  /** Active operators with at least one published route for this O/D (RLS bypassed: returns ids only). */
-  private async tenantsServingOd(originCityId: CityId, destCityId: CityId): Promise<TenantId[]> {
-    return this.uow.run(
-      { name: 'search.tenantsServingOd', bypassRls: true, readOnly: true },
-      async (scope) => {
-        const res = await scope.client.query<{ tenant_id: TenantId }>(
-          `SELECT DISTINCT r.tenant_id
-           FROM routes r
-           JOIN tenants t ON t.id = r.tenant_id AND t.status = 'active' AND t.deleted_at IS NULL
-          WHERE r.origin_city_id = $1 AND r.dest_city_id = $2
-            AND r.status = 'published' AND r.deleted_at IS NULL`,
-          [originCityId, destCityId],
-        );
-        return res.rows.map((r) => r.tenant_id);
-      },
-    );
+  /** Active operators with at least one published route for this O/D. */
+  private tenantsServingOd(originCityId: CityId, destCityId: CityId): Promise<TenantId[]> {
+    return this.routes.tenantsServingOd(originCityId, destCityId);
   }
 
   private async computeForTenant(

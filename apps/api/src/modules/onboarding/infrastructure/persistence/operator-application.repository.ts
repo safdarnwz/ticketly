@@ -14,6 +14,18 @@ export interface OperatorApplicationRow {
   mobile: string;
   passwordHash: string;
   companyName: string;
+  gstNumber?: string | null;
+  officialEmail?: string | null;
+  companyMobile?: string | null;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pinCode?: string | null;
+  bankAccountHolder?: string | null;
+  bankAccountNumber?: string | null;
+  bankIfsc?: string | null;
+  bankName?: string | null;
   [k: string]: unknown;
 }
 

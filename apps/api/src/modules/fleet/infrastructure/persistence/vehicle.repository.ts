@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 
-import { DatabaseService, registerConstraintMessages } from '@database';
+import { DatabaseService, registerConstraintMessages, UnitOfWork } from '@database';
 import {
   newId,
   NotFoundError,
   requireTenantId,
   type LocalDate,
   type SeatLayoutId,
+  type TenantId,
   type UserId,
   type VehicleId,
   type VehicleTypeId,
@@ -113,7 +114,67 @@ const VEHICLE_COLS = `id, registration_no, vehicle_type_id, seat_layout_id, stat
 
 @Injectable()
 export class VehicleRepository {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly uow: UnitOfWork,
+  ) {}
+
+  /* ── cross-tenant reads for the platform (RLS bypassed) ── */
+
+  /** Platform verification queue across all operators — submitted first. */
+  adminQueue(filter: {
+    verification: string | null;
+    search: string | null;
+    limit: number;
+  }): Promise<Record<string, unknown>[]> {
+    return this.uow.run({ name: 'vehicle.admin.list', bypassRls: true }, async (scope) => {
+      const res = await scope.client.query<Record<string, unknown>>(
+        `SELECT v.id, v.registration_no AS "registrationNo", v.make, v.model, v.manufacture_year AS "manufactureYear",
+                v.verification_status AS "verificationStatus", v.verification_reason AS "verificationReason",
+                v.submitted_at AS "submittedAt", v.verified_at AS "verifiedAt", v.status,
+                t.id AS "tenantId", t.display_name AS "operatorName", t.slug AS "operatorSlug",
+                (SELECT count(*) FROM vehicle_documents d
+                  WHERE d.vehicle_id = v.id AND d.superseded_at IS NULL AND d.verification_status = 'pending')::int
+                  AS "pendingDocuments"
+           FROM vehicles v JOIN tenants t ON t.id = v.tenant_id
+          WHERE v.deleted_at IS NULL
+            AND ($1::text IS NULL OR v.verification_status = $1)
+            AND ($2::text IS NULL OR v.registration_no ILIKE '%' || $2 || '%' OR t.display_name ILIKE '%' || $2 || '%')
+          ORDER BY (v.verification_status = 'submitted') DESC, v.submitted_at NULLS LAST, v.created_at DESC
+          LIMIT $3`,
+        [filter.verification, filter.search, filter.limit],
+      );
+      return res.rows;
+    });
+  }
+
+  /** Approved buses with a verified required document past its expiry date. */
+  approvedWithExpiredDocuments(
+    requiredDocTypes: readonly string[],
+  ): Promise<{ id: VehicleId; tenantId: TenantId }[]> {
+    return this.uow.run({ name: 'vehicle.expirySweep.scan', bypassRls: true }, async (scope) => {
+      const res = await scope.client.query<{ id: VehicleId; tenantId: TenantId }>(
+        `SELECT DISTINCT v.id, v.tenant_id AS "tenantId" FROM vehicles v
+           JOIN vehicle_documents d ON d.vehicle_id = v.id
+          WHERE v.verification_status = 'approved' AND v.deleted_at IS NULL
+            AND d.verification_status = 'verified' AND d.superseded_at IS NULL
+            AND d.expires_on < current_date AND d.doc_type = ANY($1)`,
+        [requiredDocTypes],
+      );
+      return res.rows;
+    });
+  }
+
+  /** The operator that owns a bus. */
+  ownerOf(vehicleId: VehicleId): Promise<TenantId | null> {
+    return this.uow.run({ name: 'vehicle.admin.owner', bypassRls: true }, async (scope) => {
+      const res = await scope.client.query<{ tenant_id: TenantId }>(
+        `SELECT tenant_id FROM vehicles WHERE id = $1 AND deleted_at IS NULL`,
+        [vehicleId],
+      );
+      return res.rows[0]?.tenant_id ?? null;
+    });
+  }
 
   /** New buses always start as 'draft' — never live until the platform verifies their papers. */
   async create(
