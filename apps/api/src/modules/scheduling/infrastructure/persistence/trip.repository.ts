@@ -338,6 +338,19 @@ export class TripRepository {
     return map(row);
   }
 
+  /**
+   * Whether the bus actually left (the crew marked it departed). 'closed' is
+   * both "sales stopped" and "journey over", so status alone cannot tell.
+   */
+  async hasRun(id: TripId): Promise<boolean> {
+    const row = await this.db.queryOne<{ ran: boolean }>(
+      `SELECT actual_departed_at IS NOT NULL AS ran FROM trips WHERE tenant_id = $1 AND id = $2`,
+      [requireTenantId(), id],
+      { name: 'trip.hasRun', primary: true },
+    );
+    return row?.ran ?? false;
+  }
+
   /** Trips for a route on a date, open for sale — the search source set. */
   async findForSearch(routeId: RouteId, journeyDate: LocalDate): Promise<TripRecord[]> {
     const rows = await this.db.query<Row>(
@@ -354,9 +367,12 @@ export class TripRepository {
 
   async setStatus(id: TripId, status: TripStatus): Promise<void> {
     await this.db.execute_(
-      `UPDATE trips SET status = $3, version = version + 1, updated_at = now(),
-              actual_departed_at = CASE WHEN $3::text = 'departed' THEN coalesce(actual_departed_at, now()) ELSE actual_departed_at END,
-              actual_arrived_at = CASE WHEN $3::text = 'closed' THEN coalesce(actual_arrived_at, now()) ELSE actual_arrived_at END
+      `UPDATE trips SET status = $3::trip_status, version = version + 1, updated_at = now(),
+              actual_departed_at = CASE WHEN $3::trip_status = 'departed' THEN coalesce(actual_departed_at, now()) ELSE actual_departed_at END,
+              -- 'closed' also means "sales stopped" before departure: only a bus
+              -- that actually left arrives.
+              actual_arrived_at = CASE WHEN $3::trip_status = 'closed' AND actual_departed_at IS NOT NULL
+                                       THEN coalesce(actual_arrived_at, now()) ELSE actual_arrived_at END
         WHERE tenant_id = $1 AND id = $2`,
       [requireTenantId(), id, status],
       { name: 'trip.setStatus', primary: true },

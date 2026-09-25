@@ -61,9 +61,11 @@ export class TripOpsService {
   ): Promise<{ cancelledBookings: number; failed: number }> {
     const trip = await this.trips.getById(tripId);
     if (trip.status === 'cancelled') return { cancelledBookings: 0, failed: 0 }; // idempotent
-    if (trip.status === 'departed') {
+    // A bus that has left — or finished its journey ('closed' after running)
+    // — cannot be cancelled: that would refund everyone who travelled.
+    if (trip.status === 'departed' || (await this.trips.hasRun(tripId))) {
       throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
-        message: 'Trip has already departed — cannot cancel',
+        message: 'This bus has already left — it cannot be cancelled',
       });
     }
 
@@ -150,6 +152,12 @@ export class TripOpsService {
     if (trip.status === 'departed' || trip.status === 'cancelled') {
       throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
         message: `Trip is '${trip.status}' — sales cannot resume`,
+      });
+    }
+    // 'closed' after the journey is over is not "sales stopped".
+    if ((await this.trips.hasRun(tripId)) || trip.departsAt <= new Date()) {
+      throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
+        message: 'This bus has already left — sales cannot resume',
       });
     }
     await this.trips.setStatus(tripId, 'open');

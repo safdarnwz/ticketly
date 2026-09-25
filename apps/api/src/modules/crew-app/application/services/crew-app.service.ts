@@ -76,6 +76,15 @@ export class CrewAppService {
       // A doubled tap or a retried request must not re-fire 'trip.departed'.
       const current = await this.trips.getById(tripId);
       if (current.status === status) return;
+      if (current.status === 'cancelled')
+        throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
+          message: 'This trip was cancelled',
+        });
+      // Closing is the end of the journey: only a bus that left can arrive.
+      if (status === 'closed' && current.status !== 'departed')
+        throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
+          message: 'Mark the bus departed before closing the trip',
+        });
       await this.trips.setStatus(tripId, status);
       if (status === 'departed')
         this.events.publish({

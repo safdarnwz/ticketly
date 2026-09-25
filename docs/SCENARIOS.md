@@ -14,8 +14,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Backend status | Count |
 |---|---|
 | OPEN | 2712 |
-| DONE | 953 |
-| GAP | 311 |
+| DONE | 954 |
+| GAP | 310 |
 | CONFLICT | 76 |
 | INFRA | 20 |
 | DUP | 9 |
@@ -23,15 +23,15 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 | Frontend status | Count |
 |---|---|
-| — | 3125 |
-| TODO | 935 |
-| DONE | 18 |
+| — | 3124 |
+| TODO | 929 |
+| DONE | 25 |
 | DUP | 9 |
 
 
 ## #1–#500
 
-CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -267,7 +267,7 @@ CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 | 230 | Configure occupancy-based dynamic pricing rule | DONE | TODO | verified manually: existing module/API |
 | 231 | Configure time-based pricing rule | DONE | TODO | peak windows by departure time |
 | 232 | Configure demand surge pricing rule | GAP | — | verified manually: not built yet |
-| 233 | Block complete inventory for charter | DONE | TODO | verified manually: existing module/API |
+| 233 | Block complete inventory for charter | DONE | DONE | verified manually: existing module/API · UI: Trips & Charts › chart: Block / open seats |
 | 234 | Release previously blocked inventory | DONE | TODO | verified manually: existing module/API |
 | 235 | Create multi-hop connecting service | DONE | TODO | verified manually: existing module/API |
 | 236 | Define layover time rules | DONE | TODO | verified manually: existing module/API |
@@ -293,13 +293,13 @@ CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 | 256 | View today’s cancelled services | DONE | TODO | verified manually: existing module/API |
 | 257 | Manually mark service as departed | DONE | TODO | verified manually: existing module/API |
 | 258 | Manually mark service as arrived | DONE | TODO | verified manually: existing module/API |
-| 259 | Force release all temporary holds on service | DONE | TODO | POST /scheduling/trips/:id/release-holds |
+| 259 | Force release all temporary holds on service | DONE | DONE | POST /scheduling/trips/:id/release-holds · UI: Trips & Charts › chart: Release holds |
 | 260 | View live seat map of any service | DONE | TODO | verified manually: existing module/API |
 | 261 | Temporarily block specific seats | DONE | TODO | verified manually: existing module/API |
 | 262 | Release previously blocked seats | DONE | TODO | verified manually: existing module/API |
 | 263 | Change allocated bus of a service last minute | DONE | TODO | verified manually: existing module/API |
 | 264 | Change allocated crew last minute | DONE | TODO | verified manually: existing module/API |
-| 265 | Add internal remark on service | DONE | TODO | POST/GET /scheduling/trips/:id/remarks |
+| 265 | Add internal remark on service | DONE | DONE | POST/GET /scheduling/trips/:id/remarks · UI: Trips & Charts › chart: Staff remarks |
 | 266 | Clone an existing service to new date | DONE | TODO | POST /scheduling/services/:id/clone |
 | 267 | Bulk update fares using Excel | DONE | TODO | GET rules.csv + POST /pricing/fare-plans/:id/rules/import / adjust |
 | 268 | Bulk create schedules using Excel | GAP | — | verified manually: not built yet |
@@ -309,7 +309,7 @@ CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 | 272 | Configure seasonal schedule patterns | DONE | TODO | POST /scheduling/services/:id/clone {season:true} |
 | 273 | Create festival special services in bulk | DONE | TODO | verified manually: existing module/API |
 | 274 | Set temporary route diversion | DONE | TODO | incident type 'diversion' → trip.diverted SMS to every passenger |
-| 275 | Trigger passenger notification on schedule change | DONE | TODO | POST /scheduling/trips/:id/retime → trip.retimed SMS to every passenger |
+| 275 | Trigger passenger notification on schedule change | DONE | DONE | POST /scheduling/trips/:id/retime → trip.retimed SMS to every passenger · UI: Trips & Charts › chart: Change departure time |
 | 276 | View current inventory utilization percentage | DONE | TODO | verified manually: existing module/API |
 | 277 | View occupancy forecast for next 7 days | DONE | TODO | verified manually: existing module/API |
 | 278 | View occupancy forecast for next 15 days | DONE | TODO | GET /reports/occupancy-forecast?days=15 |
@@ -399,7 +399,7 @@ CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 | 362 | Verify booking done by agent | DONE | TODO | verified manually: existing module/API |
 | 363 | Approve agent booking | GAP | — | verified manually: not built yet |
 | 364 | Generate boarding chart in PDF | GAP | — | verified manually: not built yet |
-| 365 | Print boarding chart | GAP | — | verified manually: not built yet |
+| 365 | Print boarding chart | DONE | DONE | GET /bookings/trips/:tripId/chart (passenger list by boarding point) — printed from the web chart · UI: Trips & Charts › chart: Print chart + passenger list |
 | 366 | Share boarding chart with conductor | GAP | — | verified manually: not built yet |
 | 367 | Approve passenger boarding point change request | DONE | TODO | verified manually: existing module/API |
 | 368 | Approve passenger drop point change request | DONE | TODO | verified manually: existing module/API |
@@ -446,7 +446,7 @@ CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 | 409 | Download branch level audit report | GAP | — | verified manually: not built yet |
 | 410 | Prepare and submit month-end branch summary | GAP | — | verified manually: not built yet |
 | 411 | View real-time seat availability of any service | DONE | TODO | verified manually: existing module/API |
-| 412 | Block seats for VIP or special movement | DONE | TODO | verified manually: existing module/API |
+| 412 | Block seats for VIP or special movement | DONE | DONE | verified manually: existing module/API · UI: Trips & Charts › chart: Block / open seats |
 | 413 | Release previously blocked VIP seats | DONE | TODO | verified manually: existing module/API |
 | 414 | Change boarding point for multiple passengers together | DONE | TODO | verified manually: existing module/API |
 | 415 | Search booking using PNR number | DONE | DONE | verified manually: existing module/API · UI: operator Bookings list + detail (find by PNR/mobile/ticket, filters, CSV) |
@@ -505,7 +505,7 @@ CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 | 468 | Report bus maintenance issue | DONE | TODO | verified manually: existing module/API |
 | 469 | View upcoming document expiry of buses | DONE | TODO | verified manually: existing module/API |
 | 470 | Handle enquiry from police or RTO | PROCESS | — | operational practice, not software |
-| 471 | Provide official passenger list to authorities | DONE | TODO | verified manually: existing module/API |
+| 471 | Provide official passenger list to authorities | DONE | DONE | GET /bookings/trips/:tripId/chart (passenger list by boarding point) — printed from the web chart · UI: Trips & Charts › chart: Print chart + passenger list |
 | 472 | Manage passenger queue during peak hours | PROCESS | — | operational practice, not software |
 | 473 | Open additional temporary counter | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 474 | Close under-utilized counter | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
@@ -786,7 +786,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -901,7 +901,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1016,7 +1016,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1111,7 +1111,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1226,7 +1226,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1301,7 +1301,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|

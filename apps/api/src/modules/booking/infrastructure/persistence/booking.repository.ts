@@ -15,6 +15,26 @@ import {
 import type { BookingStatus } from '../../domain/booking-state';
 import type { LockedSeat } from './seat-lock.repository';
 
+/** One passenger on a trip's chart. */
+export interface TripOccupant {
+  seatNumber: string;
+  name: string;
+  age: number | null;
+  gender: string | null;
+  bookingId: string;
+  pnr: string;
+  status: string;
+  /** Held: the customer is paying right now. */
+  onHold: boolean;
+  holdExpiresAt: Date | null;
+  fromSeq: number;
+  toSeq: number;
+  contactPhone: string | null;
+  channel: string;
+  /** issued / boarded / no_show / cancelled. */
+  ticketStatus: string | null;
+}
+
 /** A booking as the operator's bookings list shows it. */
 export interface StaffBookingRow {
   id: string;
@@ -288,6 +308,28 @@ export class BookingRepository {
       paidMinor: Number(r.paidMinor),
       seats: (r.seats as string[] | null) ?? [],
     }));
+  }
+
+  /**
+   * Everyone on a trip, seat by seat: paid bookings and holds being paid for
+   * right now, with the part of the route each one travels.
+   */
+  async tripOccupants(tripId: string): Promise<TripOccupant[]> {
+    const rows = await this.db.query<Record<string, unknown>>(
+      `SELECT p.seat_number AS "seatNumber", p.full_name AS "name", p.age, p.gender,
+              b.id AS "bookingId", b.pnr, b.status, (b.status = 'held') AS "onHold",
+              b.hold_expires_at AS "holdExpiresAt", b.from_seq AS "fromSeq", b.to_seq AS "toSeq",
+              b.contact_phone AS "contactPhone", b.channel, tk.status AS "ticketStatus"
+         FROM passengers p
+         JOIN bookings b ON b.id = p.booking_id
+         LEFT JOIN tickets tk ON tk.booking_id = b.id AND tk.seat_number = p.seat_number
+        WHERE b.tenant_id = $1 AND b.trip_id = $2
+          AND (b.status IN ('confirmed', 'completed') OR (b.status = 'held' AND b.hold_expires_at > now()))
+        ORDER BY b.from_seq, p.seat_number`,
+      [requireTenantId(), tripId],
+      { name: 'booking.tripOccupants' },
+    );
+    return rows as unknown as TripOccupant[];
   }
 
   /** The signed-in operator's time zone (its calendar day is "today"). */

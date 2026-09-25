@@ -41,6 +41,12 @@ import { TripRepository } from './infrastructure/persistence/trip.repository';
     TimetableService,
     RouteBlackoutRepository,
   ],
-  exports: [ServiceRepository, TripRepository, InventoryRepository, MaterializationService],
+  exports: [
+    ServiceRepository,
+    TripRepository,
+    InventoryRepository,
+    MaterializationService,
+    SchedulingService,
+  ],
 })
 export class SchedulingModule {}

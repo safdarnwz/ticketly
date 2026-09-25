@@ -161,19 +161,33 @@ export class SchedulingController {
     @UuidParam('id') id: string,
     @Body(zodBody(BlockSeatsSchema)) dto: BlockSeatsDto,
   ) {
+    const trip = await this.trips.getById(id as TripId);
+    if (
+      trip.status === 'cancelled' ||
+      trip.status === 'departed' ||
+      (await this.trips.hasRun(trip.id))
+    )
+      throw new BadRequestError(
+        'This bus has left or was cancelled — its seats can no longer change',
+      );
     const seg = await this.inventory.resolveSegment(
       id as TripId,
       dto.fromStopId as StopId,
       dto.toStopId as StopId,
     );
     if (!seg) throw new BadRequestError('Invalid segment for this trip');
+    const seats = [...new Set(dto.seatNumbers)];
     const affected = await this.inventory.blockSeats(
       id as TripId,
-      dto.seatNumbers,
+      seats,
       seg.fromSeq,
       seg.toSeq,
       dto.block,
     );
+    if (affected !== seats.length)
+      throw new BadRequestError(
+        `Some seats are not on this bus (${affected} of ${seats.length} found)`,
+      );
     return { affected };
   }
 

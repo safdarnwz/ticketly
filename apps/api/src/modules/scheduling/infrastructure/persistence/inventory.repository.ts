@@ -170,6 +170,27 @@ export class InventoryRepository {
     );
   }
 
+  /** Seats kept off sale on some or all of the route (blocked), and seats never for sale. */
+  async heldBack(
+    tripId: TripId,
+  ): Promise<{ seatNumber: string; blocked: boolean; bookable: boolean }[]> {
+    const rows = await this.db.query<{
+      seat_number: string;
+      blocked: boolean;
+      is_bookable: boolean;
+    }>(
+      `SELECT seat_number, blocked_legs <> 0 AS blocked, is_bookable
+         FROM trip_seats WHERE trip_id = $1 AND (blocked_legs <> 0 OR NOT is_bookable)`,
+      [tripId],
+      { name: 'inventory.heldBack' },
+    );
+    return rows.map((r) => ({
+      seatNumber: r.seat_number,
+      blocked: r.blocked,
+      bookable: r.is_bookable,
+    }));
+  }
+
   /** Map a (fromStopId, toStopId) pair to leg sequence indices for a trip. */
   async resolveSegment(
     tripId: TripId,

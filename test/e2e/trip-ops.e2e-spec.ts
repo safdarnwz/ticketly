@@ -1,0 +1,145 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import { bootstrapTestApp, type TestApp } from './support/bootstrap';
+import { confirmedBooking } from './support/flows';
+
+/**
+ * A bus's operations: the reservation chart, stopping and resuming sales,
+ * blocking seats — and none of it once the bus has left ('closed' after the
+ * journey used to look like "sales stopped", so a finished trip could be
+ * cancelled — refunding everyone who travelled — or put back on sale).
+ */
+describe('trip operations (e2e)', () => {
+  let app: TestApp;
+  const op = { as: 'operator' as const };
+
+  beforeAll(async () => {
+    app = await bootstrapTestApp();
+  });
+  afterAll(async () => {
+    await app.close();
+  });
+
+  const chart = (tripId: string) => app.get(`/bookings/trips/${tripId}/chart`, op);
+
+  it('the chart shows every seat and who travels in it, for staff only', async () => {
+    const f = app.fixtures;
+    const { pnr } = await confirmedBooking(app, f.seatNumbers[0], {
+      fullName: 'Chart Person',
+      age: 44,
+      gender: 'female',
+    });
+    const r = await chart(f.tripId);
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.seats.length).toBe(r.body.trip.totalSeats);
+    const seat = r.body.seats.find(
+      (s: { seatNumber: string }) => s.seatNumber === f.seatNumbers[0],
+    );
+    const who = seat.occupants.find((o: { pnr: string }) => o.pnr === pnr);
+    expect(who).toMatchObject({ name: 'Chart Person', age: 44, onHold: false });
+    expect(who.from).toBeTruthy();
+    expect(who.to).toBeTruthy();
+    expect(r.body.totals.passengers).toBeGreaterThanOrEqual(1);
+    expect(r.body.trip.hasRun).toBe(false);
+
+    expect((await app.get(`/bookings/trips/${f.tripId}/chart`)).status).toBe(403); // a customer
+    expect(
+      (await app.get(`/bookings/trips/${f.tripId}/chart`, { as: 'anonymous' })).status,
+    ).toBeGreaterThanOrEqual(401);
+    expect((await chart('00000000-0000-4000-8000-000000000000')).status).toBe(404);
+  });
+
+  it('stops and resumes sales (this used to fail with a database error)', async () => {
+    const id = app.fixtures.tripId;
+    expect((await app.post(`/bookings/trips/${id}/stop-sales`, {}, op)).status).toBe(200);
+    expect((await chart(id)).body.trip.status).toBe('closed');
+    expect((await app.post(`/bookings/trips/${id}/stop-sales`, {}, op)).status).toBe(422);
+    expect((await app.post(`/bookings/trips/${id}/resume-sales`, {}, op)).status).toBe(200);
+    expect((await chart(id)).body.trip.status).toBe('open');
+  });
+
+  it('blocks and opens seats; unknown seats are refused', async () => {
+    const f = app.fixtures;
+    const body = (seatNumbers: string[], block: boolean) => ({
+      seatNumbers,
+      fromStopId: f.fromStopId,
+      toStopId: f.toStopId,
+      block,
+    });
+    const seat = f.seatNumbers[3];
+    expect(
+      (await app.post(`/scheduling/trips/${f.tripId}/block-seats`, body(['NOPE'], true), op))
+        .status,
+    ).toBe(400);
+    expect(
+      (await app.post(`/scheduling/trips/${f.tripId}/block-seats`, body([seat, seat], true), op))
+        .status,
+    ).toBe(201);
+    let s = (await chart(f.tripId)).body.seats.find(
+      (x: { seatNumber: string }) => x.seatNumber === seat,
+    );
+    expect(s.blocked).toBe(true);
+    expect(
+      (await app.post(`/scheduling/trips/${f.tripId}/block-seats`, body([seat], false), op)).status,
+    ).toBe(201);
+    s = (await chart(f.tripId)).body.seats.find(
+      (x: { seatNumber: string }) => x.seatNumber === seat,
+    );
+    expect(s.blocked).toBe(false);
+  });
+
+  it('a bus that has left cannot be cancelled, put back on sale or re-blocked', async () => {
+    // Another trip of the operator, well after the fixture's.
+    const later = new Date(Date.parse(app.fixtures.journeyDate) + 12 * 864e5)
+      .toISOString()
+      .slice(0, 10);
+    const list = await app.get(`/scheduling/trips?date=${later}`, op);
+    const spare = list.body.items.find(
+      (t: { id: string; status: string }) => t.id !== app.fixtures.tripId && t.status === 'open',
+    );
+    expect(spare, `an open trip on ${later}`).toBeDefined();
+    const id = spare.id as string;
+
+    const crew = (status: string) => app.post(`/crew/trips/${id}/status`, { status }, op);
+    expect((await crew('closed')).status).toBe(422); // not departed yet
+    expect((await crew('departed')).status).toBe(201);
+    expect((await chart(id)).body.trip.hasRun).toBe(true);
+    expect(
+      (
+        await app.post(
+          `/bookings/trips/${id}/cancel`,
+          { reason: 'too late' },
+          { ...op, idempotencyKey: `late-${id}` },
+        )
+      ).status,
+    ).toBe(422);
+    expect((await crew('closed')).status).toBe(201);
+    expect((await chart(id)).body.trip.status).toBe('closed');
+    // The journey is over: still no cancel, and no selling it again.
+    expect(
+      (
+        await app.post(
+          `/bookings/trips/${id}/cancel`,
+          { reason: 'after arrival' },
+          { ...op, idempotencyKey: `late2-${id}` },
+        )
+      ).status,
+    ).toBe(422);
+    expect((await app.post(`/bookings/trips/${id}/resume-sales`, {}, op)).status).toBe(422);
+    const stops = (await chart(id)).body.stops;
+    expect(
+      (
+        await app.post(
+          `/scheduling/trips/${id}/block-seats`,
+          {
+            seatNumbers: ['1'],
+            fromStopId: stops[0].stopId,
+            toStopId: stops[stops.length - 1].stopId,
+            block: true,
+          },
+          op,
+        )
+      ).status,
+    ).toBe(400);
+  });
+});

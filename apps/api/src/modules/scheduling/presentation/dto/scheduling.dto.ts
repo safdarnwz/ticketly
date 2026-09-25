@@ -31,7 +31,7 @@ export const PreviewDatesSchema = z.object({
 export type PreviewDatesDto = z.infer<typeof PreviewDatesSchema>;
 
 export const BlockSeatsSchema = z.object({
-  seatNumbers: z.array(z.string().min(1)).min(1),
+  seatNumbers: z.array(z.string().min(1).max(10)).min(1).max(80),
   fromStopId: uuid,
   toStopId: uuid,
   block: z.boolean().default(true),

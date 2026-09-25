@@ -196,3 +196,12 @@ an unknown id is now 404 (was 200).
   `todaySeats`, `todayRevenueMinor`, `liveHolds`, `liveHoldSeats`.
 - `GET /scheduling/trips?date=` lists one journey date (any status); seats held by expired holds no longer
   count, and each trip has `bookedSeats` / `heldSeats`.
+- **Fix:** changing a trip's status (stop / resume sales, cancel trip, crew depart / close) failed with a
+  database error (`inconsistent types deduced for parameter $3`). A trip cancel refunded every booking and
+  then failed, leaving the trip on sale.
+- **Money:** a bus that has left (or finished its journey) can no longer be cancelled — that refunded
+  everyone who travelled — nor put back on sale, nor have seats blocked. The crew app cannot close a trip
+  that never departed or depart a cancelled one.
+- New `GET /bookings/trips/:tripId/chart` (staff): the reservation chart — layout, every passenger per seat
+  (boarding → dropping, PNR, phone, ticket status), holds being paid now, blocked seats, totals, `hasRun`.
+- `POST /scheduling/trips/:id/block-seats` refuses unknown seats (400) and trips that left or were cancelled.

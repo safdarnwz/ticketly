@@ -18,6 +18,7 @@ import { BookingController } from './presentation/booking.controller';
 import { BookingRepository } from './infrastructure/persistence/booking.repository';
 import { BookingService } from './application/services/booking.service';
 import { TripOpsService } from './application/services/trip-ops.service';
+import { TripChartService } from './application/services/trip-chart.service';
 import { SeatLockRepository } from './infrastructure/persistence/seat-lock.repository';
 import { SeatUpgradeRepository } from './infrastructure/persistence/seat-upgrade.repository';
 import { JourneyConnectionRepository } from './infrastructure/persistence/journey-connection.repository';
@@ -45,6 +46,7 @@ import { OperatorPolicyRepository } from './infrastructure/persistence/operator-
   controllers: [BookingController, ConcessionController, BookingMonitoringController],
   providers: [
     BookingMonitoringRepository,
+    TripChartService,
     OperatorPolicyRepository,
     JourneyConnectionRepository,
     BookingRepository,

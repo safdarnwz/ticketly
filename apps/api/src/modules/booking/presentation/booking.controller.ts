@@ -31,6 +31,7 @@ import {
   UnauthenticatedError,
   type BookingId,
   type TenantId,
+  type TripId,
 } from '@kernel';
 
 import { NotificationService } from '../../notification';
@@ -38,6 +39,7 @@ import { BookingRepository } from '../infrastructure/persistence/booking.reposit
 import { allowedSalesChannel } from '../application/services/sales-channel';
 import { BookingService } from '../application/services/booking.service';
 import { TripOpsService } from '../application/services/trip-ops.service';
+import { TripChartService } from '../application/services/trip-chart.service';
 import {
   CancelSchema,
   CancelSeatsSchema,
@@ -79,6 +81,7 @@ export class BookingController {
     private readonly bookings: BookingRepository,
     private readonly tripOps: TripOpsService,
     private readonly notifications: NotificationService,
+    private readonly tripChart: TripChartService,
   ) {}
 
   @Post('hold')
@@ -348,6 +351,16 @@ export class BookingController {
   }
 
   /* ── trip-level operations (staff) — the whole trip, not one booking ──── */
+
+  @Get('trips/:tripId/chart')
+  @RequirePermission(Permission.BOOKING_READ)
+  @ApiOperation({
+    summary:
+      'Reservation chart: the bus layout with every passenger (seat, name, PNR, boarding → dropping, phone), holds being paid now, blocked seats and totals',
+  })
+  async chart(@UuidParam('tripId') tripId: string) {
+    return this.tripChart.chart(tripId as TripId);
+  }
 
   @Post('trips/:tripId/cancel')
   @HttpCode(200)
