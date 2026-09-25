@@ -92,9 +92,28 @@ All require a platform (tenant-less) principal.
   suspicious-login|gst-slabs|agent-credit|data-retention|ota-release}`.
 - `GET|POST /admin/role-templates`, `PUT|DELETE /admin/role-templates/:id`;
   operators: `GET /roles/templates`, `POST /roles/templates/:templateId/apply`.
+- `GET /admin/tenants/audit-log/export?days=N` (CSV), `GET /admin/tenants/export`
+  (operators CSV), `GET /admin/tenants/ranking?from&to&sortBy`,
+  `POST|GET /admin/tenants/broadcasts`, `PUT /admin/tenants/:id/rate-limit`.
+- `GET|POST /admin/platform/maintenance/windows`,
+  `POST /admin/platform/maintenance/windows/:id/{notify|cancel}` — a running
+  window puts the platform in maintenance mode by itself.
+- `POST /admin/billing/invoices`, `GET /admin/billing/invoices[/:id]`,
+  `POST|GET /admin/billing/discounts`, `DELETE /admin/billing/discounts/:id`;
+  operators: `GET /operator/platform-invoices[/:id]`.
+- `GET /admin/monitoring/payments?from&to`, `GET /admin/monitoring/messages?from&to`.
+- `GET|POST /admin/platform/cache[/clear]`,
+  `GET /admin/security/encryption`, `POST /admin/security/encryption/reencrypt`.
 - `PUT /admin/tenants/:id/domain` (`{domain}` or `null`), `PUT
   /admin/tenants/:id/favicon` (`{dataUri}` or `null`); public
   `GET /operator/branding` for the site a request is served on.
+
+## Plan quotas are enforced
+Creating a staff user, route, bus, branch or agent (and reactivating a
+branch) beyond the operator's plan quota (`max_users`, `max_routes`,
+`max_vehicles`, `max_branches`, `max_agents`; negative / missing = unlimited)
+answers 403 `TENANT.QUOTA_EXCEEDED`. Branch update / activate / deactivate of
+an unknown id is now 404 (was 200).
 
 ## Changed responses
 - `POST /bookings/:id/reschedule` now returns `status`. `rescheduled`: the

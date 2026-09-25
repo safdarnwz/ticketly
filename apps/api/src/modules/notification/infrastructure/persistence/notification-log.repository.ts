@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { DatabaseService } from '@database';
+import { DatabaseService, UnitOfWork } from '@database';
 import { newId, type TenantId, type Uuid } from '@kernel';
 
 import type { Channel } from '../provider.interface';
@@ -8,7 +8,53 @@ import type { Channel } from '../provider.interface';
 /** notifications — one row per (event, channel, recipient): the delivery log and de-dupe key. */
 @Injectable()
 export class NotificationLogRepository {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly uow: UnitOfWork,
+  ) {}
+
+  /** Messages per channel and provider over a period (#112, #113), across every operator. */
+  async deliveryStats(
+    from: string,
+    to: string,
+  ): Promise<
+    {
+      channel: string;
+      provider: string | null;
+      total: number;
+      sent: number;
+      failed: number;
+      pending: number;
+    }[]
+  > {
+    return this.uow.run({ name: 'notification.deliveryStats', bypassRls: true }, async (scope) => {
+      const { rows } = await scope.client.query<{
+        channel: string;
+        provider: string | null;
+        total: string;
+        sent: string;
+        failed: string;
+        pending: string;
+      }>(
+        `SELECT channel, provider, count(*) AS total,
+                count(*) FILTER (WHERE status = 'sent') AS sent,
+                count(*) FILTER (WHERE status = 'failed') AS failed,
+                count(*) FILTER (WHERE status NOT IN ('sent', 'failed')) AS pending
+           FROM notifications
+          WHERE created_at >= $1::date AND created_at < $2::date + 1
+          GROUP BY channel, provider ORDER BY channel, provider`,
+        [from, to],
+      );
+      return rows.map((r) => ({
+        channel: r.channel,
+        provider: r.provider,
+        total: Number(r.total),
+        sent: Number(r.sent),
+        failed: Number(r.failed),
+        pending: Number(r.pending),
+      }));
+    });
+  }
 
   /**
    * Claim a send. Returns the row id when this message should be sent now:

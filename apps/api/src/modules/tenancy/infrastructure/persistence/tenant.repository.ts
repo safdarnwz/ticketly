@@ -205,6 +205,20 @@ export class TenantRepository {
     );
   }
 
+  /** Every operator with its plan and contact details — the platform export (#107). */
+  async listForExport(): Promise<Record<string, unknown>[]> {
+    return this.db.query(
+      `SELECT t.id, t.slug, t.display_name AS "displayName", t.legal_name AS "legalName", t.status,
+              p.code AS plan, t.contact_email AS "contactEmail", t.contact_phone AS "contactPhone",
+              t.primary_domain AS "customDomain", t.gstin, t.suspended_reason AS "suspendedReason",
+              t.suspended_at AS "suspendedAt", t.created_at AS "createdAt"
+         FROM tenants t LEFT JOIN plans p ON p.id = t.plan_id
+        WHERE t.deleted_at IS NULL ORDER BY t.created_at`,
+      [],
+      { name: 'tenant.listForExport', primary: true },
+    );
+  }
+
   /** Set (true/false) or clear (null) one per-operator feature override. */
   async setFeatureOverride(
     tenantId: string,

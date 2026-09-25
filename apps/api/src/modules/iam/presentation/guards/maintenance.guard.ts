@@ -4,6 +4,7 @@ import type { FastifyRequest } from 'fastify';
 import { AppError, ErrorCode, getContext } from '@kernel';
 
 import { PlatformSettingsRepository } from '../../../platform-settings';
+import { MaintenanceWindowRepository } from '../../infrastructure/persistence/maintenance-window.repository';
 
 export interface MaintenanceState {
   enabled: boolean;
@@ -25,7 +26,10 @@ export const MAINTENANCE_KEY = 'maintenance_mode';
 export class MaintenanceGuard implements CanActivate {
   private cached: { state: MaintenanceState; at: number } | null = null;
 
-  constructor(private readonly settings: PlatformSettingsRepository) {}
+  constructor(
+    private readonly settings: PlatformSettingsRepository,
+    private readonly windows: MaintenanceWindowRepository,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<FastifyRequest>();
@@ -64,9 +68,14 @@ export class MaintenanceGuard implements CanActivate {
 
   private async state(): Promise<MaintenanceState> {
     if (this.cached && Date.now() - this.cached.at < 10_000) return this.cached.state;
-    const state = await this.settings
+    const manual = await this.settings
       .get<MaintenanceState>(MAINTENANCE_KEY, { enabled: false })
-      .catch(() => ({ enabled: false }));
+      .catch((): MaintenanceState => ({ enabled: false }));
+    // A scheduled window (#109) switches maintenance on by itself while it runs.
+    const window = manual.enabled ? null : await this.windows.current().catch(() => null);
+    const state: MaintenanceState = window
+      ? { enabled: true, message: window.message, until: window.endsAt.toISOString() }
+      : manual;
     this.cached = { state, at: Date.now() };
     return state;
   }

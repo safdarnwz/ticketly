@@ -133,6 +133,9 @@ export interface SecurityConfig {
   issuer: string;
   audience: string;
   encryptionKey: string;
+  encryptionKeyId: string;
+  encryptionPreviousKeys: string;
+  blindIndexKey: string;
   passwordHash: { memoryKiB: number; iterations: number; parallelism: number };
   idempotency: { enabled: boolean; ttlSeconds: number };
 }
@@ -342,6 +345,9 @@ export function buildAppConfig(env: Env): AppConfig {
     issuer: env.JWT_ISSUER,
     audience: env.JWT_AUDIENCE,
     encryptionKey: env.ENCRYPTION_KEY,
+    encryptionKeyId: env.ENCRYPTION_KEY_ID,
+    encryptionPreviousKeys: env.ENCRYPTION_PREVIOUS_KEYS,
+    blindIndexKey: env.BLIND_INDEX_KEY,
     passwordHash: {
       memoryKiB: env.PASSWORD_HASH_MEMORY_KIB,
       iterations: env.PASSWORD_HASH_ITERATIONS,

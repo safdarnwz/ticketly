@@ -10,6 +10,7 @@ import { PricingModule } from '../pricing/pricing.module';
 import { MasterDataModule } from '../master-data/master-data.module';
 import { PlatformSettingsModule } from '../platform-settings/platform-settings.module';
 import { IntegrationsModule } from '../integrations/integrations.module';
+import { PaymentMonitoringController } from './presentation/payment-monitoring.controller';
 import { RazorpayIntegrationTester } from './infrastructure/gateways/razorpay-integration.tester';
 import { RazorpayGateway } from './infrastructure/gateways/razorpay.gateway';
 import { ConfiguredPaymentGateway } from './infrastructure/gateways/configured.gateway';
@@ -40,7 +41,7 @@ import { SeatUpgradeCapture } from './application/services/seat-upgrade.capture'
     PlatformSettingsModule,
     IntegrationsModule,
   ],
-  controllers: [PaymentController],
+  controllers: [PaymentController, PaymentMonitoringController],
   providers: [
     AdjustmentCaptureRegistry,
     SeatUpgradeCapture,

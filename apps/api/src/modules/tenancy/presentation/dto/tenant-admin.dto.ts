@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+import { DateRangeQuerySchema } from '@http';
+
+import { BROADCAST_AUDIENCES } from '../../infrastructure/persistence/operator-broadcast.repository';
+
 import { ALLOWED_GST_RATES } from '../../../platform-settings';
 
 const featureKey = z
@@ -104,3 +108,19 @@ export const SetRateLimitSchema = z.object({
   limit: z.number().int().min(10).max(1_000_000).nullable(),
 });
 export type SetRateLimitDto = z.infer<typeof SetRateLimitSchema>;
+
+/** #106 — rank operators over a period by one measure. */
+export const OperatorRankingQuerySchema = DateRangeQuerySchema.and(
+  z.object({
+    sortBy: z.enum(['revenue', 'bookings', 'seats', 'cancellationRate']).default('revenue'),
+  }),
+);
+export type OperatorRankingQueryDto = z.infer<typeof OperatorRankingQuerySchema>;
+
+/** #108 — email every operator (or only active / suspended ones). */
+export const OperatorBroadcastSchema = z.object({
+  subject: z.string().trim().min(3).max(150),
+  body: z.string().trim().min(3).max(5000),
+  audience: z.enum(BROADCAST_AUDIENCES).default('active'),
+});
+export type OperatorBroadcastDto = z.infer<typeof OperatorBroadcastSchema>;

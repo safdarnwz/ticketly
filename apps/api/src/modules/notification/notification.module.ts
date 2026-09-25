@@ -7,6 +7,7 @@ import { ObservabilityModule } from '@observability';
 import { Mailer } from './infrastructure/mail/mailer';
 import { IntegrationsModule } from '../integrations/integrations.module';
 import { PlatformSettingsModule } from '../platform-settings/platform-settings.module';
+import { DeliveryMonitoringController } from './presentation/delivery-monitoring.controller';
 import { NotificationController } from './presentation/notification.controller';
 import { NotificationLogRepository } from './infrastructure/persistence/notification-log.repository';
 import { NotificationTemplateRepository } from './infrastructure/persistence/notification-template.repository';
@@ -39,7 +40,7 @@ import { Msg91WhatsAppProvider } from './infrastructure/providers/msg91-whatsapp
     PlatformSettingsModule,
     IntegrationsModule,
   ],
-  controllers: [NotificationController],
+  controllers: [NotificationController, DeliveryMonitoringController],
   providers: [
     NotificationLogRepository,
     NotificationService,

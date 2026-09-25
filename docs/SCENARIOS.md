@@ -12,8 +12,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Status | Count |
 |---|---|
 | OPEN | 2714 |
-| DONE | 921 |
-| GAP | 341 |
+| DONE | 931 |
+| GAP | 331 |
 | CONFLICT | 76 |
 | INFRA | 20 |
 | DUP | 9 |
@@ -22,7 +22,7 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 ## #1–#500
 
-CONFLICT 20, DONE 325, GAP 141, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -131,21 +131,21 @@ CONFLICT 20, DONE 325, GAP 141, INFRA 17, PROCESS 3
 | 103 | Set maximum branches allowed per plan | DONE | plan quotas max_branches / max_agents enforced (entitlements module; also users, routes, buses) |
 | 104 | Set maximum agents allowed per plan | DONE | plan quotas max_branches / max_agents enforced (entitlements module; also users, routes, buses) |
 | 105 | Configure platform commission percentage | DONE | verified manually: existing module/API |
-| 106 | View operator-wise performance ranking | GAP | verified manually: not built yet |
-| 107 | Export complete operator list with status | GAP | verified manually: not built yet |
-| 108 | Send bulk notification to all operators | GAP | verified manually: not built yet |
-| 109 | Schedule platform maintenance window | GAP | verified manually: not built yet |
-| 110 | Notify operators about maintenance | GAP | verified manually: not built yet |
-| 111 | Monitor payment gateway success rates | GAP | verified manually: not built yet |
-| 112 | Monitor SMS delivery success rates | GAP | verified manually: not built yet |
-| 113 | Monitor WhatsApp delivery success rates | GAP | verified manually: not built yet |
+| 106 | View operator-wise performance ranking | DONE | GET /admin/tenants/ranking?from&to&sortBy |
+| 107 | Export complete operator list with status | DONE | GET /admin/tenants/export (CSV) |
+| 108 | Send bulk notification to all operators | DONE | POST/GET /admin/tenants/broadcasts |
+| 109 | Schedule platform maintenance window | DONE | POST /admin/platform/maintenance/windows (auto maintenance mode while running) |
+| 110 | Notify operators about maintenance | DONE | POST /admin/platform/maintenance/windows/:id/notify (or notifyOperators on create) |
+| 111 | Monitor payment gateway success rates | DONE | GET /admin/monitoring/payments |
+| 112 | Monitor SMS delivery success rates | DONE | GET /admin/monitoring/messages (per channel/provider) |
+| 113 | Monitor WhatsApp delivery success rates | DONE | GET /admin/monitoring/messages (per channel/provider) |
 | 114 | View aggregated error logs across services | INFRA | DevOps/monitoring runbook (not an app feature) |
 | 115 | Restart specific microservice | INFRA | DevOps/monitoring runbook (not an app feature) |
-| 116 | Clear platform-level cache | GAP | verified manually: not built yet |
+| 116 | Clear platform-level cache | DONE | POST /admin/platform/cache/clear |
 | 117 | Run database optimization job | INFRA | DevOps/monitoring runbook (not an app feature) |
 | 118 | View slow query logs | INFRA | DevOps/monitoring runbook (not an app feature) |
 | 119 | Manage partner API keys | DONE | verified manually: existing module/API |
-| 120 | Rotate platform encryption keys | GAP | verified manually: not built yet |
+| 120 | Rotate platform encryption keys | DONE | key ring (ENCRYPTION_PREVIOUS_KEYS) + POST /admin/security/encryption/reencrypt; RUNBOOK |
 | 121 | Complete operator profile with full address | DONE | verified manually: existing module/API |
 | 122 | Upload company logo | DONE | verified manually: existing module/API |
 | 123 | Set primary and secondary contact | DONE | verified manually: existing module/API |
@@ -777,7 +777,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 325, GAP 141, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -892,7 +892,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 325, GAP 141, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1007,7 +1007,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 325, GAP 141, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1102,7 +1102,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 325, GAP 141, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1217,7 +1217,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 325, GAP 141, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1292,7 +1292,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 325, GAP 141, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 335, GAP 131, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|

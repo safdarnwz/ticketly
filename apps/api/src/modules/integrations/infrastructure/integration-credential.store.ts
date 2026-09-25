@@ -198,6 +198,34 @@ export class IntegrationCredentialStore implements OnModuleInit, OnModuleDestroy
     );
   }
 
+  /** Key rotation (#120): rewrite every stored secret still under a retired key. Returns the count. */
+  async reencryptAll(): Promise<number> {
+    let n = 0;
+    for (const row of await this.rows()) {
+      if (!this.encryptor.needsReencryption(row.secrets)) continue;
+      const plain = this.encryptor.decrypt(row.secrets);
+      await this.db.execute_(
+        `UPDATE integration_credentials SET secrets = $2 WHERE provider = $1 AND secrets = $3`,
+        [row.provider, this.encryptor.encrypt(plain), row.secrets],
+        { name: 'integrations.reencrypt', primary: true },
+      );
+      n++;
+    }
+    if (n > 0) await this.reload();
+    return n;
+  }
+
+  /** Stored secrets per key id. */
+  async encryptionCensus(): Promise<Record<string, number>> {
+    const census: Record<string, number> = {};
+    for (const row of await this.rows()) {
+      if (!row.secrets) continue;
+      const key = this.encryptor.keyIdOf(row.secrets) ?? 'plaintext';
+      census[key] = (census[key] ?? 0) + 1;
+    }
+    return census;
+  }
+
   private async reload(): Promise<void> {
     try {
       const rows = await this.rows();

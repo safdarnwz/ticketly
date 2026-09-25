@@ -129,6 +129,23 @@ export const envSchema = z.object({
   JWT_AUDIENCE: z.string().default('ticketly-clients'),
   /** AES-256-GCM key (base64, 32 bytes) for column-level PII encryption. */
   ENCRYPTION_KEY: z.string().default(''),
+  /** Id written in front of every value encrypted with ENCRYPTION_KEY (`v1:`, `v2:` …). */
+  ENCRYPTION_KEY_ID: z
+    .string()
+    .regex(/^v\d{1,4}$/, 'ENCRYPTION_KEY_ID looks like v1, v2 …')
+    .default('v1'),
+  /**
+   * Retired keys, still needed to READ older values until they are
+   * re-encrypted: `v1:<base64>,v2:<base64>`. Never used to encrypt.
+   */
+  ENCRYPTION_PREVIOUS_KEYS: z.string().default(''),
+  /**
+   * Key for the blind indexes (searchable hashes of phone / email). It must
+   * NOT change when ENCRYPTION_KEY rotates, or every lookup breaks. Defaults
+   * to one derived from the v1 key (current or previous), as before rotation
+   * existed.
+   */
+  BLIND_INDEX_KEY: z.string().default(''),
   PASSWORD_HASH_MEMORY_KIB: int(19_456, 8),
   PASSWORD_HASH_ITERATIONS: int(2, 1),
   PASSWORD_HASH_PARALLELISM: int(1, 1),

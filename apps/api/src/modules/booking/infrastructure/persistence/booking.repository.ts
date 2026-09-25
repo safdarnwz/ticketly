@@ -663,6 +663,55 @@ export class BookingRepository {
     });
   }
 
+  /**
+   * Per-operator numbers over a period (#106) — bookings confirmed, revenue
+   * collected on them, cancellations and seats — for the platform ranking.
+   * Operators with no booking in the period are left out.
+   */
+  async performanceByOperator(
+    from: string,
+    to: string,
+  ): Promise<
+    {
+      tenantId: string;
+      bookings: number;
+      revenueMinor: number;
+      cancelled: number;
+      seats: number;
+    }[]
+  > {
+    return this.uow.run(
+      { name: 'booking.performanceByOperator', bypassRls: true },
+      async (scope) => {
+        const { rows } = await scope.client.query<{
+          tenant_id: string;
+          bookings: string;
+          revenue_minor: string;
+          cancelled: string;
+          seats: string;
+        }>(
+          `SELECT b.tenant_id,
+                count(*) FILTER (WHERE b.confirmed_at IS NOT NULL) AS bookings,
+                coalesce(sum(b.paid_minor) FILTER (WHERE b.status IN ('confirmed', 'completed')), 0) AS revenue_minor,
+                count(*) FILTER (WHERE b.cancelled_at IS NOT NULL) AS cancelled,
+                coalesce(sum(s.n) FILTER (WHERE b.status IN ('confirmed', 'completed')), 0) AS seats
+           FROM bookings b
+           LEFT JOIN LATERAL (SELECT count(*) AS n FROM booking_seats bs WHERE bs.booking_id = b.id) s ON true
+          WHERE b.created_at >= $1::date AND b.created_at < $2::date + 1
+          GROUP BY b.tenant_id`,
+          [from, to],
+        );
+        return rows.map((r) => ({
+          tenantId: r.tenant_id,
+          bookings: Number(r.bookings),
+          revenueMinor: Number(r.revenue_minor),
+          cancelled: Number(r.cancelled),
+          seats: Number(r.seats),
+        }));
+      },
+    );
+  }
+
   /** Every still-live booking on a trip — for cascading cancellation when the OPERATOR cancels the whole trip (bus breakdown, etc.), never for a customer cancelling their own single seat. */
   async listActiveByTrip(tripId: TripId): Promise<{ id: BookingId; pnr: string }[]> {
     return this.db.query(

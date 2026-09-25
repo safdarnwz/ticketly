@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { DatabaseService } from '@database';
+import { DatabaseService, UnitOfWork } from '@database';
 import { requireTenantId, type TenantId, type UserId } from '@kernel';
 import { FieldEncryptor } from '@security';
 
@@ -39,7 +39,61 @@ export class UserRepository {
   constructor(
     private readonly db: DatabaseService,
     private readonly encryptor: FieldEncryptor,
+    private readonly uow: UnitOfWork,
   ) {}
+
+  /**
+   * Key rotation (#120): rewrite up to `limit` users whose email / phone is
+   * under a retired key (or still plaintext) with the current key. Every
+   * tenant. Returns how many rows were rewritten; 0 = done.
+   */
+  async reencryptBatch(limit: number): Promise<number> {
+    const current = this.encryptor.currentKeyId;
+    if (!current) return 0;
+    return this.uow.run({ name: 'user.reencryptBatch', bypassRls: true }, async (scope) => {
+      const { rows } = await scope.client.query<{
+        id: string;
+        email: string | null;
+        phone: string | null;
+      }>(
+        `SELECT id, email, phone FROM users
+          WHERE (email IS NOT NULL AND email NOT LIKE $1) OR (phone IS NOT NULL AND phone NOT LIKE $1)
+          LIMIT $2 FOR UPDATE SKIP LOCKED`,
+        [`${current}:%`, limit],
+      );
+      let n = 0;
+      for (const r of rows) {
+        const email = this.encryptor.decrypt(r.email);
+        const phone = this.encryptor.decrypt(r.phone);
+        // Blind indexes are recomputed too: a value that was plaintext before
+        // encryption was switched on has an unkeyed index that no lookup matches.
+        await scope.client.query(
+          `UPDATE users SET email = $2, phone = $3, email_blind = $4, phone_blind = $5 WHERE id = $1`,
+          [
+            r.id,
+            this.encryptor.encrypt(email),
+            this.encryptor.encrypt(phone),
+            this.encryptor.blindIndex(email),
+            this.encryptor.blindIndex(phone),
+          ],
+        );
+        n++;
+      }
+      return n;
+    });
+  }
+
+  /** Users with email / phone per key id ('plaintext' = not encrypted). */
+  async encryptionCensus(): Promise<Record<string, number>> {
+    return this.uow.run({ name: 'user.encryptionCensus', bypassRls: true }, async (scope) => {
+      const { rows } = await scope.client.query<{ key: string; n: string }>(
+        `SELECT coalesce(substring(v FROM '^(v[0-9]{1,4}):'), 'plaintext') AS key, count(*) AS n
+           FROM users, LATERAL (VALUES (email), (phone)) AS f(v)
+          WHERE v IS NOT NULL AND v <> '' GROUP BY 1`,
+      );
+      return Object.fromEntries(rows.map((r) => [r.key, Number(r.n)]));
+    });
+  }
 
   private static readonly COLUMNS = `
     id, tenant_id, kind, status, email, phone, full_name, password_hash,

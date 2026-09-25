@@ -29,6 +29,43 @@ export class PaymentRepository {
   ) {}
 
   /**
+   * Payment attempts per gateway over a period (#111), across every operator.
+   * An intent still 'created' after 30 minutes was abandoned at checkout.
+   */
+  async gatewayStats(
+    from: string,
+    to: string,
+  ): Promise<
+    { gateway: string; attempts: number; captured: number; failed: number; abandoned: number }[]
+  > {
+    return this.uow.run({ name: 'payment.gatewayStats', bypassRls: true }, async (scope) => {
+      const { rows } = await scope.client.query<{
+        gateway: string;
+        attempts: string;
+        captured: string;
+        failed: string;
+        abandoned: string;
+      }>(
+        `SELECT gateway, count(*) AS attempts,
+                count(*) FILTER (WHERE status IN ('captured', 'refunded')) AS captured,
+                count(*) FILTER (WHERE status = 'failed') AS failed,
+                count(*) FILTER (WHERE status = 'created' AND created_at < now() - interval '30 minutes') AS abandoned
+           FROM payment_intents
+          WHERE created_at >= $1::date AND created_at < $2::date + 1
+          GROUP BY gateway ORDER BY gateway`,
+        [from, to],
+      );
+      return rows.map((r) => ({
+        gateway: r.gateway,
+        attempts: Number(r.attempts),
+        captured: Number(r.captured),
+        failed: Number(r.failed),
+        abandoned: Number(r.abandoned),
+      }));
+    });
+  }
+
+  /**
    * Idempotent per purpose: a pending intent for the same booking, amount,
    * currency and metadata is reused (a retried "pay" never creates a second
    * order). A pending intent for anything else — the total changed because an

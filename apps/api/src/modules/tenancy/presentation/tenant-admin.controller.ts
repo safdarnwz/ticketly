@@ -13,7 +13,7 @@ import {
   zodBody,
   zodQuery,
 } from '@http';
-import { BadRequestError, csvField, getContext, type TenantId } from '@kernel';
+import { BadRequestError, csvField, getContext, toCsv, type TenantId } from '@kernel';
 
 import { AuditService } from '../../iam';
 import { BookingRepository } from '../../booking';
@@ -30,6 +30,8 @@ import {
   ChangePlanSchema,
   FeatureKeySchema,
   MarkPayoutsSentSchema,
+  OperatorBroadcastSchema,
+  OperatorRankingQuerySchema,
   PlanSchema,
   PlatformSettingsSchema,
   ReasonSchema,
@@ -42,6 +44,8 @@ import {
   type AuditLogQueryDto,
   type ChangePlanDto,
   type MarkPayoutsSentDto,
+  type OperatorBroadcastDto,
+  type OperatorRankingQueryDto,
   type PlanDto,
   type PlatformSettingsDto,
   type ReasonDto,
@@ -52,6 +56,8 @@ import {
   type SetPlanActiveDto,
 } from './dto/tenant-admin.dto';
 import { PlanRepository } from '../infrastructure/persistence/plan.repository';
+import { OperatorBroadcastService } from '../application/services/operator-broadcast.service';
+import { rankOperators } from '../domain/operator-ranking';
 import { TenantRateLimitService } from '../application/services/tenant-rate-limit.service';
 import { TenantBrandingService } from '../application/services/tenant-branding.service';
 import { TenantContextService } from '../application/services/tenant-context.service';
@@ -86,6 +92,7 @@ export class TenantAdminController {
     private readonly tenantContext: TenantContextService,
     private readonly branding: TenantBrandingService,
     private readonly rateLimits: TenantRateLimitService,
+    private readonly broadcasts: OperatorBroadcastService,
   ) {}
 
   @Get()
@@ -245,6 +252,69 @@ export class TenantAdminController {
       this.tenants.countsByStatus(),
     ]);
     return { ...bookings, operators };
+  }
+
+  @Post('broadcasts')
+  @HttpCode(200)
+  @Idempotent()
+  @ApiOperation({ summary: "Email a message to every operator's contact address" })
+  broadcast(@Body(zodBody(OperatorBroadcastSchema)) dto: OperatorBroadcastDto) {
+    return this.broadcasts.send(dto, getContext()?.userId ?? null);
+  }
+
+  @Get('broadcasts')
+  async broadcastHistory() {
+    return { items: await this.broadcasts.list() };
+  }
+
+  @Get('ranking')
+  @ApiOperation({
+    summary:
+      'Operators ranked over a period by revenue, bookings, seats or (lowest) cancellation rate',
+  })
+  async ranking(@Query(zodQuery(OperatorRankingQuerySchema)) q: OperatorRankingQueryDto) {
+    const [rows, operators] = await Promise.all([
+      this.bookings.performanceByOperator(q.from, q.to),
+      this.tenants.list(),
+    ]);
+    const names = new Map(operators.map((o) => [o.id as string, o]));
+    return {
+      from: q.from,
+      to: q.to,
+      sortBy: q.sortBy,
+      items: rankOperators(rows, q.sortBy).map((r) => ({
+        ...r,
+        slug: names.get(r.tenantId)?.slug ?? null,
+        displayName: names.get(r.tenantId)?.displayName ?? null,
+      })),
+    };
+  }
+
+  @Get('export')
+  @ApiOperation({ summary: 'Every operator with status, plan and contacts, as CSV' })
+  async export(@Res({ passthrough: true }) reply: FastifyReply) {
+    const rows = await this.tenants.listForExport();
+    void reply
+      .header('Content-Type', 'text/csv; charset=utf-8')
+      .header('Content-Disposition', 'attachment; filename="operators.csv"');
+    return toCsv(
+      [
+        'id',
+        'slug',
+        'displayName',
+        'legalName',
+        'status',
+        'plan',
+        'contactEmail',
+        'contactPhone',
+        'customDomain',
+        'gstin',
+        'suspendedReason',
+        'suspendedAt',
+        'createdAt',
+      ],
+      rows,
+    );
   }
 
   @Get('audit-log')

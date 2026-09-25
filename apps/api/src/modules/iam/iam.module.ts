@@ -7,6 +7,10 @@ import { StaffAccessRepository } from './infrastructure/persistence/staff-access
 import { RoleTemplateAdminController } from './presentation/role-template-admin.controller';
 import { RoleTemplateRepository } from './infrastructure/persistence/role-template.repository';
 import { RoleTemplateService } from './application/services/role-template.service';
+import { MaintenanceWindowRepository } from './infrastructure/persistence/maintenance-window.repository';
+import { MaintenanceWindowService } from './application/services/maintenance-window.service';
+import { KeyRotationController } from './presentation/key-rotation.controller';
+import { KeyRotationService } from './application/services/key-rotation.service';
 import { MaintenanceController } from './presentation/maintenance.controller';
 
 import { CacheModule } from '@cache';
@@ -68,11 +72,15 @@ import { OtpDeliveryRouter } from './infrastructure/otp/otp-delivery.router';
     ApiKeyController,
     MaintenanceController,
     RoleTemplateAdminController,
+    KeyRotationController,
   ],
   providers: [
     StaffAccessRepository,
     StaffAccessService,
     RoleTemplateRepository,
+    MaintenanceWindowRepository,
+    MaintenanceWindowService,
+    KeyRotationService,
     RoleTemplateService,
     ApiKeyRepository,
     OtpChallengeRepository,
