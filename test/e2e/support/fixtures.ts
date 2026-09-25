@@ -76,7 +76,8 @@ async function build(app: NestFastifyApplication): Promise<E2eFixtures> {
           )
         ).rows,
     );
-    for (const svc of services) await app.get(MaterializationService).materialiseService(svc.id, 14);
+    for (const svc of services)
+      await app.get(MaterializationService).materialiseService(svc.id, 14);
     return uow.run({ name: 'e2e.trip', readOnly: true }, async (s) => {
       const r = await s.client.query<{
         id: string;
