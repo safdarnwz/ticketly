@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Put } from '@nestjs/common';
+import { Body, Controller, Get, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, RequirePermission, zodBody } from '@http';
+import { ApiStandardErrors, Public, RateLimit, RequirePermission, zodBody, zodQuery } from '@http';
 
 import { ConcessionRepository } from '../infrastructure/persistence/concession.repository';
 import {
@@ -14,6 +14,8 @@ import {
   type ConcessionRuleDto,
   type AccessibleSeatRuleDto,
   type PassengerPolicyDto,
+  CheckoutConcessionQuerySchema,
+  type CheckoutConcessionQueryDto,
 } from './dto/concession.dto';
 
 /** Operator: passenger concessions (senior, student, defence, child, disabled) and passenger policy (infants, minors). */
@@ -23,6 +25,38 @@ import {
 @ApiStandardErrors()
 export class ConcessionController {
   constructor(private readonly repo: ConcessionRepository) {}
+
+  /**
+   * What a passenger can claim at checkout on this operator: the active
+   * concessions valid on the journey date, and the age rules. Public (the
+   * storefront sends X-Tenant-Id of the chosen trip); read-only.
+   */
+  @Get('checkout')
+  @Public()
+  @RateLimit(60, 60_000, 'ip')
+  @ApiOperation({ summary: 'Concessions and passenger age rules a customer can use at checkout' })
+  async checkout(@Query(zodQuery(CheckoutConcessionQuerySchema)) q: CheckoutConcessionQueryDto) {
+    const [rules, policy] = await Promise.all([this.repo.rules(), this.repo.policy()]);
+    return {
+      concessions: rules
+        .filter(
+          (r) =>
+            r.active &&
+            (!q.journeyDate ||
+              ((!r.validFrom || r.validFrom <= q.journeyDate) &&
+                (!r.validTo || r.validTo >= q.journeyDate))),
+        )
+        .map((r) => ({
+          category: r.category,
+          discountPct: r.discountPct,
+          minAge: r.minAge,
+          maxAge: r.maxAge,
+          requiresIdProof: r.requiresIdProof,
+          maxPerBooking: r.maxPerBooking,
+        })),
+      policy,
+    };
+  }
 
   @Get()
   @RequirePermission(Permission.FARE_READ)

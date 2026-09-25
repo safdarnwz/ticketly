@@ -40,6 +40,9 @@ const csv = (defaultValue: string[] = []) =>
             .filter(Boolean),
     );
 
+/** The development default — public in the repository, so never valid in production. */
+export const DEV_JWT_SECRET = 'dev-only-secret-change-me-in-production-32b';
+
 export const envSchema = z.object({
   /* ── Runtime ───────────────────────────────────────────────────────────*/
   NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
@@ -121,7 +124,7 @@ export const envSchema = z.object({
 
   /* ── Security (expanded in Part 2) ─────────────────────────────────────*/
   /** 32+ byte secret. Rotated via JWT_SECRET_PREVIOUS for zero-downtime. */
-  JWT_SECRET: z.string().min(32).default('dev-only-secret-change-me-in-production-32b'),
+  JWT_SECRET: z.string().min(32).default(DEV_JWT_SECRET),
   JWT_SECRET_PREVIOUS: z.string().optional(),
   JWT_ACCESS_TTL_SECONDS: int(900, 60),
   JWT_REFRESH_TTL_SECONDS: int(2_592_000, 300),
@@ -293,3 +296,23 @@ export const envSchema = z.object({
 });
 
 export type Env = z.infer<typeof envSchema>;
+
+/**
+ * Settings that are fine in development but a hole in production. Returns
+ * the problems (empty = safe):
+ *  - the public default JWT secret would let anyone mint any token;
+ *  - the sandbox gateway would confirm bookings with a test card, for free;
+ *  - PII encryption must be on.
+ */
+export function productionConfigProblems(env: Env): string[] {
+  if (env.NODE_ENV !== 'production') return [];
+  const out: string[] = [];
+  if (env.JWT_SECRET === DEV_JWT_SECRET)
+    out.push('JWT_SECRET: set a random secret (the default is public)');
+  if (env.PAYMENT_TEST_MODE)
+    out.push(
+      'PAYMENT_TEST_MODE: must be false in production (the test gateway confirms bookings without payment)',
+    );
+  if (!env.ENCRYPTION_KEY) out.push('ENCRYPTION_KEY: required in production (PII encryption)');
+  return out;
+}

@@ -46,3 +46,12 @@ export const AccessibleSeatRuleSchema = z.object({
   releaseHours: z.number().int().min(0).max(720).nullable(),
 });
 export type AccessibleSeatRuleDto = z.infer<typeof AccessibleSeatRuleSchema>;
+
+/** Checkout: the journey date decides which dated concessions apply. */
+export const CheckoutConcessionQuerySchema = z.object({
+  journeyDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD')
+    .optional(),
+});
+export type CheckoutConcessionQueryDto = z.infer<typeof CheckoutConcessionQuerySchema>;

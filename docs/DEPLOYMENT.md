@@ -36,6 +36,8 @@ cat deploy/postgres/postgresql.tuning.conf >> $PGDATA/postgresql.conf   # then r
 npm run db:migrate
 
 # 4. Configure. .env points DB_USER at gds_app (NOT postgres).
+#    In production the API refuses to start with the default JWT_SECRET,
+#    PAYMENT_TEST_MODE=true or no ENCRYPTION_KEY (see productionConfigProblems).
 cp .env.example /opt/ticketly/shared/.env && edit it
 
 # 5. Install services.

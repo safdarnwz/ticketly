@@ -6,7 +6,7 @@ import { config as loadDotenv } from 'dotenv';
 import { ZodError } from 'zod';
 
 import { AppConfig, buildAppConfig } from './app-config';
-import { envSchema, type Env } from './env.schema';
+import { envSchema, productionConfigProblems, type Env } from './env.schema';
 
 /**
  * Loads `.env` files (development/test only — in production configuration comes
@@ -49,7 +49,15 @@ export function loadEnv(options: { reload?: boolean; cwd?: string } = {}): Env {
   }
 
   try {
-    cached = envSchema.parse(process.env);
+    const parsed = envSchema.parse(process.env);
+    const unsafe = productionConfigProblems(parsed);
+    if (unsafe.length) {
+      process.stderr.write(
+        `\n✖ Unsafe production configuration:\n${unsafe.map((l) => `  • ${l}`).join('\n')}\n\n`,
+      );
+      process.exit(1);
+    }
+    cached = parsed;
     return cached;
   } catch (error) {
     if (error instanceof ZodError) {
