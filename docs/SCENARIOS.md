@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3124 |
-| TODO | 910 |
-| DONE | 44 |
+| TODO | 893 |
+| DONE | 61 |
 | DUP | 9 |
 
 
@@ -111,7 +111,7 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 74 | Give custom report builder access to operator | GAP | — | verified manually: not built yet |
 | 75 | Set data retention policy in days | DONE | TODO | PUT /admin/policies/data-retention + worker 'data-retention' purge job |
 | 76 | Process data deletion request | DONE | TODO | verified manually: existing module/API |
-| 77 | Set support ticket priority matrix | DONE | TODO | verified manually: existing module/API |
+| 77 | Set support ticket priority matrix | DONE | DONE | support tickets: staff raise by PNR / reply / priority / assign / resolve; customers own tickets only; author from account · UI: Support: queue views (active/mine/unassigned/…), search, ticket thread with reply, resolve/reopen/close, priority, assign; raise for a caller by PNR |
 | 78 | Deploy critical bug hotfix | INFRA | — | DevOps/monitoring runbook (not an app feature) |
 | 79 | Deploy new release to staging | INFRA | — | DevOps/monitoring runbook (not an app feature) |
 | 80 | Run smoke tests on staging | INFRA | — | DevOps/monitoring runbook (not an app feature) |
@@ -435,7 +435,7 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 398 | Check current branch wallet balance | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 399 | Raise branch wallet recharge request | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 400 | Raise formal complaint against agent | DONE | TODO | verified manually: existing module/API |
-| 401 | Register passenger complaint in system | DONE | TODO | verified manually: existing module/API |
+| 401 | Register passenger complaint in system | DONE | DONE | support tickets: staff raise by PNR / reply / priority / assign / resolve; customers own tickets only; author from account · UI: Support: queue views (active/mine/unassigned/…), search, ticket thread with reply, resolve/reopen/close, priority, assign; raise for a caller by PNR |
 | 402 | Enter lost and found item details | DONE | TODO | POST /lost-found (+claim with PNR check, 30-day disposal) |
 | 403 | Manage stock of ticket rolls | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 404 | Manage stock of printer paper | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
@@ -457,9 +457,9 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 420 | Manually apply student discount | DONE | TODO | verified manually: existing module/API |
 | 421 | Override ladies seat restriction with proper reason | DONE | TODO | POST /bookings/hold ladiesSeatOverrideReason (staff only, event booking.ladies_seat_override) |
 | 422 | Show cancellation charges to passenger before confirming | DONE | TODO | verified manually: existing module/API |
-| 423 | Process refund back to original payment method | DONE | TODO | verified manually: existing module/API |
+| 423 | Process refund back to original payment method | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
 | 424 | Process refund in cash | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
-| 425 | View list of pending refunds for branch | DONE | TODO | verified manually: existing module/API |
+| 425 | View list of pending refunds for branch | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
 | 426 | Escalate high value cancellation to operator admin | GAP | — | verified manually: not built yet |
 | 427 | View live GPS location of branch services | DONE | TODO | verified manually: existing module/API |
 | 428 | Mark service as departed from this branch | DONE | TODO | verified manually: existing module/API |
@@ -479,7 +479,7 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 442 | Add new petty cash expense | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 443 | Raise stationery requirement request | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 444 | View customer feedback received for branch | GAP | — | verified manually: not built yet |
-| 445 | Respond to passenger complaint | DONE | TODO | verified manually: existing module/API |
+| 445 | Respond to passenger complaint | DONE | DONE | support tickets: staff raise by PNR / reply / priority / assign / resolve; customers own tickets only; author from account · UI: Support: queue views (active/mine/unassigned/…), search, ticket thread with reply, resolve/reopen/close, priority, assign; raise for a caller by PNR |
 | 446 | View ranking of own branch among all branches | GAP | — | verified manually: not built yet |
 | 447 | Customize personal dashboard widgets | GAP | — | verified manually: not built yet |
 | 448 | Export daily operational report to Excel | DONE | TODO | verified manually: existing module/API |
@@ -647,7 +647,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 | 603 | View utilization report of each bus | DONE | TODO | GET /reports/dispatch buses[] |
 | 604 | Receive emergency alert from bus | DONE | TODO | incident.critical → emergency contacts (SMS+email) |
 | 605 | Notify emergency support team | DONE | TODO | incident.critical consumer |
-| 606 | Register passenger complaint related to service | DONE | TODO | verified manually: existing module/API |
+| 606 | Register passenger complaint related to service | DONE | DONE | support tickets: staff raise by PNR / reply / priority / assign / resolve; customers own tickets only; author from account · UI: Support: queue views (active/mine/unassigned/…), search, ticket thread with reply, resolve/reopen/close, priority, assign; raise for a caller by PNR |
 | 607 | Enter details of lost luggage | DONE | TODO | POST /lost-found |
 | 608 | Finalize next day bus and crew allocation | DONE | TODO | verified manually: existing module/API |
 | 609 | Block inventory at last minute | DONE | TODO | verified manually: existing module/API |
@@ -687,7 +687,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 | 643 | Mark passenger as no-show | DUP | DUP | same as #375 |
 | 644 | Record luggage pieces | GAP | — | verified manually: not built yet |
 | 645 | Collect extra luggage charges | GAP | — | verified manually: not built yet |
-| 646 | Note down passenger complaint | DONE | TODO | incidents type=complaint |
+| 646 | Note down passenger complaint | DONE | DONE | support tickets: staff raise by PNR / reply / priority / assign / resolve; customers own tickets only; author from account · UI: Support: queue views (active/mine/unassigned/…), search, ticket thread with reply, resolve/reopen/close, priority, assign; raise for a caller by PNR |
 | 647 | Raise medical emergency alert | DONE | TODO | POST /crew/trips/:id/sos kind=medical |
 | 648 | Raise security or police alert | DONE | TODO | POST /crew/trips/:id/sos kind=security |
 | 649 | Inform dispatch about bus breakdown | DONE | TODO | incidents type=breakdown |
@@ -925,11 +925,11 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 | 1010 | Calculated refund amount is wrong | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1011 | Cancellation charges are calculated incorrectly | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1012 | GST on cancellation charges is wrong | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 1013 | Refund to original payment method fails | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 1014 | Customer requests refund to different account | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 1015 | Bank account details provided for refund are invalid | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 1013 | Refund to original payment method fails | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
+| 1014 | Customer requests refund to different account | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
+| 1015 | Bank account details provided for refund are invalid | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
 | 1016 | Refund requested after allowed policy period | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 1017 | Multiple refund requests created for same booking | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 1017 | Multiple refund requests created for same booking | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
 | 1018 | Refund requested after bus has already departed | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1019 | Refund requested after passenger has boarded | GAP | — | verified manually: not built yet |
 | 1020 | Only some passengers in booking are cancelled | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
@@ -958,11 +958,11 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 | 1043 | Service is merged and fare difference refunded | GAP | — | verified manually: not built yet |
 | 1044 | Bus is changed to lower fare category | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1045 | Bus is changed to higher fare category | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 1046 | System prevents giving more refund than collected | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 1046 | System prevents giving more refund than collected | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
 | 1047 | System detects under-refund situation | GAP | — | verified manually: not built yet |
 | 1048 | Refund status webhook is delayed | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1049 | Refund status webhook arrives multiple times | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 1050 | Manual refund is forced by admin | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 1050 | Manual refund is forced by admin | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
 | 1051 | Bulk refund job fails in the middle | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1052 | Refund report does not match gateway report | GAP | — | verified manually: not built yet |
 | 1053 | Customer raises chargeback | GAP | — | verified manually: not built yet |
@@ -979,10 +979,10 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 | 1064 | Refund account is already closed | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1065 | International card refund takes longer | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1066 | Refund fails due to technical error at bank | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 1067 | Refund is successful but customer does not receive | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 1068 | Customer complains about non-receipt of refund | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 1069 | Duplicate refund is prevented by system | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 1070 | Refund is attempted on already refunded booking | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 1067 | Refund is successful but customer does not receive | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
+| 1068 | Customer complains about non-receipt of refund | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
+| 1069 | Duplicate refund is prevented by system | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
+| 1070 | Refund is attempted on already refunded booking | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
 | 1071 | Refund currency is different from booking currency | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1072 | Rounding difference in refund amount | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1073 | Tax components need reverse calculation | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
