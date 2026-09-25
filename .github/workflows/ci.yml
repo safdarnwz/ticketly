@@ -1,13 +1,106 @@
+# Continuous integration — runs on every pull request into main and on every
+# push to main. Independent gates run in parallel; "CI OK" is the single
+# required check that summarises them (and what pipeline.yml waits for).
 name: CI
+
 on:
-  push: { branches: [main] }
-  # Every change reaches main through a PR; pipeline.yml merges it when this passes
-  # and promotes main → stage → uat → prod.
-  pull_request: { branches: [main] }
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened]
+  push:
+    branches: [main]
+
+concurrency:
+  # A newer push to the same PR supersedes the older run; main runs never cancel.
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  DB_HOST: localhost
+  DB_USER: postgres
+  DB_PASSWORD: postgres
+  DB_NAME: ticketly
 
 jobs:
-  check:
+  pr-title:
+    name: PR title (Conventional Commits)
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check the title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # The squash-merge commit takes the PR title, so it feeds the changelog.
+          re='^(feat|fix|perf|refactor|docs|test|build|ci|chore|revert)(\([a-z0-9-]+\))?!?: .{3,}'
+          if ! [[ "$TITLE" =~ $re ]]; then
+            echo "::error::PR title must be a Conventional Commit, e.g. 'feat(booking): hold seats for phone bookings' — got: $TITLE"
+            exit 1
+          fi
+
+  quality:
+    name: Format, lint, typecheck, module boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run check:boundaries
+      - name: Shell scripts
+        run: shellcheck deploy/*.sh scripts/*.sh
+      - name: Workflows (actionlint)
+        run: |
+          curl -sSL -o actionlint.tgz https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz
+          echo "023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757  actionlint.tgz" | sha256sum -c -
+          tar xzf actionlint.tgz actionlint
+          ./actionlint -no-color
+
+  unit:
+    name: Unit + architecture tests (coverage)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run test:cov -- --coverage.reporter=text-summary --coverage.reporter=lcov
+      - name: Coverage summary
+        if: always()
+        run: |
+          [ -f coverage/lcov.info ] || exit 0
+          node -e '
+            const fs = require("fs");
+            let lf = 0, lh = 0;
+            for (const l of fs.readFileSync("coverage/lcov.info", "utf8").split("\n")) {
+              if (l.startsWith("LF:")) lf += +l.slice(3);
+              if (l.startsWith("LH:")) lh += +l.slice(3);
+            }
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+              `### Unit test line coverage: ${(100 * lh / Math.max(lf, 1)).toFixed(1)}% (${lh}/${lf})\n`);'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          {
+            name: coverage,
+            path: coverage/lcov.info,
+            retention-days: 14,
+            if-no-files-found: ignore,
+          }
+
+  migrations:
+    name: Migrations (apply, revert latest, re-apply)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     services:
       postgres:
         image: postgres:16
@@ -18,26 +111,100 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: npm }
-      - run: npm ci
-      # Gate 1: format + lint + typecheck.
-      - run: npm run format:check
-      - run: npm run lint
-      - run: npm run typecheck
-      # Gate 2: migrations apply cleanly against a real Postgres.
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci --no-audit --no-fund
       - run: npm run db:migrate
-        env: { DB_HOST: localhost, DB_USER: postgres, DB_PASSWORD: postgres, DB_NAME: ticketly }
-      # Gate 3: unit + architecture tests (incl. the @Idempotent enforcement).
-      - run: npm test
-      # Gate 4: end-to-end against the real API + the seeded demo operator.
-      - name: Seed demo data
-        run: npm run db:seed && npm run db:seed:geography && npm run db:seed:demo
-        env: &e2e-env
-          DB_HOST: localhost
-          DB_USER: postgres
-          DB_PASSWORD: postgres
-          DB_NAME: ticketly
-          SUPER_ADMIN_EMAIL: admin@ticketly.test
-          SUPER_ADMIN_PASSWORD: Ci-admin-pass-123
+      # Every migration must be reversible: the newest one is taken down and up again.
+      - run: npm run db:migrate:down
+      - run: npm run db:migrate
+      - run: npm run db:migrate:status
+
+  e2e:
+    name: End-to-end (real API + Postgres + seeded operator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres, POSTGRES_DB: ticketly }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      SUPER_ADMIN_EMAIL: admin@ticketly.test
+      SUPER_ADMIN_PASSWORD: Ci-admin-pass-123
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run db:migrate
+      - run: npm run db:seed && npm run db:seed:geography && npm run db:seed:demo
       - run: npm run test:e2e
-        env: *e2e-env
+
+  build:
+    name: Build the release artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      # Proves the artifact is complete: the compiled migration runner finds its migrations.
+      - run: bash scripts/package-release.sh "ci-${GITHUB_SHA::7}" "$GITHUB_SHA"
+
+  security:
+    name: Security (secrets, dependencies, SAST)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: npm }
+      - name: Secret scan (gitleaks, full history)
+        run: |
+          curl -sSL -o gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz
+          echo "5bc41815076e6ed6ef8fbecc9d9b75bcae31f39029ceb55da08086315316e3ba  gitleaks.tgz" | sha256sum -c -
+          tar xzf gitleaks.tgz gitleaks
+          ./gitleaks detect --source=. --no-banner --redact --verbose
+      - name: Dependency audit (production dependencies, blocks on critical)
+        run: |
+          npm audit --omit=dev --audit-level=critical
+          echo "### npm audit (production dependencies)" >> "$GITHUB_STEP_SUMMARY"
+          npm audit --omit=dev --json | node -e '
+            const v = JSON.parse(require("fs").readFileSync(0)).metadata.vulnerabilities;
+            console.log(`critical ${v.critical} · high ${v.high} · moderate ${v.moderate} · low ${v.low}`)' >> "$GITHUB_STEP_SUMMARY" || true
+      - name: SAST (Semgrep — report only until the baseline is triaged)
+        continue-on-error: true
+        run: |
+          pipx install semgrep==1.178.0 >/dev/null
+          semgrep scan --config p/typescript --config p/nodejs --metrics=off --error \
+            --exclude node_modules --exclude dist --sarif --output semgrep.sarif apps libs scripts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          {
+            name: semgrep-sarif,
+            path: semgrep.sarif,
+            retention-days: 14,
+            if-no-files-found: ignore,
+          }
+
+  ci-ok:
+    name: CI OK
+    if: always()
+    needs: [pr-title, quality, unit, migrations, e2e, build, security]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Every gate passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "gates: $RESULTS"
+          for r in $RESULTS; do
+            case "$r" in success|skipped) ;; *) echo "::error::a CI gate did not pass ($r)"; exit 1 ;; esac
+          done
