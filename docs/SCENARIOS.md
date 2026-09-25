@@ -13,8 +13,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 | Backend status | Count |
 |---|---|
-| OPEN | 2712 |
-| DONE | 954 |
+| OPEN | 2711 |
+| DONE | 955 |
 | GAP | 310 |
 | CONFLICT | 76 |
 | INFRA | 20 |
@@ -23,9 +23,9 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 | Frontend status | Count |
 |---|---|
-| — | 3124 |
-| TODO | 893 |
-| DONE | 61 |
+| — | 3123 |
+| TODO | 892 |
+| DONE | 63 |
 | DUP | 9 |
 
 
@@ -494,7 +494,7 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 457 | View branch collection against monthly target | GAP | — | verified manually: not built yet |
 | 458 | View all agent bookings done through this branch | DONE | TODO | verified manually: existing module/API |
 | 459 | Approve agent request for higher credit | GAP | — | verified manually: not built yet |
-| 460 | View list of blacklisted passengers | DONE | TODO | verified manually: existing module/API |
+| 460 | View list of blacklisted passengers | DONE | DONE | customer_blocks per operator (account + mobile), GET /customers?filter=blocked, hold → 403 · UI: Customers: Blocked tab, block with reason / unblock in the profile |
 | 461 | Add passenger to branch watch list | GAP | — | verified manually: not built yet |
 | 462 | Handle medical emergency at branch | DONE | TODO | incidents type=medical (critical alert) |
 | 463 | Arrange emergency support | DONE | TODO | incident.critical → emergency contacts |
@@ -909,7 +909,7 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 
 ## #1001–#1500
 
-CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
+CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1024,7 +1024,7 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 
 ## #1001–#1500
 
-CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
+CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1119,7 +1119,7 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 
 ## #1001–#1500
 
-CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
+CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1220,7 +1220,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 | 1295 | Extra passenger travelling on one ticket | OPEN | — |  |
 | 1296 | Attempt to transfer ticket to another person | OPEN | — |  |
 | 1297 | Attempt to resell ticket | OPEN | — |  |
-| 1298 | Blacklisted passenger tries to make booking | OPEN | — |  |
+| 1298 | Blacklisted passenger tries to make booking | DONE | DONE | customer_blocks per operator (account + mobile), GET /customers?filter=blocked, hold → 403 · UI: Customers: Blocked tab, block with reason / unblock in the profile |
 | 1299 | System allows booking against policy | OPEN | — |  |
 | 1300 | Policy exception requires manager approval | OPEN | — |  |
 
@@ -1234,7 +1234,7 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 
 ## #1001–#1500
 
-CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
+CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1309,7 +1309,7 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 
 ## #1001–#1500
 
-CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
+CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
