@@ -1,16 +1,16 @@
-# Release pipeline: every change reaches main through its own pull request,
-# and every green commit on main is promoted main → stage → uat → prod.
+# Continuous delivery — main → stage → uat → prod.
 #
-#  1. A PR into main runs CI (ci.yml). When CI passes, this workflow approves
-#     and merges the PR (squash) and deletes its branch.
-#  2. The merged commit — or any commit pushed straight to main whose CI
-#     passed — is fast-forwarded to stage, then uat, then prod, in order.
-#     Each environment branch only ever receives commits that passed CI on
-#     main, and never diverges from it (fast-forward only; a promotion that
-#     cannot fast-forward fails loudly instead of overwriting).
+#   CI green on a PR into main ──▶ merge-pr: approve, squash-merge, delete the branch
+#   CI green on main (or a merge above)
+#     ──▶ build:   build ONCE, package, checksum, version (vYYYY.MM.DD.N)
+#     ──▶ stage ──▶ uat ──▶ prod   (deploy.yml, one GitHub Environment each):
+#            deploy that exact artifact, smoke-test it, roll back on failure,
+#            then fast-forward the environment branch to the commit
+#     ──▶ release: tag the commit and publish a GitHub Release with the artifact
 #
-# Pushes made with GITHUB_TOKEN do not start other workflows, so the merge
-# and the promotions all happen here, in one run.
+# A failure anywhere stops the release there; later environments keep the
+# previous version. Pushes with GITHUB_TOKEN start no other workflows, so the
+# merge and everything after it happen in this one run.
 name: Pipeline
 
 on:
@@ -19,25 +19,29 @@ on:
     types: [completed]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
+  # One release at a time; a queued one waits, it is never cancelled mid-way.
   group: pipeline
   cancel-in-progress: false
 
 jobs:
   merge-pr:
-    # A green PR from this repository into main.
+    name: Merge the PR
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
     outputs:
       sha: ${{ steps.merge.outputs.sha }}
     steps:
-      - name: Approve and merge
+      - name: Approve and squash-merge
         id: merge
         uses: actions/github-script@v7
         with:
@@ -52,15 +56,19 @@ jobs:
               core.info(`No open PR into main at ${run.head_sha} (already merged, or a newer push) — nothing to do`);
               return;
             }
+            if (pr.draft) {
+              core.info(`#${pr.number} is a draft — not merged`);
+              return;
+            }
             try {
               await github.rest.pulls.createReview({ owner, repo, pull_number: pr.number, event: 'APPROVE',
-                body: 'CI passed — approved automatically by the release pipeline.' });
+                body: 'All CI gates passed — approved by the release pipeline.' });
             } catch (e) {
               // Needs "Allow GitHub Actions to create and approve pull requests"; merging does not.
               core.warning(`Could not approve #${pr.number}: ${e.message}`);
             }
             const merged = await github.rest.pulls.merge({ owner, repo, pull_number: pr.number,
-              merge_method: 'squash', sha: run.head_sha });
+              merge_method: 'squash', sha: run.head_sha, commit_title: `${pr.title} (#${pr.number})` });
             core.info(`Merged #${pr.number} as ${merged.data.sha}`);
             core.setOutput('sha', merged.data.sha);
             try {
@@ -69,7 +77,8 @@ jobs:
               core.warning(`Could not delete branch ${pr.head.ref}: ${e.message}`);
             }
 
-  promote:
+  build:
+    name: Build the release
     needs: merge-pr
     # After a merge above, or when CI passed on a push to main.
     if: >-
@@ -78,28 +87,100 @@ jobs:
       ((needs.merge-pr.result == 'success' && needs.merge-pr.outputs.sha != '') ||
        (github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'))
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      sha: ${{ steps.version.outputs.sha }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ needs.merge-pr.outputs.sha || github.event.workflow_run.head_sha }}
           fetch-depth: 0
-      - name: Promote main → stage → uat → prod
-        env:
-          SHA: ${{ needs.merge-pr.outputs.sha || github.event.workflow_run.head_sha }}
+      - name: Version
+        id: version
         run: |
           set -euo pipefail
-          git fetch origin main stage uat prod 2>/dev/null || git fetch origin main
-          # Only commits that are on main are ever promoted.
-          git merge-base --is-ancestor "$SHA" origin/main
-          for env in stage uat prod; do
-            if git ls-remote --exit-code --heads origin "$env" >/dev/null; then
-              git fetch origin "$env"
-              if git merge-base --is-ancestor "$SHA" "origin/$env"; then
-                echo "$env already has $SHA"; continue
-              fi
-              git merge-base --is-ancestor "origin/$env" "$SHA" \
-                || { echo "::error::$env has commits that are not on main — fix it by hand, never overwritten"; exit 1; }
-            fi
-            git push origin "$SHA:refs/heads/$env"
-            echo "Promoted $SHA to $env"
-          done
+          sha=$(git rev-parse HEAD)
+          git fetch --tags --quiet
+          # A commit already released keeps its version; otherwise the next vYYYY.MM.DD.N of today.
+          existing=$(git tag --points-at "$sha" --list 'v*' | head -1)
+          if [ -n "$existing" ]; then
+            version=$existing
+          else
+            day=$(date -u +%Y.%m.%d)
+            n=$(( $(git tag --list "v$day.*" | wc -l) + 1 ))
+            version="v$day.$n"
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "### Release $version — \`$sha\`" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - run: bash scripts/package-release.sh "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.sha }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: release/
+          retention-days: 90
+          if-no-files-found: error
+
+  stage:
+    needs: build
+    uses: ./.github/workflows/deploy.yml
+    with:
+      {
+        environment: stage,
+        version: '${{ needs.build.outputs.version }}',
+        sha: '${{ needs.build.outputs.sha }}',
+      }
+    secrets: inherit
+    permissions: { contents: write }
+
+  uat:
+    needs: [build, stage]
+    uses: ./.github/workflows/deploy.yml
+    with:
+      {
+        environment: uat,
+        version: '${{ needs.build.outputs.version }}',
+        sha: '${{ needs.build.outputs.sha }}',
+      }
+    secrets: inherit
+    permissions: { contents: write }
+
+  prod:
+    needs: [build, uat]
+    uses: ./.github/workflows/deploy.yml
+    with:
+      {
+        environment: prod,
+        version: '${{ needs.build.outputs.version }}',
+        sha: '${{ needs.build.outputs.sha }}',
+      }
+    secrets: inherit
+    permissions: { contents: write }
+
+  release:
+    name: Tag and publish the release
+    needs: [build, prod]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: release, path: release }
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+          SHA: ${{ needs.build.outputs.sha }}
+        run: |
+          set -euo pipefail
+          if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "$VERSION already published"; exit 0
+          fi
+          gh release create "$VERSION" release/* --repo "$GITHUB_REPOSITORY" --target "$SHA" \
+            --title "$VERSION" --generate-notes --latest

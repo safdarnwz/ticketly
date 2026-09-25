@@ -48,6 +48,34 @@ cp deploy/nginx/ticketly.conf /etc/nginx/conf.d/ && nginx -s reload
 
 PM2 is a drop-in alternative: `pm2 start deploy/ecosystem.config.cjs --env production`.
 
+## Continuous delivery (how releases reach a server)
+
+Releases are deployed by the pipeline (docs/RELEASE_PROCESS.md), not by hand.
+Each server is prepared once:
+
+```bash
+# A deploy user that owns /opt/ticketly and may restart the services only.
+useradd --system --create-home deploy
+mkdir -p /opt/ticketly/{releases,shared,incoming} && chown -R deploy /opt/ticketly
+echo 'deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart ticketly-api@*, /usr/bin/systemctl restart ticketly-worker@*' \
+  > /etc/sudoers.d/ticketly-deploy
+# Config + secrets live outside every release:
+cp .env.example /opt/ticketly/shared/.env && edit it
+# What deploy/release.sh restarts and checks:
+cat > /opt/ticketly/deploy.env <<'CONF'
+API_UNITS="ticketly-api@1 ticketly-api@2 ticketly-api@3 ticketly-api@4"
+WORKER_UNITS="ticketly-worker@1 ticketly-worker@2"
+API_HEALTH_URLS="http://127.0.0.1:3001/health/ready http://127.0.0.1:3002/health/ready http://127.0.0.1:3003/health/ready http://127.0.0.1:3004/health/ready"
+KEEP_RELEASES=5
+CONF
+```
+
+The systemd units run `/opt/ticketly/current` (a symlink to the live release).
+Every release lands in `/opt/ticketly/releases/<version>`; `deploy/release.sh`
+installs it, migrates, switches the symlink, restarts the API instances one at
+a time behind their health checks, and rolls back to the previous release if
+one does not come up. `release.sh rollback` does the same by hand.
+
 ## Rolling / zero-downtime deploy
 
 Migrations follow expand → migrate → contract (never rename in place; add columns

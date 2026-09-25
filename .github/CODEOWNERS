@@ -1,0 +1,5 @@
+# Owners are requested for review on every PR touching these paths.
+*                   @safdarnwz
+/.github/           @safdarnwz
+/db/migrations/     @safdarnwz
+/deploy/            @safdarnwz

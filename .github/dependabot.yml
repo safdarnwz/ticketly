@@ -1,0 +1,20 @@
+# Weekly dependency updates, grouped so they arrive as a few reviewable PRs
+# (each one goes through CI and the release pipeline like any other change).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly, day: monday, time: '04:00', timezone: Asia/Kolkata }
+    open-pull-requests-limit: 5
+    commit-message: { prefix: 'build(deps)', prefix-development: 'build(deps-dev)' }
+    groups:
+      nestjs: { patterns: ['@nestjs/*'] }
+      fastify: { patterns: ['fastify', '@fastify/*'] }
+      opentelemetry: { patterns: ['@opentelemetry/*'] }
+      dev-tooling:
+        dependency-type: development
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday, time: '04:00', timezone: Asia/Kolkata }
+    commit-message: { prefix: 'ci' }
