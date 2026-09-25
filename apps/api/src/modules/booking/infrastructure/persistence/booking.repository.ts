@@ -273,17 +273,19 @@ export class BookingRepository {
   }
 
   /** Staff/ops lookup by PNR ALONE — no phone-match, unlike getByPnr's customer-self-service version. Gated by a permission check at the controller, not by requiring information a staff member may not have on hand. Same cross-tenant bypassRls reasoning: a PNR alone doesn't say which operator issued it. */
+  /** A PNR in the caller's own operator only — PNRs are unique per operator, not globally. */
   async findByPnrStaff(pnr: string): Promise<BookingRow | null> {
+    const tenantId = requireTenantId();
     return this.uow.run<BookingRow | null>(
-      { name: 'booking.findByPnrStaff', bypassRls: true },
+      { name: 'booking.findByPnrStaff', tenantId, readOnly: true },
       async (scope) => {
         const result = await scope.client.query<BookingRow>(
           `SELECT id, pnr, trip_id AS "tripId", route_id AS "routeId", from_seq AS "fromSeq", to_seq AS "toSeq",
                 status, seat_count AS "seatCount", customer_id AS "customerId", currency, total_minor AS "totalMinor", paid_minor AS "paidMinor",
                 coupon_code AS "couponCode", hold_expires_at AS "holdExpiresAt", version, tenant_id AS "tenantId"
-           FROM bookings WHERE pnr = $1
+           FROM bookings WHERE pnr = $1 AND tenant_id = $2
            LIMIT 1`,
-          [pnr.trim().toUpperCase()],
+          [pnr.trim().toUpperCase(), tenantId],
         );
         return result.rows[0] ?? null;
       },
