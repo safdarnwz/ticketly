@@ -9,7 +9,6 @@
   "gds/application/gds.service.ts -> search/application",
   "gds/infrastructure/gds.repository.ts -> agents/domain",
   "onboarding/application/services/onboarding.service.ts -> files/application",
-  "onboarding/application/services/onboarding.service.ts -> files/domain",
   "search/application/services/search.service.ts -> promotions/domain",
   "search/application/services/search.service.ts -> promotions/infrastructure",
   "tenancy/presentation/tenant.controller.ts -> files/application"

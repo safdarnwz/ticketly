@@ -32,7 +32,6 @@ export interface Role {
 
 /** The system roles every tenant receives at provisioning. */
 export const SYSTEM_ROLES: { code: string; name: string; permissions: string[] }[] = [
-  { code: 'owner', name: 'Owner', permissions: ['*'] },
   {
     code: 'admin',
     name: 'Administrator',
@@ -253,6 +252,24 @@ export class RoleRepository {
     );
     await this.setPermissions(id, input.permissions);
     return id;
+  }
+
+  /**
+   * Copy a platform role template (tenant_id IS NULL) into a tenant, with its
+   * permissions — the tenant's own role, which it can then duplicate or edit.
+   */
+  async cloneFromPlatform(tenantId: TenantId, code: string): Promise<RoleId> {
+    const template = await this.findPlatformRole(code);
+    if (!template)
+      throw new Error(`Platform role template '${code}' is missing — run roles.seed.sql`);
+    return this.createRole({
+      tenantId,
+      code: template.code,
+      name: template.name,
+      description: template.description,
+      isSystem: true,
+      permissions: template.permissions,
+    });
   }
 
   async setPermissions(roleId: RoleId, permissions: string[]): Promise<void> {

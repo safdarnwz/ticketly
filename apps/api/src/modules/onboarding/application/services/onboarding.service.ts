@@ -2,23 +2,11 @@ import { Injectable } from '@nestjs/common';
 
 import { AppConfig } from '@config';
 import { UnitOfWork } from '@database';
-import {
-  AppError,
-  ErrorCode,
-  newId,
-  runWithContext,
-  createContext,
-  type Json,
-  type TenantId,
-  type UserId,
-} from '@kernel';
+import { AppError, ErrorCode, newId, type Json, type UserId } from '@kernel';
 import { PasswordHasher } from '@security';
 
-import { RoleRepository, User, UserRepository } from '../../../iam';
-import { Mailer, renderOperatorStatusEmail, NotificationService } from '../../../notification';
+import { Mailer, renderOperatorStatusEmail } from '../../../notification';
 import { FileService } from '../../../files/application/file.service';
-import { defaultLogoSvg } from '../../../files/domain/default-logo';
-import { Logger } from '@observability';
 import {
   approvalBlockers,
   assertReview,
@@ -26,7 +14,7 @@ import {
 } from '../../domain/application-status';
 import { OperatorApplicationRepository } from '../../infrastructure/persistence/operator-application.repository';
 import { PlatformPoliciesService } from '../../../platform-settings';
-import { TenantRepository } from '../../../tenancy';
+import { TenantProvisioningService } from '../../../tenancy';
 
 export interface ApplyInput {
   firstName: string;
@@ -75,17 +63,13 @@ export interface ApplyInput {
 export class OnboardingService {
   constructor(
     private readonly repo: OperatorApplicationRepository,
-    private readonly users: UserRepository,
     private readonly hasher: PasswordHasher,
     private readonly mailer: Mailer,
-    private readonly tenants: TenantRepository,
-    private readonly roles: RoleRepository,
     private readonly uow: UnitOfWork,
     private readonly config: AppConfig,
-    private readonly notifications: NotificationService,
     private readonly files: FileService,
-    private readonly logger: Logger,
     private readonly policies: PlatformPoliciesService,
+    private readonly provisioning: TenantProvisioningService,
   ) {}
 
   async apply(input: ApplyInput): Promise<{ applicationId: string; status: 'pending' }> {
@@ -214,7 +198,7 @@ export class OnboardingService {
       email: string;
       name: string;
       slug: string;
-    }>({ name: 'onboarding.approve' }, async () => {
+    }>({ name: 'onboarding.approve', bypassRls: true }, async () => {
       // Row lock: a concurrent reject/hold of the same application waits,
       // then sees 'approved' and fails cleanly — never two decisions.
       const app = await this.repo.findForUpdate(id);
@@ -237,169 +221,38 @@ export class OnboardingService {
         });
       }
 
-      // 1) Provision the tenant. The slug becomes PUBLIC — it's the second
-      // label of the operator's own login URL, app.<slug>.ticketly.com — so
-      // it must be unique. A short id suffix guarantees that without a
-      // retry loop; `slugify` keeps it URL-safe and readable.
-      const tenantId = newId();
-      const slug = `${slugify(app.companyName)}-${tenantId.slice(0, 6)}`;
-      // Registered address for the tax invoice: company address line 1/2 +
-      // city/state/pincode, joined into one display string — the invoice
-      // doesn't need these as separate structured fields, just a readable
-      // address block matching what appears on the operator's own GST
-      // registration certificate.
+      // The slug is PUBLIC (the operator's console address) and must be
+      // unique: the company name plus a short random suffix.
+      const slug = `${slugify(app.companyName)}-${newId().slice(-6)}`;
       const registeredAddress =
         [app.addressLine1, app.addressLine2, app.city, app.state, app.pinCode]
           .map((part) => (typeof part === 'string' ? part.trim() : ''))
           .filter((part) => part.length > 0)
           .join(', ') || null;
-      await this.tenants.insertApproved({
-        id: tenantId,
+      const { tenantId, ownerId } = await this.provisioning.provision({
         slug,
-        name: app.companyName,
+        legalName: app.companyName,
+        displayName: app.companyName,
         contactEmail: app.officialEmail ?? app.email,
         contactPhone: app.companyMobile ?? app.mobile,
-        bank: {
-          holder: app.bankAccountHolder ?? null,
-          accountNumber: app.bankAccountNumber ?? null,
-          ifsc: app.bankIfsc ?? null,
-          name: app.bankName ?? null,
+        business: {
+          bank: {
+            holder: app.bankAccountHolder ?? null,
+            accountNumber: app.bankAccountNumber ?? null,
+            ifsc: app.bankIfsc ?? null,
+            name: app.bankName ?? null,
+          },
+          gstin: app.gstNumber ?? null,
+          registeredAddress,
         },
-        gstin: app.gstNumber ?? null,
-        registeredAddress,
+        // The applicant signs in with the password chosen when applying.
+        owner: {
+          fullName: `${app.firstName} ${app.lastName}`.trim(),
+          email: app.email,
+          phone: app.mobile,
+          passwordHash: app.passwordHash,
+        },
       });
-
-      // 1b) Default notification templates — WITHOUT this, notify()
-      // silently sends NOTHING for this tenant forever (it looks up a
-      // template by tenant+eventType and just skips the whole event if
-      // none exists — no error, no log, nothing). Every operator needs
-      // at least these on day one, or their customers never receive a
-      // single booking confirmation, cancellation, or refund SMS/email.
-      await this.notifications.seedDefaults(tenantId as TenantId, [
-        {
-          eventType: 'booking.confirmed',
-          channel: 'sms',
-          body: 'Booking confirmed! PNR {{pnr}}. Have a safe journey.',
-        },
-        {
-          eventType: 'booking.confirmed',
-          channel: 'email',
-          subject: 'Your ticket — PNR {{pnr}}',
-          body: 'Your booking is confirmed. PNR: {{pnr}}.',
-        },
-        {
-          eventType: 'booking.cancelled',
-          channel: 'sms',
-          body: 'Booking {{pnr}} cancelled. Refund of {{refundAmount}} initiated.',
-        },
-        {
-          eventType: 'booking.seats_cancelled',
-          channel: 'sms',
-          body: 'Seat(s) {{seats}} on booking {{pnr}} cancelled. Refund of {{refund}} initiated. Your other seats remain confirmed.',
-        },
-        {
-          eventType: 'booking.cancelled',
-          channel: 'email',
-          subject: 'Booking cancelled — PNR {{pnr}}',
-          body: 'Your booking {{pnr}} has been cancelled. Refund: {{refundAmount}}.',
-        },
-        {
-          eventType: 'refund.settled',
-          channel: 'sms',
-          body: 'Refund of {{refundAmount}} for PNR {{pnr}} has been processed.',
-        },
-        {
-          eventType: 'trip.delayed',
-          channel: 'sms',
-          body: 'Your trip (PNR {{pnr}}) is delayed. New departure: {{newTime}}.',
-        },
-        {
-          eventType: 'trip.reminder.12h',
-          channel: 'sms',
-          body: 'Reminder: your trip {{pnr}} boards at {{fromStopName}} around {{boardingAt}}, alights at {{toStopName}}. Have a safe journey!',
-        },
-        {
-          eventType: 'trip.reminder.12h',
-          channel: 'whatsapp',
-          body: 'Hi! Your trip *{{pnr}}* is coming up.\n\nBoarding: *{{fromStopName}}*, around {{boardingAt}}\nAlighting: *{{toStopName}}*, around {{droppingAt}}\nPassenger(s): {{passengerNames}}\n\nWe will send your exact pickup point and bus details 4 hours before boarding.',
-        },
-        {
-          eventType: 'trip.reminder.12h',
-          channel: 'email',
-          subject: 'Your upcoming trip — PNR {{pnr}}',
-          body: 'Your trip is coming up.\n\nPNR: {{pnr}}\nBoarding: {{fromStopName}} (around {{boardingAt}})\nAlighting: {{toStopName}} (around {{droppingAt}})\nPassenger(s): {{passengerNames}}\n\nWe will send your exact pickup point, driver and bus details 4 hours before boarding.',
-        },
-        {
-          eventType: 'trip.reminder.4h',
-          channel: 'sms',
-          body: 'Boarding in 4h — PNR {{pnr}}. Pickup: {{pickup.stopName}} ({{pickup.landmark}}). Bus {{busNumber}}. Driver(s): {{driversList}}. Track live: {{trackingUrl}}',
-        },
-        {
-          eventType: 'trip.reminder.4h',
-          channel: 'whatsapp',
-          body: 'Your bus boards in 4 hours! *{{pnr}}*\n\n📍 Pickup: *{{pickup.stopName}}*\n{{pickup.landmark}}\n{{pickup.address}}\n\n🚌 Bus number: *{{busNumber}}*\n👨\u200d✈️ Driver(s): {{driversList}}\n🧑\u200d💼 Attendant(s): {{attendantsList}}\n\n📍 Track live location: {{trackingUrl}}\n\nPlease reach 15 minutes early.',
-        },
-        {
-          eventType: 'trip.reminder.4h',
-          channel: 'email',
-          subject: 'Boarding in 4 hours — PNR {{pnr}}',
-          body: 'Your bus boards in 4 hours.\n\nPickup point: {{pickup.stopName}}\nLandmark: {{pickup.landmark}}\nAddress: {{pickup.address}}\n\nBus number: {{busNumber}}\nDriver(s): {{driversList}}\nAttendant(s): {{attendantsList}}\n\nTrack live location: {{trackingUrl}}\n\nPlease reach your pickup point 15 minutes early.',
-        },
-        {
-          eventType: 'connection.at_risk',
-          channel: 'sms',
-          body: 'Your connecting bus (PNR {{pnr}}) is running {{delayMinutes}} min late. Only {{marginMinutes}} min margin left for your next bus. We are monitoring this for you.',
-        },
-        {
-          eventType: 'connection.broken',
-          channel: 'sms',
-          body: 'Your connecting bus (PNR {{pnr}}) is delayed by {{delayMinutes}} min and may miss your next connection. Please contact support for help rebooking.',
-        },
-        {
-          eventType: 'incident.critical',
-          channel: 'sms',
-          body: 'EMERGENCY ({{type}}) reported on trip {{tripId}} at {{time}}. Location: {{location}}. {{description}} — acknowledge in the Ticketly console now.',
-        },
-        {
-          eventType: 'incident.critical',
-          channel: 'email',
-          subject: 'EMERGENCY: {{type}} reported — acknowledge now',
-          body: 'An emergency ({{type}}) was reported at {{time}} on trip {{tripId}}.\nLocation: {{location}}\nDetails: {{description}}\n\nOpen the Ticketly console → Incidents to acknowledge it.',
-        },
-        {
-          eventType: 'waitlist.seats_available',
-          channel: 'sms',
-          body: 'Good news! {{seatCount}} seat(s) just opened up on {{routeName}} ({{journeyDate}}). Book quickly — seats go to whoever books first: {{bookUrl}}',
-        },
-        {
-          eventType: 'waitlist.seats_available',
-          channel: 'email',
-          subject: 'Seats available: {{routeName}} on {{journeyDate}}',
-          body: 'Seats you were waiting for have opened up on {{routeName}} ({{journeyDate}}).\n\nThis is not a reservation — the seats go to whoever books first.\nBook now: {{bookUrl}}',
-        },
-      ]);
-
-      // 2) Create the operator-admin user (reusing the applicant's hashed password).
-      const operatorUser = User.create(newId() as UserId, {
-        tenantId: tenantId as TenantId,
-        kind: 'staff',
-        fullName: `${app.firstName} ${app.lastName}`.trim(),
-        email: app.email,
-        phone: app.mobile,
-        passwordHash: app.passwordHash,
-        status: 'active',
-      });
-      // insert() encrypts PII; run in the new tenant's context for RLS.
-      await runWithContext(
-        createContext({ tenantId: tenantId as TenantId, actorType: 'system' }),
-        async () => {
-          await this.users.insert(operatorUser);
-        },
-      );
-
-      // 3) Grant the operator_admin system role.
-      const role = await this.roles.findPlatformRole('operator_admin');
-      if (role) await this.roles.grantToUser(operatorUser.id, role.id, reviewerId);
 
       await this.repo.markApproved(id, tenantId, reviewerId);
       await this.repo.recordEvent({
@@ -411,7 +264,7 @@ export class OnboardingService {
       });
       return {
         tenantId,
-        operatorUserId: operatorUser.id,
+        operatorUserId: ownerId,
         email: app.email,
         name: `${app.firstName} ${app.lastName}`.trim(),
         slug,
@@ -419,13 +272,6 @@ export class OnboardingService {
     });
 
     const consoleUrl = this.consoleUrlFor(result.slug);
-
-    // Operator's storage folder starts with a branded default logo:
-    //   {slug}/branding/logo.svg
-    // Outside the approval transaction on purpose — object storage is not
-    // transactional, and a storage hiccup must never block an approval. The
-    // operator can upload their own logo any time; this just guarantees one.
-    await this.provisionDefaultLogo(result.tenantId as TenantId, result.name, String(result.slug));
 
     await this.mailer
       .send({
@@ -441,40 +287,6 @@ export class OnboardingService {
       slug: result.slug,
       consoleUrl,
     };
-  }
-
-  private async provisionDefaultLogo(
-    tenantId: TenantId,
-    _ownerName: string,
-    _slug: string,
-  ): Promise<void> {
-    try {
-      await runWithContext(createContext({ tenantId, actorType: 'system' }), async () => {
-        const company = (await this.tenants.displayName(tenantId)) ?? 'Operator';
-        const logo = await this.files.store({
-          purpose: 'tenant_logo',
-          folder: 'branding',
-          fixedName: 'logo',
-          fileName: 'logo.svg',
-          bytes: Buffer.from(defaultLogoSvg(company), 'utf8'),
-          visibility: 'public',
-          allowSvg: true,
-          allowedMimes: ['image/svg+xml'],
-        });
-        await this.tenants.setLogoFile({
-          fileId: logo.id,
-          objectKey: logo.objectKey,
-          url: logo.url,
-        });
-      });
-    } catch (e) {
-      this.logger
-        .forContext('Onboarding')
-        .warn(
-          { tenantId, err: (e as Error).message },
-          'default logo not created — operator can upload one later',
-        );
-    }
   }
 
   /** `https://app.<slug>.ticketly.com` — the operator's own, and ONLY, console URL. */

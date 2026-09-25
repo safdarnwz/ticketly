@@ -58,46 +58,36 @@ export class TenantRepository {
   }
 
   /** Resolve by slug or verified custom domain — used by the resolver. Cached upstream. */
-  /**
-   * An operator approved from an onboarding application: active at once,
-   * with the bank, GST and registered address given on the application.
-   */
-  async insertApproved(t: {
-    id: string;
-    slug: string;
-    name: string;
-    contactEmail: string;
-    contactPhone: string | null;
-    bank: {
-      holder: string | null;
-      accountNumber: string | null;
-      ifsc: string | null;
-      name: string | null;
-    };
-    gstin: string | null;
-    registeredAddress: string | null;
-  }): Promise<void> {
+  /** Bank account (for payouts), GSTIN and registered address (for tax invoices). */
+  async setBusinessDetails(
+    tenantId: string,
+    d: {
+      bank: {
+        holder: string | null;
+        accountNumber: string | null;
+        ifsc: string | null;
+        name: string | null;
+      };
+      gstin: string | null;
+      registeredAddress: string | null;
+    },
+  ): Promise<void> {
     await this.db.execute_(
-      `INSERT INTO tenants (id, slug, legal_name, display_name, status, contact_email, contact_phone,
-                           bank_account_holder, bank_account_number, bank_ifsc, bank_name, bank_details_updated_at,
-                           gstin, registered_address)
-       VALUES ($1,$2,$3,$3,'active',$4,$5,$6,$7,$8,$9,
-               CASE WHEN $7::text IS NOT NULL THEN now() ELSE NULL END,
-               $10,$11)`,
+      `UPDATE tenants SET bank_account_holder = $2, bank_account_number = $3, bank_ifsc = $4,
+              bank_name = $5,
+              bank_details_updated_at = CASE WHEN $3::text IS NOT NULL THEN now() ELSE NULL END,
+              gstin = $6, registered_address = $7, updated_at = now()
+        WHERE id = $1`,
       [
-        t.id,
-        t.slug,
-        t.name,
-        t.contactEmail,
-        t.contactPhone,
-        t.bank.holder,
-        t.bank.accountNumber,
-        t.bank.ifsc,
-        t.bank.name,
-        t.gstin,
-        t.registeredAddress,
+        tenantId,
+        d.bank.holder,
+        d.bank.accountNumber,
+        d.bank.ifsc,
+        d.bank.name,
+        d.gstin,
+        d.registeredAddress,
       ],
-      { name: 'tenant.insertApproved', primary: true },
+      { name: 'tenant.setBusinessDetails', primary: true },
     );
   }
 

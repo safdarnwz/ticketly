@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { UnitOfWork } from '@database';
+import { createContext, runWithContext } from '@kernel';
+
 import { bootstrapTestApp, type TestApp } from './support/bootstrap';
 
 /**
@@ -10,6 +13,7 @@ import { bootstrapTestApp, type TestApp } from './support/bootstrap';
 describe('platform boundary (e2e)', () => {
   let app: TestApp;
   let owner: Record<string, string>;
+  let tenantId: string;
 
   beforeAll(async () => {
     app = await bootstrapTestApp();
@@ -29,6 +33,7 @@ describe('platform boundary (e2e)', () => {
       { as: 'platformAdmin', idempotencyKey: `e2e-provision-${suffix}` },
     );
     expect(provisioned.status, JSON.stringify(provisioned.body)).toBeLessThan(300);
+    tenantId = provisioned.body.tenantId;
 
     const login = await app.post(
       '/auth/login',
@@ -56,6 +61,22 @@ describe('platform boundary (e2e)', () => {
       { headers: owner },
     );
     expect(approve.status).toBe(403);
+  });
+
+  it('an operator created by the platform admin gets the default notification templates', async () => {
+    const [row] = await runWithContext(createContext({ actorType: 'system' }), () =>
+      app.nest
+        .get(UnitOfWork)
+        .run({ name: 'e2e.templates', bypassRls: true, readOnly: true }, (s) =>
+          s.client
+            .query<{ n: number }>(
+              `SELECT count(*)::int AS n FROM notification_templates WHERE tenant_id = $1`,
+              [tenantId],
+            )
+            .then((r) => r.rows),
+        ),
+    );
+    expect(row.n).toBeGreaterThan(10);
   });
 
   it('the platform admin still can', async () => {

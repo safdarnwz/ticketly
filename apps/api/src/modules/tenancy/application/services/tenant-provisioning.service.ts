@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
-import { newId, ConflictError, type TenantId, type UserId, type RoleId } from '@kernel';
+import {
+  ConflictError,
+  createContext,
+  newId,
+  runWithContext,
+  type TenantId,
+  type UserId,
+} from '@kernel';
 import { EventBus } from '@messaging';
 import { Logger } from '@observability';
 import { PasswordHasher } from '@security';
@@ -11,7 +18,33 @@ import { Tenant } from '../../domain/tenant.entity';
 import { PlanRepository } from '../../infrastructure/persistence/plan.repository';
 import { TenantContextService } from './tenant-context.service';
 import { TenantRepository } from '../../infrastructure/persistence/tenant.repository';
+import { defaultLogoSvg, FileService } from '../../../files';
+import { DEFAULT_OPERATOR_TEMPLATES, NotificationService } from '../../../notification';
 import { PlatformPoliciesService } from '../../../platform-settings';
+
+export interface ProvisionOperatorInput {
+  slug: string;
+  legalName: string;
+  displayName: string;
+  contactEmail: string;
+  contactPhone?: string;
+  planCode?: string;
+  /** Known when the operator comes from an onboarding application. */
+  business?: {
+    bank: {
+      holder: string | null;
+      accountNumber: string | null;
+      ifsc: string | null;
+      name: string | null;
+    };
+    gstin: string | null;
+    registeredAddress: string | null;
+  };
+  /** A new password (checked against the policy), or the applicant's existing hash. */
+  owner: { fullName: string; email: string; phone?: string } & (
+    { password: string } | { passwordHash: string }
+  );
+}
 
 /**
  * Tenant provisioning — the transactional workflow that stands up a new
@@ -42,22 +75,24 @@ export class TenantProvisioningService {
     private readonly events: EventBus,
     logger: Logger,
     private readonly policies: PlatformPoliciesService,
+    private readonly notifications: NotificationService,
+    private readonly files: FileService,
   ) {
     this.log = logger.forContext('TenantProvisioning');
   }
 
-  async provision(input: {
-    slug: string;
-    legalName: string;
-    displayName: string;
-    contactEmail: string;
-    contactPhone?: string;
-    planCode?: string;
-    owner: { fullName: string; email: string; password: string };
-  }): Promise<{ tenantId: TenantId; ownerId: UserId }> {
+  /**
+   * Create an operator — the one path for both the platform admin
+   * (POST /admin/tenants) and an approved onboarding application. In one
+   * transaction: the tenant (with bank / GST / address when known), its
+   * default staff roles, the owner (a tenant copy of the platform
+   * `operator_admin` role — every operator permission, never the platform's
+   * `*`), the default notification templates, activation and the audit row.
+   * Then, best-effort, a default logo.
+   */
+  async provision(input: ProvisionOperatorInput): Promise<{ tenantId: TenantId; ownerId: UserId }> {
     const plan = input.planCode ? await this.plans.findByCode(input.planCode) : null;
     const tenantId = newId() as TenantId;
-
     const tenant = Tenant.provision(tenantId, {
       slug: input.slug,
       legalName: input.legalName,
@@ -67,45 +102,48 @@ export class TenantProvisioningService {
       planId: plan?.id ?? null,
     });
 
-    await this.policies.assertPasswordAcceptable(input.owner.password);
-    const ownerPasswordHash = await this.hasher.hash(input.owner.password);
+    let ownerPasswordHash: string;
+    if ('passwordHash' in input.owner) ownerPasswordHash = input.owner.passwordHash;
+    else {
+      await this.policies.assertPasswordAcceptable(input.owner.password);
+      ownerPasswordHash = await this.hasher.hash(input.owner.password);
+    }
 
     const ownerId = await this.uow.run<UserId>(
       { name: 'tenant.provision', tenantId, bypassRls: true },
       async () => {
         await this.tenants.insert(tenant);
+        if (input.business) await this.tenants.setBusinessDetails(tenantId, input.business);
 
-        // Seed the five system roles for this tenant.
-        const roleIds = new Map<string, RoleId>();
-        for (const role of SYSTEM_ROLES) {
-          const id = await this.roles.createRole({
+        for (const role of SYSTEM_ROLES)
+          await this.roles.createRole({
             tenantId,
             code: role.code,
             name: role.name,
             isSystem: true,
             permissions: role.permissions,
           });
-          roleIds.set(role.code, id);
-        }
+        const ownerRoleId = await this.roles.cloneFromPlatform(tenantId, 'operator_admin');
 
-        // Create the owner user and grant the 'owner' role.
-        const owner = User.create(
-          newId() as UserId,
-          {
-            tenantId,
-            kind: 'staff',
-            fullName: input.owner.fullName,
-            email: input.owner.email,
-            passwordHash: ownerPasswordHash,
-          } as never,
+        const owner = User.create(newId() as UserId, {
+          tenantId,
+          kind: 'staff',
+          fullName: input.owner.fullName,
+          email: input.owner.email,
+          phone: input.owner.phone ?? null,
+          passwordHash: ownerPasswordHash,
+          status: 'active',
+        });
+        // insert() encrypts PII and scopes by the ambient tenant.
+        await runWithContext(createContext({ tenantId, actorType: 'system' }), () =>
+          this.users.insert(owner),
         );
-        await this.users.insert(owner);
-        await this.roles.grantToUser(owner.id, roleIds.get('owner')!, null);
+        await this.roles.grantToUser(owner.id, ownerRoleId, null);
 
-        // Activate now that the tenant is fully stood up.
+        await this.notifications.seedDefaults(tenantId, [...DEFAULT_OPERATOR_TEMPLATES]);
+
         tenant.activate();
         await this.tenants.update(tenant, tenant.version);
-
         this.events.publishAll(tenant.pullEvents());
         await this.audit.recordInTx({
           action: 'tenant.provisioned',
@@ -115,14 +153,46 @@ export class TenantProvisioningService {
           actorType: 'system',
           changes: { slug: input.slug, plan: input.planCode ?? null },
         });
-
         return owner.id;
       },
     );
 
     await this.tenantContext.invalidate(tenantId);
+    await this.provisionDefaultLogo(tenantId, input.displayName);
     this.log.info({ tenantId, slug: input.slug }, 'tenant provisioned');
     return { tenantId, ownerId };
+  }
+
+  /**
+   * Every operator starts with a branded default logo ({slug}/branding/logo.svg).
+   * Outside the transaction on purpose: object storage is not transactional,
+   * and a storage hiccup must never block creating the operator.
+   */
+  private async provisionDefaultLogo(tenantId: TenantId, displayName: string): Promise<void> {
+    try {
+      await runWithContext(createContext({ tenantId, actorType: 'system' }), async () => {
+        const logo = await this.files.store({
+          purpose: 'tenant_logo',
+          folder: 'branding',
+          fixedName: 'logo',
+          fileName: 'logo.svg',
+          bytes: Buffer.from(defaultLogoSvg(displayName), 'utf8'),
+          visibility: 'public',
+          allowSvg: true,
+          allowedMimes: ['image/svg+xml'],
+        });
+        await this.tenants.setLogoFile({
+          fileId: logo.id,
+          objectKey: logo.objectKey,
+          url: logo.url,
+        });
+      });
+    } catch (e) {
+      this.log.warn(
+        { tenantId, err: (e as Error).message },
+        'default logo not created — operator can upload one later',
+      );
+    }
   }
 
   async suspend(tenantId: TenantId, reason: string): Promise<void> {

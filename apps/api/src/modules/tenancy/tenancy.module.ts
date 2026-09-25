@@ -15,6 +15,7 @@ import { TenantController } from './presentation/tenant.controller';
 import { TenantProvisioningService } from './application/services/tenant-provisioning.service';
 import { TenantRepository } from './infrastructure/persistence/tenant.repository';
 import { IamCoreModule } from '../iam/iam-core.module';
+import { NotificationModule } from '../notification/notification.module';
 
 /**
  * Tenancy: operators, plans, provisioning and the runtime tenant profile.
@@ -40,6 +41,7 @@ import { IamCoreModule } from '../iam/iam-core.module';
     BookingModule,
     PlatformSettingsModule,
     FilesModule,
+    NotificationModule,
   ],
   controllers: [TenantController, TenantAdminController],
   providers: [

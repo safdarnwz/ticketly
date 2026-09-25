@@ -4,3 +4,4 @@ export * from './infrastructure/mail/mailer';
 export * from './domain/email-template';
 export * from './infrastructure/provider-registry';
 export type * from './infrastructure/provider.interface';
+export * from './domain/default-templates';
