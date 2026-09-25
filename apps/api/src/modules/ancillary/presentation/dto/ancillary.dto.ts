@@ -4,7 +4,7 @@ export const AttachAncillarySchema = z.object({
   bookingId: z.string().uuid(),
   items: z
     .array(z.object({ ancillaryId: z.string().uuid(), quantity: z.number().int().min(1).max(20) }))
-    .min(1),
+    .max(20),
 });
 export type AttachAncillaryDto = z.infer<typeof AttachAncillarySchema>;
 

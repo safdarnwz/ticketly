@@ -1,5 +1,8 @@
+import { createHmac } from 'node:crypto';
+
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { AppConfig } from '@config';
 import { UnitOfWork } from '@database';
 import { createContext, runAsTenant, runWithContext, type TenantId } from '@kernel';
 
@@ -51,7 +54,7 @@ describe('ancillaries (e2e)', () => {
     const code = `luggage-${Date.now()}`;
     const created = await app.post(
       '/me/ancillaries/catalogue',
-      { code, name: 'Extra luggage', kind: 'luggage', priceMinor: 10_000 },
+      { code, name: 'Extra luggage', kind: 'luggage', priceMinor: 10_000, perPassenger: false },
       { as: 'operator' },
     );
     const { bookingId } = await heldBooking(app, app.fixtures.seatNumbers[0], {
@@ -71,6 +74,40 @@ describe('ancillaries (e2e)', () => {
     const after = await totals(bookingId);
     expect(after.total - before.total).toBe(charged);
     expect(after.tax - before.tax).toBe(charged - 20_000);
+  });
+
+  it('the add-ons sent replace the previous ones: no double charge, and they can be removed', async () => {
+    const meal = await app.post(
+      '/me/ancillaries/catalogue',
+      { code: `snack-${Date.now()}`, name: 'Snack box', kind: 'meal', priceMinor: 8_000 },
+      { as: 'operator' },
+    );
+    const { bookingId } = await heldBooking(app, app.fixtures.seatNumbers[2], {
+      fullName: 'Changeable Traveller',
+    });
+    const before = await totals(bookingId);
+    const attach = (items: { ancillaryId: string; quantity: number }[], key: string) =>
+      app.post(
+        '/me/ancillaries/attach',
+        { bookingId, items },
+        { idempotencyKey: `${key}-${bookingId}` },
+      );
+
+    const once = await attach([{ ancillaryId: meal.body.id, quantity: 1 }], 'e2e-a1');
+    expect(once.status, JSON.stringify(once.body)).toBeLessThan(300);
+    const afterOnce = await totals(bookingId);
+    // the same selection again (a retry with a new key, or a double click)
+    const twice = await attach([{ ancillaryId: meal.body.id, quantity: 1 }], 'e2e-a2');
+    expect(twice.status).toBeLessThan(300);
+    expect(await totals(bookingId)).toEqual(afterOnce);
+    // per-passenger add-on: no more than one per seat
+    const tooMany = await attach([{ ancillaryId: meal.body.id, quantity: 2 }], 'e2e-a3');
+    expect(tooMany.status).toBe(422);
+    expect(await totals(bookingId)).toEqual(afterOnce);
+    // removing every add-on puts the booking back exactly as it was
+    const none = await attach([], 'e2e-a4');
+    expect(none.status, JSON.stringify(none.body)).toBeLessThan(300);
+    expect(await totals(bookingId)).toEqual(before);
   });
 
   it('a payment opened before an add-on is replaced, never charged at the old total', async () => {
@@ -111,5 +148,68 @@ describe('ancillaries (e2e)', () => {
     const byId = new Map(rows.map((r) => [r.id, r]));
     expect(Number(byId.get(second.body.intentId)!.amount_minor)).toBe(total);
     expect(byId.get(first.body.intentId)!.status).toBe('failed'); // superseded
+  });
+
+  it('a payment for less than the total (add-on attached after the order) is refunded, not confirmed', async () => {
+    const item = await app.post(
+      '/me/ancillaries/catalogue',
+      { code: `pillow-${Date.now()}`, name: 'Pillow', kind: 'other', priceMinor: 4_000 },
+      { as: 'operator' },
+    );
+    const { bookingId } = await heldBooking(app, app.fixtures.seatNumbers[3], {
+      fullName: 'Short Payer',
+    });
+    const intent = await app.post(
+      '/payments/intent',
+      { bookingId },
+      { idempotencyKey: `e2e-short-intent-${bookingId}` },
+    );
+    expect(intent.status, JSON.stringify(intent.body)).toBe(201);
+    const orderTotal = (await totals(bookingId)).total;
+    await app.post(
+      '/me/ancillaries/attach',
+      { bookingId, items: [{ ancillaryId: item.body.id, quantity: 1 }] },
+      { idempotencyKey: `e2e-short-attach-${bookingId}` },
+    );
+    expect((await totals(bookingId)).total).toBeGreaterThan(orderTotal);
+
+    // The gateway captures the OLD order amount.
+    const paymentId = `pay_short_${Date.now()}`;
+    const raw = JSON.stringify({
+      type: 'payment.captured',
+      order_id: `mock_order_${intent.body.intentId}`,
+      payment_id: paymentId,
+      amount: orderTotal,
+      status: 'captured',
+    });
+    const signature = createHmac('sha256', app.nest.get(AppConfig).security.jwtSecret)
+      .update(raw)
+      .digest('hex');
+    const send = () =>
+      app.post('/payments/webhook/test', raw, {
+        headers: { 'content-type': 'application/json', 'x-webhook-signature': signature },
+      });
+    expect((await send()).status).toBeLessThan(300);
+    expect((await send()).status).toBeLessThan(300); // the PSP retries
+
+    const state = await runWithContext(createContext({ actorType: 'system' }), () =>
+      runAsTenant(app.fixtures.tenantId as TenantId, () =>
+        app.nest.get(UnitOfWork).run({ name: 'e2e.short', readOnly: true }, async (s) => {
+          const b = await s.client.query<{ status: string }>(
+            `SELECT status FROM bookings WHERE id = $1`,
+            [bookingId],
+          );
+          const d = await s.client.query<{ status: string; amount_minor: string }>(
+            `SELECT status, amount_minor FROM duplicate_payments WHERE gateway_payment_id = $1`,
+            [paymentId],
+          );
+          return { booking: b.rows[0].status, refunds: d.rows };
+        }),
+      ),
+    );
+    expect(state.booking).toBe('held'); // never confirmed on a short payment
+    expect(state.refunds).toHaveLength(1); // refunded once, even with the retry
+    expect(Number(state.refunds[0].amount_minor)).toBe(orderTotal);
+    expect(state.refunds[0].status).toBe('refunded');
   });
 });

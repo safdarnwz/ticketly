@@ -54,7 +54,7 @@ export class AncillaryService {
   async attach(
     bookingId: BookingId,
     items: { ancillaryId: Uuid; quantity: number }[],
-  ): Promise<{ totalMinor: number }> {
+  ): Promise<{ totalMinor: number; bookingTotalMinor: number }> {
     return this.uow.run({ name: 'ancillary.attach', tenantId: requireTenantId() }, async () => {
       const tenantId = requireTenantId();
       const booking = await this.bookings.findForUpdate(bookingId);
@@ -67,51 +67,61 @@ export class AncillaryService {
             booking.status,
         });
       }
+      if (booking.holdExpiresAt && booking.holdExpiresAt < new Date())
+        throw new AppError(ErrorCode.INVENTORY_HOLD_EXPIRED, 422, {
+          message: 'Your seat hold has expired — please choose your seats again',
+        });
 
-      let totalMinor = 0;
-      for (const item of items) {
-        const unitPriceMinor = await this.ancillaries.activePrice(tenantId, item.ancillaryId);
-        if (unitPriceMinor === null)
+      // The same add-on twice in one request is one line with the quantities added.
+      const merged = new Map<Uuid, number>();
+      for (const i of items)
+        merged.set(i.ancillaryId, (merged.get(i.ancillaryId) ?? 0) + i.quantity);
+
+      // Price every line first, so a bad id changes nothing.
+      const gstRatePct = await this.platformSettings.commissionGstRatePercent();
+      const lines: {
+        ancillaryId: Uuid;
+        quantity: number;
+        unitPriceMinor: number;
+        gstMinor: number;
+      }[] = [];
+      for (const [ancillaryId, quantity] of merged) {
+        const item = await this.ancillaries.activeItem(tenantId, ancillaryId);
+        if (!item)
           throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, {
             message: 'Ancillary service not found',
           });
-        totalMinor += unitPriceMinor * item.quantity;
-        await this.ancillaries.addToBooking({
-          tenantId,
-          bookingId,
-          ancillaryId: item.ancillaryId,
-          quantity: item.quantity,
-          unitPriceMinor,
+        if (item.perPassenger && quantity > booking.seatCount)
+          throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+            message: `${item.name} is per passenger — at most ${booking.seatCount} on this booking`,
+          });
+        // GST on add-ons: they are not passenger transport, so they carry the
+        // platform's general services rate (price is exclusive of tax).
+        const net = item.priceMinor * quantity;
+        lines.push({
+          ancillaryId,
+          quantity,
+          unitPriceMinor: item.priceMinor,
+          gstMinor: Math.round((net * gstRatePct) / 100),
         });
       }
 
-      // GST on ancillaries — insurance/meals/luggage are NOT "passenger
-      // transport by road" (the ticket fare's own 5% rate); they're
-      // ordinary taxable services, so they use the platform's general
-      // services rate (the SAME 18% commissionGstRatePercent every other
-      // non-transport service in this codebase is taxed at), not the
-      // transport-specific rate. price_minor is treated as EXCLUSIVE of
-      // tax — GST is computed and added on top, never silently absorbed
-      // into it. A real deployment may want a DIFFERENT rate per
-      // ancillary type (insurance in particular has its own IRDAI/GST
-      // treatment) — this is a deliberate platform-wide simplification,
-      // not a per-item lookup, and should be revisited before this
-      // matters for a real GST return.
-      const gstRatePct = await this.platformSettings.commissionGstRatePercent();
-      const ancillaryGstMinor = Math.round((totalMinor * gstRatePct) / 100);
-      const totalWithGstMinor = totalMinor + ancillaryGstMinor;
+      // Replace, not append: the request is the booking's full set of add-ons.
+      // A retry, a double click or a changed mind never charges twice, and an
+      // empty list removes them. What was added before comes off exactly as
+      // it was charged (stored per line), even if the tax rate changed since.
+      const previous = await this.ancillaries.bookingLines(bookingId);
+      if (previous.count) await this.ancillaries.clearBooking(bookingId);
+      for (const l of lines) await this.ancillaries.addToBooking({ tenantId, bookingId, ...l });
 
-      // Fold into the booking's own total AND tax NOW, inside the SAME
-      // transaction as the ancillary rows — the customer's payment
-      // (created right after this call returns) is for the booking's
-      // total_minor, so this MUST already include add-ons (tax included)
-      // before that payment intent is created. Updating total_minor
-      // without tax_minor here would have been the exact leak this fix
-      // closes: ancillary revenue collected with NO GST ever charged,
-      // remitted, or even visible on the eventual invoice.
-      if (totalWithGstMinor > 0)
-        await this.bookings.increaseTotals(bookingId, totalWithGstMinor, ancillaryGstMinor);
-      return { totalMinor: totalWithGstMinor };
+      const netMinor = lines.reduce((a, l) => a + l.unitPriceMinor * l.quantity, 0);
+      const gstMinor = lines.reduce((a, l) => a + l.gstMinor, 0);
+      const totalMinor = netMinor + gstMinor;
+      const deltaTotal = totalMinor - (previous.totalMinor + previous.gstMinor);
+      const deltaTax = gstMinor - previous.gstMinor;
+      if (deltaTotal !== 0 || deltaTax !== 0)
+        await this.bookings.increaseTotals(bookingId, deltaTotal, deltaTax);
+      return { totalMinor, bookingTotalMinor: booking.totalMinor + deltaTotal };
     });
   }
 }

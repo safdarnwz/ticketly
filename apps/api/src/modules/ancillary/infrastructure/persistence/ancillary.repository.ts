@@ -35,13 +35,48 @@ export class AncillaryRepository {
   }
 
   /** Current price of an active catalogue item, or null. */
-  async activePrice(tenantId: TenantId, ancillaryId: Uuid): Promise<number | null> {
-    const row = await this.db.queryOne<{ price_minor: string }>(
-      `SELECT price_minor FROM ancillary_services WHERE tenant_id = $1 AND id = $2 AND is_active = true`,
+  /** An active add-on's price, and whether it is sold per passenger (else per booking). */
+  async activeItem(
+    tenantId: TenantId,
+    ancillaryId: Uuid,
+  ): Promise<{ priceMinor: number; perPassenger: boolean; name: string } | null> {
+    const row = await this.db.queryOne<{
+      price_minor: string;
+      per_passenger: boolean;
+      name: string;
+    }>(
+      `SELECT price_minor, per_passenger, name FROM ancillary_services
+        WHERE tenant_id = $1 AND id = $2 AND is_active = true`,
       [tenantId, ancillaryId],
-      { name: 'ancillary.price', primary: true },
+      { name: 'ancillary.item', primary: true },
     );
-    return row ? Number(row.price_minor) : null;
+    return row
+      ? { priceMinor: Number(row.price_minor), perPassenger: row.per_passenger, name: row.name }
+      : null;
+  }
+
+  /** What the add-ons on a booking added to its total and tax (to take them off again). */
+  async bookingLines(
+    bookingId: BookingId,
+  ): Promise<{ totalMinor: number; gstMinor: number; count: number }> {
+    const row = await this.db.queryOne<{ total: string; gst: string; n: number }>(
+      `SELECT coalesce(sum(total_minor), 0) AS total, coalesce(sum(gst_minor), 0) AS gst, count(*)::int AS n
+         FROM booking_ancillaries WHERE booking_id = $1`,
+      [bookingId],
+      { name: 'ancillary.bookingLines', primary: true },
+    );
+    return {
+      totalMinor: Number(row?.total ?? 0),
+      gstMinor: Number(row?.gst ?? 0),
+      count: row?.n ?? 0,
+    };
+  }
+
+  async clearBooking(bookingId: BookingId): Promise<void> {
+    await this.db.execute_(`DELETE FROM booking_ancillaries WHERE booking_id = $1`, [bookingId], {
+      name: 'ancillary.clearBooking',
+      primary: true,
+    });
   }
 
   /** Record an add-on sold on a booking, at the price captured now. */
@@ -51,10 +86,11 @@ export class AncillaryRepository {
     ancillaryId: Uuid;
     quantity: number;
     unitPriceMinor: number;
+    gstMinor: number;
   }): Promise<void> {
     await this.db.execute_(
-      `INSERT INTO booking_ancillaries (id, tenant_id, booking_id, ancillary_id, quantity, unit_price_minor, total_minor)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      `INSERT INTO booking_ancillaries (id, tenant_id, booking_id, ancillary_id, quantity, unit_price_minor, total_minor, gst_minor)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
       [
         newId(),
         l.tenantId,
@@ -63,6 +99,7 @@ export class AncillaryRepository {
         l.quantity,
         l.unitPriceMinor,
         l.unitPriceMinor * l.quantity,
+        l.gstMinor,
       ],
       { name: 'ancillary.addToBooking', primary: true },
     );

@@ -284,7 +284,7 @@ export class PaymentService {
             amountMinor: event.amountMinor,
             type: event.type,
           },
-          'CRITICAL: payment captured by gateway but booking could not be fulfilled — requires manual refund, see this log entry for the exact amount/gatewayPaymentId',
+          'payment captured but the booking could not take it — refunded automatically (duplicate_payments); check that row if the refund failed',
         );
         return { handled: true };
       }
@@ -364,8 +364,8 @@ export class PaymentService {
               );
             });
           } else {
-            await this.onCaptured(
-              intent.id,
+            await this.captureOrRefund(
+              { id: intent.id, gateway: intent.gateway, amountMinor: intent.amountMinor },
               intent.bookingId,
               event.gatewayPaymentId,
               event.amountMinor,
@@ -417,10 +417,53 @@ export class PaymentService {
         message: 'Payment intent not found for this booking',
       });
     }
-    const booking = await this.bookings.findForUpdate(bookingId);
-    if (!booking)
-      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
-    return this.onCaptured(intent.id, bookingId, verified.gatewayPaymentId, booking.totalMinor);
+    // What the gateway charged is the intent's amount — never the booking's
+    // current total, which may have grown after the order was created (e.g.
+    // add-ons attached while the customer was on the payment page).
+    return this.captureOrRefund(
+      { id: intent.id, gateway: intent.gateway, amountMinor: intent.amountMinor },
+      bookingId,
+      verified.gatewayPaymentId,
+      intent.amountMinor,
+    );
+  }
+
+  /**
+   * Apply a captured payment to its booking; if the booking cannot take it
+   * (hold expired, seat gone, booking cancelled, or the amount is short
+   * because the total changed after the order was made) refund the money
+   * in full, automatically. Recorded in duplicate_payments (unapplied
+   * payments), whose unique key makes the refund happen once even when the
+   * client callback and the webhook both arrive.
+   */
+  private async captureOrRefund(
+    intent: { id: PaymentId; gateway: string; amountMinor: number },
+    bookingId: BookingId,
+    gatewayPaymentId: string,
+    capturedMinor: number,
+  ): Promise<{ pnr: string }> {
+    try {
+      return await this.onCaptured(intent.id, bookingId, gatewayPaymentId, capturedMinor);
+    } catch (err) {
+      if (!isPermanentFulfilmentError(err)) throw err;
+      const first = await this.uow.run(
+        { name: 'payment.unapplied', tenantId: requireTenantId() },
+        () =>
+          this.payments.recordDuplicate({
+            intentId: intent.id,
+            bookingId,
+            gateway: intent.gateway,
+            gatewayPaymentId,
+            amountMinor: capturedMinor,
+          }),
+      );
+      if (first) await this.refundDuplicate(gatewayPaymentId, capturedMinor, bookingId);
+      const reason = err instanceof AppError ? err.message : 'the booking could not be completed';
+      throw new AppError((err as AppError).code, 422, {
+        message: `Payment received but ${reason.charAt(0).toLowerCase()}${reason.slice(1)} — the full amount is being refunded to your payment method.`,
+        details: { refundedMinor: capturedMinor, gatewayPaymentId },
+      });
+    }
   }
 
   /**
