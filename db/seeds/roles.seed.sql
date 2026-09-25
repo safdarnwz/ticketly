@@ -2,7 +2,6 @@
 -- Idempotent via fixed ids. Run AFTER permissions.seed.sql.
 
 INSERT INTO roles (id, tenant_id, code, name, description, is_system) VALUES
-  ('00000000-0000-7000-8000-0000000000a1', NULL, 'owner',   'Owner',   'Full access to the operator account', true),
   ('00000000-0000-7000-8000-0000000000a2', NULL, 'manager', 'Manager', 'Manage operations, fleet, scheduling, pricing', true),
   ('00000000-0000-7000-8000-0000000000a3', NULL, 'finance', 'Finance', 'Payments, refunds, settlements, invoicing, reports', true),
   ('00000000-0000-7000-8000-0000000000a4', NULL, 'ops',     'Operations', 'Run trips: charting, boarding, tracking', true),
@@ -58,10 +57,8 @@ INSERT INTO role_permissions (role_id, permission) VALUES
   ('00000000-0000-7000-8000-0000000000b5', 'booking:reschedule')
 ON CONFLICT DO NOTHING;
 
--- Owner: every permission.
-INSERT INTO role_permissions (role_id, permission)
-  SELECT '00000000-0000-7000-8000-0000000000a1', code FROM permissions
-ON CONFLICT DO NOTHING;
+-- (No 'owner' template: an operator's owner holds a tenant copy of
+-- 'operator_admin' — see migration 0075.)
 
 -- Manager: everything except role/tenant management and refunds.
 INSERT INTO role_permissions (role_id, permission)
