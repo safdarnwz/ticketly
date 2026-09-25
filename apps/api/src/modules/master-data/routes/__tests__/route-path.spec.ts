@@ -125,3 +125,22 @@ describe('RoutePath — negative & edge cases', () => {
     expect(() => RoutePath.create(minuteOfDay('06:00'), stops)).toThrow(/Negative dwell/);
   });
 });
+
+describe('RoutePath.instantAt — a stop’s own time on a trip', () => {
+  const path = RoutePath.create(minuteOfDay('20:30'), fourStopRoute());
+  const leaves = new Date('2026-10-01T15:00:00Z'); // 20:30 IST
+
+  it('origin departs when the trip does', () => {
+    expect(path.instantAt(0, leaves, 'depart')?.toISOString()).toBe('2026-10-01T15:00:00.000Z');
+  });
+  it('a mid-route stop: arrival is before its departure by the dwell', () => {
+    expect(path.instantAt(1, leaves, 'depart')?.toISOString()).toBe('2026-10-01T19:00:00.000Z');
+    expect(path.instantAt(1, leaves, 'arrive')?.toISOString()).toBe('2026-10-01T18:50:00.000Z');
+  });
+  it('the last stop the next morning', () => {
+    expect(path.instantAt(3, leaves, 'arrive')?.toISOString()).toBe('2026-10-02T03:00:00.000Z');
+  });
+  it('an unknown stop has no time', () => {
+    expect(path.instantAt(9, leaves, 'depart')).toBeNull();
+  });
+});

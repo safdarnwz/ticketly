@@ -13,8 +13,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 | Backend status | Count |
 |---|---|
-| OPEN | 2714 |
-| DONE | 951 |
+| OPEN | 2712 |
+| DONE | 953 |
 | GAP | 311 |
 | CONFLICT | 76 |
 | INFRA | 20 |
@@ -23,9 +23,9 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 | Frontend status | Count |
 |---|---|
-| — | 3127 |
-| TODO | 940 |
-| DONE | 11 |
+| — | 3125 |
+| TODO | 941 |
+| DONE | 12 |
 | DUP | 9 |
 
 
@@ -128,7 +128,7 @@ CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 | 91 | View overall error rate | DONE | TODO | verified manually: existing module/API |
 | 92 | View total active operators | DONE | TODO | verified manually: existing module/API |
 | 93 | View total active buses across platform | DONE | TODO | verified manually: existing module/API |
-| 94 | View platform-wide daily booking volume | DONE | TODO | verified manually: existing module/API |
+| 94 | View platform-wide daily booking volume | DONE | DONE | GET /admin/monitoring/bookings/activity (per operator, today by default) + GET /admin/monitoring/bookings (feed, live holds) · UI: super admin › Live bookings |
 | 95 | View platform-wide monthly revenue | DONE | TODO | verified manually: existing module/API |
 | 96 | Suspend non-paying operator | DONE | TODO | verified manually: existing module/API |
 | 97 | Set suspension reason | DONE | TODO | verified manually: existing module/API |
@@ -1923,7 +1923,7 @@ CONFLICT 13, DONE 53, DUP 3, OPEN 431
 
 ## #2001–#2500
 
-DONE 15, OPEN 435
+DONE 16, OPEN 434
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -2035,7 +2035,7 @@ DONE 15, OPEN 435
 | 2106 | Maintain tax code master | OPEN | — |  |
 | 2107 | Update GST rates when changed | OPEN | — |  |
 | 2108 | Map services to HSN/SAC | OPEN | — |  |
-| 2109 | Generate tax invoices | OPEN | — |  |
+| 2109 | Generate tax invoices | DONE | TODO | tax invoice on booking.confirmed, emailed separately (body + PDF: place of supply, CGST/SGST/IGST, PAN, amount in words), once per event |
 | 2110 | Generate credit notes | OPEN | — |  |
 | 2111 | Generate debit notes | OPEN | — |  |
 | 2112 | Support e-invoicing | OPEN | — |  |
@@ -3872,7 +3872,7 @@ CONFLICT 10, DONE 24, OPEN 66
 
 ## #6001–#6500
 
-CONFLICT 4, DONE 21, OPEN 75
+CONFLICT 4, DONE 22, OPEN 74
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -3951,7 +3951,7 @@ CONFLICT 4, DONE 21, OPEN 75
 | 6073 | GST calculation on cancellation | OPEN | — |  |
 | 6074 | GST rate change handling | OPEN | — |  |
 | 6075 | GST inter state vs intra state | OPEN | — |  |
-| 6076 | GST invoice generation | OPEN | — |  |
+| 6076 | GST invoice generation | DONE | TODO | tax invoice on booking.confirmed, emailed separately (body + PDF: place of supply, CGST/SGST/IGST, PAN, amount in words), once per event |
 | 6077 | GST credit note generation | OPEN | — |  |
 | 6078 | GST return data preparation | OPEN | — |  |
 | 6079 | GST reconciliation | OPEN | — |  |

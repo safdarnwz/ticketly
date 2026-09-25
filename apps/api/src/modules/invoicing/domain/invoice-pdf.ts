@@ -1,148 +1,143 @@
 import PDFDocument from 'pdfkit';
 
-export interface InvoicePdfInput {
-  invoiceNumber: string;
-  invoiceDate: Date;
-  supplierName: string;
-  supplierGstin: string | null;
-  supplierAddress: string | null;
-  supplierLogoDataUri: string | null;
-  recipientName: string;
-  recipientPhone: string | null;
-  pnr: string;
-  routeDescription: string;
-  interState: boolean;
-  taxableMinor: number;
-  taxTotalMinor: number;
-  roundOffMinor: number;
-  totalMinor: number;
-  sac: string;
-}
+import { amountInWords, formatInvoiceDate, type InvoiceDocument } from './invoice-document';
 
-const money = (minor: number) => `Rs. ${(minor / 100).toFixed(2)}`;
+// The built-in PDF fonts have no rupee glyph.
+const money = (minor: number) =>
+  `Rs. ${(minor / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /**
- * Renders a CGST Rule 46-compliant tax invoice as a PDF buffer — the exact
- * numbers ALREADY computed and stored on the invoice row (gst-invoice.ts's
- * output), never recalculated here. A PDF renderer that re-derives the tax
- * split from scratch is exactly the kind of place a rounding rule could
- * quietly drift from the number actually posted to the ledger — this
- * function only ever formats what invoice.repository.ts already persisted.
+ * The GST tax invoice (CGST Rule 46) as a PDF — the same document the
+ * invoice email shows, formatted from the invoice as issued; nothing here
+ * recalculates a total.
  */
-export function renderInvoicePdf(input: InvoicePdfInput): Promise<Buffer> {
+export function renderInvoicePdf(doc: InvoiceDocument): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    const pdf = new PDFDocument({ size: 'A4', margin: 50 });
     const chunks: Buffer[] = [];
-    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
+    pdf.on('data', (chunk: Buffer) => chunks.push(chunk));
+    pdf.on('end', () => resolve(Buffer.concat(chunks)));
+    pdf.on('error', reject);
 
-    doc.fontSize(18).text('TAX INVOICE', { align: 'center' });
-    doc.moveDown(0.5);
-    doc
-      .fontSize(10)
-      .fillColor('#555')
-      .text('Issued under Rule 46, CGST Rules, 2017', { align: 'center' });
-    doc.moveDown(1.5);
-    doc.fillColor('#000');
+    const left = 50;
+    const width = 495;
 
-    // Logo, top-right corner — decoded from the data: URI stored on the
-    // tenant (TenantRepository.getLogoUrl); pdfkit's image() needs an
-    // actual Buffer, never the data: URI string itself. Never lets a
-    // malformed/corrupt logo break invoice generation — a missing logo is
-    // cosmetic, a missing invoice is a compliance problem.
-    if (input.supplierLogoDataUri) {
+    // A broken logo is cosmetic; it must never stop the invoice.
+    if (doc.supplier.logoDataUri) {
       try {
-        const base64 = input.supplierLogoDataUri.split(',')[1];
-        if (base64) doc.image(Buffer.from(base64, 'base64'), 455, 40, { fit: [90, 50] });
+        const base64 = doc.supplier.logoDataUri.split(',')[1];
+        if (base64) pdf.image(Buffer.from(base64, 'base64'), 455, 40, { fit: [90, 50] });
       } catch {
-        /* corrupt/unsupported logo data — proceed without it */
+        /* unsupported logo */
       }
     }
 
-    // Supplier / invoice-meta block
-    doc.fontSize(12).text(input.supplierName, { continued: false });
-    if (input.supplierGstin)
-      doc.fontSize(10).fillColor('#333').text(`GSTIN: ${input.supplierGstin}`);
-    if (input.supplierAddress) doc.fontSize(10).fillColor('#333').text(input.supplierAddress);
-    doc.moveDown(1);
-    doc.fillColor('#000');
+    pdf.fontSize(18).fillColor('#000').text('TAX INVOICE', left, 50);
+    pdf.fontSize(9).fillColor('#555').text('Issued under Rule 46, CGST Rules, 2017');
+    pdf.moveDown(1);
 
-    const metaTop = doc.y;
-    doc.fontSize(10).text(`Invoice No: ${input.invoiceNumber}`, 50, metaTop);
-    doc.text(`Invoice Date: ${input.invoiceDate.toLocaleDateString('en-IN')}`, 50, metaTop + 15);
-    doc.text(`PNR: ${input.pnr}`, 300, metaTop, { align: 'right', width: 245 });
-    doc.text(
-      `Place of supply: ${input.interState ? 'Inter-state' : 'Intra-state'}`,
+    pdf.fontSize(12).fillColor('#000').text(doc.supplier.legalName);
+    pdf.fontSize(9).fillColor('#333');
+    if (doc.supplier.name !== doc.supplier.legalName) pdf.text(`Trading as ${doc.supplier.name}`);
+    if (doc.supplier.gstin) pdf.text(`GSTIN: ${doc.supplier.gstin}`);
+    if (doc.supplier.pan) pdf.text(`PAN: ${doc.supplier.pan}`);
+    if (doc.supplier.address) pdf.text(doc.supplier.address, { width: 300 });
+    pdf.moveDown(1);
+
+    // Two columns of details.
+    const top = pdf.y;
+    const pair = (k: string, v: string, x: number, y: number) => {
+      pdf.fontSize(8).fillColor('#666').text(k, x, y, { width: 230 });
+      pdf
+        .fontSize(10)
+        .fillColor('#000')
+        .text(v, x, y + 10, { width: 230 });
+    };
+    pair('Invoice number', doc.invoiceNumber, left, top);
+    pair('Invoice date', formatInvoiceDate(doc.invoiceDate, doc.timeZone), left, top + 28);
+    pair('PNR', doc.pnr, left, top + 56);
+    pair('Place of supply', doc.placeOfSupply, left, top + 84);
+    pair('Customer name', doc.recipient.name, 300, top);
+    pair(
+      'Customer contact',
+      [doc.recipient.email, doc.recipient.phone].filter(Boolean).join(' · ') || '—',
       300,
-      metaTop + 15,
-      { align: 'right', width: 245 },
+      top + 28,
     );
-    doc.moveDown(3);
+    pair('Journey', `${doc.origin} to ${doc.destination}`, 300, top + 56);
+    pair(
+      'Date of journey',
+      doc.journeyDate ? formatInvoiceDate(doc.journeyDate, doc.timeZone) : '—',
+      300,
+      top + 84,
+    );
 
-    // Recipient block
-    doc.fontSize(10).fillColor('#555').text('Billed to:');
-    doc.fillColor('#000').fontSize(11).text(input.recipientName);
-    if (input.recipientPhone) doc.fontSize(10).fillColor('#333').text(input.recipientPhone);
-    doc.moveDown(1.5);
-    doc.fillColor('#000');
-
-    // Line-item table (single line: the transport service itself)
-    const tableTop = doc.y;
-    doc.fontSize(10).fillColor('#fff');
-    doc.rect(50, tableTop, 495, 20).fill('#0b6e4f');
-    doc.fillColor('#fff').text('Description', 55, tableTop + 5, { width: 220 });
-    doc.text('SAC', 280, tableTop + 5, { width: 60 });
-    doc.text('Taxable Value', 345, tableTop + 5, { width: 90, align: 'right' });
-    doc.text('Tax', 445, tableTop + 5, { width: 90, align: 'right' });
-    doc.fillColor('#000');
-
-    const rowY = tableTop + 25;
-    doc.fontSize(10).text(input.routeDescription, 55, rowY, { width: 220 });
-    doc.text(input.sac, 280, rowY, { width: 60 });
-    doc.text(money(input.taxableMinor), 345, rowY, { width: 90, align: 'right' });
-    doc.text(money(input.taxTotalMinor), 445, rowY, { width: 90, align: 'right' });
-    doc
-      .moveTo(50, rowY + 20)
-      .lineTo(545, rowY + 20)
-      .strokeColor('#ddd')
-      .stroke();
-
-    // GST split — CGST+SGST for intra-state, IGST for inter-state, matching
-    // gst-invoice.ts's own split logic exactly (never re-derived here).
-    let y = rowY + 35;
-    doc.fontSize(9).fillColor('#555');
-    if (input.interState) {
-      doc.text(`IGST: ${money(input.taxTotalMinor)}`, 345, y, { width: 190, align: 'right' });
-      y += 15;
-    } else {
-      const half = Math.round(input.taxTotalMinor / 2);
-      doc.text(`CGST: ${money(half)}`, 345, y, { width: 190, align: 'right' });
-      y += 15;
-      doc.text(`SGST: ${money(input.taxTotalMinor - half)}`, 345, y, {
-        width: 190,
-        align: 'right',
-      });
-      y += 15;
-    }
-    if (input.roundOffMinor !== 0) {
-      doc.text(`Round off: ${money(input.roundOffMinor)}`, 345, y, { width: 190, align: 'right' });
-      y += 15;
+    // Line table.
+    let y = top + 125;
+    const cols = doc.interState
+      ? [
+          { t: 'Description', x: left + 5, w: 200, a: 'left' as const },
+          { t: 'SAC', x: 255, w: 40, a: 'left' as const },
+          { t: 'Rate', x: 295, w: 40, a: 'right' as const },
+          { t: 'Taxable value', x: 340, w: 95, a: 'right' as const },
+          { t: 'IGST', x: 440, w: 100, a: 'right' as const },
+        ]
+      : [
+          { t: 'Description', x: left + 5, w: 170, a: 'left' as const },
+          { t: 'SAC', x: 225, w: 35, a: 'left' as const },
+          { t: 'Rate', x: 260, w: 35, a: 'right' as const },
+          { t: 'Taxable value', x: 300, w: 85, a: 'right' as const },
+          { t: 'CGST', x: 390, w: 70, a: 'right' as const },
+          { t: 'SGST', x: 465, w: 75, a: 'right' as const },
+        ];
+    pdf.rect(left, y, width, 20).fill('#1f2937');
+    pdf.fontSize(9).fillColor('#fff');
+    for (const c of cols) pdf.text(c.t, c.x, y + 6, { width: c.w, align: c.a });
+    y += 26;
+    pdf.fillColor('#000');
+    for (const r of doc.rows) {
+      const cells = [
+        r.description,
+        r.sac,
+        `${r.ratePct}%`,
+        money(r.taxableMinor),
+        ...(doc.interState ? [money(r.igstMinor)] : [money(r.cgstMinor), money(r.sgstMinor)]),
+      ];
+      cols.forEach((c, i) => pdf.text(cells[i], c.x, y, { width: c.w, align: c.a }));
+      y += 22;
+      pdf
+        .moveTo(left, y - 5)
+        .lineTo(left + width, y - 5)
+        .strokeColor('#ddd')
+        .stroke();
     }
 
-    doc
+    // Totals.
+    y += 6;
+    const total = (k: string, v: string, bold = false) => {
+      pdf.fontSize(bold ? 11 : 9).fillColor(bold ? '#000' : '#333');
+      pdf.text(k, 300, y, { width: 140, align: 'right' });
+      pdf.text(v, 440, y, { width: 100, align: 'right' });
+      y += bold ? 18 : 14;
+    };
+    total('Taxable value', money(doc.taxableMinor));
+    total(doc.interState ? 'IGST' : 'CGST + SGST', money(doc.taxTotalMinor));
+    if (doc.roundOffMinor !== 0) total('Round off', money(doc.roundOffMinor));
+    total('Total (incl. GST)', money(doc.totalMinor), true);
+
+    pdf
+      .fontSize(9)
       .fillColor('#000')
-      .fontSize(12)
-      .text(`Total: ${money(input.totalMinor)}`, 345, y + 5, { width: 190, align: 'right' });
+      .text(`Amount in words: ${amountInWords(doc.totalMinor)}`, left, y + 8, { width });
 
-    doc
+    pdf
       .fontSize(8)
       .fillColor('#888')
-      .text('This is a computer-generated invoice and does not require a signature.', 50, 750, {
-        width: 495,
+      .text('This is a computer-generated invoice and does not require a signature.', left, 770, {
+        width,
         align: 'center',
       });
 
-    doc.end();
+    pdf.end();
   });
 }

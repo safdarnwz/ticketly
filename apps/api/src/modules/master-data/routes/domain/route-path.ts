@@ -85,6 +85,23 @@ export class RoutePath {
   }
 
   /**
+   * When a trip that leaves its origin at `tripDepartsAt` departs from (or
+   * arrives at) the stop with this sequence — what a passenger boarding or
+   * getting off mid-route actually sees. Null for an unknown sequence.
+   */
+  instantAt(sequence: number, tripDepartsAt: Date, at: 'depart' | 'arrive'): Date | null {
+    const origin = this.stops[0];
+    const stop = this.stops.find((s) => s.sequence === sequence);
+    if (!origin || !stop) return null;
+    const offset =
+      at === 'arrive'
+        ? stop.arrivalDayOffset * 1440 + stop.arrivalMinute
+        : stop.departDayOffset * 1440 + stop.departMinute;
+    const originOffset = origin.departDayOffset * 1440 + origin.departMinute;
+    return new Date(tripDepartsAt.getTime() + (offset - originOffset) * 60_000);
+  }
+
+  /**
    * Build and validate a path. `startMinute` is the service's origin departure
    * time (minute-of-day); it anchors the clock-time computation.
    */

@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { Injectable } from '@nestjs/common';
 
 import { type TenantId, type Uuid } from '@kernel';
@@ -9,6 +11,22 @@ import { ProviderRegistry } from '../../infrastructure/provider-registry';
 import type { Channel } from '../../infrastructure/provider.interface';
 import { PlatformBillingService } from '../../../platform-settings';
 import { NotificationLogRepository } from '../../infrastructure/persistence/notification-log.repository';
+import { Mailer } from '../../infrastructure/mail/mailer';
+
+/** The emails a booking's customer receives as documents, each once. */
+export type BookingDocumentKind = 'eticket' | 'invoice';
+
+/**
+ * A stable id for one document of one event: the delivery log de-dupes on
+ * (event, channel, recipient), and the e-ticket and the invoice are two
+ * different emails to the same address for the same event.
+ */
+export function documentEventId(eventId: string, kind: BookingDocumentKind): Uuid {
+  const h = createHash('sha1').update(`${eventId}:${kind}`).digest('hex');
+  // RFC 4122 layout, version 5 (name-based, SHA-1), variant 10xx.
+  const variant = ((parseInt(h[16], 16) & 0x3) | 0x8).toString(16);
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-${variant}${h.slice(17, 20)}-${h.slice(20, 32)}` as Uuid;
+}
 
 /**
  * Notification engine.
@@ -33,6 +51,7 @@ export class NotificationService {
     private readonly templates: NotificationTemplateRepository,
     private readonly providers: ProviderRegistry,
     private readonly billing: PlatformBillingService,
+    private readonly mailer: Mailer,
     logger: Logger,
   ) {
     this.log = logger.forContext('NotificationService');
@@ -122,6 +141,84 @@ export class NotificationService {
         await this.billing.chargeNotification(input.tenantId, template.channel, logId);
       }
     }
+  }
+
+  /**
+   * The operator's own wording for an event on one channel (subject + body),
+   * rendered — or null when it has none (or switched it off).
+   */
+  async renderOperatorTemplate(
+    tenantId: TenantId,
+    eventType: string,
+    channel: Channel,
+    data: Record<string, string | number | undefined>,
+  ): Promise<{ subject: string | null; body: string } | null> {
+    const t = (await this.templates.activeFor(tenantId, eventType)).find(
+      (x) => x.channel === channel,
+    );
+    if (!t) return null;
+    return {
+      subject: t.subject ? renderTemplate(t.subject, data) : null,
+      body: renderTemplate(t.body, data),
+    };
+  }
+
+  /**
+   * Email one of a booking's documents (e-ticket, GST invoice) — logged
+   * against the booking so the platform sees whether it went out, sent at
+   * most once per event however often the event is redelivered, and retried
+   * (by throwing, so the outbox redelivers) when the mail server refuses it.
+   * From-name is the operator's. Returns false when it was already sent.
+   */
+  async sendBookingDocument(input: {
+    tenantId: TenantId;
+    eventId: Uuid;
+    bookingId: string;
+    kind: BookingDocumentKind;
+    to: string;
+    subject: string;
+    html: string;
+    text: string;
+    attachments?: { filename: string; content: Buffer; contentType?: string; cid?: string }[];
+  }): Promise<boolean> {
+    const logId = await this.deliveries.claim({
+      tenantId: input.tenantId,
+      eventId: documentEventId(input.eventId, input.kind),
+      channel: 'email',
+      recipient: input.to,
+      subject: input.subject,
+      body: input.text,
+      bookingId: input.bookingId,
+      kind: input.kind,
+    });
+    if (!logId) return false;
+    const fromName = (await this.deliveries.operatorDisplayName(input.tenantId)) ?? undefined;
+    let provider: string;
+    try {
+      provider = await this.mailer.send({
+        to: input.to,
+        subject: input.subject,
+        html: input.html,
+        text: input.text,
+        fromName,
+        attachments: input.attachments,
+      });
+    } catch (error) {
+      await this.deliveries.recordResult(logId, { ok: false, provider: 'smtp', providerRef: null });
+      this.log.warn(
+        { tenantId: input.tenantId, bookingId: input.bookingId, kind: input.kind, err: error },
+        'booking document email failed; the outbox will retry',
+      );
+      throw error;
+    }
+    // 'log' = no mail server configured (local development): recorded, not delivered.
+    await this.deliveries.recordResult(logId, { ok: true, provider, providerRef: null });
+    return true;
+  }
+
+  /** Per booking, the latest delivery status of each document email (`{ eticket: 'sent' }`). */
+  documentStatus(bookingIds: readonly string[]): Promise<Map<string, Record<string, string>>> {
+    return this.deliveries.documentStatus(bookingIds);
   }
 
   /** Seed default templates for a tenant (called at provisioning). */

@@ -9,6 +9,7 @@ import { ObservabilityModule } from '@observability';
 
 import { NotificationModule } from '@api/modules/notification/notification.module';
 import { InvoiceModule } from '@api/modules/invoicing/invoice.module';
+import { TicketsModule } from '@api/modules/tickets/tickets.module';
 import { RefundModule } from '@api/modules/refunds/refund.module';
 import { TrackingModule } from '@api/modules/tracking/tracking.module';
 import { WebhooksModule } from '@api/modules/webhooks/webhooks.module';
@@ -19,6 +20,7 @@ import { EventDispatcher } from './dispatcher/event-dispatcher';
 import { OutboxDispatcher } from './dispatcher/outbox-dispatcher';
 import { NotificationConsumer } from './consumers/notification.consumer';
 import { InvoiceConsumer } from './consumers/invoice.consumer';
+import { TicketEmailConsumer } from './consumers/ticket-email.consumer';
 import { RefundConsumer } from './consumers/refund.consumer';
 import { AmendmentConsumer } from './consumers/amendment.consumer';
 import { WebhookConsumer } from './consumers/webhook.consumer';
@@ -64,6 +66,7 @@ import { SchedulingModule } from '@api/modules/scheduling/scheduling.module';
     NotificationModule,
     BookingModule,
     InvoiceModule,
+    TicketsModule,
     RefundModule,
     TrackingModule,
     WebhooksModule,
@@ -83,6 +86,7 @@ import { SchedulingModule } from '@api/modules/scheduling/scheduling.module';
     NotificationConsumer,
     WaitlistConsumer,
     InvoiceConsumer,
+    TicketEmailConsumer,
     RefundConsumer,
     AmendmentConsumer,
     WebhookConsumer,

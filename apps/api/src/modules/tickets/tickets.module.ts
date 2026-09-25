@@ -8,6 +8,7 @@ import { SchedulingModule } from '../scheduling/scheduling.module';
 import { MasterDataModule } from '../master-data/master-data.module';
 import { TenancyModule } from '../tenancy/tenancy.module';
 import { TrackingModule } from '../tracking/tracking.module';
+import { NotificationModule } from '../notification/notification.module';
 import { TicketService } from './application/services/ticket.service';
 import { TicketController } from './presentation/ticket.controller';
 
@@ -26,6 +27,7 @@ import { TicketController } from './presentation/ticket.controller';
     MasterDataModule,
     TenancyModule,
     TrackingModule,
+    NotificationModule,
   ],
   controllers: [TicketController],
   providers: [TicketService],

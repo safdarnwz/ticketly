@@ -11,6 +11,9 @@ import { MessagingModule } from '@messaging';
 import { PricingModule } from '../pricing/pricing.module';
 import { SchedulingModule } from '../scheduling/scheduling.module';
 import { CrmModule } from '../crm/crm.module';
+import { NotificationModule } from '../notification/notification.module';
+import { BookingMonitoringController } from './presentation/booking-monitoring.controller';
+import { BookingMonitoringRepository } from './infrastructure/persistence/booking-monitoring.repository';
 import { BookingController } from './presentation/booking.controller';
 import { BookingRepository } from './infrastructure/persistence/booking.repository';
 import { BookingService } from './application/services/booking.service';
@@ -37,9 +40,11 @@ import { OperatorPolicyRepository } from './infrastructure/persistence/operator-
     SchedulingModule,
     CrmModule,
     PlatformSettingsModule,
+    NotificationModule,
   ],
-  controllers: [BookingController, ConcessionController],
+  controllers: [BookingController, ConcessionController, BookingMonitoringController],
   providers: [
+    BookingMonitoringRepository,
     OperatorPolicyRepository,
     JourneyConnectionRepository,
     BookingRepository,

@@ -37,17 +37,10 @@ export class InvoiceConsumer implements OnModuleInit {
           event.aggregateId as BookingId,
           gst?.gstin ?? undefined,
         );
-        if (result) {
-          try {
-            // Best-effort — attaching/emailing the PDF must never undo an
-            // already-issued invoice; a failed send here just means the
-            // customer doesn't get the PDF copy, not that the invoice
-            // itself (which the ledger and any future audit need) fails.
-            await this.invoices.emailInvoicePdf(event.aggregateId as BookingId);
-          } catch {
-            /* logged inside emailInvoicePdf's own call chain via the mailer; swallow here */
-          }
-        }
+        // Its own email (the e-ticket is another). Sent once per event; a
+        // mail-server failure throws so the outbox redelivers — the invoice
+        // above is not issued twice (issueForBooking is idempotent).
+        if (result) await this.invoices.emailInvoice(event.aggregateId as BookingId, event.eventId);
       },
     });
     this.dispatcher.register({

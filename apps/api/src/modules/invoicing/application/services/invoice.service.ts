@@ -1,16 +1,26 @@
 import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
-import { requireTenantId, type BookingId, type Json } from '@kernel';
+import { requireTenantId, type BookingId, type Json, type Uuid } from '@kernel';
 
 import { BookingRepository } from '../../../booking';
 import { RouteRepository, StopRepository } from '../../../master-data';
 import { TenantRepository } from '../../../tenancy';
 import { PlatformSettingsRepository } from '../../../platform-settings';
-import { Mailer } from '../../../notification';
+import { NotificationService } from '../../../notification';
+import { TripRepository } from '../../../scheduling';
 import { computeGstInvoice } from '../../domain/gst-invoice';
 import { formatInvoiceNumber } from '../../domain/invoice-number';
 import { renderInvoicePdf } from '../../domain/invoice-pdf';
+import {
+  invoiceSubject,
+  invoiceTaxRows,
+  invoiceText,
+  panFromGstin,
+  renderInvoiceEmail,
+  type InvoiceDocument,
+  type StoredInvoiceLine,
+} from '../../domain/invoice-document';
 import { InvoiceRepository } from '../../infrastructure/persistence/invoice.repository';
 
 /**
@@ -28,7 +38,8 @@ export class InvoiceService {
     private readonly stops: StopRepository,
     private readonly tenants: TenantRepository,
     private readonly platformSettings: PlatformSettingsRepository,
-    private readonly mailer: Mailer,
+    private readonly notifications: NotificationService,
+    private readonly trips: TripRepository,
     private readonly uow: UnitOfWork,
   ) {}
 
@@ -220,76 +231,105 @@ export class InvoiceService {
   }
 
   /**
-   * Emails the GST tax invoice as a PDF attachment — SEPARATE from the
-   * regular booking.confirmed notification (SMS/WhatsApp/email text), which
-   * never carries attachments (ProviderRegistry's generic send() has no
-   * concept of one). Called once, right after issueForBooking succeeds, by
-   * the SAME worker consumer — never re-derives any tax figure, only
-   * formats what issueForBooking already computed and persisted.
+   * Emails the GST tax invoice — laid out in the body, with the PDF attached —
+   * as its own email, separate from the e-ticket. Sent once per confirmation
+   * event (a redelivered event sends nothing) and logged against the booking.
+   * Only formats the invoice as issued; never re-derives a tax figure.
+   * Returns false when there is no email address, no invoice yet, or it was
+   * already sent.
    */
-  async emailInvoicePdf(bookingId: BookingId): Promise<void> {
+  async emailInvoice(bookingId: BookingId, eventId: Uuid): Promise<boolean> {
     const booking = await this.bookings.findForUpdate(bookingId);
-    if (!booking?.contactEmail) return; // no email on file — nothing to send to
-
-    const invoiceRows = (await this.invoices.findByBooking(bookingId)) as {
-      invoiceNumber: string;
-      interState: boolean;
-      taxableMinor: number;
-      taxTotalMinor: number;
-      roundOffMinor: number;
-      totalMinor: number;
-      supplierGstin: string | null;
-      issuedAt: string;
-      kind: string;
-    }[];
-    const invoice = invoiceRows.find((r) => r.kind === 'tax');
-    if (!invoice) return; // issueForBooking returned null (booking not confirmed yet) — nothing to email
-
-    const supplier = await this.tenants.getGstDetails();
-    const supplierLogoDataUri = await this.tenants.getLogoUrl();
-    const route = await this.routes.getById(booking.routeId);
-    const origin = route.path.stops[0];
-    const destination = route.path.stops[route.path.stops.length - 1];
-    const stopIds = [origin?.stopId, destination?.stopId].filter(
-      (x): x is NonNullable<typeof x> => !!x,
-    );
-    const stopNames = await this.stops.loadMany(stopIds);
-    const originName = origin ? (stopNames.get(origin.stopId)?.name ?? 'Origin') : 'Origin';
-    const destinationName = destination
-      ? (stopNames.get(destination.stopId)?.name ?? 'Destination')
-      : 'Destination';
-
-    const pdf = await renderInvoicePdf({
-      invoiceNumber: invoice.invoiceNumber,
-      invoiceDate: new Date(invoice.issuedAt),
-      supplierName: supplier?.legalName ?? 'Operator',
-      supplierGstin: invoice.supplierGstin,
-      supplierAddress: supplier?.registeredAddress ?? null,
-      supplierLogoDataUri,
-      recipientName: 'Passenger', // booking has no single "billed to" name on file — passenger names live per-seat, not per-booking
-      recipientPhone: booking.contactPhone ?? null,
-      pnr: booking.pnr,
-      routeDescription: `Bus travel — ${originName} to ${destinationName}`,
-      interState: invoice.interState,
-      taxableMinor: invoice.taxableMinor,
-      taxTotalMinor: invoice.taxTotalMinor,
-      roundOffMinor: invoice.roundOffMinor,
-      totalMinor: invoice.totalMinor,
-      sac: '9964',
-    });
-
-    await this.mailer.send({
+    if (!booking?.contactEmail) return false;
+    const doc = await this.invoiceDocument(bookingId);
+    if (!doc) return false;
+    const pdf = await renderInvoicePdf(doc);
+    return this.notifications.sendBookingDocument({
+      tenantId: requireTenantId(),
+      eventId,
+      bookingId,
+      kind: 'invoice',
       to: booking.contactEmail,
-      subject: `Tax Invoice ${invoice.invoiceNumber} — PNR ${booking.pnr}`,
-      html: `<p>Please find attached the GST tax invoice for your booking (PNR ${booking.pnr}).</p><p>This is a computer-generated invoice and does not require a signature.</p>`,
+      subject: invoiceSubject(doc),
+      html: renderInvoiceEmail(doc),
+      text: invoiceText(doc),
       attachments: [
         {
-          filename: `Invoice-${invoice.invoiceNumber}.pdf`,
+          filename: `Invoice-${doc.invoiceNumber}.pdf`,
           content: pdf,
           contentType: 'application/pdf',
         },
       ],
-      fromName: supplier?.legalName ?? undefined,
     });
+  }
+
+  /** The booking's tax invoice as the customer sees it, or null before it is issued. */
+  async invoiceDocument(bookingId: BookingId): Promise<InvoiceDocument | null> {
+    const booking = await this.bookings.findForUpdate(bookingId);
+    if (!booking) return null;
+    const invoice = (
+      (await this.invoices.findByBooking(bookingId)) as {
+        kind: string;
+        invoiceNumber: string;
+        interState: boolean;
+        taxableMinor: number | string;
+        taxTotalMinor: number | string;
+        roundOffMinor: number | string;
+        totalMinor: number | string;
+        supplierGstin: string | null;
+        lines: StoredInvoiceLine[] | null;
+        issuedAt: string | Date;
+      }[]
+    ).find((r) => r.kind === 'tax');
+    if (!invoice) return null;
+
+    const tenantId = requireTenantId();
+    const supplier = await this.tenants.getGstDetails();
+    const tenant = (await this.tenants.findById(tenantId))?.snapshot();
+    const trip = await this.trips.getById(booking.tripId);
+    const route = await this.routes.getById(booking.routeId);
+    const fromStop = route.path.stops.find((s) => s.sequence === booking.fromSeq);
+    const toStop = route.path.stops.find((s) => s.sequence === booking.toSeq);
+    const names = await this.stops.loadMany(
+      [fromStop?.stopId, toStop?.stopId].filter((x): x is NonNullable<typeof x> => !!x),
+    );
+    const place = await this.routes.placeOfSupply(booking.routeId);
+    const passengers = await this.bookings.loadPassengers(bookingId);
+    passengers.sort((a, b) => a.seatNumber.localeCompare(b.seatNumber, 'en', { numeric: true }));
+    const gstin = invoice.supplierGstin ?? supplier?.gstin ?? null;
+    const taxTotalMinor = Number(invoice.taxTotalMinor);
+
+    return {
+      invoiceNumber: invoice.invoiceNumber,
+      invoiceDate: new Date(invoice.issuedAt),
+      timeZone: tenant?.timezone ?? 'Asia/Kolkata',
+      supplier: {
+        name: tenant?.displayName ?? supplier?.legalName ?? 'Operator',
+        legalName: supplier?.legalName ?? tenant?.displayName ?? 'Operator',
+        gstin,
+        pan: panFromGstin(gstin),
+        address: supplier?.registeredAddress ?? null,
+        logoDataUri: await this.tenants.getLogoUrl(),
+      },
+      // Billed to the lead passenger: the booking has no separate billing name.
+      recipient: {
+        name: passengers[0]?.fullName ?? 'Passenger',
+        email: booking.contactEmail,
+        phone: booking.contactPhone,
+      },
+      pnr: booking.pnr,
+      placeOfSupply: place
+        ? `${place.stateName}${place.gstCode ? ` (${place.gstCode})` : ''}`
+        : 'India',
+      origin: (fromStop && names.get(fromStop.stopId)?.name) ?? 'Boarding point',
+      destination: (toStop && names.get(toStop.stopId)?.name) ?? 'Dropping point',
+      journeyDate: route.path.instantAt(booking.fromSeq, trip.departsAt, 'depart'),
+      interState: invoice.interState,
+      rows: invoiceTaxRows(invoice.lines ?? [], invoice.interState, taxTotalMinor),
+      taxableMinor: Number(invoice.taxableMinor),
+      taxTotalMinor,
+      roundOffMinor: Number(invoice.roundOffMinor),
+      totalMinor: Number(invoice.totalMinor),
+    };
   }
 }

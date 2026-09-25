@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import QRCode from 'qrcode';
 
 import { AppConfig } from '@config';
 import { Permission } from '@contracts';
@@ -8,9 +9,11 @@ import {
   getContext,
   getUserId,
   hasPermission,
+  requireTenantId,
   runAsTenant,
   type BookingId,
   type TenantId,
+  type Uuid,
 } from '@kernel';
 import { hmacSha256 } from '@security';
 
@@ -19,6 +22,7 @@ import { TripRepository } from '../../../scheduling';
 import { RouteRepository, StopRepository } from '../../../master-data';
 import { TenantRepository } from '../../../tenancy';
 import { TrackingService } from '../../../tracking';
+import { NotificationService } from '../../../notification';
 import {
   signingInput,
   encodeToken,
@@ -28,6 +32,13 @@ import {
   verifyBookingQrToken,
   type BookingQrPayload,
 } from '../../domain/ticket-token';
+import {
+  renderTicketEmail,
+  renderTicketPage,
+  ticketSubject,
+  ticketText,
+  type TicketView,
+} from '../../domain/ticket-document';
 
 export interface IssuedTicket {
   seat: string;
@@ -55,6 +66,7 @@ export class TicketService {
     private readonly tenants: TenantRepository,
     private readonly config: AppConfig,
     private readonly tracking: TrackingService,
+    private readonly notifications: NotificationService,
   ) {}
 
   private signingKey(): string {
@@ -161,23 +173,18 @@ export class TicketService {
     return verifyBookingQrToken(token, expected, nowMs);
   }
 
-  /** A self-contained, printable HTML ticket carrying the boarding tokens. */
-  async renderHtml(bookingId: BookingId): Promise<string> {
-    const { pnr, tickets, bookingQrToken } = await this.issueForBooking(bookingId);
+  /** Everything a printed or emailed ticket shows, for a confirmed booking (operator scope). */
+  async ticketView(bookingId: BookingId): Promise<TicketView> {
+    const { pnr, bookingQrToken } = await this.issueForBooking(bookingId);
     const booking = await this.bookings.findForUpdate(bookingId);
     if (!booking)
       throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
 
     const trip = await this.trips.getById(booking.tripId);
-    const trackingToken = this.tracking.issueTrackingToken(
-      bookingId,
-      booking.tripId,
-      pnr,
-      trip.arrivesAt,
+    const trackingUrl = this.tracking.buildTrackingUrl(
+      this.tracking.issueTrackingToken(bookingId, booking.tripId, pnr, trip.arrivesAt),
     );
-    const trackingUrl = this.tracking.buildTrackingUrl(trackingToken);
     const route = await this.routes.getById(trip.routeId);
-    const origin = route.path.stops[0];
     const fromStop = route.path.stops.find((s) => s.sequence === booking.fromSeq);
     const toStop = route.path.stops.find((s) => s.sequence === booking.toSeq);
     const stopIds = [fromStop?.stopId, toStop?.stopId].filter(
@@ -186,119 +193,97 @@ export class TicketService {
     const stopNames = await this.stops.loadMany(stopIds);
     const fromDetail = fromStop ? stopNames.get(fromStop.stopId) : undefined;
     const toDetail = toStop ? stopNames.get(toStop.stopId) : undefined;
-    const fromName = fromDetail?.name ?? 'Boarding point';
-    const toName = toDetail?.name ?? 'Dropping point';
-
-    // trip.departsAt is the ORIGIN's departure instant. Each stop's own
-    // clock time is an offset from origin (dayOffset*1440 + minute) — the
-    // DIFFERENCE between a stop's offset and the origin's gives exactly how
-    // many minutes to shift trip.departsAt to land on THAT stop's actual
-    // time, which is what a passenger boarding or alighting midway through
-    // the route actually experiences (never just the trip's overall
-    // start/end time, unless they happen to be at the origin/destination).
-    const originOffset = origin ? origin.departDayOffset * 1440 + origin.departMinute : 0;
-    const toClock = (s: typeof fromStop, useArrival: boolean) => {
-      if (!s) return null;
-      const offset = useArrival
-        ? s.arrivalDayOffset * 1440 + s.arrivalMinute
-        : s.departDayOffset * 1440 + s.departMinute;
-      return new Date(trip.departsAt.getTime() + (offset - originOffset) * 60_000);
-    };
-    const boardingTime = toClock(fromStop, false);
-    const arrivalTime = toClock(toStop, true);
-    const fmtDate = (d: Date) =>
-      d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    const fmtTime = (d: Date) =>
-      d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
     const operator = await this.tenants.getGstDetails();
-    const logoDataUri = await this.tenants.getLogoUrl();
+    const tenant = (await this.tenants.findById(requireTenantId()))?.snapshot();
     const passengers = await this.bookings.loadPassengers(bookingId);
-    const nameBySeat = new Map(passengers.map((p) => [p.seatNumber, p.fullName]));
+    passengers.sort((a, b) => a.seatNumber.localeCompare(b.seatNumber, 'en', { numeric: true }));
 
-    const fareMinor = booking.totalMinor - booking.taxMinor;
-    const money = (m: number) => `₹${(m / 100).toFixed(2)}`;
-
-    const rows = tickets
-      .map(
-        (t) => `
-      <div class="seat">
-        <div class="seat-no">Seat ${escapeHtml(t.seat)}</div>
-        <div class="pax-name">${escapeHtml(nameBySeat.get(t.seat) ?? '—')}</div>
-      </div>`,
-      )
-      .join('');
-
-    return `<!doctype html><html lang="en"><head><meta charset="utf-8">
-<title>${escapeHtml(operator?.legalName ?? 'Bus')} Ticket ${escapeHtml(pnr)}</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<style>
-  body{font-family:system-ui,sans-serif;margin:0;padding:24px;color:#111}
-  .ticket{max-width:680px;margin:auto;border:1px solid #ddd;border-radius:12px;overflow:hidden}
-  .head{background:#0b5;color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center}
-  .head h1{margin:0;font-size:20px}
-  .head .gstin{font-size:11px;opacity:.85}
-  .pnr{font-size:13px;opacity:.9;margin-top:8px}
-  .qr-box{background:#fff;padding:6px;border-radius:8px}
-  .qr-caption{font-size:9px;color:#fff;opacity:.85;text-align:center;margin-top:4px}
-  .journey{padding:16px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between}
-  .journey .stop{font-weight:600;font-size:14px}
-  .journey .landmark{font-size:11px;color:#888;margin-top:2px}
-  .journey .label{font-size:11px;color:#666;margin-top:4px}
-  .journey .time{font-weight:600;font-size:13px;margin-top:1px}
-  .body{padding:8px 20px}
-  .seat{display:flex;justify-content:space-between;align-items:center;border-top:1px dashed #ccc;padding:12px 0}
-  .seat-no{font-weight:600}
-  .pax-name{font-size:13px;color:#666}
-  .fare{padding:16px 20px;border-top:1px solid #eee;font-size:13px}
-  .fare-row{display:flex;justify-content:space-between;padding:2px 0}
-  .fare-total{font-weight:700;border-top:1px solid #ddd;margin-top:6px;padding-top:6px}
-  .foot{padding:12px 20px;font-size:11px;color:#888;border-top:1px solid #eee}
-</style></head>
-<body><div class="ticket">
-  <div class="head">
-    ${logoDataUri ? `<img src="${escapeHtml(logoDataUri)}" alt="${escapeHtml(operator?.legalName ?? 'Operator')} logo" style="max-height:56px;max-width:140px;object-fit:contain;margin-bottom:8px" />` : ''}
-    <div>
-      <h1>${escapeHtml(operator?.legalName ?? 'Bus Operator')}</h1>
-      ${operator?.gstin ? `<div class="gstin">GSTIN: ${escapeHtml(operator.gstin)}</div>` : ''}
-      <div class="pnr">PNR ${escapeHtml(pnr)} · ${tickets.length} seat${tickets.length > 1 ? 's' : ''}</div>
-      <div class="track-link"><a href="${escapeHtml(trackingUrl)}" target="_blank" style="color:#fff;text-decoration:underline">📍 Track your bus live</a></div>
-    </div>
-    <div>
-      <div class="qr-box" id="pnr-qr"></div>
-      <div class="qr-caption">Scan to check in</div>
-    </div>
-  </div>
-  <div class="journey">
-    <div>
-      <div class="stop">${escapeHtml(fromName)}</div>
-      ${fromDetail?.landmark ? `<div class="landmark">${escapeHtml(fromDetail.landmark)}</div>` : ''}
-      <div class="label">Boarding at</div>
-      ${boardingTime ? `<div class="time">${escapeHtml(fmtDate(boardingTime))}, ${escapeHtml(fmtTime(boardingTime))}</div>` : ''}
-    </div>
-    <div style="text-align:right">
-      <div class="stop">${escapeHtml(toName)}</div>
-      ${toDetail?.landmark ? `<div class="landmark">${escapeHtml(toDetail.landmark)}</div>` : ''}
-      <div class="label">Arrival at</div>
-      ${arrivalTime ? `<div class="time">${escapeHtml(fmtDate(arrivalTime))}, ${escapeHtml(fmtTime(arrivalTime))}</div>` : ''}
-    </div>
-  </div>
-  <div class="body">${rows}</div>
-  <div class="fare">
-    <div class="fare-row"><span>Fare</span><span>${money(fareMinor)}</span></div>
-    <div class="fare-row"><span>GST</span><span>${money(booking.taxMinor)}</span></div>
-    <div class="fare-row fare-total"><span>Total paid</span><span>${money(booking.totalMinor)}</span></div>
-  </div>
-  <div class="foot">${escapeHtml(operator?.legalName ?? 'Operator')} is the transport provider for this journey. Booked via Ticketly. Scan the QR above to check in — one passenger checks in instantly, a group is checked in one by one as each person boards.</div>
-</div>
-<script>new QRCode(document.getElementById('pnr-qr'), { text: ${JSON.stringify(bookingQrToken)}, width: 84, height: 84, correctLevel: QRCode.CorrectLevel.M });</script>
-</body></html>`;
+    return {
+      operatorName: tenant?.displayName ?? operator?.legalName ?? 'Bus operator',
+      operatorGstin: operator?.gstin ?? null,
+      operatorPhone: tenant?.contactPhone ?? null,
+      logoDataUri: await this.tenants.getLogoUrl(),
+      pnr,
+      seatType: null,
+      from: {
+        name: fromDetail?.name ?? 'Boarding point',
+        landmark: fromDetail?.landmark ?? null,
+        at: route.path.instantAt(booking.fromSeq, trip.departsAt, 'depart'),
+      },
+      to: {
+        name: toDetail?.name ?? 'Dropping point',
+        landmark: toDetail?.landmark ?? null,
+        at: route.path.instantAt(booking.toSeq, trip.departsAt, 'arrive'),
+      },
+      passengers: passengers.map((p) => ({
+        seat: p.seatNumber,
+        name: p.fullName,
+        age: p.age,
+        gender: p.gender,
+      })),
+      fareMinor: booking.totalMinor - booking.taxMinor,
+      taxMinor: booking.taxMinor,
+      totalMinor: booking.totalMinor,
+      currency: tenant?.currency ?? 'INR',
+      trackingUrl,
+      qrToken: bookingQrToken,
+      timeZone: tenant?.timezone ?? 'Asia/Kolkata',
+    };
   }
-}
 
-function escapeHtml(s: string): string {
-  return s.replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string,
-  );
+  /** A self-contained, printable HTML ticket; the QR is drawn server-side (no scripts). */
+  async renderHtml(bookingId: BookingId): Promise<string> {
+    const view = await this.ticketView(bookingId);
+    const svg = await QRCode.toString(view.qrToken, {
+      type: 'svg',
+      margin: 1,
+      errorCorrectionLevel: 'M',
+    });
+    return renderTicketPage(view, svg);
+  }
+
+  /**
+   * Email the e-ticket to the booking's email address, once per confirmation
+   * event (a redelivered event sends nothing). The operator's own
+   * confirmation email template, when it has one, is the subject and the
+   * opening text. The GST invoice goes separately (InvoiceService). Returns
+   * false when there is no email address or it was already sent.
+   */
+  async emailTicket(bookingId: BookingId, eventId: Uuid): Promise<boolean> {
+    const booking = await this.bookings.findForUpdate(bookingId);
+    if (!booking?.contactEmail) return false;
+    if (booking.status !== 'confirmed' && booking.status !== 'completed') return false;
+    const view = await this.ticketView(bookingId);
+    const tenantId = requireTenantId();
+    const own = await this.notifications.renderOperatorTemplate(
+      tenantId,
+      'booking.confirmed',
+      'email',
+      {
+        pnr: view.pnr,
+      },
+    );
+    view.intro = own?.body ?? null;
+    const qrPng = await QRCode.toBuffer(view.qrToken, {
+      type: 'png',
+      width: 330,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+    });
+    const cid = `qr-${view.pnr}@ticket`;
+    return this.notifications.sendBookingDocument({
+      tenantId,
+      eventId,
+      bookingId,
+      kind: 'eticket',
+      to: booking.contactEmail,
+      subject: own?.subject || ticketSubject(view),
+      html: renderTicketEmail(view, cid),
+      text: ticketText(view),
+      attachments: [
+        { filename: `boarding-qr-${view.pnr}.png`, content: qrPng, contentType: 'image/png', cid },
+      ],
+    });
+  }
 }

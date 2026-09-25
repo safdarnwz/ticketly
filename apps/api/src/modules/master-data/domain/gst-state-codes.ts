@@ -60,3 +60,9 @@ export function stateFromGstin(gstin: string | null | undefined): string | null 
   if (!gstin || gstin.length < 2) return null;
   return GST_STATE_CODE_TO_ISO[gstin.slice(0, 2)] ?? null;
 }
+
+/** The GST numeric code ("07") of an ISO-style state code ("DL"), or null. */
+export function gstCodeOfState(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  return Object.entries(GST_STATE_CODE_TO_ISO).find(([, v]) => v === iso)?.[0] ?? null;
+}

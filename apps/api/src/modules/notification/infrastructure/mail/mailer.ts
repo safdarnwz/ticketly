@@ -70,8 +70,9 @@ export class Mailer {
     html: string;
     text?: string;
     fromName?: string;
-    attachments?: { filename: string; content: Buffer; contentType?: string }[];
-  }): Promise<void> {
+    /** `cid` makes an attachment an inline image (`<img src="cid:…">`). */
+    attachments?: { filename: string; content: Buffer; contentType?: string; cid?: string }[];
+  }): Promise<'smtp' | 'log'> {
     const saved = this.savedSmtp();
     const fromAddress = saved?.fromAddress ?? this.fromAddress;
     const defaultFrom = saved?.from ?? this.from;
@@ -96,7 +97,7 @@ export class Mailer {
         },
         'Email (dev, not sent)',
       );
-      return;
+      return 'log';
     }
     await transporter.sendMail({
       from,
@@ -110,6 +111,7 @@ export class Mailer {
       { to: input.to, subject: input.subject, from, attachments: input.attachments?.length ?? 0 },
       'Email sent',
     );
+    return 'smtp';
   }
 
   /**

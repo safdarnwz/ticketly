@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { CacheNamespace, CacheService, CacheTtl } from '@cache';
 import { DatabaseService, registerConstraintMessages, UnitOfWork } from '@database';
-import { stateFromGstin } from '../../domain/gst-state-codes';
+import { gstCodeOfState, stateFromGstin } from '../../domain/gst-state-codes';
 import {
   minuteOfDay,
   newId,
@@ -264,6 +264,28 @@ export class RouteRepository {
    * the operator's GSTIN state can't be determined, rather than silently
    * assuming intra-state on missing data.
    */
+  /**
+   * Place of supply of a passenger-transport service: the state where the
+   * journey starts (IGST Act s.12(9)) — the route's origin, the same state
+   * isInterState compares with the operator's own.
+   */
+  async placeOfSupply(
+    routeId: RouteId,
+  ): Promise<{ stateName: string; stateCode: string; gstCode: string | null } | null> {
+    const row = await this.db.queryOne<{ name: string; code: string }>(
+      `SELECT s.name, s.code
+         FROM routes r
+         JOIN cities o ON o.id = r.origin_city_id
+         JOIN states s ON s.id = o.state_id
+        WHERE r.id = $1`,
+      [routeId],
+      { name: 'route.placeOfSupply', primary: true },
+    );
+    return row
+      ? { stateName: row.name, stateCode: row.code, gstCode: gstCodeOfState(row.code) }
+      : null;
+  }
+
   async isInterState(routeId: RouteId): Promise<boolean> {
     const row = await this.db.queryOne<{
       origin_state_code: string;

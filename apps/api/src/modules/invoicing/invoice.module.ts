@@ -6,6 +6,7 @@ import { BookingModule } from '../booking/booking.module';
 import { MasterDataModule } from '../master-data/master-data.module';
 import { NotificationModule } from '../notification/notification.module';
 import { TenancyModule } from '../tenancy/tenancy.module';
+import { SchedulingModule } from '../scheduling/scheduling.module';
 import { PlatformSettingsModule } from '../platform-settings/platform-settings.module';
 import { InvoiceController } from './presentation/invoice.controller';
 import { InvoiceRepository } from './infrastructure/persistence/invoice.repository';
@@ -17,7 +18,7 @@ import { InvoiceService } from './application/services/invoice.service';
  * per-(tenant, financial-year) numbering series and a computed CGST/SGST vs
  * IGST tax split (never hand-entered, and never a hard-coded place-of-supply —
  * see InvoiceService, which asks MasterDataModule's RouteRepository). Pure tax
- * maths lives in domain/. NotificationModule (for Mailer) and TenancyModule (for the
+ * maths lives in domain/. NotificationModule (invoice emails) and TenancyModule (for the
  * supplier's own GSTIN/name/address) support the PDF-invoice email — see
  * InvoiceService.emailInvoicePdf.
  */
@@ -28,6 +29,7 @@ import { InvoiceService } from './application/services/invoice.service';
     MasterDataModule,
     NotificationModule,
     TenancyModule,
+    SchedulingModule,
     PlatformSettingsModule,
   ],
   controllers: [InvoiceController],

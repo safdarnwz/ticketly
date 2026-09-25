@@ -277,7 +277,12 @@ export class NotificationConsumer implements OnModuleInit {
         // here we derive from the payload where present.
         const recipients = {
           sms: (payload.contactPhone as string) ?? undefined,
-          email: (payload.contactEmail as string) ?? undefined,
+          // A confirmation's email is the e-ticket itself (TicketEmailConsumer),
+          // which carries the operator's email template as its opening text.
+          email:
+            eventType === 'booking.confirmed'
+              ? undefined
+              : ((payload.contactEmail as string) ?? undefined),
         };
         if (!recipients.sms && !recipients.email) return;
 

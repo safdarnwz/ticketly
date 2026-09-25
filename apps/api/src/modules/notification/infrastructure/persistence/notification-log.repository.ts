@@ -68,14 +68,27 @@ export class NotificationLogRepository {
     recipient: string;
     subject: string | null;
     body: string;
+    /** A booking document (e-ticket, invoice): which booking, which document. */
+    bookingId?: string;
+    kind?: string;
   }): Promise<string | null> {
     const row = await this.db.queryOne<{ id: string }>(
-      `INSERT INTO notifications (id, tenant_id, event_id, channel, recipient, subject, body, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'pending')
+      `INSERT INTO notifications (id, tenant_id, event_id, channel, recipient, subject, body, status, booking_id, kind)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9)
        ON CONFLICT (event_id, channel, recipient) DO UPDATE SET status = 'pending'
          WHERE notifications.status = 'failed'
        RETURNING id`,
-      [newId(), n.tenantId, n.eventId, n.channel, n.recipient, n.subject, n.body],
+      [
+        newId(),
+        n.tenantId,
+        n.eventId,
+        n.channel,
+        n.recipient,
+        n.subject,
+        n.body,
+        n.bookingId ?? null,
+        n.kind ?? null,
+      ],
       { name: 'notify.logInsert', primary: true },
     );
     return row?.id ?? null;
@@ -102,5 +115,35 @@ export class NotificationLogRepository {
       { name: 'notify.tenantDisplayName' },
     );
     return row?.display_name ?? null;
+  }
+
+  /**
+   * Latest delivery status of each document kind per booking, across every
+   * operator — e.g. `{ eticket: 'sent', invoice: 'failed' }`.
+   */
+  async documentStatus(
+    bookingIds: readonly string[],
+  ): Promise<Map<string, Record<string, string>>> {
+    const out = new Map<string, Record<string, string>>();
+    if (bookingIds.length === 0) return out;
+    await this.uow.run(
+      { name: 'notification.documentStatus', bypassRls: true, readOnly: true },
+      async (scope) => {
+        const { rows } = await scope.client.query<{
+          booking_id: string;
+          kind: string;
+          status: string;
+        }>(
+          `SELECT DISTINCT ON (booking_id, kind) booking_id, kind, status
+             FROM notifications
+            WHERE booking_id = ANY($1::uuid[]) AND kind IS NOT NULL
+            ORDER BY booking_id, kind, created_at DESC`,
+          [bookingIds],
+        );
+        for (const r of rows)
+          out.set(r.booking_id, { ...out.get(r.booking_id), [r.kind]: r.status });
+      },
+    );
+    return out;
   }
 }

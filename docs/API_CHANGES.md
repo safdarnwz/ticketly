@@ -170,3 +170,13 @@ an unknown id is now 404 (was 200).
   seats. Idempotent; a paid booking is never touched; 400 without any proof.
 - `GET /scheduling/trips/:id/availability` and search seat counts now treat seats under a
   live (unexpired) hold as taken — they used to show as free until payment.
+- Customer emails on confirmation: the one-line confirmation email is replaced by the **e-ticket**
+  (journey, boarding/dropping, passengers, fare, boarding QR as an inline image; the operator's
+  confirmation email template is its subject and opening text), and the **GST tax invoice** is its own
+  email (invoice in the body + PDF). Each goes once per event and is logged against the booking
+  (`notifications.booking_id`, `kind` = `eticket` | `invoice`, migration 0083).
+- `GET /bookings/:id/ticket.html` draws the QR server-side (no external script).
+- New (platform admin): `GET /admin/monitoring/bookings/activity?from&to` — per operator: holds in
+  progress now, confirmed / cancelled, seats, gross; `GET /admin/monitoring/bookings?from&to&tenantId&status&channel&pnr&cursor&limit`
+  — every operator's bookings newest first (`status=live` = being paid now), with each booking's
+  e-ticket / invoice email status. Customer phone and email are masked. Max 92 days per request.
