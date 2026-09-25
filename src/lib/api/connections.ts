@@ -56,7 +56,7 @@ export const connectionsApi = {
     return {
       options: r.journeys.map((j) => ({
         connectionCityId: j.hub,
-        connectionCityName: j.legs[0].droppingStop.name,
+        connectionCityName: j.hubCity.name,
         layoverMinutes: j.layoverMin,
         leg1: leg(j.legs[0]),
         leg2: leg(j.legs[1]),

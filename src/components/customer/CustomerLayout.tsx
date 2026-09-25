@@ -1,8 +1,11 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Bus, Ticket, UserRound } from 'lucide-react';
 
 import { Button } from '@/components/ui';
 import { BackButton } from '@/components/layout/BackButton';
+import { AnnouncementBanner } from '@/components/layout/AnnouncementBanner';
+import { legalApi } from '@/lib/api/legal';
 import { useAuth } from '@/stores/auth';
 
 export function CustomerLayout() {
@@ -11,6 +14,7 @@ export function CustomerLayout() {
   const user = useAuth((s) => s.user);
   const token = useAuth((s) => s.token);
   const logout = useAuth((s) => s.logout);
+  const legal = useQuery({ queryKey: ['legal-pages'], queryFn: legalApi.list, staleTime: 10 * 60_000 });
   // Every page gets a Back button EXCEPT the landing page itself — there's
   // nowhere logical to go "back" TO from the entry point, and a button
   // that just sits there unable to do anything useful is worse than no
@@ -62,6 +66,8 @@ export function CustomerLayout() {
         </div>
       </header>
 
+      <AnnouncementBanner audience="customers" className="mx-auto w-full max-w-6xl" />
+
       <main className="flex-1">
         {showBack && (
           <div className="mx-auto max-w-6xl px-4 pt-3">
@@ -76,10 +82,9 @@ export function CustomerLayout() {
           <span>© Ticketly — book bus tickets across India</span>
           <div className="flex flex-wrap justify-center gap-4">
             <Link to="/become-operator" className="hover:text-text">Become an operator</Link>
-            <Link to="/legal/terms" className="hover:text-text">Terms</Link>
-            <Link to="/legal/privacy" className="hover:text-text">Privacy Policy</Link>
-            <Link to="/legal/refund-policy" className="hover:text-text">Cancellation & Refunds</Link>
-            <Link to="/legal/grievance" className="hover:text-text">Grievance Officer</Link>
+            {(legal.data?.items ?? []).map((p) => (
+              <Link key={p.slug} to={`/legal/${p.slug}`} className="hover:text-text">{p.title}</Link>
+            ))}
           </div>
         </div>
       </footer>

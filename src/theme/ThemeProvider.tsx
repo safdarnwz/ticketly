@@ -1,24 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { appearanceApi } from '@/lib/api/platform';
 import { useAuth } from '@/stores/auth';
 import { DEFAULT_THEME, themeToCssVars } from './defaultTheme';
 import type { Theme } from './types';
+import { ThemeContext } from './theme-context';
 
-interface ThemeContextValue {
-  theme: Theme;
-  /** Apply an arbitrary theme's variables to :root — used for live preview. */
-  previewTheme: (theme: Theme) => void;
-  /** Restore the persisted effective theme. */
-  resetPreview: () => void;
-}
 
-const ThemeContext = createContext<ThemeContextValue>({
-  theme: DEFAULT_THEME,
-  previewTheme: () => {},
-  resetPreview: () => {},
-});
 
 function applyVars(theme: Theme): void {
   const vars = themeToCssVars(theme);
@@ -48,8 +37,4 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({ theme, previewTheme, resetPreview }), [theme, previewTheme, resetPreview]);
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
-}
-
-export function useTheme(): ThemeContextValue {
-  return useContext(ThemeContext);
 }

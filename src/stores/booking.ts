@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { configureBookingTenant } from '@/lib/api/client';
 import type { Quote } from '@/lib/api/booking-flow';
 import type { SearchResult } from '@/lib/api/types';
+import { todayLocal } from '@/lib/utils';
 
 export interface PassengerDraft { seatNumber: string; fullName: string; age?: number; gender?: string }
 
@@ -24,6 +25,8 @@ interface BookingState {
   /** Set after a cross-tenant PNR lookup (AccountPage) so the follow-up
    *  ticket/invoice fetch for THAT booking still carries its operator. */
   viewedBookingTenantId?: string;
+  /** Round trip: the return leg still to book after this one (shown on the confirmation page). */
+  pendingReturn?: { date: string; fromLabel: string; toLabel: string };
 
   setSearch: (p: Partial<Pick<BookingState, 'originCityId' | 'originLabel' | 'destCityId' | 'destLabel' | 'journeyDate'>>) => void;
   selectTrip: (trip: SearchResult, fromStopId: string, toStopId: string) => void;
@@ -33,13 +36,13 @@ interface BookingState {
   setContact: (email: string, phone: string) => void;
   setConfirmed: (bookingId: string, pnr: string) => void;
   setViewedBookingTenant: (tenantId: string | undefined) => void;
+  setPendingReturn: (r: BookingState['pendingReturn']) => void;
   reset: () => void;
 }
 
-const today = new Date().toISOString().slice(0, 10);
 
 export const useBooking = create<BookingState>((set) => ({
-  originCityId: '', originLabel: '', destCityId: '', destLabel: '', journeyDate: today,
+  originCityId: '', originLabel: '', destCityId: '', destLabel: '', journeyDate: todayLocal(),
   seatNumbers: [], passengers: [], contactEmail: '', contactPhone: '',
 
   setSearch: (p) => set(p),
@@ -50,6 +53,7 @@ export const useBooking = create<BookingState>((set) => ({
   setContact: (contactEmail, contactPhone) => set({ contactEmail, contactPhone }),
   setConfirmed: (bookingId, pnr) => set({ bookingId, pnr }),
   setViewedBookingTenant: (viewedBookingTenantId) => set({ viewedBookingTenantId }),
+  setPendingReturn: (pendingReturn) => set({ pendingReturn }),
   reset: () => set({ trip: undefined, seatNumbers: [], quote: undefined, passengers: [], bookingId: undefined, pnr: undefined }),
 }));
 

@@ -45,10 +45,57 @@ export function formatDateTime(iso: string): string {
   return d.toLocaleString(undefined, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+/**
+ * Bus times are shown in the operators' timezone (the backend's
+ * DEFAULT_TIMEZONE), not the viewer's browser zone — a 21:00 departure
+ * from Delhi is 21:00 wherever the customer happens to be.
+ */
+export const APP_TIMEZONE = 'Asia/Kolkata';
+
 export function formatTime(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: APP_TIMEZONE });
 }
+
+/** YYYY-MM-DD of an instant in APP_TIMEZONE. */
+export function localDateOf(d: Date | string): string {
+  const date = typeof d === 'string' ? new Date(d) : d;
+  return new Intl.DateTimeFormat('en-CA', { timeZone: APP_TIMEZONE }).format(date);
+}
+
+/** Today in APP_TIMEZONE, as YYYY-MM-DD. */
+export function todayLocal(): string {
+  return localDateOf(new Date());
+}
+
+/** Add days to a YYYY-MM-DD date (calendar arithmetic, no timezone drift). */
+export function addDaysIso(date: string, days: number): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + days));
+  return t.toISOString().slice(0, 10);
+}
+
+/** "Fri, 26 Sep" for a YYYY-MM-DD date. */
+export function formatDateLabel(date: string, opts: Intl.DateTimeFormatOptions = { weekday: 'short', day: '2-digit', month: 'short' }): string {
+  const [y, m, d] = date.split('-').map(Number);
+  if (!y || !m || !d) return date;
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-IN', { ...opts, timeZone: 'UTC' });
+}
+
+/** Days between the local dates of two instants (0 = same day, 1 = arrives next day…). */
+export function dayDiff(fromIso: string, toIso: string): number {
+  const a = localDateOf(fromIso);
+  const b = localDateOf(toIso);
+  return Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
+}
+
+export const SEAT_TYPE_LABEL: Record<string, string> = {
+  seater: 'Seater',
+  sleeper: 'Sleeper',
+  semi_sleeper: 'Semi-sleeper',
+};
 
 export function minutesToHm(min: number): string {
   const h = Math.floor(min / 60);

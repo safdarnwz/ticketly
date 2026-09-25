@@ -24,8 +24,11 @@ export interface SearchResult {
   availableSeats: number;
   fromPriceMinor: number;
   currency: string;
-  operatorRating?: number;
-  seatTypes?: string[];
+  /** seater / sleeper / semi_sleeper */
+  seatTypes: string[];
+  /** Average stars of the route's reviews; null until the first review. */
+  rating: number | null;
+  ratingCount: number;
   amenities: { id: string; code: string; name: string; icon: string | null }[];
   /** A paid promotion is running on this route. */
   isPromoted?: boolean;

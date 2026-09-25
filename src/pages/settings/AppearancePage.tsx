@@ -5,7 +5,7 @@ import { Palette, RotateCcw, Save, Type, Square, Layers } from 'lucide-react';
 import { Button, Card, CardBody, CardHeader, Select, Badge, Input, PageLoader, ErrorState, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { appearanceApi } from '@/lib/api/platform';
-import { useTheme } from '@/theme/ThemeProvider';
+import { useTheme } from '@/theme/theme-context';
 import { DEFAULT_THEME } from '@/theme/defaultTheme';
 import type { Theme, ThemePatch } from '@/theme/types';
 

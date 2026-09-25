@@ -11,4 +11,5 @@ export const announcementsApi = {
     post<{ id: string }>('/v1/content/admin/announcements', input),
   remove: (id: string) => del<{ ok: boolean }>(`/v1/content/admin/announcements/${id}`),
   activeForOperators: () => get<{ items: Announcement[] }>('/v1/content/announcements/operators'),
+  activeForCustomers: () => get<{ items: Announcement[] }>('/v1/content/announcements/customers'),
 };

@@ -1,18 +1,19 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { Search as SearchIcon, Clock, Users, ArrowRight } from 'lucide-react';
+import { Search as SearchIcon } from 'lucide-react';
 
-import { Button, Card, CardBody, Input, Select, Badge, EmptyState, ErrorState, Spinner } from '@/components/ui';
+import { Button, Card, CardBody, Input, Select, EmptyState, ErrorState, Spinner } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { CityInput } from '@/components/customer/CityInput';
+import { TripResultCard } from '@/components/customer/TripResultCard';
 import { storefrontApi, type SearchInput } from '@/lib/api/storefront';
-import type { SearchResult } from '@/lib/api/types';
-import { formatMoney, formatTime, minutesToHm } from '@/lib/utils';
+import { todayLocal } from '@/lib/utils';
 
 export function SearchPage() {
+  const navigate = useNavigate();
   const [form, setForm] = useState<SearchInput>({
-    originCityId: '', destCityId: '', journeyDate: new Date().toISOString().slice(0, 10), sort: 'departure',
+    originCityId: '', destCityId: '', journeyDate: todayLocal(), sort: 'departure',
   });
   const [originLabel, setOriginLabel] = useState('');
   const [destLabel, setDestLabel] = useState('');
@@ -38,9 +39,9 @@ export function SearchPage() {
             onSubmit={(e) => { e.preventDefault(); search.mutate(); }}
             className="grid grid-cols-1 gap-4 md:grid-cols-5"
           >
-            <CityInput label="Origin city" value={originLabel} onSelect={(c) => { set({ originCityId: c.id }); setOriginLabel(c.name); }} />
-            <CityInput label="Destination city" value={destLabel} onSelect={(c) => { set({ destCityId: c.id }); setDestLabel(c.name); }} />
-            <Input label="Date" type="date" value={form.journeyDate} onChange={(e) => set({ journeyDate: e.target.value })} required />
+            <CityInput label="Origin city" value={originLabel} onSelect={(c) => { set({ originCityId: c.id }); setOriginLabel(c.name); }} onClear={() => set({ originCityId: '' })} />
+            <CityInput label="Destination city" value={destLabel} onSelect={(c) => { set({ destCityId: c.id }); setDestLabel(c.name); }} onClear={() => set({ destCityId: '' })} />
+            <Input label="Date" type="date" value={form.journeyDate} min={todayLocal()} onChange={(e) => set({ journeyDate: e.target.value })} required />
             <Select
               label="Sort by"
               value={form.sort}
@@ -53,7 +54,7 @@ export function SearchPage() {
               ]}
             />
             <div className="flex items-end">
-              <Button type="submit" fullWidth loading={search.isPending} disabled={!form.originCityId || !form.destCityId} leftIcon={<SearchIcon className="h-4 w-4" />}>
+              <Button type="submit" fullWidth loading={search.isPending} disabled={!form.originCityId || !form.destCityId || form.originCityId === form.destCityId} leftIcon={<SearchIcon className="h-4 w-4" />}>
                 Search
               </Button>
             </div>
@@ -74,47 +75,12 @@ export function SearchPage() {
         ) : (
           <div className="flex flex-col gap-3">
             <div className="text-sm text-text-muted">{search.data.count} trip(s) found</div>
-            {search.data.results.map((r) => <TripCard key={r.tripId} trip={r} />)}
+            {search.data.results.map((r) => (
+              <TripResultCard key={r.tripId} trip={r} actionLabel="Select seats" onSelect={(trip) => navigate('/staff-trip', { state: { trip } })} />
+            ))}
           </div>
         )
       )}
     </>
-  );
-}
-
-function TripCard({ trip }: { trip: SearchResult }) {
-  const navigate = useNavigate();
-  return (
-    <Card className="transition hover:shadow-md">
-      <CardBody className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
-        <div className="flex flex-1 items-center gap-6">
-          <div className="text-center">
-            <div className="text-lg font-semibold text-text">{formatTime(trip.departsAt)}</div>
-            <div className="text-xs text-text-muted">Depart</div>
-          </div>
-          <div className="flex flex-col items-center text-text-muted">
-            <span className="flex items-center gap-1 text-xs"><Clock className="h-3 w-3" />{minutesToHm(trip.durationMin)}</span>
-            <ArrowRight className="h-4 w-4" />
-          </div>
-          <div className="text-center">
-            <div className="text-lg font-semibold text-text">{formatTime(trip.arrivesAt)}</div>
-            <div className="text-xs text-text-muted">Arrive</div>
-          </div>
-          <div className="ml-4 flex items-center gap-2">
-            <Badge tone={trip.availableSeats > 5 ? 'success' : 'warning'}>
-              <Users className="h-3 w-3" /> {trip.availableSeats} seats
-            </Badge>
-            {trip.operatorRating ? <Badge tone="info">★ {trip.operatorRating.toFixed(1)}</Badge> : null}
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <div className="text-xs text-text-muted">from</div>
-            <div className="text-xl font-semibold text-text">{formatMoney(trip.fromPriceMinor, trip.currency)}</div>
-          </div>
-          <Button onClick={() => navigate('/staff-trip', { state: { trip } })}>Select seats</Button>
-        </div>
-      </CardBody>
-    </Card>
   );
 }
