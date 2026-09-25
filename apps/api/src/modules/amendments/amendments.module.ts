@@ -11,6 +11,8 @@ import { SchedulingModule } from '../scheduling/scheduling.module';
 import { AmendmentService } from './application/services/amendment.service';
 import { AmendmentRepository } from './infrastructure/persistence/amendment.repository';
 import { AmendmentsController } from './presentation/amendments.controller';
+import { PaymentModule } from '../payment/payment.module';
+import { RescheduleCapture } from './application/services/reschedule.capture';
 
 /**
  * Booking amendments — reschedule (date/trip change) and seat change. Reuses the
@@ -24,11 +26,12 @@ import { AmendmentsController } from './presentation/amendments.controller';
     MessagingModule,
     BookingModule,
     MasterDataModule,
+    PaymentModule,
     PricingModule,
     SchedulingModule,
   ],
   controllers: [AmendmentsController],
-  providers: [AmendmentRepository, AmendmentService],
+  providers: [AmendmentRepository, AmendmentService, RescheduleCapture],
   exports: [AmendmentService],
 })
 export class AmendmentsModule {}

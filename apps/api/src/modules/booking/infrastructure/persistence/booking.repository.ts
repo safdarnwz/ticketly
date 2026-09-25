@@ -674,7 +674,13 @@ export class BookingRepository {
 
   /* ── amendments: the booking-owned rows an amendment rewrites (run in its unit of work) ── */
 
-  /** Reschedule: point the booking at another trip/segment and replace its seats. */
+  /**
+   * Reschedule: point the booking at another trip/segment and replace its
+   * seats. What was paid for the ticket becomes the new total — a cheaper
+   * trip's difference is refunded and a dearer one's collected separately
+   * (the reschedule fee is income, not ticket value), so a later cancellation
+   * refunds from the right amount.
+   */
   async moveToTrip(input: {
     bookingId: BookingId;
     tripId: TripId;
@@ -688,7 +694,7 @@ export class BookingRepository {
     const tenantId = requireTenantId();
     await this.db.execute_(
       `UPDATE bookings SET trip_id = $3, from_seq = $4, to_seq = $5, from_stop_id = $6, to_stop_id = $7,
-              total_minor = $8, times_rescheduled = times_rescheduled + 1, updated_at = now()
+              total_minor = $8, paid_minor = $8, times_rescheduled = times_rescheduled + 1, updated_at = now()
         WHERE tenant_id = $1 AND id = $2`,
       [
         tenantId,

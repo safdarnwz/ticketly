@@ -28,7 +28,14 @@ export class PaymentRepository {
     private readonly platformSettings: PlatformSettingsRepository,
   ) {}
 
-  /** Idempotent: one intent per booking (reuses an existing pending one). */
+  /**
+   * Idempotent per purpose: a pending intent for the same booking, amount,
+   * currency and metadata is reused (a retried "pay" never creates a second
+   * order). A pending intent for anything else — the total changed because an
+   * add-on was attached, or it was for a different upgrade — is retired
+   * ('failed', superseded) and a new one created, so a customer is never asked
+   * to pay a stale amount.
+   */
   async createIntent(input: {
     bookingId: BookingId;
     gateway: string;
@@ -36,14 +43,32 @@ export class PaymentRepository {
     currency: string;
     metadata?: Record<string, unknown>;
   }): Promise<PaymentIntent> {
+    const metadata = JSON.stringify(input.metadata ?? {});
     const existing = await this.db.queryOne<Row>(
-      `SELECT id, booking_id, gateway, gateway_order_id, gateway_payment_id, amount_minor, currency, status
-         FROM payment_intents WHERE tenant_id = $1 AND booking_id = $2 AND status IN ('created','authorized')
-         ORDER BY created_at DESC LIMIT 1`,
-      [requireTenantId(), input.bookingId],
+      `SELECT id, booking_id, gateway, gateway_order_id, gateway_payment_id, amount_minor, currency, status, metadata
+         FROM payment_intents
+        WHERE tenant_id = $1 AND booking_id = $2 AND status IN ('created','authorized')
+          AND gateway = $3 AND amount_minor = $4 AND currency = $5 AND metadata = $6::jsonb
+        ORDER BY created_at DESC LIMIT 1`,
+      [
+        requireTenantId(),
+        input.bookingId,
+        input.gateway,
+        input.amountMinor,
+        input.currency,
+        metadata,
+      ],
       { name: 'payment.existingIntent', primary: true },
     );
     if (existing) return map(existing);
+
+    await this.db.execute_(
+      `UPDATE payment_intents SET status = 'failed', failed_reason = 'superseded', updated_at = now()
+        WHERE tenant_id = $1 AND booking_id = $2 AND status = 'created'
+          AND coalesce(metadata->>'kind', '') = coalesce($3::jsonb->>'kind', '')`,
+      [requireTenantId(), input.bookingId, metadata],
+      { name: 'payment.supersedeIntents', primary: true },
+    );
 
     const id = newId() as PaymentId;
     await this.db.execute_(
@@ -56,7 +81,7 @@ export class PaymentRepository {
         input.gateway,
         input.amountMinor,
         input.currency,
-        JSON.stringify(input.metadata ?? {}),
+        metadata,
       ],
       { name: 'payment.createIntent', primary: true },
     );
@@ -69,7 +94,18 @@ export class PaymentRepository {
       amountMinor: input.amountMinor,
       currency: input.currency,
       status: 'created',
+      metadata: input.metadata ?? {},
     };
+  }
+
+  async findById(id: PaymentId): Promise<PaymentIntent | null> {
+    const row = await this.db.queryOne<Row>(
+      `SELECT id, booking_id, gateway, gateway_order_id, gateway_payment_id, amount_minor, currency, status, metadata
+         FROM payment_intents WHERE tenant_id = $1 AND id = $2`,
+      [requireTenantId(), id],
+      { name: 'payment.findById', primary: true },
+    );
+    return row ? map(row) : null;
   }
 
   async setGatewayOrder(id: PaymentId, gatewayOrderId: string): Promise<void> {

@@ -80,6 +80,15 @@ wrong thing, now get a `400` with an `issues[]` array naming the field:
 - `POST /me/ancillaries/attach` and `GET /me/ancillaries` are open to guest
   checkout (held bookings only), like hold / payment intent / charge.
 
+## Changed responses
+- `POST /bookings/:id/reschedule` now returns `status`. `rescheduled`: the
+  booking moved (any refund due is paid automatically). `payment_required`:
+  the change costs more (`amountDueMinor` = fee + fare difference) — `payment`
+  carries a payment for exactly that amount, and the booking moves when it is
+  captured, at the price quoted. (It used to refuse with 422 "cancel and book
+  the new trip instead".) In test mode pay it with
+  `POST /payments/intents/:id/charge-test` (sandbox instrument body).
+
 ## Permission fixes
 - `GET /admin/tenants/plans` now requires the platform admin (it had no check).
 - `admin/operator-applications/*` require a platform (tenant-less) principal; an

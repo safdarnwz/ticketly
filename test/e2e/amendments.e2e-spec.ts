@@ -6,7 +6,7 @@ import { confirmedBooking } from './support/flows';
 /**
  * End-to-end: changes to a confirmed booking — seat change, name correction,
  * reschedule — each one unit of work over seats, passengers, tickets and the
- * amendment audit row. A refused amendment must leave the booking untouched.
+ * amendment audit row. A reschedule that costs more moves only once paid.
  */
 describe('booking amendments (e2e)', () => {
   let app: TestApp;
@@ -53,9 +53,7 @@ describe('booking amendments (e2e)', () => {
     expect(transfer.status).toBe(422);
   });
 
-  it('refuses a reschedule that would cost more, and changes nothing', async () => {
-    // Same fare + the reschedule fee = money due, which reschedule cannot
-    // collect yet (cancel and rebook instead) — so it is refused outright.
+  it('a reschedule that costs more is paid for first, then the booking moves', async () => {
     const res = await app.post(
       `/bookings/${bookingId}/reschedule`,
       {
@@ -66,11 +64,29 @@ describe('booking amendments (e2e)', () => {
       },
       { as: 'operator', idempotencyKey: `e2e-amend-resched-${bookingId}` },
     );
-    expect(res.status).toBe(422);
-    expect(res.body.detail).toContain('cancel and book');
+    // Same fare + the reschedule fee: money is due, so nothing moves yet.
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.status).toBe('payment_required');
+    expect(res.body.amountDueMinor).toBeGreaterThan(0);
+    expect(res.body.payment.amountMinor).toBe(res.body.amountDueMinor);
     expect((await tickets()).map((t) => t.seat)).toEqual([seats()[1]]);
 
-    // The seat the booking still holds stays unavailable to others.
+    const pay = (key: string) =>
+      app.post(
+        `/payments/intents/${res.body.payment.intentId}/charge-test`,
+        { method: 'upi', vpa: 'success@ticketly' },
+        { as: 'anonymous', idempotencyKey: key },
+      );
+    const paid = await pay(`e2e-amend-pay-${bookingId}`);
+    expect(paid.status, JSON.stringify(paid.body)).toBe(200);
+    expect(paid.body.status).toBe('captured');
+    expect((await tickets()).map((t) => t.seat)).toEqual([seats()[2]]);
+
+    // Paying again changes nothing.
+    const again = await pay(`e2e-amend-pay2-${bookingId}`);
+    expect(again.body.status).toBe('already_captured');
+
+    // The seat given up can be sold to someone else.
     const quote = await app.post('/pricing/quote', {
       tripId: app.fixtures.tripId,
       fromStopId: app.fixtures.fromStopId,
@@ -88,6 +104,6 @@ describe('booking amendments (e2e)', () => {
       },
       { idempotencyKey: `e2e-amend-rehold-${bookingId}` },
     );
-    expect(hold.status).toBe(422);
+    expect(hold.status, JSON.stringify(hold.body)).toBe(201);
   });
 });

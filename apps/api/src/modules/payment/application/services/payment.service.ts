@@ -31,6 +31,7 @@ import {
   type PaymentIntent,
 } from '../../infrastructure/persistence/payment.repository';
 import { PaymentGateway } from '../../infrastructure/gateways/gateway.interface';
+import { AdjustmentCaptureRegistry } from './adjustment-capture.registry';
 import {
   validateTestInstrument,
   type TestInstrument,
@@ -76,6 +77,7 @@ export class PaymentService {
     private readonly routes: RouteRepository,
     logger: Logger,
     private readonly metrics: Metrics,
+    private readonly adjustments: AdjustmentCaptureRegistry,
   ) {
     this.log = logger.forContext('PaymentService');
   }
@@ -344,8 +346,23 @@ export class PaymentService {
           // Seat-upgrade differential payments branch BEFORE onCaptured (which
           // confirms a fresh booking). This is the ONLY place an upgrade's swap
           // + ledger entry happen — never before real money is captured.
-          if (intent.metadata?.kind === 'seat_upgrade') {
-            await this.captureSeatUpgrade(intent, event.gatewayPaymentId);
+          if (this.adjustments.forIntent(intent)) {
+            await this.captureAdjustment(intent, event.gatewayPaymentId).catch((err: unknown) => {
+              // Money is captured but the change can no longer be applied
+              // (e.g. the seat was taken meanwhile) — a PSP retry would never
+              // succeed, so it is logged for a manual refund instead.
+              this.log.error(
+                {
+                  err,
+                  intentId: intent.id,
+                  bookingId: intent.bookingId,
+                  kind: intent.metadata?.kind,
+                  gatewayPaymentId: event.gatewayPaymentId,
+                  amountMinor: intent.amountMinor,
+                },
+                'CRITICAL: adjustment payment captured but the change could not be applied — requires manual refund',
+              );
+            });
           } else {
             await this.onCaptured(
               intent.id,
@@ -633,9 +650,8 @@ export class PaymentService {
     // else could take toSeatNumber while this customer is on the Razorpay
     // screen — the webhook branch re-validates the seat is still free
     // before swapping, and fails the upgrade (refunding, see below) if not.
-    const intent = await this.payments.createIntent({
+    const payment = await this.createAdjustmentPayment({
       bookingId: booking.id,
-      gateway: this.gateway.name,
       amountMinor: differentialTotalMinor,
       currency: booking.currency,
       metadata: {
@@ -654,18 +670,9 @@ export class PaymentService {
         routeId: trip.routeId,
       },
     });
-    const created = await this.gateway.createIntent({
-      intentId: intent.id,
-      amountMinor: differentialTotalMinor,
-      currency: booking.currency,
-      bookingId: booking.id,
-      callbackUrl: `${this.config.app.publicBaseUrl}/api/v1/payments/webhook/${this.gateway.name}`,
-    });
-    await this.payments.setGatewayOrder(intent.id, created.gatewayOrderId);
-
     return {
-      intentId: intent.id,
-      clientPayload: created.clientPayload,
+      intentId: payment.intentId,
+      clientPayload: payment.clientPayload,
       differentialMinor: differentialTotalMinor,
     };
   }
@@ -882,124 +889,135 @@ export class PaymentService {
   }
 
   /**
-   * Capture an ADDITIONAL payment on an ALREADY-CONFIRMED booking — the
-   * seat-upgrade differential is the only current caller. This is
-   * DELIBERATELY separate from onCaptured(): that method always computes
-   * commission/GST off `booking.totalMinor` (the booking's ORIGINAL fare),
-   * which is exactly correct for the first payment that confirms a booking
-   * (every existing caller passes an amountMinor that equals
-   * booking.totalMinor, so this was never visibly wrong before) but would
-   * be a SEVERE double-counting bug here: reusing onCaptured() for a
-   * differential would silently re-post the ENTIRE original fare a SECOND
-   * time into gateway_clearing/operator_payable/platform_revenue, while the
-   * actual (much smaller) differential collected from the customer would
-   * have no correct representation in the books at all.
-   *
-   * Here, commission and GST are computed on THIS capture's OWN net/tax
-   * split — passed in explicitly, never re-derived from the booking row —
-   * and the ledger entry's `totalMinor` is THIS capture's amount, not the
-   * booking's. Never calls bookingService.confirm() — the booking is
-   * already confirmed; there is nothing to confirm.
+   * A payment for a change to an existing booking (seat upgrade, reschedule
+   * that costs more). Nothing about the booking changes when the payment is
+   * created; the registered handler applies the change once the gateway
+   * confirms real money, in the same transaction as the ledger entry and the
+   * intent's 'captured' mark — exactly once, whichever of the webhook or the
+   * test charge arrives first.
    */
-  /**
-   * The ONLY place a seat-upgrade's seat-swap and ledger entry actually
-   * happen — called exclusively from the webhook, once a REAL capture is
-   * confirmed for an intent carrying seat_upgrade metadata (see
-   * upgradeSeat()'s own doc comment for the critical bug this replaced:
-   * the old code swapped the seat immediately and faked its own capture,
-   * meaning every upgrade was free with zero real payment ever collected).
-   *
-   * Exactly-once via the same lockIntentForCapture()-then-check-status
-   * pattern onCaptured() uses — a webhook retry (or the rare case of two
-   * gateway callbacks for the same event) must never swap the seat or post
-   * the ledger entry twice for one real charge.
-   *
-   * The new seat's availability was intentionally NOT locked/reserved when
-   * the intent was created — exactly like a fresh booking's hold-then-pay
-   * flow, the customer could spend several minutes on the Razorpay screen.
-   * swapSeat() itself re-validates the target seat is still free (row-locked,
-   * throws if taken) before touching anything; if someone else took it in
-   * the meantime, the catch block below logs CRITICALLY for a manual refund
-   * — real money has already been collected by the gateway by this point,
-   * and (same reasoning as the normal-booking webhook catch block) there is
-   * no safe, verified automatic-refund path to improvise here.
-   */
-  private async captureSeatUpgrade(intent: PaymentIntent, gatewayPaymentId: string): Promise<void> {
-    const locked = await this.payments.lockIntentForCapture(intent.id);
-    if (!locked || locked.status === 'captured') return; // already processed — exactly-once
-
-    const m = intent.metadata as {
-      ticketId: string;
-      tripId: string;
-      fromSeq: number;
-      toSeq: number;
-      stopCount: number;
-      fromSeatNumber: string;
-      toSeatNumber: string;
-      fromSeatType: string;
-      toSeatType: string;
-      differentialFareMinor: number;
-      differentialTaxMinor: number;
-      routeId: string;
+  async createAdjustmentPayment(input: {
+    bookingId: BookingId;
+    amountMinor: number;
+    currency: string;
+    metadata: { kind: string } & Record<string, unknown>;
+  }): Promise<{
+    intentId: PaymentId;
+    clientPayload: Record<string, unknown>;
+    amountMinor: number;
+  }> {
+    if (!this.adjustments.forIntent({ metadata: input.metadata }))
+      throw new Error(`No capture handler registered for '${input.metadata.kind}'`);
+    const intent = await this.payments.createIntent({
+      bookingId: input.bookingId,
+      gateway: this.gateway.name,
+      amountMinor: input.amountMinor,
+      currency: input.currency,
+      metadata: input.metadata,
+    });
+    const created = await this.gateway.createIntent({
+      intentId: intent.id,
+      amountMinor: input.amountMinor,
+      currency: input.currency,
+      bookingId: input.bookingId,
+      callbackUrl: `${this.config.app.publicBaseUrl}/api/v1/payments/webhook/${this.gateway.name}`,
+    });
+    await this.payments.setGatewayOrder(intent.id, created.gatewayOrderId);
+    return {
+      intentId: intent.id,
+      clientPayload: created.clientPayload,
+      amountMinor: input.amountMinor,
     };
+  }
 
-    try {
-      await this.uow.run(
-        { name: 'seatUpgrade.captureSwap', tenantId: requireTenantId() },
-        async () => {
-          await this.seatUpgrades.swapSeat(
-            m.tripId as never,
-            m.stopCount,
-            m.fromSeq,
-            m.toSeq,
-            m.fromSeatNumber,
-            m.toSeatNumber,
-          );
-          await this.seatUpgrades.updateTicketSeat(m.ticketId, m.toSeatNumber);
-          await this.seatUpgrades.recordUpgrade({
-            bookingId: intent.bookingId,
-            ticketId: m.ticketId,
-            fromSeatNumber: m.fromSeatNumber,
-            toSeatNumber: m.toSeatNumber,
-            fromSeatType: m.fromSeatType,
-            toSeatType: m.toSeatType,
-            differentialFareMinor: m.differentialFareMinor,
-            differentialTaxMinor: m.differentialTaxMinor,
-          });
+  /**
+   * Apply a captured adjustment payment: the change, the ledger entry,
+   * 'captured' — exactly once (intent row-locked). Deliberately NOT
+   * onCaptured(): that computes commission off the booking's whole fare,
+   * which would re-post the original fare into the books. Here commission is
+   * on the fare part of THIS payment and the entry's total is THIS amount.
+   */
+  async captureAdjustment(
+    intent: PaymentIntent,
+    gatewayPaymentId: string,
+  ): Promise<'captured' | 'already_captured'> {
+    const handler = this.adjustments.forIntent(intent);
+    if (!handler) throw new Error(`No capture handler for payment ${intent.id}`);
+    return this.uow.run(
+      { name: 'payment.captureAdjustment', tenantId: requireTenantId() },
+      async () => {
+        // The lock must be inside the transaction — seat upgrades took it
+        // outside one, so every upgrade capture threw before being applied.
+        const locked = await this.payments.lockIntentForCapture(intent.id);
+        if (!locked) throw new Error(`Payment ${intent.id} not found`);
+        if (locked.status === 'captured') return 'already_captured';
 
-          const config = (await this.payments.loadCommissionConfig(m.routeId)) as CommissionConfig;
-          const { commission } = computeCommission({
-            netFareMinor: m.differentialFareMinor,
-            seatCount: 1,
-            config,
-          });
-          const commissionGstRatePct = await this.platformSettings.commissionGstRatePercent();
-          const commissionGstMinor = Math.round((commission.minor * commissionGstRatePct) / 100);
+        const booking = await this.bookings.findForUpdate(intent.bookingId);
+        if (!booking) throw new Error(`Booking ${intent.bookingId} not found`);
+        const { fareMinor } = await handler.apply(intent);
 
-          const entry = captureEntry({
+        const config = (await this.payments.loadCommissionConfig(
+          booking.routeId,
+        )) as CommissionConfig;
+        const { commission } = computeCommission({
+          netFareMinor: Math.max(0, fareMinor),
+          seatCount: 1,
+          config,
+        });
+        const commissionGstRatePct = await this.platformSettings.commissionGstRatePercent();
+        await this.ledger.post(
+          captureEntry({
             currency: intent.currency as never,
             bookingId: intent.bookingId,
             operatorId: requireTenantId(),
             totalMinor: intent.amountMinor,
             commissionMinor: commission.minor,
-            commissionGstMinor,
-          });
-          await this.ledger.post(entry);
-          await this.payments.markCaptured(intent.id, gatewayPaymentId);
-        },
-      );
+            commissionGstMinor: Math.round((commission.minor * commissionGstRatePct) / 100),
+          }),
+        );
+        await this.payments.markCaptured(intent.id, gatewayPaymentId);
+        return 'captured';
+      },
+    );
+  }
+
+  /** TEST mode: pay an adjustment payment with a sandbox instrument. */
+  async chargeTestAdjustment(
+    intentId: string,
+    instrument: TestInstrument,
+  ): Promise<{ status: 'captured' | 'already_captured'; amountMinor: number }> {
+    if (!this.config.payment.testMode)
+      throw new AppError(ErrorCode.PAYMENT_GATEWAY_ERROR, 400, {
+        message: 'Test payments are disabled',
+      });
+    const intent = await this.payments.findById(intentId as PaymentId);
+    if (!intent || !this.adjustments.forIntent(intent))
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Payment not found' });
+    const d = new Date();
+    const result = validateTestInstrument(instrument, this.testConfig(), {
+      year: d.getUTCFullYear(),
+      month: d.getUTCMonth() + 1,
+    });
+    if (!result.ok) {
+      await this.payments.markFailed(intent.id, result.reason);
+      throw new AppError(ErrorCode.PAYMENT_DECLINED, 402, { message: result.reason });
+    }
+    const gatewayPaymentId = `test_pay_${newId().replace(/-/g, '').slice(0, 20)}`;
+    await this.payments.setMethodMetadata(intent.id, {
+      method: instrument.method,
+      masked: result.masked,
+      label: result.label,
+      gatewayOrderId: intent.gatewayOrderId ?? `test_order_${intent.id}`,
+      gatewayPaymentId,
+    });
+    try {
+      const status = await this.captureAdjustment(intent, gatewayPaymentId);
+      return { status, amountMinor: intent.amountMinor };
     } catch (err) {
-      this.log.error(
-        {
-          err,
-          intentId: intent.id,
-          bookingId: intent.bookingId,
-          gatewayPaymentId,
-          amountMinor: intent.amountMinor,
-          toSeatNumber: m.toSeatNumber,
-        },
-        'CRITICAL: seat-upgrade payment captured by gateway but the seat swap could not be completed (likely taken concurrently) — requires manual refund',
-      );
+      throw new AppError(ErrorCode.COMMON_CONFLICT, 409, {
+        message: 'The change can no longer be made (e.g. the seat was taken) — no money was taken',
+        cause: err as Error,
+      });
     }
   }
 }

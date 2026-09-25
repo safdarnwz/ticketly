@@ -18,17 +18,19 @@ import { localDate, type BookingId } from '@kernel';
 
 import {
   ChargeTestSchema,
-  type ChargeTestDto,
   CreateIntentSchema,
-  type CreateIntentDto,
   GenerateSettlementSchema,
-  type GenerateSettlementDto,
-  SetCommissionSchema,
   SelfUpgradeSeatSchema,
+  SetCommissionSchema,
+  TestInstrumentSchema,
   UpgradeSeatSchema,
   VerifyPaymentSchema,
-  type SetCommissionDto,
+  type ChargeTestDto,
+  type CreateIntentDto,
+  type GenerateSettlementDto,
   type SelfUpgradeSeatDto,
+  type SetCommissionDto,
+  type TestInstrumentDto,
   type UpgradeSeatDto,
   type VerifyPaymentDto,
 } from './dto/payment.dto';
@@ -94,6 +96,22 @@ export class PaymentController {
   async charge(@Body(zodBody(ChargeTestSchema)) dto: ChargeTestDto) {
     const { bookingId, ...instrument } = dto;
     return this.payment.chargeTest(bookingId as BookingId, instrument);
+  }
+
+  /**
+   * TEST/SANDBOX: pay a payment for a change to a booking (seat upgrade,
+   * reschedule that costs more) — the change is applied on capture.
+   */
+  @Public()
+  @Post('intents/:id/charge-test')
+  @HttpCode(200)
+  @Idempotent()
+  @ApiOperation({ summary: 'Pay a booking-change payment via the sandbox gateway (test mode)' })
+  async chargeAdjustmentTest(
+    @UuidParam('id') id: string,
+    @Body(zodBody(TestInstrumentSchema)) instrument: TestInstrumentDto,
+  ) {
+    return this.payment.chargeTestAdjustment(id, instrument);
   }
 
   @Post('upgrade-seat')

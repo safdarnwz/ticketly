@@ -19,6 +19,8 @@ import { PaymentRepository } from './infrastructure/persistence/payment.reposito
 import { PaymentService } from './application/services/payment.service';
 import { SettlementService } from './application/services/settlement.service';
 import { SettlementRepository } from './infrastructure/persistence/settlement.repository';
+import { AdjustmentCaptureRegistry } from './application/services/adjustment-capture.registry';
+import { SeatUpgradeCapture } from './application/services/seat-upgrade.capture';
 
 /**
  * Payments, ledger & settlement. The gateway is bound behind the
@@ -39,6 +41,8 @@ import { SettlementRepository } from './infrastructure/persistence/settlement.re
   ],
   controllers: [PaymentController],
   providers: [
+    AdjustmentCaptureRegistry,
+    SeatUpgradeCapture,
     PaymentRepository,
     LedgerRepository,
     PaymentService,
@@ -49,6 +53,13 @@ import { SettlementRepository } from './infrastructure/persistence/settlement.re
     ConfiguredPaymentGateway,
     { provide: PaymentGateway, useExisting: ConfiguredPaymentGateway },
   ],
-  exports: [LedgerRepository, PaymentRepository, PaymentService, SettlementService, PaymentGateway],
+  exports: [
+    LedgerRepository,
+    PaymentRepository,
+    PaymentService,
+    SettlementService,
+    PaymentGateway,
+    AdjustmentCaptureRegistry,
+  ],
 })
 export class PaymentModule {}

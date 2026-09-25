@@ -17,6 +17,7 @@ import { EventBus } from '@messaging';
 import { BookingRepository, SeatLockRepository, ticketCode } from '../../../booking';
 import { RouteRepository } from '../../../master-data';
 import { InventoryRepository, TripRepository } from '../../../scheduling';
+import { PaymentService } from '../../../payment';
 import { PricingService, FareRepository } from '../../../pricing';
 import { quoteReschedule } from '../../domain/reschedule-policy';
 import { planSeatChange, SeatChangeError } from '../../domain/seat-change';
@@ -35,6 +36,38 @@ import { AmendmentRepository } from '../../infrastructure/persistence/amendment.
  * seat any more than a booking can. The money delta (fee + fare difference) is
  * computed by the pure policy and recorded on `booking_amendments` for audit.
  */
+export interface RescheduleInput {
+  bookingId: BookingId;
+  newTripId: TripId;
+  newFromStopId: StopId;
+  newToStopId: StopId;
+  newSeatNumbers: string[];
+}
+
+interface RescheduleMoney {
+  feeMinor: number;
+  fareDiffMinor: number;
+  amountDueMinor: number;
+  refundMinor: number;
+}
+
+/** What a reschedule payment carries until it is captured. */
+export interface RescheduleMetadata extends RescheduleMoney {
+  kind: 'reschedule';
+  newTripId: string;
+  newFromStopId: string;
+  newToStopId: string;
+  newSeatNumbers: string[];
+  newTotalMinor: number;
+}
+
+export type RescheduleResult =
+  | ({ status: 'rescheduled'; amendmentId: string } & RescheduleMoney)
+  | ({
+      status: 'payment_required';
+      payment: { intentId: string; clientPayload: Record<string, unknown>; amountMinor: number };
+    } & RescheduleMoney);
+
 @Injectable()
 export class AmendmentService {
   constructor(
@@ -48,25 +81,19 @@ export class AmendmentService {
     private readonly fares: FareRepository,
     private readonly routes: RouteRepository,
     private readonly amendments: AmendmentRepository,
+    private readonly payments: PaymentService,
   ) {}
 
   /**
-   * Reschedule a confirmed booking to a new trip. Locks the new seats, releases
-   * the old, records the money delta. The passenger pays `amountDue` (Part 8
-   * intent) or is refunded `refund` (Part 8) out of band; this moves the seats.
+   * Reschedule a confirmed booking to another trip / segment / seats.
+   *
+   * Priced by quoteReschedule (fee + fare difference). When nothing is due,
+   * the booking moves now and any refund due is paid by the refunds worker
+   * (booking.rescheduled). When money is due, nothing moves yet: the result
+   * carries a payment for exactly that amount, and the booking moves when the
+   * payment is captured (RescheduleCapture) — at the price quoted now.
    */
-  async reschedule(input: {
-    bookingId: BookingId;
-    newTripId: TripId;
-    newFromStopId: StopId;
-    newToStopId: StopId;
-    newSeatNumbers: string[];
-  }): Promise<{
-    amountDueMinor: number;
-    refundMinor: number;
-    feeMinor: number;
-    amendmentId: string;
-  }> {
+  async reschedule(input: RescheduleInput): Promise<RescheduleResult> {
     return this.uow.run({ name: 'amend.reschedule', tenantId: requireTenantId() }, async () => {
       const booking = await this.bookings.findForUpdate(input.bookingId);
       if (!booking)
@@ -76,26 +103,8 @@ export class AmendmentService {
           message: 'Only a confirmed booking can be rescheduled',
         });
       }
-
       const oldTrip = await this.trips.getById(booking.tripId);
-      const newTrip = await this.trips.getById(input.newTripId);
-      if (newTrip.status !== 'open') {
-        throw new AppError(ErrorCode.INVENTORY_TRIP_CLOSED, 422, {
-          message: 'Target trip is not open for booking',
-        });
-      }
-
-      // Price the new trip's segment for the same seat count.
-      const seg = await this.inventory.resolveSegment(
-        input.newTripId,
-        input.newFromStopId,
-        input.newToStopId,
-      );
-      if (!seg)
-        throw new AppError(ErrorCode.INVENTORY_SEGMENT_INVALID, 422, {
-          message: 'Invalid segment on the target trip',
-        });
-
+      const target = await this.resolveTarget(input);
       const quote = await this.pricing.quote({
         tripId: input.newTripId,
         fromStopId: input.newFromStopId,
@@ -103,7 +112,6 @@ export class AmendmentService {
         seatType: 'seater',
         seatCount: input.newSeatNumbers.length,
       });
-
       const rq = quoteReschedule({
         originalFareMinor: booking.totalMinor,
         newFareMinor: quote.totalMinor,
@@ -116,96 +124,169 @@ export class AmendmentService {
       if (!rq.allowed) {
         throw new AppError(ErrorCode.BOOKING_NOT_CANCELLABLE, 422, { message: rq.reason });
       }
-      // A fare INCREASE needs to actually be COLLECTED from the customer —
-      // there is no saved card/UPI to auto-charge, and this is a background-
-      // safe seat-repoint, not an interactive checkout. Until a proper
-      // synchronous "pay the difference, then repoint" flow exists (the
-      // same shape as seat-upgrade's captureIncrementalPayment), blocking
-      // this outright is the safe choice: the alternative — silently
-      // repointing to the pricier trip without collecting anything — was a
-      // genuine revenue leak (this repo's #16). Cancelling and rebooking
-      // fresh already goes through the real payment flow correctly.
-      if (rq.amountDueMinor > 0) {
-        throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
-          message: `This reschedule would cost ${rq.amountDueMinor} more, which isn't collectable through reschedule yet — please cancel and book the new trip instead.`,
-        });
-      }
-
-      // Lock the NEW seats (the same anti-double-sell gate). Positional
-      // correspondence with the existing passengers — reschedule/seat-change
-      // preserve WHO is travelling, just WHICH seat they're in, so old-seat
-      // index i's passenger becomes new-seat index i's passenger. Needed so
-      // a genuine female passenger rebooked into another ladies-only seat
-      // isn't wrongly rejected by seat-lock's per-seat gender check (which
-      // has no other way to know who's actually going into the new seat).
-      const oldPassengers = await this.bookings.loadPassengers(input.bookingId);
-      const genderBySeat: Record<string, string | undefined> = {};
-      input.newSeatNumbers.forEach((seatNumber: string, i: number) => {
-        genderBySeat[seatNumber] = oldPassengers[i]?.gender ?? undefined;
-      });
-      const newLocked = await this.seatLock.lockSeats({
-        tripId: input.newTripId,
-        seatNumbers: input.newSeatNumbers,
-        fromSeq: seg.fromSeq,
-        toSeq: seg.toSeq,
-        stopCount: newTrip.stopCount,
-        passengerGenderBySeat: genderBySeat,
-      });
-      await this.seatLock.commitOccupancy(input.newTripId, newLocked);
-
-      // Release the OLD seats.
-      const oldSeats = await this.bookings.loadSeats(input.bookingId);
-      await this.seatLock.releaseOccupancy(booking.tripId, oldSeats);
-
-      // Repoint the booking to the new trip/seats and bump the reschedule count.
-      const amendmentId = newId();
-      // The new total split over the seats exactly (remainder to the first
-      // seats), so a later partial cancel refunds precisely what was paid.
-      const seatFares = Money.of(quote.totalMinor).allocate(newLocked.length);
-      await this.bookings.moveToTrip({
-        bookingId: input.bookingId,
-        tripId: input.newTripId,
-        fromSeq: seg.fromSeq,
-        toSeq: seg.toSeq,
-        fromStopId: input.newFromStopId,
-        toStopId: input.newToStopId,
-        totalMinor: quote.totalMinor,
-        seats: newLocked.map((l, i) => ({ ...l, fareMinor: seatFares[i].minor })),
-      });
-      await this.amendments.record({
-        id: amendmentId,
-        tenantId: requireTenantId(),
-        bookingId: input.bookingId,
-        kind: 'reschedule',
-        newTripId: input.newTripId,
-        detail: { from: booking.tripId, seats: input.newSeatNumbers },
-        performedBy: getUserId() ?? null,
-        money: {
-          feeMinor: rq.feeMinor,
-          fareDiffMinor: rq.fareDifferenceMinor,
-          amountDueMinor: rq.amountDueMinor,
-          refundMinor: rq.refundDueMinor,
-        },
-      });
-
-      this.events.publish({
-        type: 'booking.rescheduled',
-        aggregateType: 'booking',
-        aggregateId: input.bookingId,
-        payload: {
-          newTripId: input.newTripId,
-          amountDue: rq.amountDueMinor,
-          refund: rq.refundDueMinor,
-        },
-      });
-
-      return {
+      const money = {
+        feeMinor: rq.feeMinor,
+        fareDiffMinor: rq.fareDifferenceMinor,
         amountDueMinor: rq.amountDueMinor,
         refundMinor: rq.refundDueMinor,
-        feeMinor: rq.feeMinor,
-        amendmentId,
       };
+
+      if (rq.amountDueMinor > 0) {
+        await this.assertSeatsFree(input, target);
+        const metadata: RescheduleMetadata = {
+          kind: 'reschedule',
+          newTripId: input.newTripId,
+          newFromStopId: input.newFromStopId,
+          newToStopId: input.newToStopId,
+          newSeatNumbers: input.newSeatNumbers,
+          newTotalMinor: quote.totalMinor,
+          ...money,
+        };
+        const payment = await this.payments.createAdjustmentPayment({
+          bookingId: input.bookingId,
+          amountMinor: rq.amountDueMinor,
+          currency: booking.currency,
+          metadata: { ...metadata },
+        });
+        return { status: 'payment_required', ...money, payment };
+      }
+
+      const amendmentId = await this.moveBooking(input, target, quote.totalMinor, money);
+      return { status: 'rescheduled', ...money, amendmentId };
     });
+  }
+
+  /**
+   * Complete a reschedule whose difference has been paid (called by
+   * RescheduleCapture inside the capture transaction). Re-checks the booking
+   * and the seats — they were not reserved while the customer paid.
+   */
+  async completePaidReschedule(bookingId: BookingId, m: RescheduleMetadata): Promise<void> {
+    const booking = await this.bookings.findForUpdate(bookingId);
+    if (!booking || booking.status !== 'confirmed')
+      throw new Error(`Booking ${bookingId} can no longer be rescheduled`);
+    const input: RescheduleInput = {
+      bookingId,
+      newTripId: m.newTripId as TripId,
+      newFromStopId: m.newFromStopId as StopId,
+      newToStopId: m.newToStopId as StopId,
+      newSeatNumbers: m.newSeatNumbers,
+    };
+    const target = await this.resolveTarget(input);
+    await this.moveBooking(input, target, m.newTotalMinor, {
+      feeMinor: m.feeMinor,
+      fareDiffMinor: m.fareDiffMinor,
+      amountDueMinor: m.amountDueMinor,
+      refundMinor: 0,
+    });
+  }
+
+  /** The target trip must be open and the segment valid on it. */
+  private async resolveTarget(input: RescheduleInput) {
+    const trip = await this.trips.getById(input.newTripId);
+    if (trip.status !== 'open') {
+      throw new AppError(ErrorCode.INVENTORY_TRIP_CLOSED, 422, {
+        message: 'Target trip is not open for booking',
+      });
+    }
+    const seg = await this.inventory.resolveSegment(
+      input.newTripId,
+      input.newFromStopId,
+      input.newToStopId,
+    );
+    if (!seg)
+      throw new AppError(ErrorCode.INVENTORY_SEGMENT_INVALID, 422, {
+        message: 'Invalid segment on the target trip',
+      });
+    return { trip, seg };
+  }
+
+  /** Fail before asking for money if a requested seat is already taken. */
+  private async assertSeatsFree(
+    input: RescheduleInput,
+    target: Awaited<ReturnType<AmendmentService['resolveTarget']>>,
+  ): Promise<void> {
+    const seats = await this.inventory.seatAvailability(
+      input.newTripId,
+      target.seg.fromSeq,
+      target.seg.toSeq,
+    );
+    const free = new Set(seats.filter((s) => s.available).map((s) => s.seatNumber));
+    const taken = input.newSeatNumbers.filter((n) => !free.has(n));
+    if (taken.length)
+      throw new AppError(ErrorCode.INVENTORY_SEAT_UNAVAILABLE, 409, {
+        message: `Seat(s) ${taken.join(', ')} are not available on that trip`,
+      });
+  }
+
+  /**
+   * Move the booking: lock + occupy the new seats (the same anti-double-sell
+   * gate as a new booking), release the old, repoint the booking, record the
+   * amendment, publish booking.rescheduled (the refunds worker pays any refund).
+   */
+  private async moveBooking(
+    input: RescheduleInput,
+    target: Awaited<ReturnType<AmendmentService['resolveTarget']>>,
+    newTotalMinor: number,
+    money: RescheduleMoney,
+  ): Promise<string> {
+    const booking = (await this.bookings.findForUpdate(input.bookingId))!;
+    // Positional: old passenger i travels in new seat i, so the ladies-only
+    // check sees who actually sits in each new seat.
+    const oldPassengers = await this.bookings.loadPassengers(input.bookingId);
+    const genderBySeat: Record<string, string | undefined> = {};
+    input.newSeatNumbers.forEach((seatNumber, i) => {
+      genderBySeat[seatNumber] = oldPassengers[i]?.gender ?? undefined;
+    });
+    const newLocked = await this.seatLock.lockSeats({
+      tripId: input.newTripId,
+      seatNumbers: input.newSeatNumbers,
+      fromSeq: target.seg.fromSeq,
+      toSeq: target.seg.toSeq,
+      stopCount: target.trip.stopCount,
+      passengerGenderBySeat: genderBySeat,
+    });
+    await this.seatLock.commitOccupancy(input.newTripId, newLocked);
+    await this.seatLock.releaseOccupancy(
+      booking.tripId,
+      await this.bookings.loadSeats(input.bookingId),
+    );
+
+    // The new total split over the seats exactly (remainder to the first
+    // seats), so a later partial cancel refunds precisely what was paid.
+    const seatFares = Money.of(newTotalMinor).allocate(newLocked.length);
+    await this.bookings.moveToTrip({
+      bookingId: input.bookingId,
+      tripId: input.newTripId,
+      fromSeq: target.seg.fromSeq,
+      toSeq: target.seg.toSeq,
+      fromStopId: input.newFromStopId,
+      toStopId: input.newToStopId,
+      totalMinor: newTotalMinor,
+      seats: newLocked.map((l, i) => ({ ...l, fareMinor: seatFares[i].minor })),
+    });
+    const amendmentId = newId();
+    await this.amendments.record({
+      id: amendmentId,
+      tenantId: requireTenantId(),
+      bookingId: input.bookingId,
+      kind: 'reschedule',
+      newTripId: input.newTripId,
+      detail: { from: booking.tripId, seats: input.newSeatNumbers },
+      performedBy: getUserId() ?? null,
+      money,
+    });
+    this.events.publish({
+      type: 'booking.rescheduled',
+      aggregateType: 'booking',
+      aggregateId: input.bookingId,
+      payload: {
+        newTripId: input.newTripId,
+        amountDue: money.amountDueMinor,
+        refund: money.refundMinor,
+      },
+    });
+    return amendmentId;
   }
 
   /**

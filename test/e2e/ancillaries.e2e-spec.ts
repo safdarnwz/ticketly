@@ -72,4 +72,44 @@ describe('ancillaries (e2e)', () => {
     expect(after.total - before.total).toBe(charged);
     expect(after.tax - before.tax).toBe(charged - 20_000);
   });
+
+  it('a payment opened before an add-on is replaced, never charged at the old total', async () => {
+    const code = `insurance-${Date.now()}`;
+    const item = await app.post(
+      '/me/ancillaries/catalogue',
+      { code, name: 'Travel insurance', kind: 'insurance', priceMinor: 5_000 },
+      { as: 'operator' },
+    );
+    const { bookingId } = await heldBooking(app, app.fixtures.seatNumbers[1], {
+      fullName: 'Intent Traveller',
+    });
+    const open = () =>
+      app.post('/payments/intent', { bookingId }, { idempotencyKey: `e2e-intent-${Date.now()}` });
+
+    const first = await open();
+    expect(first.status, JSON.stringify(first.body)).toBe(201);
+    await app.post(
+      '/me/ancillaries/attach',
+      { bookingId, items: [{ ancillaryId: item.body.id, quantity: 1 }] },
+      { idempotencyKey: `e2e-attach2-${bookingId}` },
+    );
+    const second = await open();
+    expect(second.body.intentId).not.toBe(first.body.intentId);
+
+    const rows = await runWithContext(createContext({ actorType: 'system' }), () =>
+      runAsTenant(app.fixtures.tenantId as TenantId, () =>
+        app.nest.get(UnitOfWork).run({ name: 'e2e.intents', readOnly: true }, async (s) => {
+          const r = await s.client.query<{ id: string; amount_minor: string; status: string }>(
+            `SELECT id, amount_minor, status FROM payment_intents WHERE booking_id = $1`,
+            [bookingId],
+          );
+          return r.rows;
+        }),
+      ),
+    );
+    const { total } = await totals(bookingId);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    expect(Number(byId.get(second.body.intentId)!.amount_minor)).toBe(total);
+    expect(byId.get(first.body.intentId)!.status).toBe('failed'); // superseded
+  });
 });
