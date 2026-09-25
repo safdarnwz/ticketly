@@ -4,7 +4,8 @@
 #  1. A PR into main runs CI (ci.yml). When CI passes, this workflow approves
 #     and merges the PR (squash) and deletes its branch.
 #  2. The merged commit — or any commit pushed straight to main whose CI
-#     passed — is fast-forwarded to stage, then uat, then prod, in order.
+#     passed — goes to stage, then uat, then prod, one environment job after
+#     the other (promote.yml): fast-forward the branch, then deploy it.
 #     Each environment branch only ever receives commits that passed CI on
 #     main, and never diverges from it (fast-forward only; a promotion that
 #     cannot fast-forward fails loudly instead of overwriting).
@@ -69,7 +70,7 @@ jobs:
               core.warning(`Could not delete branch ${pr.head.ref}: ${e.message}`);
             }
 
-  promote:
+  resolve:
     needs: merge-pr
     # After a merge above, or when CI passed on a push to main.
     if: >-
@@ -78,28 +79,28 @@ jobs:
       ((needs.merge-pr.result == 'success' && needs.merge-pr.outputs.sha != '') ||
        (github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'))
     runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
-      - name: Promote main → stage → uat → prod
-        env:
-          SHA: ${{ needs.merge-pr.outputs.sha || github.event.workflow_run.head_sha }}
-        run: |
-          set -euo pipefail
-          git fetch origin main stage uat prod 2>/dev/null || git fetch origin main
-          # Only commits that are on main are ever promoted.
-          git merge-base --is-ancestor "$SHA" origin/main
-          for env in stage uat prod; do
-            if git ls-remote --exit-code --heads origin "$env" >/dev/null; then
-              git fetch origin "$env"
-              if git merge-base --is-ancestor "$SHA" "origin/$env"; then
-                echo "$env already has $SHA"; continue
-              fi
-              git merge-base --is-ancestor "origin/$env" "$SHA" \
-                || { echo "::error::$env has commits that are not on main — fix it by hand, never overwritten"; exit 1; }
-            fi
-            git push origin "$SHA:refs/heads/$env"
-            echo "Promoted $SHA to $env"
-          done
+      - id: sha
+        run: echo "sha=${{ needs.merge-pr.outputs.sha || github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+
+  # One job per environment, in order. Each shows up under the repository's
+  # Environments / Deployments, fast-forwards its branch, then deploys it.
+  stage:
+    needs: resolve
+    uses: ./.github/workflows/promote.yml
+    with: { environment: stage, sha: '${{ needs.resolve.outputs.sha }}' }
+    secrets: inherit
+
+  uat:
+    needs: [resolve, stage]
+    uses: ./.github/workflows/promote.yml
+    with: { environment: uat, sha: '${{ needs.resolve.outputs.sha }}' }
+    secrets: inherit
+
+  prod:
+    needs: [resolve, uat]
+    uses: ./.github/workflows/promote.yml
+    with: { environment: prod, sha: '${{ needs.resolve.outputs.sha }}' }
+    secrets: inherit

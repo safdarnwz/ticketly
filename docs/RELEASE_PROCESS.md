@@ -13,10 +13,20 @@ feature / fix branch ──PR──▶ main ──▶ stage ──▶ uat ──
 3. **When CI passes, the PR is approved and squash-merged automatically**
    (`.github/workflows/pipeline.yml`) and its branch is deleted.
 4. **The merged commit is promoted automatically**: `main` → `stage` → `uat` →
-   `prod`, in that order, by fast-forward only. An environment branch never
-   receives a commit that did not pass CI on `main`, and is never rewritten: if
-   one has diverged (someone committed to it directly), the promotion stops
-   with an error instead of overwriting it.
+   `prod`, one environment job after the other (`.github/workflows/promote.yml`),
+   each running in the GitHub Environment of the same name:
+   - the exact commit is verified again (install, typecheck, unit tests);
+   - the environment branch is fast-forwarded to it — never force-pushed: if
+     one has diverged (someone committed to it directly), the release stops
+     there with an error instead of overwriting it;
+   - it is deployed, when that environment has a `DEPLOY_WEBHOOK_URL` secret
+     (a POST of `{environment, branch, commit}`; the hosting platform pulls
+     the branch). Without the secret the branch is still promoted.
+
+   A failure at `stage` stops the release before `uat` and `prod`. Each run
+   is listed under the repository's *Environments / Deployments*; a manual
+   gate (required reviewer) can be added per environment in *Settings →
+   Environments* at any time without changing the workflows.
 
 Never commit to `stage`, `uat` or `prod` directly; a hot fix is a normal PR
 into `main` and rides the same pipeline.
