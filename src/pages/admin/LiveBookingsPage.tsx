@@ -92,7 +92,7 @@ export function LiveBookingsPage() {
   const [params, setParams] = useSearchParams();
   const today = todayLocal();
   const from = params.get('from') ?? today;
-  const to = params.get('to') ?? from;
+  const to = params.get('to') ?? today;
   const tenantId = params.get('operator') ?? '';
   const status = (params.get('status') as FeedStatus | null) ?? 'all';
   const channel = params.get('channel') ?? '';

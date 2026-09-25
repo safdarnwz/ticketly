@@ -141,7 +141,7 @@ function TripsTab() {
   const [cancelling, setCancelling] = useState<TripRow | null>(null);
   const [reason, setReason] = useState('');
 
-  const trips = useQuery({ queryKey: ['trips'], queryFn: schedulingApi.listTrips });
+  const trips = useQuery({ queryKey: ['trips'], queryFn: () => schedulingApi.listTrips() });
 
   const cancel = useMutation({
     mutationFn: () => tripOpsApi.cancel(cancelling!.id, reason),

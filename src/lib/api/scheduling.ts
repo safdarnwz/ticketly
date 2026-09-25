@@ -4,6 +4,8 @@ export interface ServiceRow { id: string; code: string; routeId: string; vehicle
 export interface TripRow {
   id: string; routeId: string; routeName: string; journeyDate: string;
   departsAt: string; arrivesAt: string; totalSeats: number; status: string; occupancyPct: number;
+  /** Paid seats, and seats a customer is paying for right now. */
+  bookedSeats: number; heldSeats: number;
 }
 
 export const schedulingApi = {
@@ -18,7 +20,8 @@ export const schedulingApi = {
   previewDates: (input: { recurrence: unknown; from: string; to: string }) =>
     post<{ dates: string[] }>('/v1/scheduling/services/preview-dates', input),
 
-  listTrips: () => get<{ items: TripRow[] }>('/v1/scheduling/trips'),
+  /** One journey date (any status), or — no date — every trip still to leave. */
+  listTrips: (date?: string) => get<{ items: TripRow[] }>(`/v1/scheduling/trips${date ? `?date=${date}` : ''}`),
 };
 
 export const tripOpsApi = {

@@ -1,9 +1,12 @@
 import { get } from './client';
 
+/** "Today" is the operator's own calendar day. */
 export interface ReportSummary {
-  totalBookings: number; todayBookings: number;
+  totalBookings: number; todayBookings: number; todaySeats: number; todayRevenueMinor: number;
   totalCancelled: number; todayCancelled: number;
   totalRevenueMinor: number;
+  /** Customers paying for seats right now. */
+  liveHolds: number; liveHoldSeats: number;
 }
 
 export const reportsApi = {

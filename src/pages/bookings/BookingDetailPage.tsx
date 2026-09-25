@@ -1,142 +1,184 @@
 import type { ReactNode } from 'react';
-import { useState, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useRef, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ticket, ShieldCheck, XCircle, ArrowUpCircle } from 'lucide-react';
+import { ArrowUpCircle, Mail, MailWarning, Send, ShieldCheck, Ticket, XCircle } from 'lucide-react';
 
-import { Button, Card, CardBody, CardHeader, Badge, statusTone, Modal, Input, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Input, Modal, PageLoader, statusTone, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { PrintTicketButton } from '@/components/customer/PrintTicketButton';
 import { bookingsApi } from '@/lib/api/bookings';
-import { paymentsApi, openRazorpayCheckout } from '@/lib/api/payments';
+import { ApiError } from '@/lib/api/client';
+import { openRazorpayCheckout, paymentsApi } from '@/lib/api/payments';
 import { refundsApi } from '@/lib/api/ops';
-import { formatMoney } from '@/lib/utils';
+import { isEmail } from '@/lib/checkout';
+import { formatMoney, formatTime } from '@/lib/utils';
 
+const CHANNEL_LABEL: Record<string, string> = { direct_web: 'Website', direct_app: 'Mobile app', ota: 'OTA partner', backoffice: 'Counter' };
+const dt = (iso: string) =>
+  new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+const errText = (e: unknown, fallback: string) => (e instanceof ApiError || e instanceof Error ? e.message : fallback);
+
+/**
+ * One booking for the operator's staff: journey, passengers, contact, tickets
+ * (print, verify, upgrade), the e-ticket / invoice emails (with re-send),
+ * refunds and GST invoices — and cancelling all or some seats, with the
+ * refund shown before anything is done.
+ */
 export function BookingDetailPage() {
   const { pnr = '' } = useParams();
   const qc = useQueryClient();
   const toast = useToast();
   const [upgrading, setUpgrading] = useState<{ ticketId: string; seat: string } | null>(null);
   const [toSeat, setToSeat] = useState('');
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [resendOpen, setResendOpen] = useState(false);
   const upgradeInFlight = useRef(false);
-  const cancelInFlight = useRef(false);
 
-  const booking = useQuery({
-    queryKey: ['booking', pnr],
-    queryFn: () => bookingsApi.byPnrStaff(pnr).then((r) => r.booking),
-  });
-  const id = booking.data?.id;
-
-  const tickets = useQuery({ queryKey: ['tickets', id], queryFn: () => bookingsApi.tickets(id!), enabled: Boolean(id) });
+  const q = useQuery({ queryKey: ['booking', pnr], queryFn: () => bookingsApi.byPnrStaff(pnr), retry: (n, e) => !(e instanceof ApiError && e.status < 500) && n < 2 });
+  const b = q.data?.booking;
+  const id = b?.id;
+  const confirmed = b ? ['confirmed', 'completed'].includes(b.status) : false;
+  const tickets = useQuery({ queryKey: ['tickets', id], queryFn: () => bookingsApi.tickets(id!), enabled: Boolean(id) && confirmed });
   const invoices = useQuery({ queryKey: ['invoices', id], queryFn: () => bookingsApi.invoices(id!), enabled: Boolean(id) });
   const refunds = useQuery({ queryKey: ['refunds', id], queryFn: () => refundsApi.forBooking(id!), enabled: Boolean(id) });
 
-  const cancel = useMutation({
-    mutationFn: () => bookingsApi.cancel(id!, 'operator cancel'),
-    onSuccess: (r) => {
-      toast.success(`Cancelled · refund ${formatMoney(r.refundMinor, booking.data?.currency)} (${r.refundPct}%)`);
-      void qc.invalidateQueries({ queryKey: ['booking', pnr] });
-      void qc.invalidateQueries({ queryKey: ['refunds', id] });
-    },
-    onError: (e) => { toast.error(e instanceof Error ? e.message : 'Cancel failed'); cancelInFlight.current = false; },
-  });
-  const handleCancel = () => {
-    if (cancelInFlight.current) return;
-    cancelInFlight.current = true;
-    cancel.mutate();
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ['booking', pnr] });
+    void qc.invalidateQueries({ queryKey: ['refunds', id] });
+    void qc.invalidateQueries({ queryKey: ['invoices', id] });
+    void qc.invalidateQueries({ queryKey: ['staff-bookings'] });
   };
 
   const upgrade = useMutation({
     mutationFn: async () => {
+      // The seat moves only after the gateway confirms the difference was paid.
       const r = await paymentsApi.upgradeSeat(upgrading!.ticketId, toSeat.trim());
-      // The seat is NOT swapped yet — only a real gateway order was
-      // created (see PaymentService.upgradeSeat's own doc comment for the
-      // critical bug this replaced: the old flow swapped the seat and
-      // faked its own payment capture, meaning every upgrade was free).
-      // The customer must actually complete Razorpay checkout here; the
-      // seat only actually changes once the webhook confirms a real capture.
       await openRazorpayCheckout(r.clientPayload);
       return r;
     },
     onSuccess: (r) => {
-      toast.success(`Payment complete — charged ${formatMoney(r.differentialMinor, booking.data?.currency)} extra. Your new seat will show shortly once confirmed.`);
-      setUpgrading(null); setToSeat(''); upgradeInFlight.current = false;
-      void qc.invalidateQueries({ queryKey: ['tickets', id] });
+      toast.success(`Paid ${formatMoney(r.differentialMinor, b?.currency)} extra — the new seat shows once the payment is confirmed.`);
+      setUpgrading(null); setToSeat(''); void qc.invalidateQueries({ queryKey: ['tickets', id] });
     },
-    onError: (e) => { toast.error(e instanceof Error ? e.message : 'Upgrade failed'); upgradeInFlight.current = false; },
+    onError: (e) => toast.error(errText(e, 'Upgrade failed')),
+    onSettled: () => { upgradeInFlight.current = false; },
   });
-  const handleUpgrade = () => {
-    if (upgradeInFlight.current) return;
-    upgradeInFlight.current = true;
-    upgrade.mutate();
-  };
 
-  if (booking.isLoading) return <PageLoader />;
-  if (booking.isError) return <ErrorState error={booking.error} onRetry={booking.refetch} />;
-  const b = booking.data!;
-  const cancellable = ['held', 'confirmed'].includes(b.status);
+  if (q.isLoading) return <PageLoader />;
+  if (q.isError) {
+    const notFound = q.error instanceof ApiError && q.error.status === 404;
+    return notFound
+      ? <EmptyState title={`No booking ${pnr.toUpperCase()}`} description="Check the PNR — it may belong to another operator." action={<Link to="/bookings"><Button variant="outline">All bookings</Button></Link>} />
+      : <ErrorState error={q.error} onRetry={q.refetch} />;
+  }
+  const { detail: d, passengers, emails } = q.data!;
+  const booking = b!;
+  const cancellable = ['held', 'confirmed'].includes(booking.status);
+  const status = d?.liveHold ? 'paying now' : d?.status ?? booking.status;
 
   return (
     <>
       <PageHeader
-        back
-        backTo="/bookings"
-        title={`PNR ${b.pnr}`}
-        subtitle={`Trip ${b.tripId}`}
+        title={`PNR ${booking.pnr}`}
+        subtitle={d ? `${d.routeName} · ${d.journeyDate} · departs ${formatTime(d.departsAt)}` : undefined}
         action={
-          cancellable ? (
-            <Button variant="danger" onClick={handleCancel} loading={cancel.isPending} leftIcon={<XCircle className="h-4 w-4" />}>
-              Cancel booking
-            </Button>
-          ) : null
+          <div className="flex gap-2">
+            {confirmed && <Button variant="outline" leftIcon={<Send className="h-4 w-4" />} onClick={() => setResendOpen(true)}>Resend e-ticket</Button>}
+            {cancellable && <Button variant="danger" leftIcon={<XCircle className="h-4 w-4" />} onClick={() => setCancelOpen(true)}>Cancel…</Button>}
+          </div>
         }
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-1">
+        <Card>
           <CardHeader title="Overview" />
           <CardBody className="flex flex-col gap-3 text-sm">
-            <Row label="Status"><Badge tone={statusTone(b.status)}>{b.status}</Badge></Row>
-            <Row label="Seats">{b.seatCount}</Row>
-            <Row label="Total">{formatMoney(b.totalMinor, b.currency)}</Row>
-            <Row label="Paid">{formatMoney(b.paidMinor, b.currency)}</Row>
+            <Row label="Status"><Badge tone={d?.liveHold ? 'warning' : statusTone(booking.status)}>{status}</Badge></Row>
+            {d && <Row label="Booked">{dt(d.createdAt)}</Row>}
+            {d && <Row label="Channel">{CHANNEL_LABEL[d.channel] ?? d.channel}</Row>}
+            <Row label="Seats">{d?.seats.join(', ') || booking.seatCount}</Row>
+            <Row label="Total">{formatMoney(booking.totalMinor, booking.currency)}</Row>
+            <Row label="Paid">{formatMoney(booking.paidMinor, booking.currency)}</Row>
+            {d?.cancelledAt && <Row label="Cancelled">{dt(d.cancelledAt)}</Row>}
           </CardBody>
         </Card>
 
-        <Card className="lg:col-span-2">
-          <CardHeader
-            title={<span className="flex items-center gap-2"><Ticket className="h-4 w-4" /> Tickets</span>}
-            action={id ? <PrintTicketButton bookingId={id} /> : null}
-          />
+        <Card>
+          <CardHeader title="Journey" action={d ? <Link className="text-sm text-primary hover:underline" to={`/bookings?tripId=${d.tripId}&basis=journey&from=${d.journeyDate}&to=${d.journeyDate}&route=${encodeURIComponent(`${d.routeName} ${formatTime(d.departsAt)}`)}`}>Bus bookings</Link> : null} />
+          <CardBody className="flex flex-col gap-3 text-sm">
+            {d ? (
+              <>
+                <Row label="Boarding">{d.fromName ?? '—'}</Row>
+                <Row label="Dropping">{d.toName ?? '—'}</Row>
+                <Row label="Date">{d.journeyDate}</Row>
+                <Row label="Bus departs">{formatTime(d.departsAt)}</Row>
+              </>
+            ) : <p className="text-text-muted">Journey details unavailable.</p>}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader title="Contact" />
+          <CardBody className="flex flex-col gap-3 text-sm">
+            <Row label="Mobile">{d?.contactPhone ? <a className="text-primary" href={`tel:${d.contactPhone}`}>{d.contactPhone}</a> : '—'}</Row>
+            <Row label="Email">{d?.contactEmail ?? '—'}</Row>
+            <Row label="E-ticket email"><EmailStatus status={emails.eticket} /></Row>
+            <Row label="Invoice email"><EmailStatus status={emails.invoice} /></Row>
+          </CardBody>
+        </Card>
+
+        <Card className="lg:col-span-3">
+          <CardHeader title="Passengers" />
           <CardBody>
-            {tickets.isLoading ? <PageLoader /> : tickets.data?.tickets?.length ? (
+            {passengers.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead><tr className="text-left text-text-muted"><th className="py-2">Seat</th><th>Name</th><th>Age</th><th>Gender</th></tr></thead>
+                  <tbody>
+                    {passengers.map((p) => (
+                      <tr key={p.seatNumber} className="border-t border-border">
+                        <td className="py-2 font-semibold">{p.seatNumber}</td><td>{p.fullName}</td><td>{p.age ?? '—'}</td><td className="capitalize">{p.gender ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : <p className="text-sm text-text-muted">No passenger details.</p>}
+          </CardBody>
+        </Card>
+
+        <Card className="lg:col-span-3">
+          <CardHeader title={<span className="flex items-center gap-2"><Ticket className="h-4 w-4" /> Tickets</span>} action={id && confirmed ? <PrintTicketButton bookingId={id} /> : null} />
+          <CardBody>
+            {!confirmed ? (
+              <EmptyState title="No tickets" description={booking.status === 'cancelled' ? 'This booking was cancelled.' : 'Tickets are issued once the booking is paid.'} />
+            ) : tickets.isLoading ? <PageLoader /> : tickets.isError ? <ErrorState error={tickets.error} onRetry={tickets.refetch} /> : (
               <div className="flex flex-col gap-2">
-                {tickets.data.tickets.map((t) => (
+                {tickets.data?.tickets.map((t) => (
                   <div key={t.seat} className="flex items-center justify-between rounded-md border border-border p-3">
-                    <div className="font-medium text-text">Seat {t.seat}</div>
+                    <div className="font-medium text-text">Seat {t.seat} <span className="text-text-muted">· {passengers.find((p) => p.seatNumber === t.seat)?.fullName ?? ''}</span></div>
                     <div className="flex gap-2">
-                      {t.ticketId && <Button variant="ghost" size="sm" leftIcon={<ArrowUpCircle className="h-4 w-4" />} onClick={() => { setUpgrading({ ticketId: t.ticketId!, seat: t.seat }); setToSeat(''); }}>Upgrade</Button>}
+                      {t.ticketId && booking.status === 'confirmed' && <Button variant="ghost" size="sm" leftIcon={<ArrowUpCircle className="h-4 w-4" />} onClick={() => { setUpgrading({ ticketId: t.ticketId!, seat: t.seat }); setToSeat(''); }}>Upgrade</Button>}
                       <VerifyButton token={t.boardingToken} />
                     </div>
                   </div>
                 ))}
               </div>
-            ) : (
-              <EmptyState title="No tickets yet" description="Tickets appear once the booking is confirmed." />
             )}
           </CardBody>
         </Card>
 
         <Card className="lg:col-span-3">
-          <CardHeader title="Refunds & Invoices" />
+          <CardHeader title="Refunds & invoices" />
           <CardBody className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div>
               <div className="mb-2 text-sm font-semibold text-text-muted">Refunds</div>
-              {refunds.data?.refunds?.length ? (
+              {refunds.isError ? <ErrorState error={refunds.error} onRetry={refunds.refetch} /> : refunds.data?.refunds?.length ? (
                 <div className="flex flex-col gap-2">
                   {refunds.data.refunds.map((r, i) => (
                     <div key={i} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
-                      <span>{formatMoney(r.amountMinor, r.currency)} — {r.destination === 'alternate_account' ? 'Alternate account' : 'Original source'}</span>
+                      <span>{formatMoney(r.amountMinor, r.currency)} — {r.destination === 'alternate_account' ? 'Alternate account' : 'Original payment'}</span>
                       <Badge tone={statusTone(r.status)}>{r.status}</Badge>
                     </div>
                   ))}
@@ -145,13 +187,13 @@ export function BookingDetailPage() {
             </div>
             <div>
               <div className="mb-2 text-sm font-semibold text-text-muted">GST invoices</div>
-              {invoices.data?.invoices?.length ? (
+              {invoices.isError ? <ErrorState error={invoices.error} onRetry={invoices.refetch} /> : invoices.data?.invoices?.length ? (
                 <div className="flex flex-col gap-2">
                   {invoices.data.invoices.map((inv) => (
                     <div key={inv.id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
                       <span className="font-mono text-xs">{inv.invoiceNumber}</span>
                       <span className="text-xs text-text-muted">{inv.kind === 'credit' ? 'Credit note' : 'Tax invoice'}</span>
-                      <span>{formatMoney(inv.totalMinor, booking.data?.currency ?? 'INR')}</span>
+                      <span>{formatMoney(inv.totalMinor, booking.currency)}</span>
                       <span className="text-xs text-text-muted">{new Date(inv.issuedAt).toLocaleDateString('en-IN')}</span>
                     </div>
                   ))}
@@ -162,10 +204,17 @@ export function BookingDetailPage() {
         </Card>
       </div>
 
+      {cancelOpen && id && (
+        <CancelModal bookingId={id} currency={booking.currency} seats={d?.seats ?? []} passengers={passengers} onClose={() => setCancelOpen(false)} onDone={() => { setCancelOpen(false); refresh(); }} />
+      )}
+      {resendOpen && id && (
+        <ResendModal bookingId={id} defaultEmail={d?.contactEmail ?? ''} onClose={() => setResendOpen(false)} onDone={() => { setResendOpen(false); refresh(); }} />
+      )}
+
       <Modal open={!!upgrading} onClose={() => setUpgrading(null)} title={`Upgrade seat ${upgrading?.seat ?? ''}`}
-        footer={<><Button variant="ghost" onClick={() => setUpgrading(null)}>Cancel</Button><Button loading={upgrade.isPending} disabled={!toSeat.trim() || upgrade.isPending} onClick={handleUpgrade}>Upgrade & charge difference</Button></>}>
+        footer={<><Button variant="ghost" onClick={() => setUpgrading(null)}>Close</Button><Button loading={upgrade.isPending} disabled={!toSeat.trim() || upgrade.isPending} onClick={() => { if (upgradeInFlight.current) return; upgradeInFlight.current = true; upgrade.mutate(); }}>Upgrade & charge difference</Button></>}>
         <div className="flex flex-col gap-3">
-          <p className="text-sm text-text-muted">Only the FARE DIFFERENCE (plus its own GST) is charged — closes 1 hour before departure.</p>
+          <p className="text-sm text-text-muted">Only the fare difference (plus its GST) is charged. Closes 1 hour before departure.</p>
           <Input label="New seat number" value={toSeat} onChange={(e) => setToSeat(e.target.value)} placeholder="e.g. U5" />
         </div>
       </Modal>
@@ -173,11 +222,95 @@ export function BookingDetailPage() {
   );
 }
 
+function CancelModal({ bookingId, currency, seats, passengers, onClose, onDone }: {
+  bookingId: string; currency: string; seats: string[];
+  passengers: { seatNumber: string; fullName: string }[];
+  onClose: () => void; onDone: () => void;
+}) {
+  const toast = useToast();
+  const [picked, setPicked] = useState<string[]>(seats);
+  const [reason, setReason] = useState('');
+  const [touched, setTouched] = useState(false);
+  const inFlight = useRef(false);
+  const preview = useQuery({ queryKey: ['refund-preview', bookingId], queryFn: () => bookingsApi.refundPreview(bookingId) });
+  const all = picked.length === seats.length || seats.length === 0;
+  const reasonError = reason.trim().length < 3 ? 'Say why (at least 3 characters)' : '';
+  const seatError = picked.length === 0 ? 'Pick at least one seat' : '';
+
+  const cancel = useMutation({
+    mutationFn: () => (all ? bookingsApi.cancel(bookingId, reason.trim()) : bookingsApi.cancelSeats(bookingId, picked, reason.trim())),
+    onSuccess: (r) => { toast.success(`Cancelled · refund ${formatMoney(r.refundMinor, currency)} (${r.refundPct}%)`); onDone(); },
+    onError: (e) => toast.error(errText(e, 'Could not cancel')),
+    onSettled: () => { inFlight.current = false; },
+  });
+  const submit = () => {
+    setTouched(true);
+    if (reasonError || seatError || inFlight.current || preview.data?.cancellable === false) return;
+    inFlight.current = true;
+    cancel.mutate();
+  };
+
+  return (
+    <Modal open onClose={onClose} title="Cancel booking"
+      footer={<><Button variant="ghost" onClick={onClose} disabled={cancel.isPending}>Keep booking</Button><Button variant="danger" loading={cancel.isPending} disabled={cancel.isPending || preview.data?.cancellable === false} onClick={submit}>{all ? 'Cancel whole booking' : `Cancel ${picked.length} seat${picked.length === 1 ? '' : 's'}`}</Button></>}>
+      <div className="flex flex-col gap-4 text-sm">
+        {preview.isLoading ? <p className="text-text-muted">Working out the refund…</p> : preview.isError ? <ErrorState error={preview.error} onRetry={preview.refetch} /> : preview.data?.cancellable === false ? (
+          <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-danger">{preview.data.reason ?? 'This booking can no longer be cancelled.'}</p>
+        ) : preview.data ? (
+          <p className="rounded-md bg-surface-muted px-3 py-2">
+            Cancelling now refunds <b>{preview.data.refundPct}%</b>{all ? <> — <b>{formatMoney(preview.data.refundMinor, currency)}</b> for the whole booking</> : ' of each cancelled seat’s fare'}, to the original payment.
+          </p>
+        ) : null}
+        {seats.length > 1 && (
+          <fieldset>
+            <legend className="mb-2 font-medium text-text">Seats to cancel</legend>
+            <div className="flex flex-col gap-1">
+              {seats.map((s) => (
+                <label key={s} className="flex items-center gap-2">
+                  <input type="checkbox" checked={picked.includes(s)} onChange={(e) => setPicked((cur) => (e.target.checked ? [...cur, s] : cur.filter((x) => x !== s)))} />
+                  Seat {s} <span className="text-text-muted">{passengers.find((p) => p.seatNumber === s)?.fullName}</span>
+                </label>
+              ))}
+            </div>
+            {touched && seatError && <p role="alert" className="mt-1 text-xs text-danger">{seatError}</p>}
+          </fieldset>
+        )}
+        <Input label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Customer called to cancel" maxLength={500} error={touched ? reasonError : undefined} />
+      </div>
+    </Modal>
+  );
+}
+
+function ResendModal({ bookingId, defaultEmail, onClose, onDone }: { bookingId: string; defaultEmail: string; onClose: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const [email, setEmail] = useState(defaultEmail);
+  const [touched, setTouched] = useState(false);
+  const error = !email.trim() ? 'Enter the email to send it to' : !isEmail(email.trim()) ? 'Enter a valid email address' : '';
+  const send = useMutation({
+    mutationFn: () => bookingsApi.resendTicket(bookingId, email.trim() === defaultEmail ? undefined : email.trim()),
+    onSuccess: () => { toast.success(`E-ticket sent to ${email.trim()}`); onDone(); },
+    onError: (e) => toast.error(errText(e, 'Could not send the e-ticket')),
+  });
+  return (
+    <Modal open onClose={onClose} title="Resend e-ticket"
+      footer={<><Button variant="ghost" onClick={onClose}>Close</Button><Button loading={send.isPending} disabled={send.isPending} onClick={() => { setTouched(true); if (!error) send.mutate(); }}>Send</Button></>}>
+      <Input label="Send to" type="email" value={email} onChange={(e) => setEmail(e.target.value)} error={touched ? error : undefined} />
+      <p className="mt-2 text-xs text-text-muted">The GST invoice is not re-sent; it is in the first email and on this page.</p>
+    </Modal>
+  );
+}
+
+function EmailStatus({ status }: { status?: string }) {
+  if (!status) return <span className="text-text-muted">not sent</span>;
+  const ok = status === 'sent';
+  return <span className={ok ? 'inline-flex items-center gap-1 text-success' : 'inline-flex items-center gap-1 text-danger'}>{ok ? <Mail className="h-3.5 w-3.5" /> : <MailWarning className="h-3.5 w-3.5" />}{status}</span>;
+}
+
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between gap-3">
       <span className="text-text-muted">{label}</span>
-      <span className="font-medium text-text">{children}</span>
+      <span className="text-right font-medium text-text">{children}</span>
     </div>
   );
 }
@@ -187,11 +320,7 @@ function VerifyButton({ token }: { token: string }) {
   const verify = useMutation({
     mutationFn: () => bookingsApi.verifyTicket(token),
     onSuccess: (r) => (r.valid ? toast.success('Ticket signature valid ✓') : toast.error('Invalid ticket')),
-    onError: (e) => toast.error(e instanceof Error ? e.message : 'Verification failed'),
+    onError: (e) => toast.error(errText(e, 'Verification failed')),
   });
-  return (
-    <Button variant="ghost" size="sm" onClick={() => verify.mutate()} loading={verify.isPending} leftIcon={<ShieldCheck className="h-4 w-4" />}>
-      Verify
-    </Button>
-  );
+  return <Button variant="ghost" size="sm" onClick={() => verify.mutate()} loading={verify.isPending} leftIcon={<ShieldCheck className="h-4 w-4" />}>Verify</Button>;
 }
