@@ -187,4 +187,32 @@ export class DemandRepository {
       { name: 'forecast.upcoming' },
     );
   }
+
+  /** Trips the operator already decided a cancel suggestion for (#280). */
+  async decidedCancelSuggestions(tripIds: string[]): Promise<Set<string>> {
+    const rows = await this.db.query<{ trip_id: string }>(
+      `SELECT trip_id FROM trip_suggestion_decisions
+        WHERE tenant_id = $1 AND kind = 'cancel' AND trip_id = ANY($2::uuid[])`,
+      [requireTenantId(), tripIds],
+      { name: 'suggestion.decided' },
+    );
+    return new Set(rows.map((r) => r.trip_id));
+  }
+
+  async recordDecision(d: {
+    tripId: string;
+    decision: 'accepted' | 'rejected';
+    reason: string;
+    forecastPct: number | null;
+    decidedBy: string | null;
+  }): Promise<void> {
+    await this.db.execute_(
+      `INSERT INTO trip_suggestion_decisions (tenant_id, trip_id, kind, decision, reason, forecast_pct, decided_by)
+       VALUES ($1, $2, 'cancel', $3, $4, $5, $6)
+       ON CONFLICT (trip_id, kind) DO UPDATE SET decision = EXCLUDED.decision, reason = EXCLUDED.reason,
+         forecast_pct = EXCLUDED.forecast_pct, decided_by = EXCLUDED.decided_by, decided_at = now()`,
+      [requireTenantId(), d.tripId, d.decision, d.reason, d.forecastPct, d.decidedBy],
+      { name: 'suggestion.record', primary: true },
+    );
+  }
 }

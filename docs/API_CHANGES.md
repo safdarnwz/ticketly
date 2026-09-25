@@ -131,6 +131,8 @@ All require a platform (tenant-less) principal.
   `trip.retimed` SMS. Delays (`trip.delayed`) and diversions (`trip.diverted`) now
   reach every passenger of the trip (the delay SMS never went out before).
 - `GET|POST /scheduling/routes/:routeId/blackouts`, `POST …/blackouts/remove`.
+- `GET /reports/cancel-suggestions?days&maxPct` (trips forecast to run nearly empty) and
+  `POST /trips/:tripId/cancel-suggestion/decision` (`accepted` / `rejected` + reason).
 - `GET /pricing/fare-plans/:id/rules.csv`, `POST /pricing/fare-plans/:id/rules/import`,
   `POST /pricing/fare-plans/:id/rules/adjust`.
 

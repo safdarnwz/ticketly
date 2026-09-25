@@ -12,8 +12,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Status | Count |
 |---|---|
 | OPEN | 2714 |
-| DONE | 950 |
-| GAP | 312 |
+| DONE | 951 |
+| GAP | 311 |
 | CONFLICT | 76 |
 | INFRA | 20 |
 | DUP | 9 |
@@ -22,7 +22,7 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 ## #1–#500
 
-CONFLICT 20, DONE 354, GAP 112, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -305,7 +305,7 @@ CONFLICT 20, DONE 354, GAP 112, INFRA 17, PROCESS 3
 | 277 | View occupancy forecast for next 7 days | DONE | verified manually: existing module/API |
 | 278 | View occupancy forecast for next 15 days | DONE | GET /reports/occupancy-forecast?days=15 |
 | 279 | Accept AI suggestion for adding extra trip | DONE | verified manually: existing module/API |
-| 280 | Reject AI suggestion for cancelling service | GAP | verified manually: not built yet |
+| 280 | Reject AI suggestion for cancelling service | DONE | GET /reports/cancel-suggestions; POST /trips/:tripId/cancel-suggestion/decision |
 | 281 | Set minimum fare floor value | DONE | route floor (engine, after yield) |
 | 282 | Set maximum fare ceiling value | DONE | route ceiling (engine, after yield) |
 | 283 | Configure round-trip discount percentage | GAP | verified manually: not built yet |
@@ -777,7 +777,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 354, GAP 112, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -892,7 +892,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 354, GAP 112, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1007,7 +1007,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 354, GAP 112, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1102,7 +1102,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 354, GAP 112, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1217,7 +1217,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 354, GAP 112, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1292,7 +1292,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 354, GAP 112, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|

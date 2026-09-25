@@ -15,7 +15,11 @@ import { getUserId, type TripId } from '@kernel';
 
 import { DemandService } from '../application/demand.service';
 import {
+  CancelSuggestionQuerySchema,
   ForecastQuerySchema,
+  SuggestionDecisionSchema,
+  type CancelSuggestionQueryDto,
+  type SuggestionDecisionDto,
   JoinDemandListSchema,
   LeaveDemandListSchema,
   type ForecastQueryDto,
@@ -77,5 +81,30 @@ export class DemandController {
   @RequirePermission(Permission.REPORT_READ)
   async upcoming(@Query(zodQuery(ForecastQuerySchema)) q: ForecastQueryDto) {
     return this.demand.upcomingForecast(q.days);
+  }
+
+  @Get('reports/cancel-suggestions')
+  @ApiBearerAuth('bearer')
+  @RequirePermission(Permission.SERVICE_MANAGE)
+  @ApiOperation({
+    summary:
+      'Upcoming trips forecast to run nearly empty — candidates to cancel or merge (decided ones are left out)',
+  })
+  async cancelSuggestions(
+    @Query(zodQuery(CancelSuggestionQuerySchema)) q: CancelSuggestionQueryDto,
+  ) {
+    return this.demand.cancelSuggestions(q.days, q.maxPct);
+  }
+
+  @Post('trips/:tripId/cancel-suggestion/decision')
+  @HttpCode(200)
+  @ApiBearerAuth('bearer')
+  @RequirePermission(Permission.SERVICE_MANAGE)
+  @ApiOperation({ summary: 'Accept or reject the suggestion to cancel this trip, with the reason' })
+  decide(
+    @UuidParam('tripId') tripId: string,
+    @Body(zodBody(SuggestionDecisionSchema)) dto: SuggestionDecisionDto,
+  ) {
+    return this.demand.decideCancelSuggestion(tripId as TripId, dto.decision, dto.reason);
   }
 }

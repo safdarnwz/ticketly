@@ -7,6 +7,7 @@ import {
   ErrorCode,
   mapWithConcurrency,
   newId,
+  getUserId,
   requireTenantId,
   type TripId,
 } from '@kernel';
@@ -209,5 +210,53 @@ export class DemandService {
       }),
     );
     return { items };
+  }
+
+  /* ───────────── cancel suggestions (#280) ───────────── */
+
+  /**
+   * Trips departing in the next `days` whose forecast final occupancy is
+   * below `maxPct` — candidates to cancel or merge. A trip the operator has
+   * already accepted or rejected is not suggested again. Only trips with
+   * enough history to forecast are suggested.
+   */
+  async cancelSuggestions(days: number, maxPct: number) {
+    const { items } = await this.upcomingForecast(days);
+    const decided = await this.repo.decidedCancelSuggestions(items.map((i) => i.tripId));
+    return {
+      maxPct,
+      items: items
+        .filter(
+          (i) =>
+            !decided.has(i.tripId) &&
+            i.forecastPct !== null &&
+            i.forecastPct < maxPct &&
+            i.confidence !== 'none',
+        )
+        .map((i) => ({ ...i, suggestion: 'cancel' as const })),
+    };
+  }
+
+  /**
+   * Record the operator's answer. Accepting does not cancel the trip by
+   * itself — cancelling (with refunds) stays a deliberate action on the
+   * trip; this keeps the decision, its reason and who made it.
+   */
+  async decideCancelSuggestion(
+    tripId: TripId,
+    decision: 'accepted' | 'rejected',
+    reason: string,
+  ): Promise<{ tripId: string; decision: string }> {
+    const f = await this.forecast(tripId);
+    await this.uow.run({ name: 'suggestion.decide', tenantId: requireTenantId() }, () =>
+      this.repo.recordDecision({
+        tripId,
+        decision,
+        reason,
+        forecastPct: f.forecastPct,
+        decidedBy: getUserId() ?? null,
+      }),
+    );
+    return { tripId, decision };
   }
 }
