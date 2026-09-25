@@ -92,6 +92,8 @@ async function build(app: NestFastifyApplication): Promise<E2eFixtures> {
                 (SELECT stop_id FROM route_stops WHERE route_id = r.id ORDER BY sequence DESC LIMIT 1) AS to_stop
            FROM trips t JOIN routes r ON r.id = t.route_id
           WHERE t.tenant_id = $2 AND t.journey_date BETWEEN $1::date AND $1::date + 9 AND t.status = 'open'
+            -- a route that is priced (a new route may still have no fares)
+            AND EXISTS (SELECT 1 FROM fare_plans fp WHERE fp.route_id = r.id AND fp.status = 'active' AND fp.deleted_at IS NULL)
           -- the emptiest trip of the next days: every run books seats, so one trip fills up
           ORDER BY (SELECT count(*) FROM trip_seats ts WHERE ts.trip_id = t.id AND ts.is_bookable
                       AND ts.occupied_legs = 0 AND ts.blocked_legs = 0) DESC, t.departs_at

@@ -89,16 +89,19 @@ describe('trip operations (e2e)', () => {
   });
 
   it('a bus that has left cannot be cancelled, put back on sale or re-blocked', async () => {
-    // Another trip of the operator, well after the fixture's.
-    const later = new Date(Date.parse(app.fixtures.journeyDate) + 12 * 864e5)
-      .toISOString()
-      .slice(0, 10);
-    const list = await app.get(`/scheduling/trips?date=${later}`, op);
-    const spare = list.body.items.find(
-      (t: { id: string; status: string }) => t.id !== app.fixtures.tripId && t.status === 'open',
-    );
-    expect(spare, `an open trip on ${later}`).toBeDefined();
-    const id = spare.id as string;
+    // Another open trip of the operator, after the fixture's (each run uses one up).
+    let spare: { id: string } | undefined;
+    for (let d = 5; d <= 28 && !spare; d += 1) {
+      const day = new Date(Date.parse(app.fixtures.journeyDate) + d * 864e5)
+        .toISOString()
+        .slice(0, 10);
+      const list = await app.get(`/scheduling/trips?date=${day}`, op);
+      spare = list.body.items.find(
+        (t: { id: string; status: string }) => t.id !== app.fixtures.tripId && t.status === 'open',
+      );
+    }
+    expect(spare, 'an open trip in the next weeks').toBeDefined();
+    const id = spare!.id;
 
     const crew = (status: string) => app.post(`/crew/trips/${id}/status`, { status }, op);
     expect((await crew('closed')).status).toBe(422); // not departed yet

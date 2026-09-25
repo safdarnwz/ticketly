@@ -6,11 +6,11 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { from, of, type Observable } from 'rxjs';
-import { catchError, switchMap, tap } from 'rxjs/operators';
+import { from, of, throwError, type Observable } from 'rxjs';
+import { catchError, concatMap, map, switchMap } from 'rxjs/operators';
 
 import { AppConfig } from '@config';
-import { AppError, ErrorCode, getContext, toAppError, type Uuid } from '@kernel';
+import { AppError, ErrorCode, getContext, type Uuid } from '@kernel';
 
 import { IDEMPOTENT_KEY } from '../decorators/idempotent.decorator';
 import { IdempotencyStore } from './idempotency.store';
@@ -107,19 +107,21 @@ export class IdempotencyInterceptor implements NestInterceptor {
         }
 
         return next.handle().pipe(
-          tap({
-            next: (body: unknown) => {
-              void this.store.complete(key, tenantId, reply.statusCode || 200, body);
-            },
-          }),
-          catchError((error: unknown) => {
-            const appError = toAppError(error);
-            // 4xx outcomes are deterministic — keep them so a retry replays the
-            // same rejection. 5xx may be transient — release so a retry can run.
-            if (appError.status >= 500) void this.store.release(key, tenantId);
-            else void this.store.complete(key, tenantId, appError.status, appError.toPublicJSON());
-            throw error;
-          }),
+          // Record the outcome before answering, so a retry that arrives the
+          // moment this response does never finds the key still in progress.
+          concatMap((body: unknown) =>
+            from(this.store.complete(key, tenantId, reply.statusCode || 200, body)).pipe(
+              map(() => body),
+            ),
+          ),
+          catchError((error: unknown) =>
+            // A failed request changed nothing (its transaction rolled back),
+            // so the key is released and a retry runs again. Keeping a 4xx
+            // replayed it forever — even after the cause was fixed (a bus
+            // given its seat layout, a document uploaded) — and the replay
+            // lost the problem-details body.
+            from(this.store.release(key, tenantId)).pipe(switchMap(() => throwError(() => error))),
+          ),
         );
       }),
     );

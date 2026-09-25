@@ -205,3 +205,9 @@ an unknown id is now 404 (was 200).
 - New `GET /bookings/trips/:tripId/chart` (staff): the reservation chart — layout, every passenger per seat
   (boarding → dropping, PNR, phone, ticket status), holds being paid now, blocked seats, totals, `hasRun`.
 - `POST /scheduling/trips/:id/block-seats` refuses unknown seats (400) and trips that left or were cancelled.
+- **Idempotency:** a failed request no longer pins its `Idempotency-Key` to that failure. The key is released
+  on any error (a failed request changed nothing), so a retry with the same key runs again once the cause is
+  fixed; a success is still replayed. The store is updated before the response is sent (a quick retry used
+  to get 409 "still in progress"), and replays no longer return a non-RFC-9457 error body.
+- Fleet: `registrationNo` is normalised (capitals, no spaces/dashes) and must be a valid state or BH-series
+  number; crew `phone` must be a 10-digit mobile.

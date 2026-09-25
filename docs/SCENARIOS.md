@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3124 |
-| TODO | 929 |
-| DONE | 25 |
+| TODO | 924 |
+| DONE | 30 |
 | DUP | 9 |
 
 
@@ -166,7 +166,7 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 129 | Set branch working hours | DONE | TODO | branches.working_hours via POST/PATCH /branches |
 | 130 | Deactivate branch temporarily | DONE | TODO | verified manually: existing module/API |
 | 131 | Reactivate branch | DONE | TODO | verified manually: existing module/API |
-| 132 | Add new bus with registration number | DONE | TODO | verified manually: existing module/API |
+| 132 | Add new bus with registration number | DONE | DONE | verified manually: existing module/API · UI: Fleet › Add vehicle (reg validated) + vehicle page |
 | 133 | Select bus type (Seater, Sleeper, Semi-Sleeper, Multi-Axle) | DONE | TODO | verified manually: existing module/API |
 | 134 | Enter total seat capacity | DONE | TODO | verified manually: existing module/API |
 | 135 | Design seat layout visually | DONE | TODO | verified manually: existing module/API |
@@ -182,7 +182,7 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 145 | Enable charging point amenity | DONE | TODO | verified manually: existing module/API |
 | 146 | Enable blanket and water amenity | DONE | TODO | verified manually: existing module/API |
 | 147 | Enable toilet amenity | DONE | TODO | verified manually: existing module/API |
-| 148 | Create new route with origin and destination | DONE | TODO | verified manually: existing module/API |
+| 148 | Create new route with origin and destination | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops › New route (stops, km, timing validated) + publish |
 | 149 | Add intermediate stage 1 | DONE | TODO | verified manually: existing module/API |
 | 150 | Add intermediate stage 2 | DONE | TODO | verified manually: existing module/API |
 | 151 | Add multiple intermediate stages | DONE | TODO | verified manually: existing module/API |
@@ -329,8 +329,8 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 292 | Set child fare rules by age | DONE | TODO | verified manually: existing module/API |
 | 293 | Set infant policy (free or charged) | DONE | TODO | verified manually: existing module/API |
 | 294 | Configure disability-friendly seat rules | DONE | TODO | PUT /concessions/accessible-seats (release hours), enforced on hold |
-| 295 | Upload and manage bus permit documents | DONE | TODO | verified manually: existing module/API |
-| 296 | Upload and manage insurance documents | DONE | TODO | verified manually: existing module/API |
+| 295 | Upload and manage bus permit documents | DONE | DONE | verified manually: existing module/API · UI: Fleet › vehicle page › documents upload/replace + submit for verification |
+| 296 | Upload and manage insurance documents | DONE | DONE | verified manually: existing module/API · UI: Fleet › vehicle page › documents upload/replace + submit for verification |
 | 297 | Upload and manage fitness certificate | DONE | TODO | verified manually: existing module/API |
 | 298 | Set document expiry reminder days | GAP | — | verified manually: not built yet |
 | 299 | View document expiry dashboard | DONE | TODO | verified manually: existing module/API |
@@ -601,7 +601,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 | 557 | View current bus allocation | DONE | TODO | verified manually: existing module/API |
 | 558 | View current driver allocation | DONE | TODO | verified manually: existing module/API |
 | 559 | View current conductor allocation | DONE | TODO | verified manually: existing module/API |
-| 560 | Assign bus to a service | DONE | TODO | verified manually: existing module/API |
+| 560 | Assign bus to a service | DONE | DONE | verified manually: existing module/API · UI: Trips & Charts › chart › Assign / change bus |
 | 561 | Assign driver to a service | DONE | TODO | verified manually: existing module/API |
 | 562 | Assign conductor to a service | DONE | TODO | verified manually: existing module/API |
 | 563 | Change already assigned crew | DONE | TODO | verified manually: existing module/API |

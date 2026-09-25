@@ -85,4 +85,41 @@ describe('hold release (e2e)', () => {
     expect(r.status).toBe(200);
     expect(r.body.released).toBe(false);
   });
+
+  it('a rejected request can be retried with the same key once the cause is gone', async () => {
+    const f = app.fixtures;
+    const seat = f.seatNumbers[3];
+    const blocker = await heldBooking(app, seat, { fullName: 'In The Way', age: 30 });
+    const quote = await app.post('/pricing/quote', {
+      tripId: f.tripId,
+      fromStopId: f.fromStopId,
+      toStopId: f.toStopId,
+      seatType: 'seater',
+      seatNumbers: [seat],
+    });
+    const body = {
+      quoteId: quote.body.quoteId,
+      seatNumbers: [seat],
+      passengers: [{ seatNumber: seat, fullName: 'Second Try', age: 31 }],
+      contactPhone: f.customer.phone,
+    };
+    const key = `e2e-retry-${Date.now()}`;
+    const first = await app.post('/bookings/hold', body, { idempotencyKey: key });
+    expect(first.status).toBe(422);
+    expect(first.body.detail).toBeTruthy();
+
+    const freed = await app.post(
+      `/bookings/${blocker.bookingId}/release-hold`,
+      { mobile: f.customer.phone },
+      { as: 'anonymous' },
+    );
+    expect(freed.body.released).toBe(true);
+
+    const retry = await app.post('/bookings/hold', body, { idempotencyKey: key });
+    expect(retry.status, JSON.stringify(retry.body)).toBe(201);
+    // A success is still replayed, not repeated.
+    const again = await app.post('/bookings/hold', body, { idempotencyKey: key });
+    expect(again.status).toBe(201);
+    expect(again.body.bookingId).toBe(retry.body.bookingId);
+  });
 });

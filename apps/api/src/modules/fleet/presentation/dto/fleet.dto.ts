@@ -28,8 +28,29 @@ const vehicleDetails = {
   hasAc: z.boolean().optional(),
 };
 
+/**
+ * An Indian registration number, stored in one form: capitals, no spaces or
+ * dashes — "rj 14 pa-1234" is RJ14PA1234. State series (RJ14PA1234,
+ * DL1C1234) or Bharat series (22BH1234AA).
+ */
+export const registrationNo = z
+  .string()
+  .transform((v) => v.replace(/[\s-]/g, '').toUpperCase())
+  .refine(
+    (v) => /^[A-Z]{2}\d{1,2}[A-Z]{0,3}\d{1,4}$/.test(v) || /^\d{2}BH\d{4}[A-Z]{1,2}$/.test(v),
+    {
+      message: 'Enter a registration number like RJ14PA1234',
+    },
+  );
+
+/** A 10-digit Indian mobile number, stored as its 10 digits. */
+const mobile = z
+  .string()
+  .transform((v) => v.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, ''))
+  .refine((v) => /^[6-9]\d{9}$/.test(v), { message: 'Enter a 10-digit mobile number' });
+
 export const CreateVehicleSchema = z.object({
-  registrationNo: z.string().trim().min(4).max(20),
+  registrationNo,
   vehicleTypeId: uuid,
   ...vehicleDetails,
 });
@@ -75,8 +96,8 @@ export type OptionalNoteDto = z.infer<typeof OptionalNoteSchema>;
 
 export const CreateCrewSchema = z.object({
   role: z.enum(CREW_ROLES),
-  fullName: z.string().min(1).max(120),
-  phone: z.string().max(20).optional(),
+  fullName: z.string().trim().min(2, 'Enter the full name').max(120),
+  phone: mobile.optional(),
   licenceNo: z.string().max(40).optional(),
   licenceExpiresOn: localDate.optional(),
   employeeCode: z.string().max(40).optional(),
