@@ -124,9 +124,7 @@ export class SchedulingController {
   @RateLimit(120, 60_000, 'ip')
   @ApiOperation({ summary: 'Trip detail with its stop timetable' })
   async getTrip(@UuidParam('id') id: string) {
-    const trip = await this.trips.getById(id as TripId);
-    const stops = await this.trips.loadStops(id as TripId);
-    return { trip, stops };
+    return this.scheduling.tripDetail(id as TripId);
   }
 
   @Get('trips')
@@ -144,19 +142,14 @@ export class SchedulingController {
   @RateLimit(120, 60_000, 'ip')
   @ApiQuery({ name: 'from', required: true, description: 'origin stop id' })
   @ApiQuery({ name: 'to', required: true, description: 'destination stop id' })
-  @ApiOperation({ summary: 'Per-seat availability for a segment' })
+  @ApiOperation({
+    summary: 'Seat map for a segment: bus layout, each seat placed on it, and whether it is free',
+  })
   async availability(
     @UuidParam('id') id: string,
     @Query(zodQuery(SegmentQuerySchema)) q: SegmentQuery,
   ) {
-    const seg = await this.inventory.resolveSegment(id as TripId, q.from as StopId, q.to as StopId);
-    if (!seg) throw new BadRequestError('Invalid boarding/dropping combination for this trip');
-    const seats = await this.inventory.seatAvailability(id as TripId, seg.fromSeq, seg.toSeq);
-    return {
-      available: seats.filter((s) => s.available).length,
-      total: seats.length,
-      seats,
-    };
+    return this.scheduling.seatMap(id as TripId, q.from as StopId, q.to as StopId);
   }
 
   @Post('trips/:id/block-seats')

@@ -62,11 +62,11 @@ describe('seat and sales rules (e2e)', () => {
           AND NOT EXISTS (SELECT 1 FROM booking_seats bs JOIN bookings b ON b.id = bs.booking_id
                            WHERE bs.trip_id = ts.trip_id AND bs.seat_number = ts.seat_number
                              AND b.status = 'held' AND b.hold_expires_at > now())
-        ORDER BY seat_number DESC LIMIT 4`,
+        ORDER BY seat_number DESC LIMIT 5`,
       [app.fixtures.tripId, app.fixtures.seatNumbers],
     );
     seats = free.rows.map((x: { seat_number: string }) => x.seat_number);
-    expect(seats).toHaveLength(4);
+    expect(seats).toHaveLength(5);
   });
   afterAll(async () => {
     await sql(
@@ -118,7 +118,7 @@ describe('seat and sales rules (e2e)', () => {
     expect(staff.status, JSON.stringify(staff.body)).toBe(201);
   });
 
-  it('stops OTA sales beyond the service release % but not the website', async () => {
+  it('an OTA release cap does not stop the website', async () => {
     const seat = seats[2];
     const set = await app.put(
       `/scheduling/services/${serviceId}/sales-rules`,
@@ -126,9 +126,16 @@ describe('seat and sales rules (e2e)', () => {
       { as: 'operator' },
     );
     expect(set.status, JSON.stringify(set.body)).toBe(200);
-    const ota = await hold(seat, { gender: 'male' }, { channel: 'ota' });
-    expect(ota.status).toBe(422);
-    expect(ota.body.detail).toMatch(/partners/);
+    // The website keeps selling; the OTA cap itself is covered by the sales-rules
+    // unit tests (a partner books through the GDS API with its own channel).
+    expect((await hold(seat, { gender: 'male' })).status).toBe(201);
+  });
+
+  it('a guest cannot claim the OTA or back-office channel', async () => {
+    const ota = await hold(seats[4], { gender: 'male' }, { channel: 'ota' });
+    expect(ota.status).toBe(403);
+    const backoffice = await hold(seats[4], { gender: 'male' }, { channel: 'backoffice' });
+    expect(backoffice.status).toBe(403);
   });
 
   it('keeps seats for women until release; women may still take them', async () => {

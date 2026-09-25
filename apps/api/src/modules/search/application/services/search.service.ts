@@ -50,6 +50,8 @@ export interface SearchResult {
   amenities: Amenity[];
   /** Seat types this bus sells (seater / sleeper / semi_sleeper). */
   seatTypes: string[];
+  /** Price per seat for each seat type that has a fare (the cheapest is `fromPriceMinor`). */
+  fares: { seatType: string; priceMinor: number }[];
   /** Average stars of the route's published reviews (1 dp); null until the first review. */
   rating: number | null;
   ratingCount: number;
@@ -342,6 +344,7 @@ export class SearchService {
         const offered = seatTypesByTrip.get(trip.id) ?? [];
         const candidates = input.seatType ? offered.filter((t) => t === input.seatType) : offered;
         let breakup: ReturnType<typeof PricingEngine.price> | null = null;
+        const fares: { seatType: string; priceMinor: number }[] = [];
         for (const seatType of candidates) {
           const fare = await fareFor(seatType);
           if (!fare) continue;
@@ -353,6 +356,7 @@ export class SearchService {
             yield: routePricing.ladder,
             tax: { gstRatePct: routePricing.gstRatePct, interState },
           });
+          fares.push({ seatType, priceMinor: priced.total.minor });
           if (!breakup || priced.total.minor < breakup.total.minor) breakup = priced;
         }
         if (!breakup) continue;
@@ -372,6 +376,7 @@ export class SearchService {
           currency: breakup.currency,
           amenities: trip.vehicleId ? (amenitiesByVehicle.get(trip.vehicleId) ?? []) : [],
           seatTypes: offered,
+          fares,
           rating: rating.count ? rating.average : null,
           ratingCount: rating.count,
         });

@@ -27,6 +27,7 @@ function result(tripId: string, departsAt: string, arrivesAt: string, price = 50
     currency: 'INR',
     amenities: [{ id: 'a1', code: 'wifi', name: 'WiFi', icon: null } as never],
     seatTypes: ['seater'],
+    fares: [{ seatType: 'seater', priceMinor: price }],
     rating: null,
     ratingCount: 0,
   };

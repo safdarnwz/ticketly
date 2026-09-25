@@ -21,6 +21,7 @@ import {
 } from '@kernel';
 
 import { BookingRepository } from '../infrastructure/persistence/booking.repository';
+import { allowedSalesChannel } from '../application/services/sales-channel';
 import { BookingService } from '../application/services/booking.service';
 import { TripOpsService } from '../application/services/trip-ops.service';
 import {
@@ -70,7 +71,7 @@ export class BookingController {
   @Idempotent()
   @ApiOperation({ summary: 'Hold seats against a price quote (guest checkout)' })
   async hold(@Body(zodBody(HoldSchema)) dto: HoldDto) {
-    return this.booking.hold(dto);
+    return this.booking.hold({ ...dto, channel: allowedSalesChannel(dto.channel) });
   }
 
   /**
