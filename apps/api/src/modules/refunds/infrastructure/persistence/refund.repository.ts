@@ -16,6 +16,30 @@ export interface RefundRow {
   gatewayRefundId: string | null;
   cancellationId: string | null;
   dispatchAttempt: number;
+  failureReason: string | null;
+  payoutReference: string | null;
+  createdAt: Date;
+}
+
+export interface RefundQueueRow {
+  id: string;
+  bookingId: string;
+  pnr: string;
+  contactPhone: string | null;
+  amountMinor: number;
+  currency: string;
+  status: RefundStatus;
+  destination: RefundDestination;
+  failureReason: string | null;
+  attempts: number;
+  accountHolder: string | null;
+  accountMasked: string | null;
+  ifsc: string | null;
+  bankName: string | null;
+  payoutReference: string | null;
+  paidAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 /**
@@ -289,6 +313,87 @@ export class RefundRepository {
     return row ? map(row) : null;
   }
 
+  /** Record a refund paid by bank transfer. Caller holds the row lock. */
+  async recordPayout(refundId: string, reference: string, paidBy: string | null): Promise<void> {
+    const scope = currentTransaction();
+    if (!scope) throw new Error('recordPayout requires a transaction');
+    await scope.client.query(
+      `UPDATE refunds SET payout_reference = $3, paid_by = $4, paid_at = now(), updated_at = now()
+        WHERE tenant_id = $1 AND id = $2`,
+      [requireTenantId(), refundId, reference, paidBy],
+    );
+  }
+
+  /** Full account details for sending the transfer — only to someone allowed to pay refunds. */
+  async payoutDetails(refundId: string): Promise<{
+    accountHolder: string | null;
+    accountNumber: string | null;
+    ifsc: string | null;
+    bankName: string | null;
+  } | null> {
+    return this.db.queryOne(
+      `SELECT alt_account_holder AS "accountHolder", alt_account_number AS "accountNumber",
+              alt_ifsc AS "ifsc", alt_bank_name AS "bankName"
+         FROM refunds WHERE tenant_id = $1 AND id = $2 AND destination = 'alternate_account'`,
+      [requireTenantId(), refundId],
+      { name: 'refund.payoutDetails', primary: true },
+    );
+  }
+
+  /**
+   * The operator's refunds queue, newest first. `action` = what needs a person:
+   * failed refunds, and bank transfers not yet sent. Account numbers are masked.
+   */
+  async queue(input: {
+    queue: 'action' | 'processing' | 'done' | 'all';
+    pnr?: string;
+    before?: { createdAt: string; id: string };
+    limit: number;
+  }): Promise<RefundQueueRow[]> {
+    const where: Record<typeof input.queue, string> = {
+      action: `(r.status = 'failed' OR (r.status = 'processing' AND r.destination = 'alternate_account'))`,
+      processing: `r.status IN ('initiated','processing') AND r.destination = 'source'`,
+      done: `r.status IN ('settled','manual','cancelled')`,
+      all: 'true',
+    };
+    return this.db.query<RefundQueueRow>(
+      `SELECT r.id, r.booking_id AS "bookingId", b.pnr, b.contact_phone AS "contactPhone",
+              r.amount_minor::bigint::float8 AS "amountMinor", r.currency, r.status, r.destination,
+              r.failure_reason AS "failureReason", r.dispatch_attempt AS "attempts",
+              r.alt_account_holder AS "accountHolder",
+              CASE WHEN r.alt_account_number IS NULL THEN NULL
+                   ELSE '••••' || right(r.alt_account_number, 4) END AS "accountMasked",
+              r.alt_ifsc AS "ifsc", r.alt_bank_name AS "bankName",
+              r.payout_reference AS "payoutReference", r.paid_at AS "paidAt",
+              r.created_at AS "createdAt", r.updated_at AS "updatedAt"
+         FROM refunds r JOIN bookings b ON b.id = r.booking_id
+        WHERE r.tenant_id = $1 AND ${where[input.queue]}
+          AND ($2::text IS NULL OR b.pnr = $2)
+          AND ($3::timestamptz IS NULL OR (r.created_at, r.id) < ($3::timestamptz, $4::uuid))
+        ORDER BY r.created_at DESC, r.id DESC
+        LIMIT $5`,
+      [
+        requireTenantId(),
+        input.pnr ?? null,
+        input.before?.createdAt ?? null,
+        input.before?.id ?? null,
+        input.limit,
+      ],
+      { name: 'refund.queue' },
+    );
+  }
+
+  /** How many refunds wait for a person — the badge on the queue. */
+  async actionCount(): Promise<number> {
+    const row = await this.db.queryOne<{ n: number }>(
+      `SELECT count(*)::int AS n FROM refunds
+        WHERE tenant_id = $1 AND (status = 'failed' OR (status = 'processing' AND destination = 'alternate_account'))`,
+      [requireTenantId()],
+      { name: 'refund.actionCount' },
+    );
+    return row?.n ?? 0;
+  }
+
   async listByBooking(bookingId: BookingId): Promise<RefundRow[]> {
     const rows = await this.db.query<Raw>(
       `${SELECT} WHERE tenant_id = $1 AND booking_id = $2 ORDER BY created_at`,
@@ -301,7 +406,8 @@ export class RefundRepository {
 
 const SELECT = `SELECT id, booking_id AS "bookingId", payment_intent_id AS "paymentIntentId", amount_minor AS "amountMinor",
                        currency, status, destination, gateway_refund_id AS "gatewayRefundId", cancellation_id AS "cancellationId",
-                       dispatch_attempt AS "dispatchAttempt"
+                       dispatch_attempt AS "dispatchAttempt", failure_reason AS "failureReason",
+                       payout_reference AS "payoutReference", created_at AS "createdAt"
                   FROM refunds`;
 
 interface Raw {
@@ -315,6 +421,9 @@ interface Raw {
   gatewayRefundId: string | null;
   cancellationId: string | null;
   dispatchAttempt: number;
+  failureReason: string | null;
+  payoutReference: string | null;
+  createdAt: Date;
 }
 function map(r: Raw): RefundRow {
   return {

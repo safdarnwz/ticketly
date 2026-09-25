@@ -392,11 +392,31 @@ export class RefundService {
   }
 
   /** Mark a failed refund as paid outside the gateway (manual bank transfer). */
-  async markManual(refundId: string): Promise<void> {
+  /**
+   * Paid outside the gateway: a failed refund paid by hand, or a refund to the
+   * customer's other bank account once the transfer is sent. `reference` is the
+   * transfer's UTR, kept with the refund. A gateway refund still in flight
+   * cannot be marked — it may yet be paid by the gateway too.
+   */
+  async markManual(
+    refundId: string,
+    input: { reference: string; paidBy: string | null },
+  ): Promise<void> {
     await this.uow.run({ name: 'refund.manual', tenantId: requireTenantId() }, async () => {
       const refund = await this.refunds.findForUpdate(refundId);
       if (!refund)
         throw new AppError(ErrorCode.REFUND_NOT_FOUND, 404, { message: 'Refund not found' });
+      if (refund.status === 'processing' && refund.destination !== 'alternate_account') {
+        throw new AppError(ErrorCode.REFUND_NOT_ALLOWED, 422, {
+          message:
+            'The payment gateway is still processing this refund — wait for it, or pay by hand once it fails',
+        });
+      }
+      if (refund.status === 'manual' || refund.status === 'settled') {
+        throw new AppError(ErrorCode.REFUND_NOT_ALLOWED, 422, {
+          message: 'This refund has already been paid',
+        });
+      }
       assertRefundTransition(refund.status, 'manual');
       // Money left the business outside the gateway; the ledger still records it.
       await this.postRefundLedger(
@@ -405,6 +425,7 @@ export class RefundService {
         refund.currency as CurrencyCode,
       );
       await this.refunds.transition(refundId, 'manual', { reconciled: true });
+      await this.refunds.recordPayout(refundId, input.reference, input.paidBy);
       const booking = await this.bookings.findForUpdate(refund.bookingId);
       this.events.publish({
         type: 'refund.settled',
@@ -423,8 +444,39 @@ export class RefundService {
     });
   }
 
-  async listForBooking(bookingId: BookingId): Promise<unknown[]> {
-    return this.refunds.listByBooking(bookingId);
+  /** The account a refund must be transferred to (404 for a gateway refund). */
+  async payoutDetails(refundId: string) {
+    const details = await this.refunds.payoutDetails(refundId);
+    if (!details)
+      throw new AppError(ErrorCode.REFUND_NOT_FOUND, 404, { message: 'Refund not found' });
+    return details;
+  }
+
+  queue(input: Parameters<RefundRepository['queue']>[0]) {
+    return this.refunds.queue(input);
+  }
+
+  actionCount(): Promise<number> {
+    return this.refunds.actionCount();
+  }
+
+  /** A booking's refunds, and how much of what was paid can still be refunded. */
+  async bookingRefunds(bookingId: BookingId) {
+    const booking = await this.bookings.findForUpdate(bookingId); // outside a transaction: a plain read
+    if (!booking)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
+    const [refunds, capturedMinor, committedMinor] = await Promise.all([
+      this.refunds.listByBooking(bookingId),
+      this.refunds.capturedAmountForBooking(bookingId),
+      this.refunds.committedRefundTotal(bookingId),
+    ]);
+    return {
+      refunds,
+      currency: booking.currency,
+      capturedMinor,
+      refundedMinor: committedMinor,
+      refundableMinor: Math.max(0, capturedMinor - committedMinor),
+    };
   }
 
   /** processing → settled: ledger entry, status, notification event. Caller holds the refund row lock. */

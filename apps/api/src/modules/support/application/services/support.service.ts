@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
+import { Permission } from '@contracts';
 import {
   AppError,
   ErrorCode,
+  getContext,
   getUserId,
+  hasPermission,
+  NotFoundError,
   requireTenantId,
   type BookingId,
   type SupportTicketId,
@@ -27,6 +31,11 @@ import { SupportRepository } from '../../infrastructure/persistence/support.repo
  * Reply + status move happen in one transaction so the thread and the ticket
  * state never disagree.
  */
+/** Operator staff handle tickets; everyone else is a customer who sees only their own. */
+function isStaff(): boolean {
+  return Boolean(getContext()?.tenantId) && hasPermission(Permission.BOOKING_READ);
+}
+
 @Injectable()
 export class SupportService {
   constructor(
@@ -34,83 +43,142 @@ export class SupportService {
     private readonly uow: UnitOfWork,
   ) {}
 
+  /**
+   * A customer opens a ticket about their own booking (or none); staff raise
+   * one for a caller — the ticket then belongs to the booking's customer.
+   */
   async open(input: {
     subject: string;
     body: string;
     category?: string;
     priority?: string;
     bookingId?: BookingId;
+    pnr?: string;
   }): Promise<{ ticketId: string }> {
+    const staff = isStaff();
+    const me = getUserId() ?? null;
+    if (!me)
+      throw new AppError(ErrorCode.COMMON_UNAUTHENTICATED, 401, { message: 'Sign in first' });
+    let bookingId: string | null = null;
+    let customerId: string | null = staff ? null : me;
+    if (input.bookingId || input.pnr) {
+      const b = await this.repo.booking({ id: input.bookingId, pnr: input.pnr });
+      // A customer can only raise a ticket about their own booking.
+      if (!b || (!staff && b.customerId !== me))
+        throw new NotFoundError('Booking', input.pnr ?? input.bookingId ?? '');
+      bookingId = b.id;
+      if (staff) customerId = b.customerId;
+    }
     return this.uow.run({ name: 'support.open', tenantId: requireTenantId() }, async () => {
-      const customerId = getUserId() ?? null;
       const ticketId = await this.repo.createTicket({
         subject: input.subject,
         category: input.category ?? 'general',
-        priority: input.priority ?? 'normal',
-        customerId,
-        bookingId: input.bookingId ?? null,
+        // Customers cannot jump the queue; staff set the priority.
+        priority: staff ? (input.priority ?? 'normal') : 'normal',
+        customerId: customerId as UserId | null,
+        bookingId: bookingId as BookingId | null,
       });
       await this.repo.addMessage({
         ticketId: ticketId as SupportTicketId,
-        authorKind: 'customer',
-        authorId: customerId,
+        authorKind: staff ? 'agent' : 'customer',
+        authorId: me,
         body: input.body,
       });
+      if (staff) await this.repo.update(ticketId as SupportTicketId, { assignedTo: me });
       return { ticketId };
     });
   }
 
   async reply(
     ticketId: SupportTicketId,
-    input: { authorKind: 'customer' | 'agent' | 'system'; body: string },
+    input: { body: string },
   ): Promise<{ status: TicketStatus }> {
+    const staff = isStaff();
     return this.uow.run({ name: 'support.reply', tenantId: requireTenantId() }, async () => {
-      const ticket = await this.repo.findTicket(ticketId);
-      if (!ticket)
-        throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Ticket not found' });
+      const ticket = await this.visible(ticketId, staff);
       if (isTicketClosed(ticket.status)) {
         throw new AppError(ErrorCode.SUPPORT_TICKET_CLOSED, 422, {
-          message: 'Cannot reply to a closed ticket',
+          message: 'This ticket is closed — open a new one',
         });
       }
-      const authorId = getUserId() ?? null;
+      const authorKind = staff ? 'agent' : 'customer';
       await this.repo.addMessage({
         ticketId,
-        authorKind: input.authorKind,
-        authorId,
+        authorKind,
+        authorId: getUserId() ?? null,
         body: input.body,
       });
-
-      const next = statusAfterMessage(ticket.status, input.authorKind);
+      const next = statusAfterMessage(ticket.status, authorKind);
       if (next !== ticket.status) await this.repo.updateStatus(ticketId, next);
+      // The first staff member to answer takes the ticket.
+      if (staff && !ticket.assignedTo)
+        await this.repo.update(ticketId, { assignedTo: getUserId() ?? null });
       return { status: next };
     });
   }
 
+  /** Staff move a ticket through its states; a customer can only close their own. */
   async transition(ticketId: SupportTicketId, to: TicketStatus): Promise<{ status: TicketStatus }> {
+    const staff = isStaff();
     return this.uow.run({ name: 'support.transition', tenantId: requireTenantId() }, async () => {
-      const ticket = await this.repo.findTicket(ticketId);
-      if (!ticket)
-        throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Ticket not found' });
+      const ticket = await this.visible(ticketId, staff);
+      if (!staff && to !== 'closed')
+        throw new AppError(ErrorCode.COMMON_FORBIDDEN, 403, {
+          message: 'You can close your ticket; the operator moves it otherwise',
+        });
       assertTicketTransition(ticket.status, to);
       if (ticket.status !== to) await this.repo.updateStatus(ticketId, to);
       return { status: to };
     });
   }
 
+  /** Staff: priority and assignee (another staff member of this operator, or nobody). */
+  async update(
+    ticketId: SupportTicketId,
+    patch: { priority?: string; assignedTo?: string | null },
+  ): Promise<void> {
+    const ticket = await this.visible(ticketId, true);
+    if (isTicketClosed(ticket.status))
+      throw new AppError(ErrorCode.SUPPORT_TICKET_CLOSED, 422, {
+        message: 'This ticket is closed',
+      });
+    if (patch.assignedTo && !(await this.repo.isStaff(patch.assignedTo)))
+      throw new NotFoundError('Staff member', patch.assignedTo);
+    await this.repo.update(ticketId, patch);
+  }
+
   async get(ticketId: SupportTicketId): Promise<unknown> {
-    const ticket = await this.repo.findTicket(ticketId);
-    if (!ticket)
-      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Ticket not found' });
-    const messages = await this.repo.listMessages(ticketId);
+    await this.visible(ticketId, isStaff());
+    const [ticket, messages] = await Promise.all([
+      this.repo.ticketView(ticketId),
+      this.repo.listMessages(ticketId),
+    ]);
     return { ticket, messages };
   }
 
   async list(filter: {
-    customerId?: UserId;
-    status?: TicketStatus;
-    limit?: number;
+    status?: TicketStatus | 'active';
+    priority?: string;
+    category?: string;
+    assigned?: 'me' | 'none';
+    q?: string;
+    limit: number;
   }): Promise<unknown[]> {
-    return this.repo.listTickets(filter);
+    const staff = isStaff();
+    const me = getUserId();
+    return this.repo.listTickets({
+      ...filter,
+      // A customer sees only their own tickets, whatever they ask for.
+      customerId: staff ? undefined : ((me ?? '00000000-0000-0000-0000-000000000000') as UserId),
+      assignedTo: filter.assigned === 'none' ? 'none' : filter.assigned === 'me' ? me : undefined,
+    });
+  }
+
+  /** The ticket, if this caller may see it (404 otherwise — never a hint it exists). */
+  private async visible(ticketId: SupportTicketId, staff: boolean) {
+    const ticket = await this.repo.findTicket(ticketId);
+    if (!ticket || (!staff && ticket.customerId !== getUserId()))
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Ticket not found' });
+    return ticket;
   }
 }

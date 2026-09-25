@@ -14,7 +14,7 @@ import { DomainError, ErrorCode } from '@kernel';
  * keeps the rules testable.
  *
  *   initiated ──▶ processing ──▶ settled
- *       │             │
+ *       │             │  └──▶ manual   (bank transfer sent — alternate account only)
  *       │             └──▶ failed ──▶ processing   (retry)
  *       └──▶ cancelled                 └──▶ manual  (paid outside the gateway)
  *
@@ -30,7 +30,7 @@ export type RefundDestination = 'source' | 'alternate_account';
 
 const TRANSITIONS: Record<RefundStatus, RefundStatus[]> = {
   initiated: ['processing', 'cancelled'],
-  processing: ['settled', 'failed'],
+  processing: ['settled', 'failed', 'manual'],
   failed: ['processing', 'manual', 'cancelled'],
   settled: [],
   cancelled: [],

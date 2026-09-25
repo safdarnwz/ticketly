@@ -124,6 +124,10 @@ describe('route promotions (e2e)', () => {
     const draft = await buy({ ...body, routeIds: [copy.body.id] });
     expect(draft.status).toBe(422);
     expect(draft.body.detail).toMatch(/not published/);
+    // Leave no stray draft route behind.
+    expect(
+      (await app.post(`/master-data/routes/${copy.body.id}/archive`, {}, op)).status,
+    ).toBeLessThan(300);
   });
 
   it('a paused promotion can be cancelled, once, by its owner only', async () => {

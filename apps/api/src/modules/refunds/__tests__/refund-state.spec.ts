@@ -23,6 +23,11 @@ describe('refund state machine', () => {
     expect(canRefundTransition('failed', 'manual')).toBe(true);
   });
 
+  it('a refund being processed can be recorded as paid by hand (a bank transfer sent)', () => {
+    expect(canRefundTransition('processing', 'manual')).toBe(true);
+    expect(canRefundTransition('manual', 'manual')).toBe(false);
+  });
+
   it('forbids reviving a settled refund', () => {
     expect(canRefundTransition('settled', 'processing')).toBe(false);
     expect(() => assertRefundTransition('settled', 'processing')).toThrow(/cannot move/);

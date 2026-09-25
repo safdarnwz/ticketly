@@ -1,9 +1,23 @@
-import { Body, Controller, Get, Post, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, Post, HttpCode, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Idempotent, RequirePermission, UuidParam, zodBody } from '@http';
-import { type BookingId } from '@kernel';
+import {
+  ApiStandardErrors,
+  Idempotent,
+  RequirePermission,
+  UuidParam,
+  zodBody,
+  zodQuery,
+} from '@http';
+import {
+  BadRequestError,
+  decodeCursor,
+  encodeCursor,
+  getUserId,
+  isUuid,
+  type BookingId,
+} from '@kernel';
 
 import { RefundService } from '../application/services/refund.service';
 import {
@@ -11,6 +25,10 @@ import {
   type InitiateRefundDto,
   ReconcileRefundSchema,
   type ReconcileRefundDto,
+  MarkRefundPaidSchema,
+  type MarkRefundPaidDto,
+  RefundQueueSchema,
+  type RefundQueueDto,
 } from './dto/refund.dto';
 
 /**
@@ -28,9 +46,56 @@ export class RefundController {
 
   @Get('bookings/:bookingId/refunds')
   @RequirePermission(Permission.PAYMENT_READ)
-  @ApiOperation({ summary: 'List refunds for a booking' })
+  @ApiOperation({
+    summary: "A booking's refunds, and how much of what was paid can still be refunded",
+  })
   async list(@UuidParam('bookingId') bookingId: string) {
-    return { refunds: await this.refunds.listForBooking(bookingId as BookingId) };
+    return this.refunds.bookingRefunds(bookingId as BookingId);
+  }
+
+  @Get('refunds')
+  @RequirePermission(Permission.PAYMENT_READ)
+  @ApiOperation({
+    summary:
+      'Refunds queue, newest first — action (failed, or a bank transfer to send), processing, done, all',
+  })
+  async queue(@Query(zodQuery(RefundQueueSchema)) q: RefundQueueDto) {
+    let before: { createdAt: string; id: string } | undefined;
+    if (q.cursor) {
+      let c: ReturnType<typeof decodeCursor> | undefined;
+      try {
+        c = decodeCursor(q.cursor);
+      } catch {
+        c = undefined;
+      }
+      const [at, id] = c?.k ?? [];
+      if (c?.v !== 1 || typeof at !== 'string' || Number.isNaN(Date.parse(at)) || !isUuid(id))
+        throw new BadRequestError('That page link is no longer valid — start from the first page');
+      before = { createdAt: at, id };
+    }
+    const [rows, needsAction] = await Promise.all([
+      this.refunds.queue({ queue: q.queue, pnr: q.pnr, before, limit: q.limit + 1 }),
+      this.refunds.actionCount(),
+    ]);
+    const hasMore = rows.length > q.limit;
+    const items = rows.slice(0, q.limit);
+    const last = items[items.length - 1];
+    return {
+      items,
+      needsAction,
+      hasMore,
+      nextCursor:
+        hasMore && last
+          ? encodeCursor({ v: 1, k: [new Date(last.createdAt).toISOString(), last.id], d: 'desc' })
+          : null,
+    };
+  }
+
+  @Get('refunds/:id/payout')
+  @RequirePermission(Permission.PAYMENT_REFUND)
+  @ApiOperation({ summary: 'The bank account to send an alternate-account refund to' })
+  async payout(@UuidParam('id') id: string) {
+    return this.refunds.payoutDetails(id);
   }
 
   @Post('refunds')
@@ -46,6 +111,8 @@ export class RefundController {
       bookingId: dto.bookingId as BookingId,
       amountMinor: dto.amountMinor,
       destination: dto.destination,
+      altAccountDetails:
+        dto.destination === 'alternate_account' ? dto.altAccountDetails : undefined,
     });
   }
 
@@ -71,9 +138,15 @@ export class RefundController {
   @HttpCode(200)
   @Idempotent()
   @RequirePermission(Permission.PAYMENT_REFUND)
-  @ApiOperation({ summary: 'Mark a failed refund as paid manually (off-gateway)' })
-  async manual(@UuidParam('id') id: string) {
-    await this.refunds.markManual(id);
+  @ApiOperation({
+    summary:
+      'Record a refund paid outside the gateway (a failed one paid by hand, or a bank transfer sent) with its UTR',
+  })
+  async manual(
+    @UuidParam('id') id: string,
+    @Body(zodBody(MarkRefundPaidSchema)) dto: MarkRefundPaidDto,
+  ) {
+    await this.refunds.markManual(id, { reference: dto.reference, paidBy: getUserId() ?? null });
     return { ok: true };
   }
 }

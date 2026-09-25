@@ -3,18 +3,21 @@ import { expect } from 'vitest';
 import type { TestApp } from './bootstrap';
 
 type Passenger = { fullName: string; age?: number; gender?: 'male' | 'female' | 'other' };
+/** Another trip than the fixture's (default: the fixture trip and its stops). */
+export type TripLeg = { tripId: string; fromStopId: string; toStopId: string };
 
 /** Quote and hold one seat on the fixture trip (awaiting payment). */
 export async function heldBooking(
   app: TestApp,
   seat: string,
   passenger: Passenger,
+  leg?: TripLeg,
 ): Promise<{ bookingId: string; pnr: string; key: string }> {
   const f = app.fixtures;
   const quote = await app.post('/pricing/quote', {
-    tripId: f.tripId,
-    fromStopId: f.fromStopId,
-    toStopId: f.toStopId,
+    tripId: leg?.tripId ?? f.tripId,
+    fromStopId: leg?.fromStopId ?? f.fromStopId,
+    toStopId: leg?.toStopId ?? f.toStopId,
     seatType: 'seater',
     seatNumbers: [seat],
   });
@@ -39,8 +42,9 @@ export async function confirmedBooking(
   app: TestApp,
   seat: string,
   passenger: Passenger,
+  leg?: TripLeg,
 ): Promise<{ bookingId: string; pnr: string }> {
-  const { bookingId, pnr, key } = await heldBooking(app, seat, passenger);
+  const { bookingId, pnr, key } = await heldBooking(app, seat, passenger, leg);
   const pay = await app.post(
     '/payments/charge',
     { bookingId, method: 'upi', vpa: 'success@ticketly' },

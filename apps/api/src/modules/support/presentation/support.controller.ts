@@ -1,9 +1,9 @@
-import { Body, Controller, Get, Post, Query, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Query, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
 import { ApiStandardErrors, RequirePermission, UuidParam, zodBody, zodQuery } from '@http';
-import { type BookingId, type SupportTicketId, type UserId } from '@kernel';
+import { type BookingId, type SupportTicketId } from '@kernel';
 
 import { SupportService } from '../application/services/support.service';
 import {
@@ -11,7 +11,9 @@ import {
   OpenSupportTicketSchema,
   SupportReplySchema,
   SupportTransitionSchema,
+  UpdateTicketSchema,
   type ListSupportTicketsQueryDto,
+  type UpdateTicketDto,
   type OpenSupportTicketDto,
   type SupportReplyDto,
   type SupportTransitionDto,
@@ -19,6 +21,11 @@ import {
 
 @ApiTags('support')
 @ApiBearerAuth('bearer')
+/**
+ * One set of endpoints for both sides: signed-in customers see and answer only
+ * their own tickets; operator staff see and work all of the operator's. Who
+ * wrote a message comes from the account, never from the request.
+ */
 @Controller({ path: 'support/tickets', version: '1' })
 @ApiStandardErrors()
 export class SupportController {
@@ -26,7 +33,6 @@ export class SupportController {
 
   @Post()
   @HttpCode(201)
-  @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'Open a support ticket' })
   async open(@Body(zodBody(OpenSupportTicketSchema)) dto: OpenSupportTicketDto) {
     return this.support.open({
@@ -35,23 +41,17 @@ export class SupportController {
       category: dto.category,
       priority: dto.priority,
       bookingId: dto.bookingId as BookingId | undefined,
+      pnr: dto.pnr,
     });
   }
 
   @Get()
-  @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'List support tickets' })
   async list(@Query(zodQuery(ListSupportTicketsQuerySchema)) q: ListSupportTicketsQueryDto) {
-    return {
-      tickets: await this.support.list({
-        status: q.status,
-        customerId: q.customerId as UserId | undefined,
-      }),
-    };
+    return { tickets: await this.support.list(q) };
   }
 
   @Get(':id')
-  @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'Get a ticket with its message thread' })
   async get(@UuidParam('id') id: string) {
     return this.support.get(id as SupportTicketId);
@@ -59,18 +59,27 @@ export class SupportController {
 
   @Post(':id/messages')
   @HttpCode(200)
-  @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'Reply on a ticket' })
   async reply(
     @UuidParam('id') id: string,
     @Body(zodBody(SupportReplySchema)) dto: SupportReplyDto,
   ) {
-    return this.support.reply(id as SupportTicketId, dto);
+    return this.support.reply(id as SupportTicketId, { body: dto.body });
+  }
+
+  @Patch(':id')
+  @RequirePermission(Permission.BOOKING_READ)
+  @ApiOperation({ summary: 'Staff: change priority or assignee' })
+  async update(
+    @UuidParam('id') id: string,
+    @Body(zodBody(UpdateTicketSchema)) dto: UpdateTicketDto,
+  ) {
+    await this.support.update(id as SupportTicketId, dto);
+    return { ok: true };
   }
 
   @Post(':id/status')
   @HttpCode(200)
-  @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({ summary: 'Change a ticket status' })
   async transition(
     @UuidParam('id') id: string,

@@ -244,3 +244,33 @@ an unknown id is now 404 (was 200).
   Revoke / deliveries / test of an unknown or another operator's webhook: 404.
 - **Branches:** name 2+ characters and unique per operator ignoring case (409); phone must be a number
   with STD code (10–12 digits); opening hours are HH:MM; the manager must be staff of this operator (404).
+
+### Refunds, reviews, support (O5)
+
+- **Refunds:** `POST /refunds` now passes `altAccountDetails` on to the refund — a refund to another bank
+  account always failed with "requires account details". Account number 9–18 digits (spaces dropped), IFSC
+  upper-cased and checked, holder 2+ characters; the amount is at least ₹1.
+- `POST /refunds/:id/manual` takes `{ reference }` (the transfer's UTR, 6–30 letters/digits) and also closes
+  a refund to another account once the transfer is sent (such refunds used to stay `processing` for ever).
+  A gateway refund still in flight is refused (422); an already paid one too. Migration 0090 stores
+  `payout_reference`, `paid_by`, `paid_at`.
+- New `GET /refunds?queue=action|processing|done|all&pnr&cursor&limit` — the refunds queue with PNR,
+  contact, amount, destination (account masked), failure reason, UTR; `needsAction` counts failed refunds
+  and transfers to send. New `GET /refunds/:id/payout` (payment:refund) — the full account to transfer to.
+- `GET /bookings/:id/refunds` returns `{ refunds, currency, capturedMinor, refundedMinor, refundableMinor }`
+  (was `{ refunds }`), 404 for another operator's booking.
+- **Reviews:** customers can post reviews again — `POST /reviews` required a staff permission. Only the
+  traveller's own signed-in account may review, and only once the bus has left (a confirmed booking for next
+  week could be reviewed; staff could review a guest booking). New `GET /reviews` (operator: filter
+  `all|unanswered|low|reported`, `routeId`, `rating`, cursor; with star counts and totals),
+  `PUT /reviews/:id/reply { reply }` (empty removes it; shown on the public route reviews),
+  `POST /reviews/:id/report { reason, note? }` (409 if already reported; the review stays visible —
+  operators cannot hide reviews). Migration 0091.
+- **Support:** customers can open tickets again (a staff permission was required). A customer sees and
+  answers only their own tickets and can only close them; staff see all of the operator's. The author of a
+  message comes from the account — `authorKind` in the body is ignored (a customer could post as "agent").
+  Staff can raise a ticket by `pnr` (it belongs to that booking's customer), and new `PATCH
+  /support/tickets/:id { priority?, assignedTo? }` re-prioritises / (un)assigns (assignee must be this
+  operator's staff). `GET /support/tickets` filters by `status` (or `active`), `priority`, `category`,
+  `assigned=me|none`, `q` (subject or PNR), and returns PNR, customer, assignee, message count, who wrote
+  last; most urgent first. Customer-set priority is ignored.

@@ -40,16 +40,23 @@ export class ReviewService {
     if (!booking)
       throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
 
-    // Only a traveller on this booking may review it.
+    // Only the traveller's own account may review it — never staff (an
+    // operator could otherwise rate its own buses through a guest booking).
+    const userId = getUserId();
+    if (!userId || !booking.customerId || booking.customerId !== userId) {
+      throw new AppError(ErrorCode.REVIEW_NOT_ELIGIBLE, 403, {
+        message: 'Only the traveller who booked, signed in to that account, can review this trip',
+      });
+    }
+    // …and only once they have travelled: a confirmed booking for next week is not a review.
     if (booking.status !== 'confirmed' && booking.status !== 'completed') {
       throw new AppError(ErrorCode.REVIEW_NOT_ELIGIBLE, 422, {
         message: 'You can only review a completed trip',
       });
     }
-    const userId = getUserId();
-    if (userId && booking.customerId && booking.customerId !== userId) {
-      throw new AppError(ErrorCode.REVIEW_NOT_ELIGIBLE, 403, {
-        message: 'You can only review your own booking',
+    if (!(await this.reviews.tripTravelled(booking.tripId))) {
+      throw new AppError(ErrorCode.REVIEW_NOT_ELIGIBLE, 422, {
+        message: 'You can review this trip once the bus has left',
       });
     }
 
@@ -75,5 +82,34 @@ export class ReviewService {
 
   async listForRoute(routeId: RouteId, limit = 20): Promise<unknown[]> {
     return this.reviews.listForRoute(routeId, limit);
+  }
+
+  /** The operator's reviews with a summary: stars, averages, what still needs an answer. */
+  async operatorSummary(routeId?: string) {
+    const [ratings, extra] = await Promise.all([
+      this.reviews.ratingsForOperator(routeId),
+      this.reviews.operatorSummary(routeId),
+    ]);
+    const agg = aggregateRatings(ratings);
+    return { ...agg, bayesian: bayesianRating(agg.count, agg.average), ...extra };
+  }
+
+  listForOperator(input: Parameters<ReviewRepository['listForOperator']>[0]) {
+    return this.reviews.listForOperator(input);
+  }
+
+  async reply(id: string, text: string): Promise<void> {
+    if (!(await this.reviews.setReply(id, text || null, getUserId() ?? null)))
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Review not found' });
+  }
+
+  async report(id: string, reason: string): Promise<void> {
+    const done = await this.reviews.report(id, reason, getUserId() ?? null);
+    if (done === null)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Review not found' });
+    if (!done)
+      throw new AppError(ErrorCode.COMMON_CONFLICT, 409, {
+        message: 'This review is already reported — the platform will look at it',
+      });
   }
 }
