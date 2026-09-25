@@ -122,6 +122,18 @@ All require a platform (tenant-less) principal.
   accessible seat, the OTA share being used up, or seats kept for women /
   senior citizens.
 
+## Timetables, fares in bulk, trip changes (scenario tracker #169, #266–#275)
+- `PATCH /scheduling/services/:id` (departure time / recurrence / bus; each change a version),
+  `GET /scheduling/services/:id/versions`, `POST /scheduling/services/:id/versions/:n/restore`,
+  `POST /scheduling/services/:id/clone` (`season: true` = the original skips those dates),
+  `DELETE /scheduling/services/:id` (only a service that never sold or ran; 409 otherwise).
+- `POST /scheduling/trips/:id/retime` — move one trip; every passenger gets the
+  `trip.retimed` SMS. Delays (`trip.delayed`) and diversions (`trip.diverted`) now
+  reach every passenger of the trip (the delay SMS never went out before).
+- `GET|POST /scheduling/routes/:routeId/blackouts`, `POST …/blackouts/remove`.
+- `GET /pricing/fare-plans/:id/rules.csv`, `POST /pricing/fare-plans/:id/rules/import`,
+  `POST /pricing/fare-plans/:id/rules/adjust`.
+
 ## Plan quotas are enforced
 Creating a staff user, route, bus, branch or agent (and reactivating a
 branch) beyond the operator's plan quota (`max_users`, `max_routes`,

@@ -51,6 +51,16 @@ export const DEFAULT_OPERATOR_TEMPLATES: readonly DefaultTemplate[] = [
     body: 'Your trip (PNR {{pnr}}) is delayed. New departure: {{newTime}}.',
   },
   {
+    eventType: 'trip.retimed',
+    channel: 'sms',
+    body: 'Schedule change for PNR {{pnr}}: your bus now departs at {{newTime}} (was {{oldTime}}). {{reason}}',
+  },
+  {
+    eventType: 'trip.diverted',
+    channel: 'sms',
+    body: 'Route change for PNR {{pnr}}: your bus is taking a diversion. {{reason}} We will keep you updated.',
+  },
+  {
     eventType: 'trip.reminder.12h',
     channel: 'sms',
     body: 'Reminder: your trip {{pnr}} boards at {{fromStopName}} around {{boardingAt}}, alights at {{toStopName}}. Have a safe journey!',

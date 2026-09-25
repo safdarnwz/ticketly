@@ -23,6 +23,7 @@ import { Logger, Metrics } from '@observability';
 import { SeatLayoutRepository, VehicleTypeRepository, RouteRepository } from '../../../master-data';
 import { FleetService } from '../../../fleet';
 import { datesToMaterialise } from '../../domain/recurrence';
+import { RouteBlackoutRepository } from '../../infrastructure/persistence/route-blackout.repository';
 import { ServiceRepository } from '../../infrastructure/persistence/service.repository';
 import {
   TripRepository,
@@ -58,6 +59,7 @@ export class MaterializationService {
   private readonly log: Logger;
 
   constructor(
+    private readonly blackouts: RouteBlackoutRepository,
     private readonly services: ServiceRepository,
     private readonly routes: RouteRepository,
     private readonly layouts: SeatLayoutRepository,
@@ -93,12 +95,16 @@ export class MaterializationService {
     const today = todayIn(tz);
     const horizonEnd = addDays(today, horizonDays ?? this.config.domain.inventoryHorizonDays);
 
-    const already = await this.services.materialisedDates(serviceId);
+    // Blackout dates (#271) count as "already there": they are never materialised.
+    const [already, blackouts] = await Promise.all([
+      this.services.materialisedDates(serviceId),
+      this.blackouts.dates(service.routeId),
+    ]);
     const dates = datesToMaterialise(
       service.recurrence,
       today,
       horizonEnd,
-      already.map((d) => localDate(d)),
+      [...already, ...blackouts].map((d) => localDate(d)),
     );
 
     const seatInit: SeatInit[] = layout.seatMap.toJSON().seats.map((s) => ({

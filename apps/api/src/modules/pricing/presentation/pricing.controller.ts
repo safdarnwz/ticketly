@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Post, Put, HttpCode } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, Post, Put, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
@@ -7,8 +7,13 @@ import { ApiStandardErrors, Public, RateLimit, RequirePermission, UuidParam, zod
 import { BadRequestError, getUserId, requireTenantId, type StopId, type TripId } from '@kernel';
 
 import { CouponRepository } from '../infrastructure/persistence/coupon.repository';
+import { FareBulkService } from '../application/services/fare-bulk.service';
 import {
   AddFareRuleSchema,
+  AdjustFaresSchema,
+  ImportFareRulesSchema,
+  type AdjustFaresDto,
+  type ImportFareRulesDto,
   CreateCouponSchema,
   CreateFarePlanSchema,
   CreatePricingPolicySchema,
@@ -35,6 +40,7 @@ import { validateBounds, validatePeakWindows } from '../domain/pricing-rules';
 @ApiStandardErrors()
 export class PricingController {
   constructor(
+    private readonly fareBulk: FareBulkService,
     private readonly fares: FareRepository,
     private readonly coupons: CouponRepository,
     private readonly pricing: PricingService,
@@ -55,6 +61,36 @@ export class PricingController {
   @ApiOperation({ summary: 'List rules for a fare plan' })
   async listRules(@UuidParam('id') id: string) {
     return { rules: await this.fares.listRules(id) };
+  }
+
+  @Get('fare-plans/:id/rules.csv')
+  @RequirePermission(Permission.FARE_READ)
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header('Content-Disposition', 'attachment; filename="fare-rules.csv"')
+  @ApiOperation({ summary: "A plan's fares as CSV — edit in Excel and import back" })
+  exportRules(@UuidParam('id') id: string) {
+    return this.fareBulk.exportCsv(id);
+  }
+
+  @Post('fare-plans/:id/rules/import')
+  @HttpCode(200)
+  @RequirePermission(Permission.FARE_MANAGE)
+  @ApiOperation({
+    summary: 'Save a whole fare sheet at once (all rows checked first; nothing saved on an error)',
+  })
+  importRules(
+    @UuidParam('id') id: string,
+    @Body(zodBody(ImportFareRulesSchema)) dto: ImportFareRulesDto,
+  ) {
+    return this.fareBulk.importRules(id, dto.rows);
+  }
+
+  @Post('fare-plans/:id/rules/adjust')
+  @HttpCode(200)
+  @RequirePermission(Permission.FARE_MANAGE)
+  @ApiOperation({ summary: 'Raise or lower every fare of a plan by a percentage' })
+  adjustRules(@UuidParam('id') id: string, @Body(zodBody(AdjustFaresSchema)) dto: AdjustFaresDto) {
+    return this.fareBulk.adjust(id, dto);
   }
 
   @Post('fare-plans')

@@ -12,8 +12,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Status | Count |
 |---|---|
 | OPEN | 2714 |
-| DONE | 941 |
-| GAP | 321 |
+| DONE | 950 |
+| GAP | 312 |
 | CONFLICT | 76 |
 | INFRA | 20 |
 | DUP | 9 |
@@ -22,7 +22,7 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 ## #1–#500
 
-CONFLICT 20, DONE 345, GAP 121, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 354, GAP 112, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -194,7 +194,7 @@ CONFLICT 20, DONE 345, GAP 121, INFRA 17, PROCESS 3
 | 166 | Create special extra trip service | DONE | verified manually: existing module/API |
 | 167 | Temporarily cancel a service | DONE | verified manually: existing module/API |
 | 168 | Set cancellation reason | DONE | verified manually: existing module/API |
-| 169 | Permanently delete a service | GAP | verified manually: not built yet |
+| 169 | Permanently delete a service | DONE | DELETE /scheduling/services/:id (only without history) |
 | 170 | Set OTA inventory release percentage per service | DONE | PUT /scheduling/services/:id/sales-rules {otaReleasePct}; platform default PUT /admin/policies/ota-release; enforced on hold |
 | 171 | Set agent-wise inventory quota | DONE | verified manually: existing module/API |
 | 172 | Set branch-wise inventory allocation percentage | DONE | POST /trips/:tripId/quotas/percentage (branch/agent) |
@@ -291,16 +291,16 @@ CONFLICT 20, DONE 345, GAP 121, INFRA 17, PROCESS 3
 | 263 | Change allocated bus of a service last minute | DONE | verified manually: existing module/API |
 | 264 | Change allocated crew last minute | DONE | verified manually: existing module/API |
 | 265 | Add internal remark on service | DONE | POST/GET /scheduling/trips/:id/remarks |
-| 266 | Clone an existing service to new date | GAP | verified manually: not built yet |
-| 267 | Bulk update fares using Excel | GAP | verified manually: not built yet |
+| 266 | Clone an existing service to new date | DONE | POST /scheduling/services/:id/clone |
+| 267 | Bulk update fares using Excel | DONE | GET rules.csv + POST /pricing/fare-plans/:id/rules/import / adjust |
 | 268 | Bulk create schedules using Excel | GAP | verified manually: not built yet |
-| 269 | View complete schedule version history | GAP | verified manually: not built yet |
-| 270 | Rollback schedule to previous version | GAP | verified manually: not built yet |
-| 271 | Set blackout dates for route | GAP | verified manually: not built yet |
-| 272 | Configure seasonal schedule patterns | GAP | verified manually: not built yet |
+| 269 | View complete schedule version history | DONE | GET /scheduling/services/:id/versions |
+| 270 | Rollback schedule to previous version | DONE | POST /scheduling/services/:id/versions/:n/restore |
+| 271 | Set blackout dates for route | DONE | POST /scheduling/routes/:routeId/blackouts (materialisation skips) |
+| 272 | Configure seasonal schedule patterns | DONE | POST /scheduling/services/:id/clone {season:true} |
 | 273 | Create festival special services in bulk | DONE | verified manually: existing module/API |
-| 274 | Set temporary route diversion | GAP | verified manually: not built yet |
-| 275 | Trigger passenger notification on schedule change | GAP | verified manually: not built yet |
+| 274 | Set temporary route diversion | DONE | incident type 'diversion' → trip.diverted SMS to every passenger |
+| 275 | Trigger passenger notification on schedule change | DONE | POST /scheduling/trips/:id/retime → trip.retimed SMS to every passenger |
 | 276 | View current inventory utilization percentage | DONE | verified manually: existing module/API |
 | 277 | View occupancy forecast for next 7 days | DONE | verified manually: existing module/API |
 | 278 | View occupancy forecast for next 15 days | DONE | GET /reports/occupancy-forecast?days=15 |
@@ -777,7 +777,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 345, GAP 121, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 354, GAP 112, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -892,7 +892,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 345, GAP 121, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 354, GAP 112, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1007,7 +1007,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 345, GAP 121, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 354, GAP 112, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1102,7 +1102,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 345, GAP 121, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 354, GAP 112, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1217,7 +1217,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 345, GAP 121, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 354, GAP 112, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1292,7 +1292,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 345, GAP 121, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 354, GAP 112, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|

@@ -339,6 +339,49 @@ export class FareRepository {
     );
   }
 
+  /** The plan's route, or null when it is not this operator's plan. */
+  async planRoute(farePlanId: string): Promise<string | null> {
+    const row = await this.db.queryOne<{ route_id: string }>(
+      `SELECT route_id FROM fare_plans WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+      [requireTenantId(), farePlanId],
+      { name: 'fare.planRoute', primary: true },
+    );
+    return row?.route_id ?? null;
+  }
+
+  /** Stop ids (of the given ones) that are on the route. */
+  async stopsOnRoute(routeId: string, stopIds: string[]): Promise<Set<string>> {
+    const rows = await this.db.query<{ stop_id: string }>(
+      `SELECT stop_id FROM route_stops WHERE route_id = $1 AND stop_id = ANY($2::uuid[])`,
+      [routeId, stopIds],
+      { name: 'fare.stopsOnRoute', primary: true },
+    );
+    return new Set(rows.map((r) => r.stop_id));
+  }
+
+  /**
+   * Raise or lower every rule of a plan by `percent` (#267), rounded to
+   * `roundToMinor` (e.g. 100 = whole rupees). Returns rules changed.
+   */
+  async adjustRules(
+    farePlanId: string,
+    percent: number,
+    seatType: string | null,
+    roundToMinor: number,
+  ): Promise<number> {
+    const n = await this.db.execute_(
+      `UPDATE fare_rules SET
+         base_fare_minor = greatest(0, round(base_fare_minor * (1 + $3::numeric / 100) / $5) * $5),
+         per_km_minor = CASE WHEN per_km_minor IS NULL THEN NULL
+                             ELSE greatest(0, round(per_km_minor * (1 + $3::numeric / 100))) END
+       WHERE tenant_id = $1 AND fare_plan_id = $2 AND ($4::text IS NULL OR seat_type = $4)`,
+      [requireTenantId(), farePlanId, percent, seatType, roundToMinor],
+      { name: 'fare.adjustRules', primary: true },
+    );
+    await this.cache.invalidatePrefix(CacheNamespace.FARE_RULE);
+    return n;
+  }
+
   async listRules(farePlanId: string): Promise<
     {
       id: string;

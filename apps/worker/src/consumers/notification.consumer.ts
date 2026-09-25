@@ -28,13 +28,14 @@ export class NotificationConsumer implements OnModuleInit {
       'booking.confirmed',
       'booking.cancelled',
       'booking.seats_cancelled',
-      'trip.delayed',
       'refund.settled',
       'connection.at_risk',
       'connection.broken',
     ]) {
       this.dispatcher.register(this.handlerFor(type));
     }
+    for (const type of ['trip.delayed', 'trip.retimed', 'trip.diverted'])
+      this.dispatcher.register(this.tripPassengersHandler(type));
     this.dispatcher.register(this.twelveHourReminderHandler());
     this.dispatcher.register(this.waitlistHandler());
     this.dispatcher.register(this.criticalIncidentHandler());
@@ -201,6 +202,71 @@ export class NotificationConsumer implements OnModuleInit {
     };
   }
 
+  /**
+   * A trip-level event (delay, new departure time, diversion) carries no
+   * passenger contact: it goes to the contact of every live booking on the
+   * trip (#274, #275). Times are shown in the operator's timezone.
+   */
+  private tripPassengersHandler(eventType: string): EventHandler {
+    return {
+      eventType,
+      handle: async (event: DomainEvent) => {
+        if (!event.tenantId) return;
+        const p = event.payload as {
+          delayMinutes?: number;
+          reason?: string | null;
+          description?: string | null;
+          oldDepartsAt?: string;
+          newDepartsAt?: string;
+        };
+        const rows = await this.db.query<{
+          pnr: string;
+          contact_phone: string | null;
+          contact_email: string | null;
+          departs_at: Date;
+          timezone: string;
+        }>(
+          `SELECT b.pnr, b.contact_phone, b.contact_email, t.departs_at, te.timezone
+             FROM bookings b JOIN trips t ON t.id = b.trip_id JOIN tenants te ON te.id = b.tenant_id
+            WHERE b.tenant_id = $1 AND b.trip_id = $2 AND b.status = 'confirmed'`,
+          [event.tenantId, event.aggregateId],
+          { name: 'notify.tripPassengers', primary: true, tenantId: event.tenantId },
+        );
+        for (const r of rows) {
+          if (!r.contact_phone && !r.contact_email) continue;
+          const fmt = (d: Date | string) =>
+            new Date(d).toLocaleString('en-IN', {
+              timeZone: r.timezone,
+              day: 'numeric',
+              month: 'short',
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+          const newTime =
+            eventType === 'trip.delayed'
+              ? fmt(new Date(new Date(r.departs_at).getTime() + (p.delayMinutes ?? 0) * 60_000))
+              : fmt(p.newDepartsAt ?? r.departs_at);
+          await this.notifications.notify({
+            tenantId: event.tenantId,
+            eventId: event.eventId,
+            eventType,
+            recipients: {
+              sms: r.contact_phone ?? undefined,
+              email: r.contact_email ?? undefined,
+            },
+            data: {
+              pnr: r.pnr,
+              delayMinutes: p.delayMinutes,
+              newTime,
+              oldTime: p.oldDepartsAt ? fmt(p.oldDepartsAt) : undefined,
+              reason: p.reason ?? p.description ?? undefined,
+            },
+          });
+        }
+      },
+    };
+  }
+
   private handlerFor(eventType: string): EventHandler {
     return {
       eventType,
@@ -223,6 +289,8 @@ export class NotificationConsumer implements OnModuleInit {
           data: {
             pnr: payload.pnr as string,
             refund: payload.refundMinor ? `₹${Number(payload.refundMinor) / 100}` : undefined,
+            // The seeded templates say {{refundAmount}}; older ones {{refund}}.
+            refundAmount: payload.refundMinor ? `₹${Number(payload.refundMinor) / 100}` : undefined,
             seats: Array.isArray(payload.seats)
               ? (payload.seats as string[]).join(', ')
               : undefined,

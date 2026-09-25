@@ -14,33 +14,3 @@ export function renderTemplate(
     return value === undefined || value === null ? '' : String(value);
   });
 }
-
-/** The default templates seeded for a new tenant. */
-export const DEFAULT_TEMPLATES: {
-  eventType: string;
-  channel: string;
-  subject?: string;
-  body: string;
-}[] = [
-  {
-    eventType: 'booking.confirmed',
-    channel: 'sms',
-    body: 'Booking confirmed! PNR {{pnr}}. {{origin}}→{{destination}} on {{date}}, seat(s) {{seats}}. Board by {{boardingTime}}.',
-  },
-  {
-    eventType: 'booking.confirmed',
-    channel: 'email',
-    subject: 'Your ticket — PNR {{pnr}}',
-    body: 'Dear {{name}}, your booking {{pnr}} is confirmed for {{origin}}→{{destination}} on {{date}}.',
-  },
-  {
-    eventType: 'booking.cancelled',
-    channel: 'sms',
-    body: 'Booking {{pnr}} cancelled. Refund of {{refund}} will be processed.',
-  },
-  {
-    eventType: 'trip.delayed',
-    channel: 'sms',
-    body: 'Your bus (PNR {{pnr}}) is delayed by ~{{delay}} min. New ETA {{eta}}.',
-  },
-];

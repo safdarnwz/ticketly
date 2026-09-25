@@ -5,6 +5,7 @@ import {
   DomainError,
   ErrorCode,
   localDate,
+  getUserId,
   minuteOfDay,
   requireTenantId,
   type ServiceId,
@@ -48,19 +49,20 @@ export class SchedulingService {
       );
     }
 
-    return this.uow.run({ name: 'service.create', tenantId: requireTenantId() }, async () =>
-      this.services.create({
+    return this.uow.run({ name: 'service.create', tenantId: requireTenantId() }, async () => {
+      const id = await this.services.create({
         code: input.code,
         routeId: input.routeId as never,
         vehicleTypeId: input.vehicleTypeId as never,
         defaultVehicleId: input.defaultVehicleId as never,
         startMinute: minuteOfDay(input.startTime),
         recurrence: input.recurrence,
-      }),
-    );
+      });
+      await this.services.snapshotVersion(id, 'Created', getUserId() ?? null);
+      return id;
+    });
   }
 
-  /** Activate and immediately materialise the horizon. */
   /** OTA release % and women / senior seat quotas of a service (#170, #173, #174). */
   async setSalesRules(serviceId: ServiceId, rules: ServiceSalesRules): Promise<ServiceSalesRules> {
     const errors = salesRulesErrors(rules);
@@ -69,6 +71,7 @@ export class SchedulingService {
     return rules;
   }
 
+  /** Activate and immediately materialise the horizon. */
   async activate(serviceId: ServiceId): Promise<{ trips: number }> {
     await this.uow.run({ name: 'service.activate', tenantId: requireTenantId() }, async () => {
       await this.services.setStatus(serviceId, 'active');

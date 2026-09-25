@@ -242,6 +242,70 @@ export class TripRepository {
     return row?.closed ?? [];
   }
 
+  /**
+   * Move a trip (every stop time with it) by `minutes` (#275). Only a trip
+   * that has not left; returns the old and new departure, or null.
+   */
+  async shiftTimes(
+    tripId: TripId,
+    minutes: number,
+  ): Promise<{ oldDepartsAt: Date; newDepartsAt: Date } | null> {
+    const row = await this.db.queryOne<{ old_departs_at: Date; new_departs_at: Date }>(
+      `UPDATE trips t SET departs_at = t.departs_at + make_interval(mins => $3),
+              arrives_at = t.arrives_at + make_interval(mins => $3), version = t.version + 1, updated_at = now()
+         FROM (SELECT departs_at AS old_departs_at FROM trips WHERE id = $2) o
+        WHERE t.tenant_id = $1 AND t.id = $2 AND t.status IN ('scheduled', 'open') AND t.actual_departed_at IS NULL
+        RETURNING o.old_departs_at, t.departs_at AS new_departs_at`,
+      [requireTenantId(), tripId, minutes],
+      { name: 'trip.shiftTimes', primary: true },
+    );
+    if (!row) return null;
+    await this.db.execute_(
+      `UPDATE trip_stops SET arrives_at = arrives_at + make_interval(mins => $3),
+              departs_at = departs_at + make_interval(mins => $3)
+        WHERE tenant_id = $1 AND trip_id = $2`,
+      [requireTenantId(), tripId, minutes],
+      { name: 'trip.shiftStops', primary: true },
+    );
+    return { oldDepartsAt: row.old_departs_at, newDepartsAt: row.new_departs_at };
+  }
+
+  /** Trips of a route on the given dates, with how many live bookings each has (#271). */
+  tripsOnDates(
+    routeId: RouteId,
+    dates: string[],
+  ): Promise<{ tripId: TripId; journeyDate: string; status: string; bookings: number }[]> {
+    return this.db
+      .query<{ id: TripId; journey_date: string; status: string; bookings: string }>(
+        `SELECT t.id, t.journey_date::text AS journey_date, t.status,
+                (SELECT count(*) FROM bookings b WHERE b.trip_id = t.id AND b.status IN ('held', 'confirmed')) AS bookings
+           FROM trips t WHERE t.tenant_id = $1 AND t.route_id = $2 AND t.journey_date = ANY($3::date[])
+            AND t.status IN ('scheduled', 'open')`,
+        [requireTenantId(), routeId, dates],
+        { name: 'trip.onDates', primary: true },
+      )
+      .then((rows) =>
+        rows.map((r) => ({
+          tripId: r.id,
+          journeyDate: r.journey_date,
+          status: r.status,
+          bookings: Number(r.bookings),
+        })),
+      );
+  }
+
+  /** Cancel trips that nobody has booked (a blackout date). */
+  async cancelUnbooked(tripIds: TripId[]): Promise<number> {
+    if (tripIds.length === 0) return 0;
+    return this.db.execute_(
+      `UPDATE trips t SET status = 'cancelled', updated_at = now()
+        WHERE t.tenant_id = $1 AND t.id = ANY($2::uuid[]) AND t.status IN ('scheduled', 'open')
+          AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.trip_id = t.id AND b.status IN ('held', 'confirmed'))`,
+      [requireTenantId(), tripIds],
+      { name: 'trip.cancelUnbooked', primary: true },
+    );
+  }
+
   /** The sales rules of the trip's service ({} for a trip without one). */
   async salesRules(tripId: TripId): Promise<ServiceSalesRules> {
     const row = await this.db.queryOne<{ rules: ServiceSalesRules | null }>(

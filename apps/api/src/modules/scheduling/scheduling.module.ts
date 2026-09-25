@@ -10,6 +10,9 @@ import { MasterDataModule } from '../master-data/master-data.module';
 import { InventoryRepository } from './infrastructure/persistence/inventory.repository';
 import { MaterializationService } from './application/services/materialization.service';
 import { SchedulingController } from './presentation/scheduling.controller';
+import { TimetableService } from './application/services/timetable.service';
+import { RouteBlackoutRepository } from './infrastructure/persistence/route-blackout.repository';
+import { TimetableController } from './presentation/timetable.controller';
 import { SchedulingService } from './application/services/scheduling.service';
 import { ServiceRepository } from './infrastructure/persistence/service.repository';
 import { TripRepository } from './infrastructure/persistence/trip.repository';
@@ -28,13 +31,15 @@ import { TripRepository } from './infrastructure/persistence/trip.repository';
     MasterDataModule,
     FleetModule,
   ],
-  controllers: [SchedulingController],
+  controllers: [SchedulingController, TimetableController],
   providers: [
     ServiceRepository,
     TripRepository,
     InventoryRepository,
     MaterializationService,
     SchedulingService,
+    TimetableService,
+    RouteBlackoutRepository,
   ],
   exports: [ServiceRepository, TripRepository, InventoryRepository, MaterializationService],
 })

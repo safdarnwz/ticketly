@@ -77,3 +77,55 @@ export const SalesRulesSchema = z.object({
     .optional(),
 });
 export type SalesRulesDto = z.infer<typeof SalesRulesSchema>;
+
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM (24h)');
+
+/** #269 — change a service's timetable; every change is kept as a version. */
+export const UpdateTimetableSchema = z
+  .object({
+    startTime: hhmm.optional(),
+    recurrence: RecurrenceSchema.optional(),
+    vehicleTypeId: uuid.optional(),
+    defaultVehicleId: uuid.nullable().optional(),
+    note: z.string().trim().max(200).optional(),
+  })
+  .refine(
+    (v) =>
+      v.startTime !== undefined ||
+      v.recurrence !== undefined ||
+      v.vehicleTypeId !== undefined ||
+      v.defaultVehicleId !== undefined,
+    { message: 'Change at least one of startTime, recurrence, vehicleTypeId, defaultVehicleId' },
+  );
+export type UpdateTimetableDto = z.infer<typeof UpdateTimetableSchema>;
+
+/** #266 / #272 — copy a service to other dates, optionally as a seasonal variant. */
+export const CloneServiceSchema = z
+  .object({
+    code: z.string().trim().min(1).max(40),
+    startDate: localDate,
+    endDate: localDate,
+    startTime: hhmm.optional(),
+    weekdays: z.array(z.number().int().min(1).max(7)).min(1).max(7).optional(),
+    /** The original skips these dates, so the two never run on the same day. */
+    season: z.boolean().default(false),
+  })
+  .refine((v) => v.startDate <= v.endDate, { message: 'startDate must not be after endDate' });
+export type CloneServiceDto = z.infer<typeof CloneServiceSchema>;
+
+/** #275 — move one trip; its passengers are told. */
+export const RetimeTripSchema = z.object({
+  newDepartsAt: z.string().datetime({ offset: true }),
+  reason: z.string().trim().min(3).max(200),
+});
+export type RetimeTripDto = z.infer<typeof RetimeTripSchema>;
+
+/** #271 — dates a route does not run. */
+export const BlackoutSchema = z.object({
+  dates: z.array(localDate).min(1).max(60),
+  reason: z.string().trim().min(3).max(200),
+});
+export type BlackoutDto = z.infer<typeof BlackoutSchema>;
+
+export const RemoveBlackoutSchema = BlackoutSchema.pick({ dates: true });
+export type RemoveBlackoutDto = z.infer<typeof RemoveBlackoutSchema>;

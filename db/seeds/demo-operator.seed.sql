@@ -88,6 +88,8 @@ BEGIN
     (uuid_generate_v7(), v_tenant_id, 'booking.cancelled', 'email', 'Booking cancelled — PNR {{pnr}}', 'Your booking {{pnr}} has been cancelled. Refund: {{refundAmount}}.'),
     (uuid_generate_v7(), v_tenant_id, 'refund.settled', 'sms', NULL, 'Refund of {{refundAmount}} for PNR {{pnr}} has been processed.'),
     (uuid_generate_v7(), v_tenant_id, 'trip.delayed', 'sms', NULL, 'Your trip (PNR {{pnr}}) is delayed. New departure: {{newTime}}.'),
+    (uuid_generate_v7(), v_tenant_id, 'trip.retimed', 'sms', NULL, 'Schedule change for PNR {{pnr}}: your bus now departs at {{newTime}} (was {{oldTime}}). {{reason}}'),
+    (uuid_generate_v7(), v_tenant_id, 'trip.diverted', 'sms', NULL, 'Route change for PNR {{pnr}}: your bus is taking a diversion. {{reason}} We will keep you updated.'),
     (uuid_generate_v7(), v_tenant_id, 'trip.reminder.12h', 'sms', NULL, 'Reminder: your trip {{pnr}} boards at {{fromStopName}} around {{boardingAt}}, alights at {{toStopName}}. Have a safe journey!'),
     (uuid_generate_v7(), v_tenant_id, 'trip.reminder.12h', 'whatsapp', NULL, 'Hi! Your trip {{pnr}} is coming up.
 

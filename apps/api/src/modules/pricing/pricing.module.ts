@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 
+import { FareBulkService } from './application/services/fare-bulk.service';
+
 import { CacheModule } from '@cache';
 import { DatabaseModule } from '@database';
 
@@ -34,7 +36,7 @@ import { PricingService } from './application/services/pricing.service';
     PlatformSettingsModule,
   ],
   controllers: [PricingController],
-  providers: [FareRepository, CouponRepository, PricingService],
+  providers: [FareBulkService, FareRepository, CouponRepository, PricingService],
   exports: [FareRepository, CouponRepository, PricingService],
 })
 export class PricingModule {}

@@ -125,3 +125,21 @@ export const TripFareAdjustmentSchema = z
     message: 'A reason is required for a fare change',
   });
 export type TripFareAdjustmentDto = z.infer<typeof TripFareAdjustmentSchema>;
+
+/** #267 — the whole fare sheet of a plan, edited offline and sent back. */
+export const ImportFareRulesSchema = z.object({
+  rows: z
+    .array(AddFareRuleSchema.omit({ farePlanId: true }))
+    .min(1)
+    .max(1000),
+});
+export type ImportFareRulesDto = z.infer<typeof ImportFareRulesSchema>;
+
+/** #267 — change every fare of a plan by a percentage. */
+export const AdjustFaresSchema = z.object({
+  percent: z.number().min(-90).max(300),
+  seatType: z.enum(['seater', 'sleeper', 'semi_sleeper']).optional(),
+  /** Round results to this many paise (100 = whole rupees). */
+  roundToMinor: z.number().int().min(1).max(10_000).default(100),
+});
+export type AdjustFaresDto = z.infer<typeof AdjustFaresSchema>;
