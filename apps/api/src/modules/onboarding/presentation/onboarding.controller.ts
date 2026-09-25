@@ -7,6 +7,7 @@ import {
   Public,
   RateLimit,
   RequirePermission,
+  RequirePlatformAdmin,
   UuidParam,
   zodBody,
   zodQuery,
@@ -60,6 +61,7 @@ export class OnboardingController {
   @ApiBearerAuth('bearer')
   @Get('admin/operator-applications/:id/documents/:docType')
   @RequirePermission(Permission.PLATFORM_OPERATORS)
+  @RequirePlatformAdmin()
   @ApiOperation({ summary: 'Short-lived link to one application document' })
   async applicationDocument(@UuidParam('id') id: string, @Param('docType') docType: string) {
     return this.onboarding.applicationDocumentUrl(id, docType);
@@ -77,6 +79,7 @@ export class OnboardingController {
   @ApiBearerAuth('bearer')
   @Get('admin/operator-applications')
   @RequirePermission(Permission.PLATFORM_OPERATORS)
+  @RequirePlatformAdmin()
   @ApiOperation({ summary: 'List operator applications (super/platform admin)' })
   async list(@Query(zodQuery(ListApplicationsQuerySchema)) q: ListApplicationsQueryDto) {
     return { applications: await this.onboarding.list(q.status) };
@@ -85,6 +88,7 @@ export class OnboardingController {
   @ApiBearerAuth('bearer')
   @Get('admin/operator-applications/:id')
   @RequirePermission(Permission.PLATFORM_OPERATORS)
+  @RequirePlatformAdmin()
   @ApiOperation({ summary: 'Full application detail incl. documents' })
   async get(@UuidParam('id') id: string) {
     return this.onboarding.get(id);
@@ -94,6 +98,7 @@ export class OnboardingController {
   @Post('admin/operator-applications/:id/approve')
   @HttpCode(200)
   @RequirePermission(Permission.PLATFORM_OPERATORS)
+  @RequirePlatformAdmin()
   @ApiOperation({ summary: 'Approve → provision operator tenant + admin user' })
   async approve(@UuidParam('id') id: string, @Body(zodBody(ApproveSchema)) dto: ApproveDto) {
     return this.onboarding.approve(id, getUserId() ?? null, dto?.note);
@@ -103,6 +108,7 @@ export class OnboardingController {
   @Post('admin/operator-applications/:id/reject')
   @HttpCode(200)
   @RequirePermission(Permission.PLATFORM_OPERATORS)
+  @RequirePlatformAdmin()
   @ApiOperation({ summary: 'Reject an application with a reason' })
   async reject(@UuidParam('id') id: string, @Body(zodBody(RejectSchema)) dto: RejectDto) {
     await this.onboarding.reject(id, dto.reason, getUserId() ?? null);
@@ -113,6 +119,7 @@ export class OnboardingController {
   @Post('admin/operator-applications/:id/hold')
   @HttpCode(200)
   @RequirePermission(Permission.PLATFORM_OPERATORS)
+  @RequirePlatformAdmin()
   @ApiOperation({
     summary:
       'Keep an application pending with a reason (e.g. more documents needed) — emailed to the applicant',
@@ -126,6 +133,7 @@ export class OnboardingController {
   @Post('admin/operator-applications/:id/reopen')
   @HttpCode(200)
   @RequirePermission(Permission.PLATFORM_OPERATORS)
+  @RequirePlatformAdmin()
   @ApiOperation({ summary: 'Move a rejected application back to pending, with a reason' })
   async reopen(@UuidParam('id') id: string, @Body(zodBody(RejectSchema)) dto: RejectDto) {
     await this.onboarding.reopen(id, dto.reason, getUserId() ?? null);

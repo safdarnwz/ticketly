@@ -31,6 +31,8 @@ export interface TestApp {
 interface CallOptions {
   as?: Principal;
   idempotencyKey?: string;
+  /** Replace the principal's headers entirely (e.g. another operator's token). */
+  headers?: Record<string, string>;
 }
 
 export async function bootstrapTestApp(): Promise<TestApp> {
@@ -82,7 +84,7 @@ export async function bootstrapTestApp(): Promise<TestApp> {
       method,
       url: `${prefix}${path}`,
       headers: {
-        ...headersFor(opts.as ?? 'customer'),
+        ...(opts.headers ?? headersFor(opts.as ?? 'customer')),
         ...(opts.idempotencyKey ? { 'idempotency-key': opts.idempotencyKey } : {}),
       },
       payload: body as never,
