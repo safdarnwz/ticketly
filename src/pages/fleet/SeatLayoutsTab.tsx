@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, LayoutGrid, Copy, Trash2, Wand2, Info, Code2, History, Eye, RotateCcw, Car } from 'lucide-react';
+import { LayoutGrid, Copy, Trash2, Wand2, Info, Code2, History, Eye, RotateCcw, Car } from 'lucide-react';
 
 import { Button, Card, CardBody, Badge, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
 import { masterDataApi, type SeatLayoutRow, type SeatLayoutVersion } from '@/lib/api/masterData';
@@ -208,9 +208,11 @@ export function SeatLayoutsTab() {
   };
 
   const save = useMutation({
-    mutationFn: () => editing!.id
-      ? masterDataApi.updateSeatLayout(editing!.id, { name: editing!.name, layout: buildSeatMap(editing!) })
-      : masterDataApi.createSeatLayout({ name: editing!.name, layout: buildSeatMap(editing!) }),
+    mutationFn: async (): Promise<void> => {
+      const body = { name: editing!.name, layout: buildSeatMap(editing!) };
+      if (editing!.id) await masterDataApi.updateSeatLayout(editing!.id, body);
+      else await masterDataApi.createSeatLayout(body);
+    },
     onSuccess: () => {
       toast.success(`Layout "${editing!.name}" saved with ${summary?.total ?? 0} seats`);
       setEditing(null);

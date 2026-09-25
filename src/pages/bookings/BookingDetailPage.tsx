@@ -20,7 +20,10 @@ export function BookingDetailPage() {
   const upgradeInFlight = useRef(false);
   const cancelInFlight = useRef(false);
 
-  const booking = useQuery({ queryKey: ['booking', pnr], queryFn: () => bookingsApi.getByPnr(pnr) });
+  const booking = useQuery({
+    queryKey: ['booking', pnr],
+    queryFn: () => bookingsApi.byPnrStaff(pnr).then((r) => r.booking),
+  });
   const id = booking.data?.id;
 
   const tickets = useQuery({ queryKey: ['tickets', id], queryFn: () => bookingsApi.tickets(id!), enabled: Boolean(id) });

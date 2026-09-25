@@ -57,7 +57,7 @@ export function ConnectingResultsPage() {
                 <Card key={idx} className="hover:border-primary/40">
                   <CardBody className="flex flex-col gap-4">
                     <div className="flex items-center justify-between">
-                      <Badge variant="outline">Via {opt.connectionCityName}</Badge>
+                      <Badge tone="neutral">Via {opt.connectionCityName}</Badge>
                       <span className="flex items-center gap-1 text-xs text-text-muted"><Clock className="h-3.5 w-3.5" /> {fmtLayover(opt.layoverMinutes)}</span>
                     </div>
 

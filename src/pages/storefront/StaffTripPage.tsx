@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Armchair, Smartphone, CheckCircle2 } from 'lucide-react';
 
@@ -57,7 +57,7 @@ export function StaffTripPage() {
   const [contactEmail, setContactEmail] = useState('');
   const [passengers, setPassengers] = useState<Record<string, { fullName: string; age: string; gender: 'male' | 'female' | 'other' }>>({});
   const setPassenger = (seat: string, patch: Partial<{ fullName: string; age: string; gender: 'male' | 'female' | 'other' }>) =>
-    setPassengers((p) => ({ ...p, [seat]: { fullName: '', age: '', gender: 'male', ...p[seat], ...patch } }));
+    setPassengers((p) => ({ ...p, [seat]: { ...(p[seat] ?? { fullName: '', age: '', gender: 'male' }), ...patch } }));
 
   const [confirmedPnr, setConfirmedPnr] = useState<string | null>(null);
 

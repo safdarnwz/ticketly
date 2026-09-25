@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Webhook as WebhookIcon, Trash2, Copy, Radio } from 'lucide-react';
 
-import { Button, Card, CardBody, Badge, statusTone, Table, type Column, Modal, Input, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
+import { Button, Badge, statusTone, Table, type Column, Modal, Input, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { distributionApi, type Webhook, type WebhookDelivery } from '@/lib/api/distribution';
 

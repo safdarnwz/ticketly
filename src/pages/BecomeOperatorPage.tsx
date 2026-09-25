@@ -50,9 +50,9 @@ export function BecomeOperatorPage() {
             <h2 className="mb-3 font-display text-lg text-text">Speed up your review</h2>
             <KycVerificationSection
               operatorApplicationId={applicationId}
-              panNumber={f.panNumber}
-              bankAccountNumber={f.bankAccountNumber}
-              bankIfsc={f.bankIfsc}
+              panNumber={f.panNumber ?? ''}
+              bankAccountNumber={f.bankAccountNumber ?? ''}
+              bankIfsc={f.bankIfsc ?? ''}
               applicantName={`${f.firstName} ${f.lastName}`.trim()}
             />
           </div>

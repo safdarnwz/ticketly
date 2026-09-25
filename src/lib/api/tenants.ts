@@ -4,7 +4,17 @@ export interface TenantRow {
   id: string; slug: string; displayName: string; status: string;
   contactEmail: string; suspendedReason: string | null; createdAt: string; consoleUrl: string;
 }
-export interface Plan { id: string; code: string; name: string; monthlyPrice: number; currency: string }
+export interface Plan {
+  id: string;
+  code: string;
+  name: string;
+  monthlyPrice: number;
+  currency: string;
+  isActive: boolean;
+  features?: Record<string, unknown>;
+  /** Negative = unlimited. */
+  quotas?: Record<string, number>;
+}
 
 export interface ProvisionTenantInput {
   slug: string; legalName: string; displayName: string; contactEmail: string;

@@ -11,7 +11,7 @@ export interface HoldInput {
 
 export const bookingsApi = {
   /** Staff/ops lookup by PNR alone — no customer phone-number needed, unlike the customer-self-service by-pnr endpoint. */
-  byPnrStaff: (pnr: string) => get<{ booking: { id: string; pnr: string; status: string; totalMinor: number } }>(`/v1/bookings/by-pnr-staff/${encodeURIComponent(pnr)}`),
+  byPnrStaff: (pnr: string) => get<{ booking: Booking }>(`/v1/bookings/by-pnr-staff/${encodeURIComponent(pnr)}`),
   hold: (input: HoldInput) =>
     post<{ bookingId: string; pnr: string; holdExpiresAt: string; totalMinor: number }>(
       '/v1/bookings/hold', input, withIdempotency(`hold-${input.quoteId}`),

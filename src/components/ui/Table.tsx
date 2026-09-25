@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils';
 export interface Column<T> {
   key: string;
   header: ReactNode;
-  render: (row: T) => ReactNode;
+  /** Defaults to the row's `key` field. */
+  render?: (row: T) => ReactNode;
   className?: string;
 }
 
@@ -44,7 +45,7 @@ export function Table<T>({ columns, rows, onRowClick, empty }: {
                 >
                   {columns.map((c) => (
                     <td key={c.key} className={cn('px-4 py-3 text-text', c.className)}>
-                      {c.render(row)}
+                      {c.render ? c.render(row) : String((row as Record<string, unknown>)[c.key] ?? '')}
                     </td>
                   ))}
                 </tr>

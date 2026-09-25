@@ -3,17 +3,17 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Ticketly operator console — React + TypeScript + Tailwind frontend",
+  "description": "Ticketly operator console \u2014 React + TypeScript + Tailwind frontend",
   "engines": {
     "node": ">=20.11.0",
     "npm": ">=10.0.0"
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -p tsconfig.json && vite build",
     "preview": "vite preview",
     "lint": "eslint . --max-warnings 0",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.51.1",
