@@ -31,6 +31,8 @@ import {
   PreviewDatesSchema,
   ReleaseHoldsSchema,
   TripRemarkSchema,
+  TripListQuerySchema,
+  type TripListQuery,
   type BlockSeatsDto,
   type SalesRulesDto,
   type CreateServiceDto,
@@ -131,10 +133,10 @@ export class SchedulingController {
   @RequirePermission(Permission.SERVICE_READ)
   @ApiOperation({
     summary:
-      'Upcoming trips across every service — the operational day-to-day view (occupancy, cancel, stop/resume sales)',
+      'Trips across every service: one journey date (`date`, any status) or everything still to leave — occupancy counts paid seats; seats being paid for right now are `heldSeats`',
   })
-  async listTrips() {
-    return { items: await this.trips.listUpcoming() };
+  async listTrips(@Query(zodQuery(TripListQuerySchema)) q: TripListQuery) {
+    return { items: await this.trips.listUpcoming(q.limit, q.date) };
   }
 
   @Get('trips/:id/availability')

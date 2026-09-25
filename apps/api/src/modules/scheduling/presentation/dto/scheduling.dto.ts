@@ -129,3 +129,10 @@ export type BlackoutDto = z.infer<typeof BlackoutSchema>;
 
 export const RemoveBlackoutSchema = BlackoutSchema.pick({ dates: true });
 export type RemoveBlackoutDto = z.infer<typeof RemoveBlackoutSchema>;
+
+/** The trips list: one journey date, or (none) everything still to leave. */
+export const TripListQuerySchema = z.object({
+  date: localDate.optional(),
+  limit: z.coerce.number().int().min(1).max(300).default(100),
+});
+export type TripListQuery = z.infer<typeof TripListQuerySchema>;

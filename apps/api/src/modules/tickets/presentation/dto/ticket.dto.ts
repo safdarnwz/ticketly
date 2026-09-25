@@ -8,3 +8,9 @@ export const TicketAccessQuerySchema = z.object({
   mobile: z.string().trim().min(6).max(20).optional(),
 });
 export type TicketAccessQueryDto = z.infer<typeof TicketAccessQuerySchema>;
+
+/** Staff re-send of the e-ticket: to the booking's email, or another one the customer gives. */
+export const ResendTicketSchema = z.object({
+  email: z.string().trim().toLowerCase().email('Enter a valid email address').max(254).optional(),
+});
+export type ResendTicketDto = z.infer<typeof ResendTicketSchema>;

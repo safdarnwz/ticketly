@@ -366,21 +366,41 @@ export class TripRepository {
   /** Upcoming trips across every service — the staff "Trips" console view (search/scheduling both work per-service; this is the cross-service operational view for cancel/stop-sales day-to-day). */
   async listUpcoming(
     limit = 100,
-  ): Promise<(TripRecord & { routeName: string; occupancyPct: number })[]> {
-    const rows = await this.db.query<Row & { route_name: string; booked_seats: string }>(
+    date?: string,
+  ): Promise<
+    (TripRecord & {
+      routeName: string;
+      occupancyPct: number;
+      bookedSeats: number;
+      heldSeats: number;
+    })[]
+  > {
+    // A day's trips (any status — the chart for a departed bus is still
+    // needed), or everything still to leave. Seats: paid, and held by a
+    // customer paying right now (an expired hold holds nothing).
+    const rows = await this.db.query<
+      Row & { route_name: string; booked_seats: string; held_seats: string }
+    >(
       `SELECT t.id, t.service_id, t.route_id, t.vehicle_id, t.seat_layout_id, t.journey_date,
               t.departs_at, t.arrives_at, t.stop_count, t.total_seats, t.status,
               r.name AS route_name,
-              coalesce((SELECT sum(b.seat_count) FROM bookings b WHERE b.trip_id = t.id AND b.status IN ('held','confirmed')), 0) AS booked_seats
+              coalesce((SELECT sum(b.seat_count) FROM bookings b
+                         WHERE b.trip_id = t.id AND b.status IN ('confirmed', 'completed')), 0) AS booked_seats,
+              coalesce((SELECT sum(b.seat_count) FROM bookings b
+                         WHERE b.trip_id = t.id AND b.status = 'held' AND b.hold_expires_at > now()), 0) AS held_seats
          FROM trips t JOIN routes r ON r.id = t.route_id
-        WHERE t.tenant_id = $1 AND t.departs_at > now() AND t.status != 'cancelled'
+        WHERE t.tenant_id = $1
+          AND (CASE WHEN $3::date IS NULL THEN t.departs_at > now() AND t.status != 'cancelled'
+                    ELSE t.journey_date = $3::date END)
         ORDER BY t.departs_at LIMIT $2`,
-      [requireTenantId(), Math.min(limit, 300)],
+      [requireTenantId(), Math.min(limit, 300), date ?? null],
       { name: 'trip.listUpcoming' },
     );
     return rows.map((r) => ({
       ...map(r),
       routeName: r.route_name,
+      bookedSeats: Number(r.booked_seats),
+      heldSeats: Number(r.held_seats),
       occupancyPct:
         r.total_seats > 0 ? Math.round((Number(r.booked_seats) / r.total_seats) * 100) : 0,
     }));

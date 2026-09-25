@@ -14,7 +14,18 @@ import {
 } from '@http';
 import {
   BadRequestError,
+  DEFAULT_TIMEZONE,
+  ForbiddenError,
+  getContext,
+  hasPermission,
+  daysBetween,
+  decodeCursor,
+  encodeCursor,
   getUserId,
+  isUuid,
+  isValidTimeZone,
+  localDate,
+  todayIn,
   NotFoundError,
   runAsTenant,
   UnauthenticatedError,
@@ -22,6 +33,7 @@ import {
   type TenantId,
 } from '@kernel';
 
+import { NotificationService } from '../../notification';
 import { BookingRepository } from '../infrastructure/persistence/booking.repository';
 import { allowedSalesChannel } from '../application/services/sales-channel';
 import { BookingService } from '../application/services/booking.service';
@@ -66,6 +78,7 @@ export class BookingController {
     private readonly booking: BookingService,
     private readonly bookings: BookingRepository,
     private readonly tripOps: TripOpsService,
+    private readonly notifications: NotificationService,
   ) {}
 
   @Post('hold')
@@ -147,32 +160,87 @@ export class BookingController {
   @Post(':id/cancel-seats')
   @HttpCode(200)
   @Public()
+  @RateLimit(20, 60_000, 'ip')
   @Idempotent()
   @ApiOperation({
     summary:
-      'Cancel only SOME seats of a multi-seat booking (e.g. one family member drops out) — the remaining seats stay confirmed. Each cancelled seat refunds off its own actual fare.',
+      'Cancel only SOME seats of a multi-seat booking — the rest stay confirmed; each seat refunds off its own fare. Operator staff (booking:cancel), the signed-in customer who booked it, or the booking mobile as proof; only staff may send the refund to another account.',
   })
   async cancelSeats(
     @UuidParam('id') id: string,
     @Body(zodBody(CancelSeatsSchema)) dto: CancelSeatsDto,
   ) {
-    return this.booking.cancelSeats(
-      id as BookingId,
-      dto.seatNumbers,
-      dto.reason,
-      dto.refundDestination,
-      dto.altAccountDetails,
-    );
+    const run = () =>
+      this.booking.cancelSeats(
+        id as BookingId,
+        dto.seatNumbers,
+        dto.reason,
+        dto.refundDestination,
+        dto.altAccountDetails,
+      );
+    // Operator staff: the booking must be theirs (the service reads it in
+    // the caller's tenant, so another operator's id is simply not found).
+    if (getContext()?.tenantId && hasPermission(Permission.BOOKING_CANCEL)) return run();
+
+    // Anyone else proves the booking is theirs — it used to take any id.
+    const info = await this.bookings.accessInfo(id);
+    const digits = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '').slice(-10);
+    const owner = Boolean(info?.customerId) && info?.customerId === getUserId();
+    const byPhone =
+      Boolean(dto.mobile) &&
+      digits(dto.mobile).length === 10 &&
+      digits(dto.mobile) === digits(info?.contactPhone);
+    if (!info || (!owner && !byPhone)) throw new NotFoundError('Booking', id);
+    if (dto.refundDestination !== 'source')
+      throw new ForbiddenError({
+        message: 'The refund goes back to how you paid — ask the operator to send it elsewhere',
+      });
+    return runAsTenant(info.tenantId as TenantId, run);
   }
 
   @Get('search')
   @RequirePermission(Permission.BOOKING_READ)
   @ApiOperation({
     summary:
-      'Staff search by PNR, mobile number (any format) or ticket number — at least one is required',
+      "This operator's bookings, newest first: by PNR / mobile / ticket number (any date), or a period (default today, max 92 days) by booking or journey date, with status, channel and trip filters; cursor paging",
   })
   async search(@Query(zodQuery(StaffBookingSearchQuerySchema)) q: StaffBookingSearchQueryDto) {
-    return { items: await this.bookings.search(q) };
+    const byId = Boolean(q.pnr || q.mobile || q.ticket);
+    let from = q.from;
+    let to = q.to;
+    if (!byId && !from && !to) {
+      const tz = await this.bookings.operatorTimezone();
+      from = to = todayIn(isValidTimeZone(tz) ? tz : DEFAULT_TIMEZONE);
+    }
+    if (from && to && daysBetween(localDate(from), localDate(to)) + 1 > 92)
+      throw new BadRequestError('Choose at most 92 days');
+    let before: { createdAt: string; id: string } | undefined;
+    if (q.cursor) {
+      let c: ReturnType<typeof decodeCursor>;
+      try {
+        c = decodeCursor(q.cursor);
+      } catch {
+        c = undefined;
+      }
+      const [at, id] = c?.k ?? [];
+      if (c?.v !== 1 || typeof at !== 'string' || Number.isNaN(Date.parse(at)) || !isUuid(id))
+        throw new BadRequestError('That page link is no longer valid — start from the first page');
+      before = { createdAt: at, id: id };
+    }
+    const rows = await this.bookings.search({ ...q, from, to, before, limit: q.limit + 1 });
+    const hasMore = rows.length > q.limit;
+    const items = rows.slice(0, q.limit);
+    const last = items[items.length - 1];
+    return {
+      from: from ?? null,
+      to: to ?? null,
+      items,
+      hasMore,
+      nextCursor:
+        hasMore && last
+          ? encodeCursor({ v: 1, k: [new Date(last.createdAt).toISOString(), last.id], d: 'desc' })
+          : null,
+    };
   }
 
   @Get('by-pnr/:pnr')
@@ -205,7 +273,11 @@ export class BookingController {
   async byPnrStaff(@Param('pnr') pnr: string) {
     const booking = await this.bookings.findByPnrStaff(pnr);
     if (!booking) throw new NotFoundError('Booking', pnr);
-    return { booking };
+    const [detail] = await this.bookings.search({ pnr: booking.pnr, limit: 1 });
+    const passengers = await this.bookings.loadPassengers(booking.id);
+    passengers.sort((a, b) => a.seatNumber.localeCompare(b.seatNumber, 'en', { numeric: true }));
+    const emails = (await this.notifications.documentStatus([booking.id])).get(booking.id) ?? {};
+    return { booking, detail: detail ?? null, passengers, emails };
   }
 
   /**

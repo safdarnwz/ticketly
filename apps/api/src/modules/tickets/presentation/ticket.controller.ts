@@ -11,12 +11,14 @@ import {
   zodBody,
   zodQuery,
 } from '@http';
-import { type BookingId } from '@kernel';
+import { AppError, ErrorCode, newId, type BookingId } from '@kernel';
 
 import { TicketService } from '../application/services/ticket.service';
 import {
+  ResendTicketSchema,
   TicketAccessQuerySchema,
   VerifyTicketSchema,
+  type ResendTicketDto,
   type TicketAccessQueryDto,
   type VerifyTicketDto,
 } from './dto/ticket.dto';
@@ -56,6 +58,26 @@ export class TicketController {
     return this.tickets.asViewer(bookingId as BookingId, q.mobile, () =>
       this.tickets.renderHtml(bookingId as BookingId),
     );
+  }
+
+  @Post('bookings/:bookingId/tickets/resend')
+  @HttpCode(200)
+  @RequirePermission(Permission.BOOKING_READ)
+  @RateLimit(30, 60_000, 'tenant')
+  @ApiOperation({
+    summary:
+      "Operator staff: email the e-ticket again — to the booking's email or another address the customer gives (a confirmed booking of this operator only)",
+  })
+  async resend(
+    @UuidParam('bookingId') bookingId: string,
+    @Body(zodBody(ResendTicketSchema)) dto: ResendTicketDto,
+  ) {
+    const sent = await this.tickets.emailTicket(bookingId as BookingId, newId(), dto.email);
+    if (!sent)
+      throw new AppError(ErrorCode.COMMON_PRECONDITION_FAILED, 422, {
+        message: 'Only a confirmed booking with an email address can be sent its ticket',
+      });
+    return { sent: true };
   }
 
   @Post('tickets/verify')

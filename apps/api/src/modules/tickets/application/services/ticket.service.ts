@@ -250,9 +250,10 @@ export class TicketService {
    * opening text. The GST invoice goes separately (InvoiceService). Returns
    * false when there is no email address or it was already sent.
    */
-  async emailTicket(bookingId: BookingId, eventId: Uuid): Promise<boolean> {
+  async emailTicket(bookingId: BookingId, eventId: Uuid, to?: string): Promise<boolean> {
     const booking = await this.bookings.findForUpdate(bookingId);
-    if (!booking?.contactEmail) return false;
+    const recipient = to ?? booking?.contactEmail;
+    if (!booking || !recipient) return false;
     if (booking.status !== 'confirmed' && booking.status !== 'completed') return false;
     const view = await this.ticketView(bookingId);
     const tenantId = requireTenantId();
@@ -277,7 +278,7 @@ export class TicketService {
       eventId,
       bookingId,
       kind: 'eticket',
-      to: booking.contactEmail,
+      to: recipient,
       subject: own?.subject || ticketSubject(view),
       html: renderTicketEmail(view, cid),
       text: ticketText(view),

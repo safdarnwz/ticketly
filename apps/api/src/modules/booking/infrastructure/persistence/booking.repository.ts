@@ -15,6 +15,32 @@ import {
 import type { BookingStatus } from '../../domain/booking-state';
 import type { LockedSeat } from './seat-lock.repository';
 
+/** A booking as the operator's bookings list shows it. */
+export interface StaffBookingRow {
+  id: string;
+  pnr: string;
+  status: string;
+  liveHold: boolean;
+  holdExpiresAt: Date | null;
+  totalMinor: number;
+  paidMinor: number;
+  seatCount: number;
+  contactPhone: string | null;
+  contactEmail: string | null;
+  channel: string;
+  createdAt: Date;
+  confirmedAt: Date | null;
+  cancelledAt: Date | null;
+  tripId: string;
+  journeyDate: string;
+  departsAt: Date;
+  routeName: string;
+  fromName: string | null;
+  toName: string | null;
+  leadPassenger: string | null;
+  seats: string[];
+}
+
 export interface BookingRow {
   id: BookingId;
   pnr: string;
@@ -177,6 +203,12 @@ export class BookingRepository {
    * Staff search (415–417): by PNR, mobile (last 10 digits, so +91 / 0 prefixes
    * match) or ticket/boarding code. Newest first, max 50.
    */
+  /**
+   * The operator's bookings, newest first. By PNR / mobile / ticket number
+   * (any date), or by period (booking or journey date, in the operator's own
+   * time zone) narrowed by status, channel and trip. `before` pages on
+   * (createdAt, id). The agent portal uses it with `agentId`.
+   */
   async search(q: {
     pnr?: string;
     mobile?: string;
@@ -184,21 +216,54 @@ export class BookingRepository {
     agentId?: string;
     from?: string;
     to?: string;
-  }): Promise<unknown[]> {
+    dateBasis?: 'booked' | 'journey';
+    status?: 'live' | 'confirmed' | 'cancelled' | 'expired' | 'completed';
+    channel?: string;
+    tripId?: string;
+    before?: { createdAt: string; id: string };
+    limit?: number;
+  }): Promise<StaffBookingRow[]> {
     const digits = (q.mobile ?? '').replace(/\D/g, '').slice(-10);
-    return this.db.query(
-      `SELECT DISTINCT b.id, b.pnr, b.status, b.total_minor AS "totalMinor", b.contact_phone AS "contactPhone", b.channel, b.created_at AS "createdAt",
-              t.journey_date AS "journeyDate", r.name AS "routeName"
-         FROM bookings b JOIN trips t ON t.id = b.trip_id JOIN routes r ON r.id = t.route_id
-         LEFT JOIN tickets tk ON tk.booking_id = b.id
+    const status = {
+      live: "b.status = 'held' AND b.hold_expires_at > now()",
+      confirmed: "b.status = 'confirmed'",
+      cancelled: "b.status = 'cancelled'",
+      expired: "(b.status = 'expired' OR (b.status = 'held' AND b.hold_expires_at <= now()))",
+      completed: "b.status = 'completed'",
+    }[q.status ?? 'confirmed'];
+    const onDate =
+      q.dateBasis === 'journey'
+        ? 't.journey_date'
+        : '(b.created_at AT TIME ZONE te.timezone)::date';
+    const rows = await this.db.query<Record<string, unknown>>(
+      `SELECT b.id, b.pnr, b.status, (b.status = 'held' AND b.hold_expires_at > now()) AS "liveHold",
+              b.hold_expires_at AS "holdExpiresAt", b.total_minor AS "totalMinor", b.paid_minor AS "paidMinor",
+              b.seat_count AS "seatCount", b.contact_phone AS "contactPhone", b.contact_email AS "contactEmail",
+              b.channel, b.created_at AS "createdAt", b.confirmed_at AS "confirmedAt",
+              b.cancelled_at AS "cancelledAt", b.trip_id AS "tripId", t.journey_date AS "journeyDate",
+              t.departs_at AS "departsAt", r.name AS "routeName",
+              fs.name AS "fromName", ts.name AS "toName",
+              (SELECT p.full_name FROM passengers p WHERE p.booking_id = b.id ORDER BY p.seat_number LIMIT 1) AS "leadPassenger",
+              (SELECT array_agg(bs.seat_number ORDER BY bs.seat_number) FROM booking_seats bs WHERE bs.booking_id = b.id) AS seats
+         FROM bookings b
+         JOIN tenants te ON te.id = b.tenant_id
+         JOIN trips t ON t.id = b.trip_id
+         JOIN routes r ON r.id = t.route_id
+         LEFT JOIN stops fs ON fs.id = b.from_stop_id
+         LEFT JOIN stops ts ON ts.id = b.to_stop_id
         WHERE b.tenant_id = $1
           AND ($2::text IS NULL OR upper(b.pnr) = upper($2))
           AND ($3::text IS NULL OR right(regexp_replace(coalesce(b.contact_phone, ''), '\\D', '', 'g'), 10) = $3)
-          AND ($4::text IS NULL OR upper(tk.boarding_code) = upper($4))
+          AND ($4::text IS NULL OR EXISTS (SELECT 1 FROM tickets tk WHERE tk.booking_id = b.id AND upper(tk.boarding_code) = upper($4)))
           AND ($5::uuid IS NULL OR b.agent_id = $5)
-          AND ($6::date IS NULL OR b.created_at >= $6::date)
-          AND ($7::date IS NULL OR b.created_at < $7::date + 1)
-        ORDER BY b.created_at DESC LIMIT 50`,
+          AND ($6::date IS NULL OR ${onDate} >= $6::date)
+          AND ($7::date IS NULL OR ${onDate} <= $7::date)
+          AND ($8::boolean OR ${status})
+          AND ($9::text IS NULL OR b.channel = $9)
+          AND ($10::uuid IS NULL OR b.trip_id = $10)
+          AND ($11::timestamptz IS NULL OR (b.created_at, b.id) < ($11::timestamptz, $12::uuid))
+        ORDER BY b.created_at DESC, b.id DESC
+        LIMIT $13`,
       [
         requireTenantId(),
         q.pnr?.trim() || null,
@@ -207,9 +272,32 @@ export class BookingRepository {
         q.agentId ?? null,
         q.from ?? null,
         q.to ?? null,
+        !q.status,
+        q.channel ?? null,
+        q.tripId ?? null,
+        q.before?.createdAt ?? null,
+        q.before?.id ?? null,
+        Math.min(q.limit ?? 50, 201),
       ],
       { name: 'booking.search' },
     );
+    return rows.map((r) => ({
+      ...(r as unknown as StaffBookingRow),
+      status: r.status === 'held' && !r.liveHold ? 'expired' : (r.status as string),
+      totalMinor: Number(r.totalMinor),
+      paidMinor: Number(r.paidMinor),
+      seats: (r.seats as string[] | null) ?? [],
+    }));
+  }
+
+  /** The signed-in operator's time zone (its calendar day is "today"). */
+  async operatorTimezone(): Promise<string> {
+    const row = await this.db.queryOne<{ timezone: string }>(
+      `SELECT timezone FROM tenants WHERE id = $1`,
+      [requireTenantId()],
+      { name: 'booking.operatorTimezone' },
+    );
+    return row?.timezone ?? 'Asia/Kolkata';
   }
 
   async channelOf(bookingId: BookingId): Promise<string | null> {
@@ -385,39 +473,56 @@ export class BookingRepository {
    * has no tenant of its own, so this runs with `bypassRls` for the one
    * tenant being inspected.
    */
+  /**
+   * An operator's headline numbers. "Today" is the operator's own calendar
+   * day (its time zone), not the database server's.
+   */
   async statsForTenant(tenantId: string): Promise<{
     totalBookings: number;
     todayBookings: number;
+    todaySeats: number;
+    todayRevenueMinor: number;
     totalCancelled: number;
     todayCancelled: number;
     totalRevenueMinor: number;
+    liveHolds: number;
+    liveHoldSeats: number;
   }> {
-    return this.uow.run({ name: 'booking.statsForTenant', bypassRls: true }, async (scope) => {
-      const row = await scope.client.query<{
-        total_bookings: string;
-        today_bookings: string;
-        total_cancelled: string;
-        today_cancelled: string;
-        total_revenue_minor: string;
-      }>(
-        `SELECT
-           count(*) FILTER (WHERE confirmed_at IS NOT NULL) AS total_bookings,
-           count(*) FILTER (WHERE confirmed_at IS NOT NULL AND confirmed_at::date = current_date) AS today_bookings,
-           count(*) FILTER (WHERE cancelled_at IS NOT NULL) AS total_cancelled,
-           count(*) FILTER (WHERE cancelled_at IS NOT NULL AND cancelled_at::date = current_date) AS today_cancelled,
-           coalesce(sum(paid_minor) FILTER (WHERE status IN ('confirmed','completed')), 0) AS total_revenue_minor
-         FROM bookings WHERE tenant_id = $1`,
-        [tenantId],
-      );
-      const r = row.rows[0];
-      return {
-        totalBookings: Number(r?.total_bookings ?? 0),
-        todayBookings: Number(r?.today_bookings ?? 0),
-        totalCancelled: Number(r?.total_cancelled ?? 0),
-        todayCancelled: Number(r?.today_cancelled ?? 0),
-        totalRevenueMinor: Number(r?.total_revenue_minor ?? 0),
-      };
-    });
+    return this.uow.run(
+      { name: 'booking.statsForTenant', bypassRls: true, readOnly: true },
+      async (scope) => {
+        const row = await scope.client.query<Record<string, string>>(
+          `WITH day AS (
+             SELECT (date_trunc('day', now() AT TIME ZONE timezone) AT TIME ZONE timezone) AS starts
+               FROM tenants WHERE id = $1)
+           SELECT
+             count(*) FILTER (WHERE confirmed_at IS NOT NULL) AS total_bookings,
+             count(*) FILTER (WHERE confirmed_at >= day.starts) AS today_bookings,
+             coalesce(sum(seat_count) FILTER (WHERE confirmed_at >= day.starts), 0) AS today_seats,
+             coalesce(sum(paid_minor) FILTER (WHERE confirmed_at >= day.starts AND status IN ('confirmed','completed')), 0) AS today_revenue_minor,
+             count(*) FILTER (WHERE cancelled_at IS NOT NULL) AS total_cancelled,
+             count(*) FILTER (WHERE cancelled_at >= day.starts) AS today_cancelled,
+             coalesce(sum(paid_minor) FILTER (WHERE status IN ('confirmed','completed')), 0) AS total_revenue_minor,
+             count(*) FILTER (WHERE status = 'held' AND hold_expires_at > now()) AS live_holds,
+             coalesce(sum(seat_count) FILTER (WHERE status = 'held' AND hold_expires_at > now()), 0) AS live_hold_seats
+           FROM bookings, day WHERE tenant_id = $1`,
+          [tenantId],
+        );
+        const r = row.rows[0] ?? {};
+        const n = (k: string) => Number(r[k] ?? 0);
+        return {
+          totalBookings: n('total_bookings'),
+          todayBookings: n('today_bookings'),
+          todaySeats: n('today_seats'),
+          todayRevenueMinor: n('today_revenue_minor'),
+          totalCancelled: n('total_cancelled'),
+          todayCancelled: n('today_cancelled'),
+          totalRevenueMinor: n('total_revenue_minor'),
+          liveHolds: n('live_holds'),
+          liveHoldSeats: n('live_hold_seats'),
+        };
+      },
+    );
   }
 
   /** Passenger names by seat — for e-ticket/invoice rendering (a passenger's name must appear on their own ticket). */
@@ -475,6 +580,14 @@ export class BookingRepository {
       `UPDATE tickets SET status = 'cancelled' WHERE tenant_id = $1 AND booking_id = $2 AND seat_number = ANY($3)`,
       [tenantId, bookingId, seatNumbers],
       { name: 'booking.removeSeatsPartial.tickets', primary: true },
+    );
+    // The booking's seat count follows its seats — occupancy, the bookings
+    // list and the dashboard all read it.
+    await this.db.execute_(
+      `UPDATE bookings SET seat_count = (SELECT count(*) FROM booking_seats WHERE booking_id = $2), updated_at = now()
+        WHERE tenant_id = $1 AND id = $2`,
+      [tenantId, bookingId],
+      { name: 'booking.removeSeatsPartial.count', primary: true },
     );
   }
 

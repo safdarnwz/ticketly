@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3125 |
-| TODO | 941 |
-| DONE | 12 |
+| TODO | 935 |
+| DONE | 18 |
 | DUP | 9 |
 
 
@@ -254,7 +254,7 @@ CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 | 217 | Set reporting manager for staff | DONE | TODO | PUT /users/:id/access {managerId} (no loops) |
 | 218 | Create temporary contractor staff with expiry | DONE | TODO | PUT /users/:id/access {accessExpiresAt} |
 | 219 | System auto-deactivates expired staff | DONE | TODO | auth guard refuses expired access on next request |
-| 220 | View main operator dashboard | DONE | TODO | verified manually: existing module/API |
+| 220 | View main operator dashboard | DONE | DONE | GET /reports/summary (today in operator tz, live holds) + GET /scheduling/trips?date= + GET /bookings/search · UI: operator Dashboard (KPIs, today's departures, latest bookings) |
 | 221 | View today’s total bookings | DONE | TODO | verified manually: existing module/API |
 | 222 | View today’s total revenue | DONE | TODO | verified manually: existing module/API |
 | 223 | View today’s average occupancy | DONE | TODO | verified manually: existing module/API |
@@ -408,7 +408,7 @@ CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 | 371 | Calculate fare difference on date change | DONE | TODO | verified manually: existing module/API |
 | 372 | Process full cancellation request | DONE | TODO | verified manually: existing module/API |
 | 373 | Initiate refund after cancellation | DONE | TODO | verified manually: existing module/API |
-| 374 | Process partial cancellation of one passenger | DONE | TODO | verified manually: existing module/API |
+| 374 | Process partial cancellation of one passenger | DONE | DONE | POST /bookings/:id/cancel-seats (staff / owner / booking mobile; seat_count kept in step) · UI: booking detail › Cancel… (pick seats, refund preview, reason) |
 | 375 | Mark passenger as no-show | DONE | TODO | verified manually: existing module/API |
 | 376 | Generate daily cash collection summary | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 377 | View digital payment collection summary | GAP | — | verified manually: not built yet |
@@ -449,9 +449,9 @@ CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 | 412 | Block seats for VIP or special movement | DONE | TODO | verified manually: existing module/API |
 | 413 | Release previously blocked VIP seats | DONE | TODO | verified manually: existing module/API |
 | 414 | Change boarding point for multiple passengers together | DONE | TODO | verified manually: existing module/API |
-| 415 | Search booking using PNR number | DONE | TODO | verified manually: existing module/API |
-| 416 | Search booking using mobile number | DONE | TODO | GET /bookings/search?mobile= (last-10-digit match) |
-| 417 | Search booking using ticket number | DONE | TODO | GET /bookings/search?ticket= |
+| 415 | Search booking using PNR number | DONE | DONE | verified manually: existing module/API · UI: operator Bookings list + detail (find by PNR/mobile/ticket, filters, CSV) |
+| 416 | Search booking using mobile number | DONE | DONE | GET /bookings/search?mobile= (last-10-digit match) · UI: operator Bookings list + detail (find by PNR/mobile/ticket, filters, CSV) |
+| 417 | Search booking using ticket number | DONE | DONE | GET /bookings/search?ticket= · UI: operator Bookings list + detail (find by PNR/mobile/ticket, filters, CSV) |
 | 418 | View complete passenger travel history | DONE | TODO | verified manually: existing module/API |
 | 419 | Manually apply senior citizen discount | DONE | TODO | verified manually: existing module/API |
 | 420 | Manually apply student discount | DONE | TODO | verified manually: existing module/API |
@@ -546,7 +546,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 | 502 | Receive booking confirmation | DONE | TODO | verified manually: existing module/API |
 | 503 | Download ticket PDF | GAP | — | verified manually: not built yet |
 | 504 | Share ticket with customer | GAP | — | verified manually: not built yet |
-| 505 | Search booking by PNR | DONE | TODO | verified manually: existing module/API |
+| 505 | Search booking by PNR | DONE | DONE | verified manually: existing module/API · UI: operator Bookings list + detail (find by PNR/mobile/ticket, filters, CSV) |
 | 506 | Search booking by mobile number | DONE | TODO | GET /bookings/search (agent-scoped via portal) |
 | 507 | View complete booking details | DONE | TODO | verified manually: existing module/API |
 | 508 | Raise boarding point change request | DONE | TODO | POST /agent-portal/bookings/:id/change-points |
@@ -561,7 +561,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 | 517 | View net refund amount | DONE | TODO | verified manually: existing module/API |
 | 518 | Confirm cancellation | DONE | TODO | verified manually: existing module/API |
 | 519 | View updated commission after cancellation | DONE | TODO | verified manually: existing module/API |
-| 520 | Raise partial cancellation for one passenger | DONE | TODO | verified manually: existing module/API |
+| 520 | Raise partial cancellation for one passenger | DONE | TODO | POST /bookings/:id/cancel-seats (staff / owner / booking mobile; seat_count kept in step) |
 | 521 | Add passenger to waitlist | DONE | TODO | verified manually: existing module/API |
 | 522 | Receive notification when waitlist confirms | DONE | TODO | verified manually: existing module/API |
 | 523 | Raise request for group booking | GAP | — | verified manually: not built yet |

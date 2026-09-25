@@ -180,3 +180,19 @@ an unknown id is now 404 (was 200).
   progress now, confirmed / cancelled, seats, gross; `GET /admin/monitoring/bookings?from&to&tenantId&status&channel&pnr&cursor&limit`
   — every operator's bookings newest first (`status=live` = being paid now), with each booking's
   e-ticket / invoice email status. Customer phone and email are masked. Max 92 days per request.
+- **Security:** `POST /bookings/:id/cancel-seats` was open to anyone with a booking id (and could send the
+  refund to any bank account). It now needs operator staff (`booking:cancel`), the signed-in customer who
+  booked it, or `mobile` in the body matching the booking; only staff may pick `refundDestination:
+  alternate_account` (403 otherwise). 404 for anyone else.
+- Cancelling some seats now also lowers the booking's `seatCount` (it stayed at the old number); migration
+  0085 repairs existing bookings.
+- `GET /bookings/search` is the operator's bookings list: PNR / mobile / ticket number (any date), or a period
+  `from`/`to` (default today in the operator's time zone, max 92 days) by `dateBasis=booked|journey`, with
+  `status`, `channel`, `tripId`, `cursor`/`limit`. Response is `{ from, to, items, hasMore, nextCursor }`
+  (was `{ items }`); each item carries journey, stops, seats, lead passenger and contact.
+- `GET /bookings/by-pnr-staff/:pnr` also returns `detail`, `passengers` and `emails` (e-ticket / invoice status).
+- New `POST /bookings/:id/tickets/resend` `{ email? }` (staff): emails the e-ticket again.
+- `GET /reports/summary` counts "today" in the operator's time zone (it used the server's) and adds
+  `todaySeats`, `todayRevenueMinor`, `liveHolds`, `liveHoldSeats`.
+- `GET /scheduling/trips?date=` lists one journey date (any status); seats held by expired holds no longer
+  count, and each trip has `bookedSeats` / `heldSeats`.

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { localDateQuery } from '@http';
 
 const uuid = z.string().uuid();
 
@@ -65,8 +66,13 @@ export type CancelDto = z.infer<typeof CancelSchema>;
 
 export const CancelSeatsSchema = z
   .object({
-    seatNumbers: z.array(z.string()).min(1, 'At least one seat must be specified'),
+    seatNumbers: z
+      .array(z.string().min(1).max(10))
+      .min(1, 'At least one seat must be specified')
+      .max(10),
     reason: z.string().max(500).optional(),
+    /** A customer (not signed in) proves the booking with its mobile. */
+    mobile: z.string().trim().max(20).optional(),
     refundDestination: z.enum(['source', 'alternate_account']).default('source'),
     altAccountDetails: AltAccountDetailsSchema.optional(),
   })
@@ -110,15 +116,28 @@ const mobileQuery = z
 export const ContactMobileQuerySchema = z.object({ mobile: mobileQuery });
 export type ContactMobileQueryDto = z.infer<typeof ContactMobileQuerySchema>;
 
-/** Staff search: by PNR, mobile or ticket number — at least one. */
+/**
+ * The operator's bookings list. By PNR / mobile / ticket number it searches
+ * every date; otherwise it lists a period (default today) by booking or
+ * journey date, narrowed by status, channel and trip. At most 92 days.
+ */
 export const StaffBookingSearchQuerySchema = z
   .object({
     pnr: z.string().trim().min(1).max(20).optional(),
     mobile: mobileQuery.optional(),
     ticket: z.string().trim().min(1).max(40).optional(),
+    from: localDateQuery.optional(),
+    to: localDateQuery.optional(),
+    dateBasis: z.enum(['booked', 'journey']).default('booked'),
+    status: z.enum(['live', 'confirmed', 'cancelled', 'expired', 'completed']).optional(),
+    channel: z.enum(['direct_web', 'direct_app', 'ota', 'backoffice']).optional(),
+    tripId: z.string().uuid().optional(),
+    cursor: z.string().max(200).optional(),
+    limit: z.coerce.number().int().min(1).max(200).default(50),
   })
-  .refine((q) => q.pnr || q.mobile || q.ticket, {
-    message: 'Give a PNR, mobile number or ticket number',
+  .refine((q) => !q.from || !q.to || q.from <= q.to, {
+    message: "'from' must not be after 'to'",
+    path: ['from'],
   });
 export type StaffBookingSearchQueryDto = z.infer<typeof StaffBookingSearchQuerySchema>;
 
