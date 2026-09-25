@@ -1,12 +1,25 @@
-import { Body, Controller, Get, Header, Post, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, Header, Post, HttpCode, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, Public, RateLimit, RequirePermission, UuidParam, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  Public,
+  RateLimit,
+  RequirePermission,
+  UuidParam,
+  zodBody,
+  zodQuery,
+} from '@http';
 import { type BookingId } from '@kernel';
 
 import { TicketService } from '../application/services/ticket.service';
-import { VerifyTicketSchema, type VerifyTicketDto } from './dto/ticket.dto';
+import {
+  TicketAccessQuerySchema,
+  VerifyTicketSchema,
+  type TicketAccessQueryDto,
+  type VerifyTicketDto,
+} from './dto/ticket.dto';
 
 @ApiTags('tickets')
 @ApiBearerAuth('bearer')
@@ -18,18 +31,31 @@ export class TicketController {
   @Get('bookings/:bookingId/tickets')
   @Public()
   @RateLimit(60, 60_000, 'ip')
-  @ApiOperation({ summary: 'Signed boarding tokens (QR content) for a booking' })
-  async tokens(@UuidParam('bookingId') bookingId: string) {
-    return this.tickets.issueForBooking(bookingId as BookingId);
+  @ApiOperation({
+    summary:
+      "Signed boarding tokens (QR content) — for the operator's staff, the signed-in customer, or with ?mobile= of the booking",
+  })
+  async tokens(
+    @UuidParam('bookingId') bookingId: string,
+    @Query(zodQuery(TicketAccessQuerySchema)) q: TicketAccessQueryDto,
+  ) {
+    return this.tickets.asViewer(bookingId as BookingId, q.mobile, () =>
+      this.tickets.issueForBooking(bookingId as BookingId),
+    );
   }
 
   @Get('bookings/:bookingId/ticket.html')
   @Public()
   @RateLimit(60, 60_000, 'ip')
   @Header('Content-Type', 'text/html; charset=utf-8')
-  @ApiOperation({ summary: 'Printable HTML e-ticket' })
-  async html(@UuidParam('bookingId') bookingId: string) {
-    return this.tickets.renderHtml(bookingId as BookingId);
+  @ApiOperation({ summary: 'Printable HTML e-ticket (same access as the tickets endpoint)' })
+  async html(
+    @UuidParam('bookingId') bookingId: string,
+    @Query(zodQuery(TicketAccessQuerySchema)) q: TicketAccessQueryDto,
+  ) {
+    return this.tickets.asViewer(bookingId as BookingId, q.mobile, () =>
+      this.tickets.renderHtml(bookingId as BookingId),
+    );
   }
 
   @Post('tickets/verify')

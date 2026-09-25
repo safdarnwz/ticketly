@@ -67,7 +67,17 @@ describe('booking flow (e2e)', () => {
     );
     expect(pay.status).toBe(200);
 
-    const tickets = await app.get(`/bookings/${hold.body.bookingId}/tickets`);
+    // Tickets only for the booking's own mobile (or its operator / customer).
+    const path = `/bookings/${hold.body.bookingId}/tickets`;
+    const anon = { as: 'anonymous' as const };
+    expect((await app.get(path, anon)).status).toBe(404);
+    expect((await app.get(`${path}?mobile=9000000001`, anon)).status).toBe(404);
+    expect((await app.get(path.replace('/tickets', '/ticket.html'), anon)).status).toBe(404);
+    expect((await app.get(path)).status).toBe(200); // the signed-in customer who booked it
+    expect((await app.get(path, { as: 'operator' })).status).toBe(200);
+    const tickets = await app.get(
+      `${path}?mobile=${encodeURIComponent(app.fixtures.customer.phone)}`,
+    );
     expect(tickets.status).toBe(200);
     const token: string = tickets.body.tickets[0].boardingToken;
     expect(token).toContain('.');

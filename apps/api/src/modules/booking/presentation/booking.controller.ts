@@ -14,8 +14,10 @@ import {
 } from '@http';
 import {
   BadRequestError,
+  getUserId,
   NotFoundError,
   runAsTenant,
+  UnauthenticatedError,
   type BookingId,
   type TenantId,
 } from '@kernel';
@@ -204,15 +206,18 @@ export class BookingController {
     return { booking };
   }
 
+  /**
+   * The signed-in customer's own bookings across every operator. It used to
+   * take any mobile number with no proof — anyone could list a stranger's
+   * trips; a booking made without signing in is found with PNR + mobile.
+   */
   @Get('mine')
-  @Public()
   @RateLimit(30, 60_000, 'ip')
-  @ApiOperation({
-    summary: "All of a phone number's bookings, across every operator (mobile self-service)",
-  })
-  async mine(@Query(zodQuery(ContactMobileQuerySchema)) { mobile }: ContactMobileQueryDto) {
-    const bookings = await this.bookings.listByContactPhone(mobile);
-    return { bookings };
+  @ApiOperation({ summary: "The signed-in customer's bookings, across every operator" })
+  async mine() {
+    const userId = getUserId();
+    if (!userId) throw new UnauthenticatedError();
+    return { bookings: await this.bookings.listForCustomer(userId) };
   }
 
   @Get(':id/refund-preview')

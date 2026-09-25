@@ -34,8 +34,9 @@ export interface BookingRow {
   version: number;
   contactPhone: string | null;
   contactEmail: string | null;
-  /** Only populated by cross-tenant reads (`listByContactPhone`) — not selected elsewhere. */
+  /** Only populated by cross-tenant reads (`listForCustomer`, `getByPnr`) — not selected elsewhere. */
   tenantId?: string;
+  createdAt?: Date;
 }
 
 /**
@@ -292,30 +293,49 @@ export class BookingRepository {
     );
   }
 
-  /** All bookings for a phone number, across every operator — for "my bookings" / mobile self-service. Same bypassRls reasoning as `getByPnr`. */
-  async listByContactPhone(contactPhone: string): Promise<BookingRow[]> {
+  /** A signed-in customer's own bookings, across every operator, newest first. */
+  async listForCustomer(customerId: string): Promise<BookingRow[]> {
     return this.uow.run<BookingRow[]>(
-      { name: 'booking.listByContactPhone', bypassRls: true },
+      { name: 'booking.listForCustomer', bypassRls: true, readOnly: true },
       async (scope) => {
         const result = await scope.client.query<BookingRow>(
           `SELECT id, pnr, trip_id AS "tripId", route_id AS "routeId", from_seq AS "fromSeq", to_seq AS "toSeq",
                 status, seat_count AS "seatCount", customer_id AS "customerId", currency, total_minor AS "totalMinor", paid_minor AS "paidMinor",
-                coupon_code AS "couponCode", hold_expires_at AS "holdExpiresAt", version, tenant_id AS "tenantId"
-           FROM bookings WHERE contact_phone = $1
-           ORDER BY created_at DESC LIMIT 100`,
-          [contactPhone.trim()],
+                coupon_code AS "couponCode", hold_expires_at AS "holdExpiresAt", version, tenant_id AS "tenantId",
+                created_at AS "createdAt"
+           FROM bookings WHERE customer_id = $1 AND status <> 'held'
+          ORDER BY created_at DESC LIMIT 200`,
+          [customerId],
         );
         return result.rows;
       },
     );
   }
 
-  /**
-   * Proves a caller actually owns a booking (matching contact mobile) and
-   * returns which tenant it belongs to — for the customer self-service
-   * cancel/reschedule endpoints, which run from www.ticketly.com with no
-   * tenant of their own (same bypassRls reasoning as getByPnr).
-   */
+  /** Who may see a booking's tickets: its operator, its customer, its contact phone. */
+  async accessInfo(
+    bookingId: string,
+  ): Promise<{ tenantId: string; customerId: string | null; contactPhone: string | null } | null> {
+    return this.uow.run(
+      { name: 'booking.accessInfo', bypassRls: true, readOnly: true },
+      async (scope) => {
+        const r = await scope.client.query<{
+          tenant_id: string;
+          customer_id: string | null;
+          contact_phone: string | null;
+        }>(`SELECT tenant_id, customer_id, contact_phone FROM bookings WHERE id = $1`, [bookingId]);
+        const row = r.rows[0];
+        return row
+          ? {
+              tenantId: row.tenant_id,
+              customerId: row.customer_id,
+              contactPhone: row.contact_phone,
+            }
+          : null;
+      },
+    );
+  }
+
   async verifyOwnership(
     bookingId: string,
     contactPhone: string,

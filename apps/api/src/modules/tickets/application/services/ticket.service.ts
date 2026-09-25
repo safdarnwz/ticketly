@@ -1,7 +1,17 @@
 import { Injectable } from '@nestjs/common';
 
 import { AppConfig } from '@config';
-import { AppError, ErrorCode, type BookingId } from '@kernel';
+import { Permission } from '@contracts';
+import {
+  AppError,
+  ErrorCode,
+  getContext,
+  getUserId,
+  hasPermission,
+  runAsTenant,
+  type BookingId,
+  type TenantId,
+} from '@kernel';
 import { hmacSha256 } from '@security';
 
 import { BookingRepository } from '../../../booking';
@@ -54,6 +64,34 @@ export class TicketService {
 
   private sign(payloadPart: string): string {
     return hmacSha256(this.signingKey(), payloadPart);
+  }
+
+  /**
+   * Tickets (names, seats, boarding QR) are shown only to the booking's
+   * operator staff, the signed-in customer who booked it, or someone who
+   * gives the booking's mobile number. Anyone else gets "not found", so a
+   * guessed or leaked booking id reveals nothing. Runs `fn` in the booking's
+   * operator scope.
+   */
+  async asViewer<T>(
+    bookingId: BookingId,
+    mobile: string | undefined,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    const info = await this.bookings.accessInfo(bookingId);
+    const notFound = () =>
+      new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
+    if (!info) throw notFound();
+    const digits = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '').slice(-10);
+    const staff =
+      getContext()?.tenantId === info.tenantId && hasPermission(Permission.BOOKING_READ);
+    const owner = Boolean(info.customerId) && info.customerId === getUserId();
+    const byPhone =
+      Boolean(mobile) &&
+      digits(mobile).length === 10 &&
+      digits(mobile) === digits(info.contactPhone);
+    if (!staff && !owner && !byPhone) throw notFound();
+    return runAsTenant(info.tenantId as TenantId, fn);
   }
 
   async issueForBooking(

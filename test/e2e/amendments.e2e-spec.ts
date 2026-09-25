@@ -26,7 +26,9 @@ describe('booking amendments (e2e)', () => {
   });
 
   const tickets = async () =>
-    (await app.get(`/bookings/${bookingId}/tickets`)).body.tickets as { seat: string }[];
+    (await app.get(`/bookings/${bookingId}/tickets`, { as: 'operator' })).body.tickets as {
+      seat: string;
+    }[];
 
   it('moves the passenger and the ticket to a new seat', async () => {
     const res = await app.post(

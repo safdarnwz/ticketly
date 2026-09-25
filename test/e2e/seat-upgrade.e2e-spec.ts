@@ -14,7 +14,7 @@ describe('seat upgrade, customer self-service (e2e)', () => {
   let othersTicketId: string;
 
   const firstTicketId = async (bookingId: string): Promise<string> => {
-    const t = await app.get(`/bookings/${bookingId}/tickets`);
+    const t = await app.get(`/bookings/${bookingId}/tickets`, { as: 'operator' });
     return t.body.tickets[0].ticketId as string;
   };
 
