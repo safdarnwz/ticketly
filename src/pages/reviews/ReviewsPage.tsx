@@ -115,7 +115,7 @@ export function ReviewsPage() {
                     {r.reportedAt && <Badge tone="warning">Reported</Badge>}
                   </div>
                   <div className="text-xs text-text-muted">
-                    {r.routeName ?? 'Route'}{r.journeyDate ? ` · travelled ${formatDateLabel(r.journeyDate, { day: '2-digit', month: 'short' })}` : ''} · <Link className="font-mono text-primary hover:underline" to={`/bookings?q=${r.pnr}`}>{r.pnr}</Link> · {formatDateTime(r.createdAt)}
+                    {r.routeName ?? 'Route'}{r.journeyDate ? ` · travelled ${formatDateLabel(r.journeyDate, { day: '2-digit', month: 'short' })}` : ''} · <Link className="font-mono text-primary hover:underline" to={`/bookings/${r.pnr}`}>{r.pnr}</Link> · {formatDateTime(r.createdAt)}
                   </div>
                 </div>
                 {r.body ? <p className="whitespace-pre-line text-sm text-text">{r.body}</p> : <p className="text-sm italic text-text-muted">Stars only, no comment.</p>}

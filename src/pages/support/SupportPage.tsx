@@ -120,7 +120,7 @@ function TicketModal({ id, onClose }: { id: string; onClose: () => void }) {
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Badge tone={STATUS[ticket.status][1]}>{STATUS[ticket.status][0]}</Badge>
             <span className="capitalize text-text-muted">{ticket.category}</span>
-            {ticket.pnr && ticket.bookingId && <Link className="font-mono text-primary hover:underline" to={`/bookings/${ticket.bookingId}`}>{ticket.pnr}</Link>}
+            {ticket.pnr && ticket.bookingId && <Link className="font-mono text-primary hover:underline" to={`/bookings/${ticket.pnr}`}>{ticket.pnr}</Link>}
             {ticket.customerName && <span className="text-text-muted">· {ticket.customerName}{ticket.customerPhone ? ` · ${ticket.customerPhone}` : ''}</span>}
             <span className="ml-auto text-xs text-text-muted">Opened {formatDateTime(ticket.createdAt)}</span>
           </div>

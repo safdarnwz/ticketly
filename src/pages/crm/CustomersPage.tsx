@@ -103,7 +103,7 @@ function CustomerModal({ customerKey, onClose }: { customerKey: string; onClose:
   });
 
   const history: Column<CustomerBooking>[] = [
-    { key: 'pnr', header: 'PNR', render: (b) => <Link to={`/bookings/${b.id}`} className="font-mono text-primary hover:underline">{b.pnr}</Link> },
+    { key: 'pnr', header: 'PNR', render: (b) => <Link to={`/bookings/${b.pnr}`} className="font-mono text-primary hover:underline">{b.pnr}</Link> },
     { key: 'journey', header: 'Journey', render: (b) => <div className="text-sm"><div>{b.routeName ?? '—'}</div><div className="text-xs text-text-muted">{dateOf(b.journeyDate)} · {b.seatCount} seat{b.seatCount === 1 ? '' : 's'}</div></div> },
     { key: 'amount', header: 'Amount', render: (b) => formatMoney(b.totalMinor, 'INR') },
     { key: 'status', header: 'Status', render: (b) => <Badge tone={statusTone(b.status)}>{b.status}</Badge> },

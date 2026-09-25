@@ -71,10 +71,11 @@ export function CityInput({ label, value, onSelect, onClear, error, placeholder 
 
   return (
     <div className="relative flex-1" ref={box}>
-      <label className="mb-1.5 block text-sm font-medium text-text">{label}</label>
+      <label htmlFor={`${listId}-input`} className="mb-1.5 block text-sm font-medium text-text">{label}</label>
       <div className="relative">
         <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
         <input
+          id={`${listId}-input`}
           value={q}
           autoFocus={autoFocus}
           onChange={(e) => {
@@ -96,7 +97,7 @@ export function CityInput({ label, value, onSelect, onClear, error, placeholder 
         />
         {loading && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-text-muted" />}
       </div>
-      {error && <p className="mt-1 text-xs text-danger">{error}</p>}
+      {error && <p className="mt-1 text-xs text-danger" role="alert">{error}</p>}
       {open && shown.length > 0 && (
         <div id={listId} role="listbox" className="absolute z-30 mt-1 w-full overflow-hidden rounded-md border border-border bg-surface shadow-dropdown">
           {shown.map((c, i) => (

@@ -61,7 +61,7 @@ export function RefundsPage() {
   });
 
   const columns: Column<RefundQueueRow>[] = [
-    { key: 'pnr', header: 'Booking', render: (r) => <div><Link to={`/bookings/${r.bookingId}`} className="font-mono font-semibold text-primary hover:underline" onClick={(e) => e.stopPropagation()}>{r.pnr}</Link>{r.contactPhone && <div className="text-xs text-text-muted">{r.contactPhone}</div>}</div> },
+    { key: 'pnr', header: 'Booking', render: (r) => <div><Link to={`/bookings/${r.pnr}`} className="font-mono font-semibold text-primary hover:underline" onClick={(e) => e.stopPropagation()}>{r.pnr}</Link>{r.contactPhone && <div className="text-xs text-text-muted">{r.contactPhone}</div>}</div> },
     { key: 'amount', header: 'Amount', render: (r) => <span className="font-semibold">{formatMoney(r.amountMinor, r.currency)}</span> },
     {
       key: 'to', header: 'To', render: (r) => r.destination === 'alternate_account'
