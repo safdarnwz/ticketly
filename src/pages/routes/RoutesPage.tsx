@@ -53,8 +53,8 @@ function RoutesTab() {
   const [cityStops, setCityStops] = useState<Stop[]>([]);
   const [newStopName, setNewStopName] = useState('');
 
-  const searchOrigin = async (q: string) => { setOriginQuery(q); if (q.length >= 2) setOriginResults((await masterDataApi.searchCities(q)).items); };
-  const searchDest = async (q: string) => { setDestQuery(q); if (q.length >= 2) setDestResults((await masterDataApi.searchCities(q)).items); };
+  const searchOrigin = async (q: string) => { setOriginQuery(q); setOrigin(null); if (q.length >= 2) setOriginResults((await masterDataApi.searchCities(q)).items); };
+  const searchDest = async (q: string) => { setDestQuery(q); setDest(null); if (q.length >= 2) setDestResults((await masterDataApi.searchCities(q)).items); };
   const searchStopCity = async (q: string) => { setStopCityQuery(q); if (q.length >= 2) setStopCityResults((await masterDataApi.searchCities(q)).items); };
 
   const pickStopCity = async (c: City) => {
@@ -71,14 +71,21 @@ function RoutesTab() {
   const addStopToRoute = (s: Stop) => {
     if (stops.some((x) => x.stopId === s.id)) return;
     const seq = stops.length;
-    setStops((arr) => [...arr, { stopId: s.id, stopName: s.name, sequence: seq, distanceFromOriginM: seq * 50000, departOffsetMin: seq * 60 }]);
+    setStops((arr) => {
+      const prev = arr[arr.length - 1];
+      return [...arr, {
+        stopId: s.id, stopName: s.name, sequence: seq,
+        distanceFromOriginM: prev ? prev.distanceFromOriginM + 50_000 : 0,
+        departOffsetMin: prev ? prev.departOffsetMin + 60 : 0,
+      }];
+    });
   };
   const removeStop = (stopId: string) => setStops((arr) => arr.filter((s) => s.stopId !== stopId).map((s, i) => ({ ...s, sequence: i })));
   const updateStop = (stopId: string, patch: Partial<StopDraft>) => setStops((arr) => arr.map((s) => (s.stopId === stopId ? { ...s, ...patch } : s)));
 
   const resetForm = () => {
     setCode(''); setName(''); setStartTime('06:00'); setOrigin(null); setDest(null); setOriginQuery(''); setDestQuery('');
-    setStops([]); setStopCity(null); setStopCityQuery(''); setCityStops([]);
+    setStops([]); setStopCity(null); setStopCityQuery(''); setCityStops([]); setTried(false);
   };
 
   const createRoute = useMutation({
@@ -113,15 +120,30 @@ function RoutesTab() {
     {
       key: 'actions', header: '', render: (r) => (
         <div className="flex justify-end gap-2">
-          {r.status === 'draft' && <Button size="sm" variant="outline" leftIcon={<CheckCircle2 className="h-4 w-4" />} loading={publish.isPending} onClick={() => publish.mutate(r.id)}>Publish</Button>}
-          {r.status === 'published' && <Button size="sm" variant="ghost" leftIcon={<Archive className="h-4 w-4" />} loading={archive.isPending} onClick={() => archive.mutate(r.id)}>Archive</Button>}
+          {r.status === 'draft' && <Button size="sm" variant="outline" leftIcon={<CheckCircle2 className="h-4 w-4" />} loading={publish.isPending && publish.variables === r.id} disabled={publish.isPending} onClick={() => publish.mutate(r.id)}>Publish</Button>}
+          {r.status === 'published' && <Button size="sm" variant="ghost" leftIcon={<Archive className="h-4 w-4" />} loading={archive.isPending && archive.variables === r.id} disabled={archive.isPending} onClick={() => archive.mutate(r.id)}>Archive</Button>}
           <Button size="sm" variant="ghost" leftIcon={<Copy className="h-4 w-4" />} onClick={() => { setDuplicating(r); setDupCode(`${r.code}-COPY`); setDupName(`${r.name} (copy)`); }}>Duplicate</Button>
         </div>
       ),
     },
   ];
 
-  const canCreate = code && name && origin && dest && stops.length >= 2;
+  const [tried, setTried] = useState(false);
+  const formErrors: Record<string, string> = {};
+  if (!/^[A-Za-z0-9-]{2,30}$/.test(code.trim())) formErrors.code = 'Use 2–30 letters, digits or dashes';
+  if (name.trim().length < 3) formErrors.name = 'Give the route a name';
+  if (!origin) formErrors.origin = originQuery ? 'Pick the city from the list' : 'Choose the origin city';
+  if (!dest) formErrors.dest = destQuery ? 'Pick the city from the list' : 'Choose the destination city';
+  if (origin && dest && origin.id === dest.id) formErrors.dest = 'Destination must differ from the origin';
+  if (stops.length < 2) formErrors.stops = 'Add at least 2 stops — the first is where the bus starts, the last where it ends';
+  stops.forEach((st, i) => {
+    const prev = stops[i - 1];
+    if (i === 0 && (st.distanceFromOriginM !== 0 || st.departOffsetMin !== 0)) formErrors[`stop${i}`] = 'The first stop is at 0 km, 0 min';
+    else if (prev && st.distanceFromOriginM < prev.distanceFromOriginM) formErrors[`stop${i}`] = 'Distance cannot go down';
+    else if (prev && st.departOffsetMin <= prev.departOffsetMin) formErrors[`stop${i}`] = 'Must leave later than the stop before';
+  });
+  const canCreate = Object.keys(formErrors).length === 0;
+  const submitRoute = () => { setTried(true); if (canCreate) createRoute.mutate(); };
 
   return (
     <>
@@ -134,19 +156,19 @@ function RoutesTab() {
         footer={(
           <>
             <Button variant="ghost" onClick={() => { setAdding(false); resetForm(); }}>Cancel</Button>
-            <Button loading={createRoute.isPending} disabled={!canCreate} onClick={() => createRoute.mutate()}>Create route (draft)</Button>
+            <Button loading={createRoute.isPending} disabled={createRoute.isPending} onClick={submitRoute}>Create route (draft)</Button>
           </>
         )}>
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Route code" placeholder="DEL-JAI-01" value={code} onChange={(e) => setCode(e.target.value)} />
+            <Input label="Route code" placeholder="DEL-JAI-01" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} error={tried ? formErrors.code : undefined} />
             <Input label="Departure time" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
           </div>
-          <Input label="Route name" placeholder="Delhi – Jaipur Express" value={name} onChange={(e) => setName(e.target.value)} />
+          <Input label="Route name" placeholder="Delhi – Jaipur Express" value={name} onChange={(e) => setName(e.target.value)} error={tried ? formErrors.name : undefined} />
 
           <div className="grid grid-cols-2 gap-3">
             <div className="relative">
-              <Input label="Origin city" value={originQuery} onChange={(e) => void searchOrigin(e.target.value)} leftIcon={<MapPin className="h-4 w-4" />} />
+              <Input label="Origin city" value={originQuery} onChange={(e) => void searchOrigin(e.target.value)} leftIcon={<MapPin className="h-4 w-4" />} error={tried ? formErrors.origin : undefined} />
               {originResults.length > 0 && !origin && (
                 <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-surface shadow-lg">
                   {originResults.map((c) => (
@@ -157,7 +179,7 @@ function RoutesTab() {
               )}
             </div>
             <div className="relative">
-              <Input label="Destination city" value={destQuery} onChange={(e) => void searchDest(e.target.value)} leftIcon={<MapPin className="h-4 w-4" />} />
+              <Input label="Destination city" value={destQuery} onChange={(e) => void searchDest(e.target.value)} leftIcon={<MapPin className="h-4 w-4" />} error={tried ? formErrors.dest : undefined} />
               {destResults.length > 0 && !dest && (
                 <div className="absolute z-10 mt-1 w-full rounded-md border border-border bg-surface shadow-lg">
                   {destResults.map((c) => (
@@ -171,17 +193,21 @@ function RoutesTab() {
 
           <div className="border-t border-border pt-3">
             <div className="mb-2 text-sm font-semibold text-text">Stops (min. 2 — first is boarding, last is dropping)</div>
+            {tried && formErrors.stops && <p role="alert" className="mb-2 text-xs text-danger">{formErrors.stops}</p>}
             {stops.length > 0 && (
               <div className="mb-3 flex flex-col gap-2">
-                {stops.map((s) => (
-                  <div key={s.stopId} className="flex items-center gap-2 rounded-md border border-border p-2">
-                    <span className="w-6 text-center text-xs text-text-muted">{s.sequence + 1}</span>
-                    <span className="flex-1 text-sm font-medium text-text">{s.stopName}</span>
-                    <Input value={s.distanceFromOriginM} onChange={(e) => updateStop(s.stopId, { distanceFromOriginM: Number(e.target.value) || 0 })}
-                      className="w-28" hint="dist. (m)" />
-                    <Input value={s.departOffsetMin} onChange={(e) => updateStop(s.stopId, { departOffsetMin: Number(e.target.value) || 0 })}
-                      className="w-28" hint="offset (min)" />
-                    <button type="button" onClick={() => removeStop(s.stopId)} className="text-danger"><Trash2 className="h-4 w-4" /></button>
+                {stops.map((s, i) => (
+                  <div key={s.stopId} className="rounded-md border border-border p-2">
+                    <div className="flex items-end gap-2">
+                      <span className="mb-2.5 w-6 text-center text-xs text-text-muted">{s.sequence + 1}</span>
+                      <span className="mb-2.5 flex-1 text-sm font-medium text-text">{s.stopName}{i === 0 ? ' · start' : i === stops.length - 1 ? ' · end' : ''}</span>
+                      <div className="w-28"><Input label="Km from start" inputMode="numeric" value={String(Math.round(s.distanceFromOriginM / 1000))} disabled={i === 0}
+                        onChange={(e) => updateStop(s.stopId, { distanceFromOriginM: (Number(e.target.value.replace(/\D/g, '')) || 0) * 1000 })} /></div>
+                      <div className="w-32"><Input label="Leaves after (min)" inputMode="numeric" value={String(s.departOffsetMin)} disabled={i === 0}
+                        onChange={(e) => updateStop(s.stopId, { departOffsetMin: Number(e.target.value.replace(/\D/g, '')) || 0 })} /></div>
+                      <button type="button" aria-label={`Remove ${s.stopName}`} onClick={() => removeStop(s.stopId)} className="mb-2.5 text-danger"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                    {tried && formErrors[`stop${i}`] && <p role="alert" className="mt-1 text-xs text-danger">{formErrors[`stop${i}`]}</p>}
                   </div>
                 ))}
               </div>

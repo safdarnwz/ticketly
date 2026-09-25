@@ -7,9 +7,19 @@ import { Button, Badge, statusTone, Table, type Column, Modal, Input, Select, Pa
 import { PageHeader } from '@/components/common/PageHeader';
 import { schedulingApi, type ServiceRow } from '@/lib/api/scheduling';
 import { masterDataApi } from '@/lib/api/masterData';
-import { cn } from '@/lib/utils';
+import { addDaysIso, cn, dayDiff, todayLocal } from '@/lib/utils';
 
-const WEEKDAYS = [{ v: 1, l: 'Sun' }, { v: 2, l: 'Mon' }, { v: 3, l: 'Tue' }, { v: 4, l: 'Wed' }, { v: 5, l: 'Thu' }, { v: 6, l: 'Fri' }, { v: 7, l: 'Sat' }];
+// ISO weekdays, as the backend's recurrence rule counts them (1 = Monday … 7 = Sunday).
+const WEEKDAYS = [{ v: 1, l: 'Mon' }, { v: 2, l: 'Tue' }, { v: 3, l: 'Wed' }, { v: 4, l: 'Thu' }, { v: 5, l: 'Fri' }, { v: 6, l: 'Sat' }, { v: 7, l: 'Sun' }];
+const hhmm = (m?: number) => (m === undefined ? '—' : `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
+function runsOn(r: ServiceRow['recurrence']): string {
+  if (!r) return '—';
+  if (r.frequency === 'daily') return 'Every day';
+  const days = [...(r.weekdays ?? [])].sort();
+  if (days.join() === '1,2,3,4,5') return 'Mon–Fri';
+  if (days.join() === '6,7') return 'Weekends';
+  return days.map((d) => WEEKDAYS.find((w) => w.v === d)?.l).join(', ');
+}
 
 export function SchedulePage() {
   return (
@@ -30,14 +40,16 @@ function ServicesTab() {
   const [adding, setAdding] = useState(false);
 
   const services = useQuery({ queryKey: ['services'], queryFn: schedulingApi.listServices });
-  const routes = useQuery({ queryKey: ['routes'], queryFn: () => masterDataApi.listRoutes('published') });
+  const routes = useQuery({ queryKey: ['routes', 'published'], queryFn: () => masterDataApi.listRoutes('published') });
+  const allRoutes = useQuery({ queryKey: ['routes'], queryFn: () => masterDataApi.listRoutes() });
   const types = useQuery({ queryKey: ['vehicle-types'], queryFn: () => masterDataApi.listVehicleTypes() });
 
   const [form, setForm] = useState({ code: '', routeId: '', vehicleTypeId: '', startTime: '06:00' });
   const [frequency, setFrequency] = useState<'daily' | 'weekly'>('daily');
-  const [weekdays, setWeekdays] = useState<number[]>([2, 3, 4, 5, 6]);
-  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
-  const [endDate, setEndDate] = useState(new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10));
+  const [weekdays, setWeekdays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [startDate, setStartDate] = useState(todayLocal());
+  const [endDate, setEndDate] = useState(addDaysIso(todayLocal(), 90));
+  const [tried, setTried] = useState(false);
 
   const toggleWeekday = (v: number) => setWeekdays((arr) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]));
 
@@ -46,13 +58,13 @@ function ServicesTab() {
       ...form,
       recurrence: { frequency, weekdays: frequency === 'weekly' ? weekdays : undefined, startDate, endDate },
     }),
-    onSuccess: () => { toast.success('Service created — activate it to materialise trips'); setAdding(false); void qc.invalidateQueries({ queryKey: ['services'] }); },
+    onSuccess: () => { toast.success('Service created — activate it to create its trips'); setAdding(false); setTried(false); setForm({ code: '', routeId: '', vehicleTypeId: '', startTime: '06:00' }); void qc.invalidateQueries({ queryKey: ['services'] }); },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not create service'),
   });
 
   const activate = useMutation({
     mutationFn: (id: string) => schedulingApi.activate(id),
-    onSuccess: (res) => { toast.success(`Activated — ${res.trips ?? 0} trips created`); void qc.invalidateQueries({ queryKey: ['services'] }); },
+    onSuccess: (res) => { toast.success(`Activated — ${res.trips ?? 0} trips created`); void qc.invalidateQueries({ queryKey: ['services'] }); void qc.invalidateQueries({ queryKey: ['trips'] }); },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Activate failed'),
   });
   const pause = useMutation({
@@ -62,22 +74,28 @@ function ServicesTab() {
   });
   const materialise = useMutation({
     mutationFn: (id: string) => schedulingApi.materialise(id),
-    onSuccess: (res) => toast.success(`${res.trips ?? 0} more trips materialised`),
+    onSuccess: (res) => { toast.success(res.trips ? `${res.trips} more trips created` : 'Trips are already created up to the booking horizon'); void qc.invalidateQueries({ queryKey: ['trips'] }); },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
   });
 
+  const routeName = (id: string) => allRoutes.data?.items.find((r) => r.id === id)?.name ?? '—';
+  const typeName = (id: string) => types.data?.items.find((t) => t.id === id)?.name ?? '—';
   const columns: Column<ServiceRow>[] = [
     { key: 'code', header: 'Code', render: (r) => <span className="font-mono text-xs">{r.code}</span> },
+    { key: 'route', header: 'Route', render: (r) => <span className="font-medium text-text">{routeName(r.routeId)}</span> },
+    { key: 'time', header: 'Departs', render: (r) => hhmm(r.startMinute) },
+    { key: 'runs', header: 'Runs', render: (r) => <span className="text-text-muted">{runsOn(r.recurrence)}{r.recurrence ? ` · till ${r.recurrence.endDate}` : ''}</span> },
+    { key: 'type', header: 'Bus type', render: (r) => <span className="text-text-muted">{typeName(r.vehicleTypeId)}</span> },
     { key: 'status', header: 'Status', render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge> },
     {
       key: 'actions', header: '', render: (r) => (
         <div className="flex justify-end gap-2">
           {r.status !== 'active' ? (
-            <Button size="sm" variant="outline" leftIcon={<PlayCircle className="h-4 w-4" />} loading={activate.isPending} onClick={() => activate.mutate(r.id)}>Activate</Button>
+            r.status !== 'ended' && <Button size="sm" variant="outline" leftIcon={<PlayCircle className="h-4 w-4" />} loading={activate.isPending && activate.variables === r.id} disabled={activate.isPending} onClick={() => activate.mutate(r.id)}>Activate</Button>
           ) : (
             <>
-              <Button size="sm" variant="ghost" leftIcon={<RefreshCw className="h-4 w-4" />} loading={materialise.isPending} onClick={() => materialise.mutate(r.id)}>Materialise more</Button>
-              <Button size="sm" variant="outline" leftIcon={<PauseCircle className="h-4 w-4" />} loading={pause.isPending} onClick={() => pause.mutate(r.id)}>Pause</Button>
+              <Button size="sm" variant="ghost" leftIcon={<RefreshCw className="h-4 w-4" />} loading={materialise.isPending && materialise.variables === r.id} disabled={materialise.isPending} onClick={() => materialise.mutate(r.id)}>Create upcoming trips</Button>
+              <Button size="sm" variant="outline" leftIcon={<PauseCircle className="h-4 w-4" />} loading={pause.isPending && pause.variables === r.id} disabled={pause.isPending} onClick={() => pause.mutate(r.id)}>Pause</Button>
             </>
           )}
         </div>
@@ -85,7 +103,20 @@ function ServicesTab() {
     },
   ];
 
-  const canCreate = form.code && form.routeId && form.vehicleTypeId && (frequency === 'daily' || weekdays.length > 0);
+  const today = todayLocal();
+  const errors: Record<string, string> = {};
+  if (!/^[A-Za-z0-9-]{2,30}$/.test(form.code.trim())) errors.code = 'Use 2–30 letters, digits or dashes';
+  if (!form.routeId) errors.routeId = routes.data?.items.length === 0 ? 'Publish a route first' : 'Choose a route';
+  if (!form.vehicleTypeId) errors.vehicleTypeId = 'Choose a bus type';
+  if (!/^\d{2}:\d{2}$/.test(form.startTime)) errors.startTime = 'Pick a time';
+  if (frequency === 'weekly' && weekdays.length === 0) errors.weekdays = 'Pick at least one day';
+  if (!startDate) errors.startDate = 'Pick a start date';
+  else if (startDate < today) errors.startDate = 'Cannot start in the past';
+  if (!endDate) errors.endDate = 'Pick an end date';
+  else if (startDate && endDate < startDate) errors.endDate = 'Must be on or after the start date';
+  else if (startDate && dayDiff(startDate, endDate) > 366) errors.endDate = 'At most one year at a time';
+  const canCreate = Object.keys(errors).length === 0;
+  const err = (k: string) => (tried ? errors[k] : undefined);
 
   return (
     <>
@@ -95,14 +126,14 @@ function ServicesTab() {
         (services.data?.services.length ? <Table columns={columns} rows={services.data.services} /> : <EmptyState title="No services yet" description="Publish a route first, then schedule a service on it." icon={<Calendar className="h-10 w-10" />} />)}
 
       <Modal open={adding} onClose={() => setAdding(false)} title="Create a recurring service" size="lg"
-        footer={<><Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button><Button loading={create.isPending} disabled={!canCreate} onClick={() => create.mutate()}>Create</Button></>}>
+        footer={<><Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button><Button loading={create.isPending} disabled={create.isPending} onClick={() => { setTried(true); if (canCreate) create.mutate(); }}>Create</Button></>}>
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Service code" placeholder="DEL-JAI-0600" value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} />
-            <Input label="Start time" type="time" value={form.startTime} onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))} />
-            <Select label="Route (published only)" value={form.routeId} onChange={(e) => setForm((f) => ({ ...f, routeId: e.target.value }))}
+            <Input label="Service code" placeholder="DEL-JAI-0600" value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))} error={err('code')} />
+            <Input label="Start time" type="time" value={form.startTime} onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))} error={err('startTime')} />
+            <Select label="Route (published only)" error={err('routeId')} value={form.routeId} onChange={(e) => setForm((f) => ({ ...f, routeId: e.target.value }))}
               options={[{ label: 'Select…', value: '' }, ...(routes.data?.items.map((r) => ({ label: r.name, value: r.id })) ?? [])]} />
-            <Select label="Vehicle type" value={form.vehicleTypeId} onChange={(e) => setForm((f) => ({ ...f, vehicleTypeId: e.target.value }))}
+            <Select label="Bus type" error={err('vehicleTypeId')} value={form.vehicleTypeId} onChange={(e) => setForm((f) => ({ ...f, vehicleTypeId: e.target.value }))}
               options={[{ label: 'Select…', value: '' }, ...(types.data?.items.map((t) => ({ label: t.name, value: t.id })) ?? [])]} />
           </div>
 
@@ -115,14 +146,15 @@ function ServicesTab() {
             {frequency === 'weekly' && (
               <div className="mb-2 flex gap-1.5">
                 {WEEKDAYS.map((d) => (
-                  <button key={d.v} type="button" onClick={() => toggleWeekday(d.v)}
+                  <button key={d.v} type="button" aria-pressed={weekdays.includes(d.v)} onClick={() => toggleWeekday(d.v)}
                     className={cn('h-9 w-11 rounded-md border text-xs font-medium', weekdays.includes(d.v) ? 'border-primary bg-primary/10 text-primary' : 'border-border text-text-muted')}>{d.l}</button>
                 ))}
               </div>
             )}
+            {err('weekdays') && <p role="alert" className="mb-2 text-xs text-danger">{err('weekdays')}</p>}
             <div className="grid grid-cols-2 gap-3">
-              <Input label="From" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-              <Input label="To" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              <Input label="From" type="date" value={startDate} min={today} onChange={(e) => setStartDate(e.target.value)} error={err('startDate')} />
+              <Input label="To" type="date" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} error={err('endDate')} />
             </div>
           </div>
         </div>

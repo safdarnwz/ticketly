@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Bus, Users, LayoutGrid, Sparkles, FileWarning, Upload } from 'lucide-react';
 
@@ -7,6 +8,8 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { masterDataApi, type VehicleType, type Amenity, type SeatLayoutRow } from '@/lib/api/masterData';
 import { fleetApi, type Vehicle, type Crew, type Duty } from '@/lib/api/fleet';
 import { SeatLayoutsTab } from './SeatLayoutsTab';
+import { isRegistration, normReg } from '@/lib/vehicle';
+import { normalizeMobile } from '@/lib/checkout';
 import { cn } from '@/lib/utils';
 
 type Tab = 'vehicles' | 'layouts' | 'setup' | 'crew';
@@ -60,10 +63,21 @@ function VehiclesTab() {
   const layouts = useQuery({ queryKey: ['seat-layouts'], queryFn: () => masterDataApi.listSeatLayouts() });
 
   const create = useMutation({
-    mutationFn: () => fleetApi.createVehicle({ ...form, seatLayoutId: form.seatLayoutId || undefined }),
-    onSuccess: () => { toast.success('Vehicle added'); setAdding(false); setForm({ registrationNo: '', vehicleTypeId: '', seatLayoutId: '', make: '', model: '' }); void qc.invalidateQueries({ queryKey: ['vehicles'] }); },
+    mutationFn: () => fleetApi.createVehicle({
+      registrationNo: normReg(form.registrationNo),
+      vehicleTypeId: form.vehicleTypeId,
+      seatLayoutId: form.seatLayoutId || undefined,
+      make: form.make.trim() || undefined,
+      model: form.model.trim() || undefined,
+    }),
+    onSuccess: () => { toast.success('Vehicle added'); setAdding(false); setTriedVehicle(false); setForm({ registrationNo: '', vehicleTypeId: '', seatLayoutId: '', make: '', model: '' }); void qc.invalidateQueries({ queryKey: ['vehicles'] }); },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not add vehicle'),
   });
+  const [triedVehicle, setTriedVehicle] = useState(false);
+  const vehicleErrors = {
+    reg: !form.registrationNo.trim() ? 'Enter the registration number' : isRegistration(normReg(form.registrationNo)) ? '' : 'Enter a registration number like RJ14PA1234',
+    type: form.vehicleTypeId ? '' : 'Choose the vehicle type',
+  };
   const setStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: 'active' | 'maintenance' | 'retired' }) => fleetApi.setVehicleStatus(id, status),
     onSuccess: () => { toast.success('Status updated'); void qc.invalidateQueries({ queryKey: ['vehicles'] }); },
@@ -88,6 +102,8 @@ function VehiclesTab() {
         const vals = line.split(',').map((v) => v.trim());
         const obj: Record<string, string> = {};
         cols.forEach((c, i) => { obj[c] = vals[i] ?? ''; });
+        // Blank cells are "not given", not empty text.
+        for (const k of Object.keys(obj)) if (obj[k] === '') delete obj[k];
         return obj as never;
       });
       return fleetApi.bulkImportVehicles(parsed);
@@ -101,12 +117,13 @@ function VehiclesTab() {
       key: 'reg', header: 'Registration', render: (r) => (
         <div className="flex items-center gap-2">
           {r.photoUrl && <img src={r.photoUrl} alt="" className="h-8 w-8 rounded object-cover" />}
-          <span className="font-mono text-sm font-medium text-text">{r.registrationNo}</span>
+          <Link to={`/fleet/vehicles/${r.id}`} className="font-mono text-sm font-medium text-primary hover:underline">{r.registrationNo}</Link>
         </div>
       ),
     },
     { key: 'model', header: 'Make/Model', render: (r) => <span className="text-text-muted">{[r.make, r.model].filter(Boolean).join(' ') || '—'}</span> },
     { key: 'status', header: 'Status', render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge> },
+    { key: 'verification', header: 'Platform check', render: (r) => <Badge tone={r.verificationStatus === 'approved' ? 'success' : r.verificationStatus === 'rejected' ? 'danger' : 'warning'}>{r.verificationStatus === 'approved' ? 'verified' : r.verificationStatus === 'draft' ? 'not submitted' : r.verificationStatus ?? '—'}</Badge> },
     {
       key: 'permitType', header: 'Permit type',
       render: (r) => (
@@ -162,10 +179,10 @@ function VehiclesTab() {
       )}
 
       <Modal open={adding} onClose={() => setAdding(false)} title="Add a vehicle"
-        footer={<><Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button><Button loading={create.isPending} disabled={!form.registrationNo || !form.vehicleTypeId} onClick={() => create.mutate()}>Add</Button></>}>
+        footer={<><Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button><Button loading={create.isPending} disabled={create.isPending} onClick={() => { setTriedVehicle(true); if (!vehicleErrors.reg && !vehicleErrors.type) create.mutate(); }}>Add</Button></>}>
         <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2"><Input label="Registration number" placeholder="RJ14PA1234" value={form.registrationNo} onChange={(e) => setForm((f) => ({ ...f, registrationNo: e.target.value }))} /></div>
-          <Select label="Vehicle type" value={form.vehicleTypeId} onChange={(e) => setForm((f) => ({ ...f, vehicleTypeId: e.target.value }))}
+          <div className="col-span-2"><Input label="Registration number" placeholder="RJ14PA1234" value={form.registrationNo} onChange={(e) => setForm((f) => ({ ...f, registrationNo: e.target.value.toUpperCase() }))} error={triedVehicle ? vehicleErrors.reg : undefined} /></div>
+          <Select label="Vehicle type" error={triedVehicle ? vehicleErrors.type : undefined} value={form.vehicleTypeId} onChange={(e) => setForm((f) => ({ ...f, vehicleTypeId: e.target.value }))}
             options={[{ label: 'Select…', value: '' }, ...(types.data?.items.map((t: VehicleType) => ({ label: t.name, value: t.id })) ?? [])]} />
           <Select label="Seat layout" value={form.seatLayoutId} onChange={(e) => setForm((f) => ({ ...f, seatLayoutId: e.target.value }))}
             options={[{ label: 'None', value: '' }, ...(layouts.data?.items.map((l: SeatLayoutRow) => ({ label: l.name, value: l.id })) ?? [])]} />
@@ -290,11 +307,22 @@ function CrewTab() {
   const duties = useQuery({ queryKey: ['duties'], queryFn: () => fleetApi.listDuties() });
 
   const create = useMutation({
-    mutationFn: () => fleetApi.createCrew(form),
-    onSuccess: () => { toast.success('Crew member added'); setAdding(false); setForm({ role: 'driver', fullName: '', phone: '', licenceNo: '' }); void qc.invalidateQueries({ queryKey: ['crew'] }); },
+    mutationFn: () => fleetApi.createCrew({
+      role: form.role,
+      fullName: form.fullName.trim(),
+      phone: form.phone.trim() || undefined,
+      licenceNo: form.licenceNo.trim() || undefined,
+    }),
+    onSuccess: () => { toast.success('Crew member added'); setAdding(false); setTriedCrew(false); setForm({ role: 'driver', fullName: '', phone: '', licenceNo: '' }); void qc.invalidateQueries({ queryKey: ['crew'] }); },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
   });
 
+  const [triedCrew, setTriedCrew] = useState(false);
+  const crewErrors = {
+    name: form.fullName.trim().length < 2 ? 'Enter the full name' : '',
+    phone: form.phone.trim() && !normalizeMobile(form.phone) ? 'Enter a 10-digit mobile number' : '',
+    licence: form.role === 'driver' && !form.licenceNo.trim() ? 'A driver needs a licence number' : '',
+  };
   const crewColumns: Column<Crew>[] = [
     { key: 'name', header: 'Name', render: (r) => <span className="font-medium text-text">{r.fullName}</span> },
     { key: 'role', header: 'Role', render: (r) => <Badge>{r.role}</Badge> },
@@ -321,13 +349,13 @@ function CrewTab() {
         (duties.data?.duties.length ? <Table columns={dutyColumns} rows={duties.data.duties} /> : <EmptyState title="No duties assigned" icon={<FileWarning className="h-10 w-10" />} />)}
 
       <Modal open={adding} onClose={() => setAdding(false)} title="Add crew member"
-        footer={<><Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button><Button loading={create.isPending} disabled={!form.fullName} onClick={() => create.mutate()}>Add</Button></>}>
+        footer={<><Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button><Button loading={create.isPending} disabled={create.isPending} onClick={() => { setTriedCrew(true); if (!crewErrors.name && !crewErrors.phone && !crewErrors.licence) create.mutate(); }}>Add</Button></>}>
         <div className="flex flex-col gap-3">
           <Select label="Role" value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
             options={[{ label: 'Driver', value: 'driver' }, { label: 'Conductor', value: 'conductor' }, { label: 'Attendant', value: 'attendant' }]} />
-          <Input label="Full name" value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} />
-          <Input label="Phone" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
-          <Input label="Licence no." value={form.licenceNo} onChange={(e) => setForm((f) => ({ ...f, licenceNo: e.target.value }))} />
+          <Input label="Full name" value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} error={triedCrew ? crewErrors.name : undefined} />
+          <Input label="Phone" inputMode="tel" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} error={triedCrew ? crewErrors.phone : undefined} />
+          <Input label="Licence no." value={form.licenceNo} onChange={(e) => setForm((f) => ({ ...f, licenceNo: e.target.value.toUpperCase() }))} error={triedCrew ? crewErrors.licence : undefined} hint={form.role === 'driver' ? 'Required for drivers' : undefined} />
         </div>
       </Modal>
     </>

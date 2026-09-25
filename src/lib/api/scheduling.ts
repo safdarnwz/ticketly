@@ -1,6 +1,12 @@
 import { get, post, withIdempotency } from './client';
 
-export interface ServiceRow { id: string; code: string; routeId: string; vehicleTypeId: string; status: string }
+export interface ServiceRow {
+  id: string; code: string; routeId: string; vehicleTypeId: string; status: string;
+  /** Minutes after midnight the bus leaves its origin. */
+  startMinute?: number;
+  /** weekdays are ISO: 1 = Monday … 7 = Sunday. */
+  recurrence?: { frequency: 'daily' | 'weekly'; weekdays?: number[]; interval?: number; startDate: string; endDate: string };
+}
 export interface TripRow {
   id: string; routeId: string; routeName: string; journeyDate: string;
   departsAt: string; arrivesAt: string; totalSeats: number; status: string; occupancyPct: number;
@@ -55,6 +61,11 @@ export const tripOpsApi = {
     post<{ released: number }>(`/v1/scheduling/trips/${tripId}/release-holds`, { includePhoneHolds }),
   remarks: (tripId: string) => get<{ items: { id: string; remark: string; createdAt: string; by: string | null }[] }>(`/v1/scheduling/trips/${tripId}/remarks`),
   addRemark: (tripId: string, remark: string) => post<{ ok: boolean }>(`/v1/scheduling/trips/${tripId}/remarks`, { remark }),
+  /** Put another bus on the trip; passengers keep their seat type if the layout differs. */
+  changeBus: (tripId: string, vehicleId: string, reason: string) =>
+    post<{ changed: boolean; layoutChanged: boolean; seatMoves: { from: string; to: string; seatType: string }[]; bookingsAffected: number }>(
+      `/v1/trips/${tripId}/vehicle`, { vehicleId, reason }, withIdempotency(`bus-${tripId}-${vehicleId}`),
+    ),
   retime: (tripId: string, newDepartsAt: string, reason: string) =>
     post<{ oldDepartsAt: string; newDepartsAt: string; shiftMinutes: number }>(`/v1/scheduling/trips/${tripId}/retime`, { newDepartsAt, reason }),
   cancel: (tripId: string, reason: string) =>

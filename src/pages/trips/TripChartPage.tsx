@@ -1,13 +1,14 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, Clock, Lock, PauseCircle, PlayCircle, Printer, TimerReset, Unlock, XCircle } from 'lucide-react';
+import { Ban, Bus as BusIcon, Clock, Lock, PauseCircle, PlayCircle, Printer, TimerReset, Unlock, XCircle } from 'lucide-react';
 
-import { Badge, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Input, Modal, PageLoader, statusTone, useToast } from '@/components/ui';
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Input, Modal, PageLoader, Select, statusTone, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ApiError } from '@/lib/api/client';
 import { tripOpsApi, type ChartOccupant, type ChartSeat, type TripChart } from '@/lib/api/scheduling';
 import { TRIP_STATUS_LABEL } from '@/lib/trip-status';
+import { fleetApi, type Vehicle } from '@/lib/api/fleet';
 import { SEAT_TYPE_LABEL, cn, formatDateLabel, formatTime } from '@/lib/utils';
 
 const CELL_REM = 4.2;
@@ -45,7 +46,8 @@ export function TripChartPage() {
   const [picked, setPicked] = useState<string | null>(null);
   const [blockMode, setBlockMode] = useState(false);
   const [blockSel, setBlockSel] = useState<string[]>([]);
-  const [dialog, setDialog] = useState<'cancel' | 'retime' | null>(null);
+  const [dialog, setDialog] = useState<'cancel' | 'retime' | 'bus' | null>(null);
+  const vehicles = useQuery({ queryKey: ['vehicles', 'active-all'], queryFn: () => fleetApi.listVehicles({ status: 'active', pageSize: 100 }), staleTime: 60_000 });
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['trip-chart', id] });
@@ -105,7 +107,7 @@ export function TripChartPage() {
       <PageHeader
         title={`${first?.name ?? 'Trip'} → ${last?.name ?? ''}`}
         subtitle={`${formatDateLabel(t.journeyDate, { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })} · departs ${formatTime(t.departsAt)} · arrives ${formatTime(t.arrivesAt)}`}
-        action={<Badge tone={statusTone(t.status === 'closed' ? 'held' : t.status)}>{t.hasRun && t.status === 'closed' ? 'journey over' : TRIP_STATUS_LABEL[t.status] ?? t.status}</Badge>}
+        action={<div className="flex items-center gap-2">{t.vehicleId && <span className="font-mono text-sm text-text-muted">{vehicles.data?.items.find((v) => v.id === t.vehicleId)?.registrationNo ?? 'Bus assigned'}</span>}<Badge tone={statusTone(t.status === 'closed' ? 'held' : t.status)}>{t.hasRun && t.status === 'closed' ? 'journey over' : TRIP_STATUS_LABEL[t.status] ?? t.status}</Badge></div>}
       />
 
       <Card className="mb-4 print:hidden">
@@ -123,6 +125,7 @@ export function TripChartPage() {
             <Button variant="outline" leftIcon={<Unlock className="h-4 w-4" />} disabled={busy} onClick={() => { setBlockMode(true); setPicked(null); }}>Block / open seats</Button>
           ))}
           {!locked && future && <Button variant="outline" leftIcon={<Clock className="h-4 w-4" />} disabled={busy} onClick={() => setDialog('retime')}>Change departure time</Button>}
+          {!locked && future && <Button variant="outline" leftIcon={<BusIcon className="h-4 w-4" />} disabled={busy} onClick={() => setDialog('bus')}>{t.vehicleId ? 'Change bus' : 'Assign bus'}</Button>}
           <Button variant="outline" leftIcon={<Printer className="h-4 w-4" />} onClick={() => window.print()}>Print chart</Button>
           {!locked && <Button variant="danger" className="ml-auto" leftIcon={<XCircle className="h-4 w-4" />} disabled={busy} onClick={() => setDialog('cancel')}>Cancel trip</Button>}
           {locked && <span className="self-center text-sm text-text-muted"><Ban className="mr-1 inline h-4 w-4" />{t.status === 'cancelled' ? 'This trip was cancelled.' : 'This bus has left — the chart is read-only.'}</span>}
@@ -166,6 +169,7 @@ export function TripChartPage() {
       <Manifest chart={data} />
 
       {dialog === 'cancel' && <CancelTripModal tripId={id} bookings={data.totals.bookings} onClose={() => setDialog(null)} onDone={() => { setDialog(null); refresh(); }} />}
+      {dialog === 'bus' && <ChangeBusModal trip={t} vehicles={vehicles.data?.items ?? []} onClose={() => setDialog(null)} onDone={() => { setDialog(null); refresh(); }} />}
       {dialog === 'retime' && <RetimeModal trip={t} onClose={() => setDialog(null)} onDone={() => { setDialog(null); refresh(); }} />}
     </div>
   );
@@ -364,6 +368,39 @@ function RetimeModal({ trip, onClose, onDone }: { trip: TripChart['trip']; onClo
         <Input label="New departure (IST)" type="datetime-local" value={value} onChange={(e) => setValue(e.target.value)} error={touched ? timeError : undefined} />
         {!timeError && <p className="text-text-muted">{shift > 0 ? `${shift} min later` : `${-shift} min earlier`}</p>}
         <Input label="Reason (sent to passengers)" value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} error={touched ? reasonError : undefined} placeholder="e.g. Heavy traffic on NH48" />
+      </div>
+    </Modal>
+  );
+}
+
+function ChangeBusModal({ trip, vehicles, onClose, onDone }: { trip: TripChart['trip']; vehicles: Vehicle[]; onClose: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const [vehicleId, setVehicleId] = useState('');
+  const [reason, setReason] = useState('');
+  const [touched, setTouched] = useState(false);
+  // Only a verified bus with a seat layout can run.
+  const options = vehicles.filter((v) => v.id !== trip.vehicleId && v.verificationStatus === 'approved' && v.seatLayoutId);
+  const notReady = vehicles.filter((v) => v.id !== trip.vehicleId && !(v.verificationStatus === 'approved' && v.seatLayoutId)).length;
+  const busError = vehicleId ? '' : options.length ? 'Choose a bus' : 'No other bus is ready — verify one and give it a seat layout in Fleet';
+  const reasonError = reason.trim().length < 5 ? 'Say why (at least 5 characters)' : '';
+  const change = useMutation({
+    mutationFn: () => tripOpsApi.changeBus(trip.id, vehicleId, reason.trim()),
+    onSuccess: (r) => {
+      toast.success(!r.changed ? 'That bus is already on this trip' : r.layoutChanged
+        ? `Bus changed — ${r.seatMoves.length} passenger${r.seatMoves.length === 1 ? '' : 's'} moved to matching seats`
+        : 'Bus changed — every passenger keeps their seat');
+      onDone();
+    },
+    onError: (e) => toast.error(errText(e, 'Could not change the bus')),
+  });
+  return (
+    <Modal open onClose={onClose} title={trip.vehicleId ? 'Change bus' : 'Assign bus'}
+      footer={<><Button variant="ghost" onClick={onClose}>Close</Button><Button loading={change.isPending} disabled={change.isPending || !options.length} onClick={() => { setTouched(true); if (!busError && !reasonError) change.mutate(); }}>{trip.vehicleId ? 'Change bus' : 'Assign'}</Button></>}>
+      <div className="flex flex-col gap-3 text-sm">
+        <Select label="Bus" value={vehicleId} onChange={(e) => setVehicleId(e.target.value)} error={touched ? busError : undefined}
+          options={[{ value: '', label: options.length ? 'Choose…' : 'No other active bus' }, ...options.map((v) => ({ value: v.id, label: `${v.registrationNo}${v.make ? ` · ${v.make} ${v.model ?? ''}` : ''}` }))]} />
+        <Input label="Reason" value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} error={touched ? reasonError : undefined} placeholder="e.g. Regular bus in for servicing" />
+        <p className="text-text-muted">Only a platform-verified, active bus with a seat layout can run{notReady ? ` (${notReady} not ready yet)` : ''}. If its layout differs, passengers move to the same seat type.</p>
       </div>
     </Modal>
   );

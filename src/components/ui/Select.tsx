@@ -32,6 +32,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         <select
           ref={ref}
           id={selectId}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${selectId}-error` : undefined}
           className={cn(
             'h-input w-full appearance-none rounded-input border bg-surface px-input-x pr-9 text-sm text-text',
             'focus-ring cursor-pointer transition-colors hover:border-primary/30 focus:border-primary',
@@ -49,7 +51,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         </select>
         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
       </div>
-      {error && <span className="text-xs text-danger">{error}</span>}
+      {error && <span id={`${selectId}-error`} role="alert" className="text-xs text-danger">{error}</span>}
     </div>
   );
 });
