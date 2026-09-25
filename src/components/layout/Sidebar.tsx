@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
+  Activity,
   LayoutDashboard, Search, Ticket, RotateCcw, Star, LifeBuoy,
   Megaphone, ShieldAlert, Bus, Building2, ClipboardList, Settings as SettingsIcon,
   Route as RouteIcon, Truck, Calendar, IndianRupee, TrendingUp, Radio, Users, BarChart3,
@@ -38,6 +39,7 @@ const tenantAdminNav = [
 const superAdminNav = [
   { to: '/admin/tenants', label: 'Operators', icon: Building2 },
   { to: '/admin/operators', label: 'Applications', icon: ClipboardList },
+  { to: '/admin/bookings', label: 'Live bookings', icon: Activity },
   { to: '/admin/analytics', label: 'Analytics & Billing', icon: TrendingUp },
   { to: '/cms', label: 'CMS & Offers', icon: Megaphone },
   { to: '/fraud', label: 'Risk & Fraud', icon: ShieldAlert },
