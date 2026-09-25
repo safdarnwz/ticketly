@@ -22,6 +22,7 @@ import { PricingEngine, FareRepository } from '../../../pricing';
 import { AmenityRepository, RouteRepository, type Amenity } from '../../../master-data';
 import { PromotionRepository, bubblePromotedToTop } from '../../../promotions';
 import { InventoryRepository, TripRepository } from '../../../scheduling';
+import { ReviewRepository } from '../../../reviews';
 
 export interface StopRef {
   id: StopId;
@@ -47,6 +48,11 @@ export interface SearchResult {
   currency: string;
   /** WiFi, charging point, blanket, water bottle etc. — resolved from the trip's assigned vehicle's type. Empty when no vehicle is assigned yet, never guessed. */
   amenities: Amenity[];
+  /** Seat types this bus sells (seater / sleeper / semi_sleeper). */
+  seatTypes: string[];
+  /** Average stars of the route's published reviews (1 dp); null until the first review. */
+  rating: number | null;
+  ratingCount: number;
   /** True when this trip's route currently has an active, paid promotion — the frontend renders the "Prio" badge on these. Never set by anything upstream of applyPromotionBubbling. */
   isPromoted?: boolean;
 }
@@ -106,6 +112,7 @@ export class SearchService {
     private readonly fares: FareRepository,
     private readonly amenities: AmenityRepository,
     private readonly promotions: PromotionRepository,
+    private readonly reviews: ReviewRepository,
     private readonly cache: CacheService,
     private readonly metrics: Metrics,
     logger: Logger,
@@ -257,11 +264,12 @@ export class SearchService {
     for (const routeId of routeIds) {
       const route = { id: routeId };
       // Three independent reads → one round-trip of latency instead of three.
-      const [trips, routePricing, interState, routeStops] = await Promise.all([
+      const [trips, routePricing, interState, routeStops, rating] = await Promise.all([
         this.trips.findForSearch(route.id, input.journeyDate),
         this.fares.routePricing(route.id),
         this.routes.isInterState(route.id),
         this.routes.stopsWithNames(route.id),
+        this.reviews.ratingSummary(route.id),
       ]);
       if (trips.length === 0 || routeStops.length < 2) continue;
       const stopRef = (id: StopId | undefined, fallback: 'first' | 'last'): StopRef | null => {
@@ -285,9 +293,30 @@ export class SearchService {
         if (seg) segByTrip.set(trip.id, seg);
       }
 
-      const availability = await this.inventory.availableCountForTrips(
-        [...segByTrip.entries()].map(([tripId, seg]) => ({ tripId, ...seg })),
-      );
+      const [availability, seatTypesByTrip] = await Promise.all([
+        this.inventory.availableCountForTrips(
+          [...segByTrip.entries()].map(([tripId, seg]) => ({ tripId, ...seg })),
+        ),
+        this.inventory.seatTypesForTrips([...segByTrip.keys()]),
+      ]);
+      // The segment fare per seat type, resolved once per route (it does not
+      // depend on the trip); a type with no fare cannot be sold.
+      const fareByType = new Map<string, Awaited<ReturnType<FareRepository['resolveFare']>>>();
+      const fareFor = async (seatType: string) => {
+        if (!fareByType.has(seatType))
+          fareByType.set(
+            seatType,
+            await this.fares.resolveFare({
+              routeId: route.id,
+              fromStopId: boardingStop.id,
+              toStopId: droppingStop.id,
+              seatType,
+              distanceM: 0,
+              journeyDate: input.journeyDate,
+            }),
+          );
+        return fareByType.get(seatType);
+      };
 
       // Batch-resolved once per route (not per trip) — the amenities
       // customers actually care about at search-time (WiFi, charging
@@ -303,29 +332,30 @@ export class SearchService {
         const available = availability.get(trip.id) ?? 0;
         if (available === 0) continue;
 
-        // "from" price: base for the segment, with dynamic yield at current occupancy.
-        const fare = await this.fares.resolveFare({
-          routeId: route.id,
-          fromStopId: boardingStop.id,
-          toStopId: droppingStop.id,
-          seatType: input.seatType ?? 'seater',
-          distanceM: 0,
-          journeyDate: input.journeyDate,
-        });
-        const baseFareMinor = fare?.baseFareMinor ?? 0;
         const occupancyPct =
           trip.totalSeats > 0
             ? Math.round(((trip.totalSeats - available) / trip.totalSeats) * 100)
             : 0;
-
-        const breakup = PricingEngine.price({
-          currency: (fare?.currency ?? 'INR') as never,
-          baseFareMinor,
-          occupancyPct,
-          daysToDeparture: daysOut,
-          yield: routePricing.ladder,
-          tax: { gstRatePct: routePricing.gstRatePct, interState },
-        });
+        // "from" price: the cheapest seat type this bus sells (or the one
+        // asked for), with dynamic yield at current occupancy. A bus with no
+        // fare for any of its seat types is not shown — it cannot be booked.
+        const offered = seatTypesByTrip.get(trip.id) ?? [];
+        const candidates = input.seatType ? offered.filter((t) => t === input.seatType) : offered;
+        let breakup: ReturnType<typeof PricingEngine.price> | null = null;
+        for (const seatType of candidates) {
+          const fare = await fareFor(seatType);
+          if (!fare) continue;
+          const priced = PricingEngine.price({
+            currency: fare.currency as never,
+            baseFareMinor: fare.baseFareMinor,
+            occupancyPct,
+            daysToDeparture: daysOut,
+            yield: routePricing.ladder,
+            tax: { gstRatePct: routePricing.gstRatePct, interState },
+          });
+          if (!breakup || priced.total.minor < breakup.total.minor) breakup = priced;
+        }
+        if (!breakup) continue;
 
         out.push({
           tripId: trip.id,
@@ -341,6 +371,9 @@ export class SearchService {
           fromPriceMinor: breakup.total.minor,
           currency: breakup.currency,
           amenities: trip.vehicleId ? (amenitiesByVehicle.get(trip.vehicleId) ?? []) : [],
+          seatTypes: offered,
+          rating: rating.count ? rating.average : null,
+          ratingCount: rating.count,
         });
       }
     }

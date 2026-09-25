@@ -26,6 +26,9 @@ function result(tripId: string, departsAt: string, arrivesAt: string, price = 50
     fromPriceMinor: price,
     currency: 'INR',
     amenities: [{ id: 'a1', code: 'wifi', name: 'WiFi', icon: null } as never],
+    seatTypes: ['seater'],
+    rating: null,
+    ratingCount: 0,
   };
 }
 
@@ -36,7 +39,13 @@ function service(byKey: Record<string, SearchResult[]>, hubs = [{ cityId: H, nam
       byKey[`${i.originCityId}>${i.destCityId}@${i.journeyDate}`] ?? [],
   };
   const hubRepo = { hubsBetween: async () => hubs };
-  return new JourneySearchService(search as never, hubRepo as never);
+  return new JourneySearchService(
+    search as never,
+    hubRepo as never,
+    {
+      domain: { timezone: 'Asia/Kolkata' },
+    } as never,
+  );
 }
 
 describe('JourneySearchService.connecting', () => {
@@ -104,5 +113,51 @@ describe('JourneySearchService.trips', () => {
     });
     expect(out.map((r) => r.tripId)).toEqual(['cheap', 'dear']);
     expect(out[0].amenities[0]).toMatchObject({ code: 'wifi', name: 'WiFi' });
+  });
+});
+
+describe('JourneySearchService.trips — filters a traveller uses', () => {
+  const at = (id: string, depUtc: string, extra: Partial<SearchResult> = {}) => ({
+    ...result(id, depUtc, new Date(Date.parse(depUtc) + 6 * 3_600_000).toISOString()),
+    ...extra,
+  });
+  const run = (rows: SearchResult[], q: Partial<Parameters<JourneySearchService['trips']>[0]>) =>
+    service({ [`${A}>${B}@${D1}`]: rows })
+      .trips({ originCityId: A, destCityId: B, journeyDate: D1, ...q })
+      .then((r) => r.map((t) => t.tripId));
+
+  it('reads "leaving after 18:00" in the operator timezone (IST), not UTC', async () => {
+    // 12:00Z = 17:30 IST, 13:00Z = 18:30 IST
+    const rows = [at('early', '2026-10-01T12:00:00Z'), at('evening', '2026-10-01T13:00:00Z')];
+    expect(await run(rows, { filter: { departAfter: '18:00' } })).toEqual(['evening']);
+    expect(await run(rows, { filter: { departBefore: '18:00' } })).toEqual(['early']);
+  });
+
+  it('keeps only buses rated at least the minimum; unrated ones are left out', async () => {
+    const rows = [
+      at('good', '2026-10-01T08:00:00Z', { rating: 4.4, ratingCount: 12 }),
+      at('poor', '2026-10-01T09:00:00Z', { rating: 2.9, ratingCount: 5 }),
+      at('new', '2026-10-01T10:00:00Z'),
+    ];
+    expect(await run(rows, { filter: { minRating: 4 } })).toEqual(['good']);
+    expect(await run(rows, { sort: 'rating' })).toEqual(['good', 'poor', 'new']);
+  });
+
+  it('filters by seat type (any of the chosen types)', async () => {
+    const rows = [
+      at('seater', '2026-10-01T08:00:00Z', { seatTypes: ['seater'] }),
+      at('sleeper', '2026-10-01T09:00:00Z', { seatTypes: ['sleeper', 'semi_sleeper'] }),
+    ];
+    expect(await run(rows, { filter: { seatTypes: ['sleeper'] } })).toEqual(['sleeper']);
+    expect(await run(rows, { filter: { seatTypes: ['seater', 'sleeper'] } })).toEqual([
+      'seater',
+      'sleeper',
+    ]);
+  });
+
+  it('sorts by departure instant, so a bus after midnight comes last', async () => {
+    // 18:00Z = 23:30 IST, 19:00Z = 00:30 IST next day
+    const rows = [at('late', '2026-10-01T19:00:00Z'), at('night', '2026-10-01T18:00:00Z')];
+    expect(await run(rows, { sort: 'departure' })).toEqual(['night', 'late']);
   });
 });

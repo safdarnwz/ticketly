@@ -10,6 +10,7 @@ import { WebhookDeliveryService } from '@api/modules/webhooks';
 import { PayoutScheduler } from './payout.scheduler';
 import { TripReminderScheduler } from './trip-reminder.scheduler';
 import { ConnectionMonitorScheduler } from './connection-monitor.scheduler';
+import { InventoryHorizonScheduler } from './inventory-horizon.scheduler';
 import { VehicleVerificationService } from '@api/modules/fleet/application/services/vehicle-verification.service';
 import { RefundService } from '@api/modules/refunds/application/services/refund.service';
 import { SeatQuotaService } from '@api/modules/quotas/application/seat-quota.service';
@@ -51,6 +52,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly payout: PayoutScheduler,
     private readonly tripReminders: TripReminderScheduler,
     private readonly connectionMonitor: ConnectionMonitorScheduler,
+    private readonly inventoryHorizon: InventoryHorizonScheduler,
     private readonly vehicleVerification: VehicleVerificationService,
     private readonly refunds: RefundService,
     private readonly quotas: SeatQuotaService,
@@ -79,6 +81,10 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     // per (tenant, period), so checking more than once on a payout day is
     // harmless — it just confirms the payout already ran and does nothing.
     this.every(3_600_000, 'weekly-payout', () => this.runPayoutIfDue());
+    // Keep every service on sale INVENTORY_HORIZON_DAYS ahead (idempotent).
+    this.every(6 * 3_600_000, 'inventory-horizon', () =>
+      this.inventoryHorizon.run().then(() => undefined),
+    );
     // A bus whose verified insurance/permit/fitness/PUC/RC/road-tax has lapsed
     // is suspended and pulled off future trips. Hourly so a document expiring
     // at midnight is caught early in the day; idempotent per bus.

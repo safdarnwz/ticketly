@@ -131,12 +131,27 @@ export class MaterializationService {
     return created;
   }
 
-  /** Materialise every active service (the daily job entry point). */
-  async materialiseAllActive(horizonDays?: number): Promise<number> {
+  /**
+   * Keep the rolling horizon filled for every active service of the current
+   * operator — the worker's daily job (InventoryHorizonScheduler). Idempotent:
+   * dates already there (or blacked out) are skipped. One broken service is
+   * logged and skipped, not fatal for the rest.
+   */
+  async materialiseAllActive(
+    horizonDays?: number,
+  ): Promise<{ services: number; trips: number; failures: number }> {
     const services = await this.services.listActive();
-    let total = 0;
-    for (const service of services) total += await this.materialiseService(service.id, horizonDays);
-    return total;
+    let trips = 0;
+    let failures = 0;
+    for (const service of services) {
+      try {
+        trips += await this.materialiseService(service.id, horizonDays);
+      } catch (err) {
+        failures += 1;
+        this.log.error({ serviceId: service.id, err }, 'materialisation failed for service');
+      }
+    }
+    return { services: services.length, trips, failures };
   }
 
   private async materialiseOne(

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
-import { addDays, type CityId, type LocalDate, type StopId } from '@kernel';
+import { AppConfig } from '@config';
+import { addDays, formatInstantTime, type CityId, type LocalDate, type StopId } from '@kernel';
 
 import {
   buildConnections,
@@ -57,6 +58,7 @@ export class JourneySearchService {
   constructor(
     private readonly search: SearchService,
     private readonly hubs: ConnectionHubRepository,
+    private readonly config: AppConfig,
   ) {}
 
   async trips(q: TripQuery): Promise<SearchResult[]> {
@@ -71,7 +73,13 @@ export class JourneySearchService {
     // The filter engine matches amenity CODES; results carry full Amenity
     // objects. Filter a code-only projection, then map back by tripId so the
     // caller still gets the full objects.
-    const filterable = results.map((r) => ({ ...r, amenities: r.amenities.map((a) => a.code) }));
+    const tz = this.config.domain.timezone;
+    const filterable = results.map((r) => ({
+      ...r,
+      amenities: r.amenities.map((a) => a.code),
+      operatorRating: r.rating ?? 0,
+      departLocal: formatInstantTime(new Date(r.departsAt), tz),
+    }));
     const filtered = filterAndSort(filterable, q.filter ?? {}, q.sort ?? 'departure', q.sortDir);
     const byTripId = new Map(results.map((r) => [r.tripId, r]));
     return filtered.map((f) => byTripId.get(f.tripId)!);

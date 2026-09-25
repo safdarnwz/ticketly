@@ -8,6 +8,7 @@ import { PricingModule } from '../pricing/pricing.module';
 import { SchedulingModule } from '../scheduling/scheduling.module';
 import { TenancyModule } from '../tenancy/tenancy.module';
 import { PromotionsModule } from '../promotions/promotions.module';
+import { ReviewModule } from '../reviews/review.module';
 import { SearchController } from './presentation/search.controller';
 import { JourneySearchService } from './application/services/journey-search.service';
 import { ConnectionHubRepository } from './infrastructure/connection-hub.repository';
@@ -34,6 +35,7 @@ import { SearchService } from './application/services/search.service';
     PricingModule,
     TenancyModule,
     PromotionsModule,
+    ReviewModule,
   ],
   controllers: [SearchController],
   providers: [SearchService, JourneySearchService, ConnectionHubRepository],

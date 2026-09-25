@@ -32,6 +32,8 @@ import { WaitlistConsumer } from './consumers/waitlist.consumer';
 import { PayoutScheduler } from './schedulers/payout.scheduler';
 import { TripReminderScheduler } from './schedulers/trip-reminder.scheduler';
 import { ConnectionMonitorScheduler } from './schedulers/connection-monitor.scheduler';
+import { InventoryHorizonScheduler } from './schedulers/inventory-horizon.scheduler';
+import { SchedulingModule } from '@api/modules/scheduling/scheduling.module';
 
 /**
  * Worker composition root.
@@ -71,6 +73,7 @@ import { ConnectionMonitorScheduler } from './schedulers/connection-monitor.sche
     QuotasModule,
     DemandModule,
     PlatformSettingsModule,
+    SchedulingModule,
     // The tenancy module registers operator rate limits here; no HTTP layer in the worker.
     TenantRateLimitsModule,
   ],
@@ -88,6 +91,7 @@ import { ConnectionMonitorScheduler } from './schedulers/connection-monitor.sche
     PayoutScheduler,
     TripReminderScheduler,
     ConnectionMonitorScheduler,
+    InventoryHorizonScheduler,
   ],
 })
 export class WorkerModule {}

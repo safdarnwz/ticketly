@@ -69,6 +69,22 @@ export class InventoryRepository {
     return result;
   }
 
+  /** The seat types each trip sells (seater / sleeper / semi_sleeper), for search filters and prices. */
+  async seatTypesForTrips(tripIds: readonly TripId[]): Promise<Map<TripId, string[]>> {
+    const result = new Map<TripId, string[]>(tripIds.map((id) => [id, []]));
+    if (tripIds.length === 0) return result;
+    const rows = await this.db.query<{ trip_id: TripId; types: string[] }>(
+      `SELECT trip_id, array_agg(DISTINCT seat_type ORDER BY seat_type) AS types
+         FROM trip_seats
+        WHERE tenant_id = $1 AND trip_id = ANY($2::uuid[]) AND is_bookable
+        GROUP BY trip_id`,
+      [requireTenantId(), tripIds],
+      { name: 'inventory.seatTypesForTrips' },
+    );
+    for (const row of rows) result.set(row.trip_id, row.types);
+    return result;
+  }
+
   /** Per-seat availability for the seat-map render. */
   async seatAvailability(
     tripId: TripId,

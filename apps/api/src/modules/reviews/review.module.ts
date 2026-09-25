@@ -16,6 +16,6 @@ import { ReviewService } from './application/services/review.service';
   imports: [DatabaseModule, BookingModule],
   controllers: [ReviewController],
   providers: [ReviewRepository, ReviewService],
-  exports: [ReviewService],
+  exports: [ReviewService, ReviewRepository],
 })
 export class ReviewModule {}

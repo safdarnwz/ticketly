@@ -58,7 +58,11 @@ import {
 import { UnitOfWork } from '@database';
 
 import { AppModule } from '../apps/api/src/app.module';
-import { ServiceRepository, TripRepository } from '../apps/api/src/modules/scheduling';
+import {
+  MaterializationService,
+  ServiceRepository,
+  TripRepository,
+} from '../apps/api/src/modules/scheduling';
 import {
   RouteRepository,
   SeatLayoutRepository,
@@ -78,6 +82,8 @@ const CUSTOMER_PASSWORD = 'pass@123';
 const TOTAL_CUSTOMERS = 1000;
 const TARGET_BOOKINGS = 1000;
 const START_DATE = '2026-09-01';
+/** How far ahead demo trips are on sale. */
+const UPCOMING_DAYS = 30;
 
 function rand(n: number): number {
   return Math.floor(Math.random() * n);
@@ -136,6 +142,7 @@ async function main(): Promise<void> {
 
   const services = app.get(ServiceRepository);
   const trips = app.get(TripRepository);
+  const materialization = app.get(MaterializationService);
   const routes = app.get(RouteRepository);
   const layouts = app.get(SeatLayoutRepository);
   const vehicleTypes = app.get(VehicleTypeRepository);
@@ -224,6 +231,12 @@ async function main(): Promise<void> {
           `  [${t.slug}] service ${svc.code}: ${created} trip-days materialised\n`,
         );
       }
+      // Upcoming trips come from the real materialisation (as the worker's
+      // daily job does), so the storefront has buses to sell.
+      const ahead = await materialization.materialiseAllActive(UPCOMING_DAYS);
+      process.stdout.write(
+        `  [${t.slug}] ${ahead.trips} upcoming trips (next ${UPCOMING_DAYS} days)\n`,
+      );
     });
   }
 

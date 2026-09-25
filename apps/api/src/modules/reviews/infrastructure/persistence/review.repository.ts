@@ -70,6 +70,17 @@ export class ReviewRepository {
     return id;
   }
 
+  /** Average stars and review count of a route's published reviews (search results). */
+  async ratingSummary(routeId: RouteId): Promise<{ average: number; count: number }> {
+    const row = await this.db.queryOne<{ average: string | null; count: number }>(
+      `SELECT round(avg(rating), 1) AS average, count(*)::int AS count
+         FROM reviews WHERE tenant_id = $1 AND route_id = $2 AND status = 'published'`,
+      [requireTenantId(), routeId],
+      { name: 'review.ratingSummary' },
+    );
+    return { average: Number(row?.average ?? 0), count: row?.count ?? 0 };
+  }
+
   /** Published star values for a route (drives aggregation). */
   async ratingsForRoute(routeId: RouteId): Promise<number[]> {
     const rows = await this.db.query<{ rating: number }>(

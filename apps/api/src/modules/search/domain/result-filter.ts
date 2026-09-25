@@ -18,6 +18,8 @@ import { DomainError, ErrorCode } from '@kernel';
 
 export interface FilterableTrip {
   departsAt: string; // ISO 8601
+  /** Departure wall-clock HH:mm in the operator's timezone — what "leaving after 18:00" means. */
+  departLocal?: string;
   arrivesAt: string; // ISO 8601
   durationMin: number;
   fromPriceMinor: number;
@@ -72,7 +74,7 @@ export function matchesFilter<T extends FilterableTrip>(trip: T, filter: TripFil
   if (filter.minRating !== undefined && (trip.operatorRating ?? 0) < filter.minRating) return false;
 
   if (filter.departAfter !== undefined || filter.departBefore !== undefined) {
-    const dep = minuteOfDay(trip.departsAt);
+    const dep = trip.departLocal ? parseHhMm(trip.departLocal) : minuteOfDay(trip.departsAt);
     if (dep === null) return false;
     if (filter.departAfter !== undefined && dep < parseHhMm(filter.departAfter)) return false;
     if (filter.departBefore !== undefined && dep > parseHhMm(filter.departBefore)) return false;
@@ -93,8 +95,11 @@ function sortValue(trip: FilterableTrip, key: SortKey): number {
   switch (key) {
     case 'price':
       return trip.fromPriceMinor;
-    case 'departure':
-      return minuteOfDay(trip.departsAt) ?? Number.MAX_SAFE_INTEGER;
+    case 'departure': {
+      // The instant, not the clock time: a 00:30 departure is after a 23:30 one.
+      const t = Date.parse(trip.departsAt);
+      return Number.isNaN(t) ? Number.MAX_SAFE_INTEGER : t;
+    }
     case 'duration':
       return trip.durationMin;
     case 'rating':
