@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isFeatureAllowed, quotaExceeded, resolveEntitlements } from '../domain/entitlements';
+import { isFeatureAllowed, resolveEntitlements } from '../domain/entitlements';
 
 const viaRedis = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
@@ -32,11 +32,9 @@ describe('entitlements', () => {
       ),
     ).toBe(false);
   });
-  it('102–104: quota at the limit is exceeded; null / missing = unlimited', () => {
-    const q = resolveEntitlements({}, {}, { maxVehicles: 25, maxUsers: null }).quotas;
-    expect(quotaExceeded(q, 'maxVehicles', 25)).toBe(25);
-    expect(quotaExceeded(q, 'maxVehicles', 24)).toBeNull();
-    expect(quotaExceeded(q, 'maxUsers', 99999)).toBeNull();
-    expect(quotaExceeded(q, 'maxBranches', 99999)).toBeNull();
+  it('keeps numeric plan quotas only', () => {
+    expect(resolveEntitlements({}, {}, { max_vehicles: 25, max_users: null }).quotas).toEqual({
+      max_vehicles: 25,
+    });
   });
 });

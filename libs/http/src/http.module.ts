@@ -15,6 +15,7 @@ import { SerializationInterceptor } from './interceptors/serialization.intercept
 import { TimeoutInterceptor } from './interceptors/timeout.interceptor';
 import { RequestContextMiddleware } from './middleware/request-context.middleware';
 import { RateLimiter } from './ratelimit/rate-limiter';
+import { TenantRateLimits } from './ratelimit/tenant-rate-limits';
 
 /**
  * Wires the HTTP cross-cutting layer.
@@ -35,6 +36,7 @@ import { RateLimiter } from './ratelimit/rate-limiter';
   providers: [
     IdempotencyStore,
     RateLimiter,
+    TenantRateLimits,
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_INTERCEPTOR, useClass: HttpMetricsInterceptor },
     { provide: APP_INTERCEPTOR, useClass: TimeoutInterceptor },
@@ -42,7 +44,7 @@ import { RateLimiter } from './ratelimit/rate-limiter';
     { provide: APP_INTERCEPTOR, useClass: SerializationInterceptor },
     { provide: APP_GUARD, useClass: RateLimitGuard },
   ],
-  exports: [IdempotencyStore, RateLimiter],
+  exports: [IdempotencyStore, RateLimiter, TenantRateLimits],
 })
 export class HttpModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

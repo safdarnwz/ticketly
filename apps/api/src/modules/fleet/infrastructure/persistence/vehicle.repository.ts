@@ -534,18 +534,14 @@ export class VehicleRepository {
   /* ── media (photos only) ─────────────────────────────────────────────────*/
 
   /** The operator's plan quota (null = unlimited / no plan) and current non-retired bus count. */
-  async quotaState(key: string): Promise<{ quotas: Record<string, number>; count: number }> {
-    const row = await this.db.queryOne<{ quotas: Record<string, unknown> | null; n: string }>(
-      `SELECT p.quotas, (SELECT count(*) FROM vehicles v WHERE v.tenant_id = t.id AND v.status <> 'retired') AS n
-         FROM tenants t LEFT JOIN plans p ON p.id = t.plan_id WHERE t.id = $1`,
+  /** Buses counting towards the plan quota (every one not retired). */
+  async countActive(): Promise<number> {
+    const row = await this.db.queryOne<{ n: string }>(
+      `SELECT count(*) AS n FROM vehicles WHERE tenant_id = $1 AND status <> 'retired'`,
       [requireTenantId()],
-      { name: 'vehicle.quotaState', primary: true },
+      { name: 'vehicle.countActive', primary: true },
     );
-    const quotas: Record<string, number> = {};
-    for (const [k, v] of Object.entries(row?.quotas ?? {}))
-      if (typeof v === 'number') quotas[k] = v;
-    void key;
-    return { quotas, count: Number(row?.n ?? 0) };
+    return Number(row?.n ?? 0);
   }
 
   async listMedia(vehicleId: VehicleId): Promise<VehicleMedia[]> {

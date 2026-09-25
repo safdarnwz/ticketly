@@ -75,7 +75,7 @@ export class PlatformChargeRepository {
     note: string,
   ): Promise<boolean> {
     const n = await this.db.execute_(
-      `UPDATE platform_charges SET amount_minor = $3, description = coalesce(description, '') || $4
+      `UPDATE platform_charges SET amount_minor = $3, base_minor = $3 - gst_minor, description = coalesce(description, '') || $4
         WHERE id = $1 AND tenant_id = $2 AND status = 'pending'`,
       [id, tenantId, amountMinor, note],
       { name: 'platformCharge.reducePending', primary: true },

@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 
+import { EntitlementsModule } from '../entitlements/entitlements.module';
+
 import { CacheModule } from '@cache';
 import { DatabaseModule } from '@database';
 import { MessagingModule } from '@messaging';
@@ -24,7 +26,7 @@ import { SeatLayoutService } from './application/services/seat-layout.service';
  * seat layouts; scheduling reads routes; search reads geography & routes).
  */
 @Module({
-  imports: [DatabaseModule, CacheModule, MessagingModule],
+  imports: [DatabaseModule, CacheModule, MessagingModule, EntitlementsModule],
   controllers: [MasterDataController],
   providers: [
     GeographyRepository,

@@ -10,6 +10,7 @@ import { PlatformSettingsModule } from '../platform-settings/platform-settings.m
 import { PlanRepository } from './infrastructure/persistence/plan.repository';
 import { PayoutRepository } from './infrastructure/persistence/payout.repository';
 import { TenantAdminController } from './presentation/tenant-admin.controller';
+import { TenantRateLimitService } from './application/services/tenant-rate-limit.service';
 import { TenantBrandingService } from './application/services/tenant-branding.service';
 import { TenantContextService } from './application/services/tenant-context.service';
 import { TenantController } from './presentation/tenant.controller';
@@ -51,6 +52,7 @@ import { NotificationModule } from '../notification/notification.module';
     PayoutRepository,
     TenantContextService,
     TenantBrandingService,
+    TenantRateLimitService,
     TenantProvisioningService,
   ],
   exports: [

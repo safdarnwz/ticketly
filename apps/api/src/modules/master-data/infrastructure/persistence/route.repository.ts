@@ -111,6 +111,16 @@ export class RouteRepository {
     return id;
   }
 
+  /** Routes counting towards the plan quota: every one not archived. */
+  async countActive(): Promise<number> {
+    const row = await this.db.queryOne<{ n: string }>(
+      `SELECT count(*) AS n FROM routes WHERE tenant_id = $1 AND deleted_at IS NULL AND status <> 'archived'`,
+      [requireTenantId()],
+      { name: 'route.countActive', primary: true },
+    );
+    return Number(row?.n ?? 0);
+  }
+
   async findById(id: RouteId): Promise<RouteRecord | null> {
     const route = await this.db.queryOne<RouteRow>(
       `SELECT id, code, name, origin_city_id, dest_city_id, status FROM routes

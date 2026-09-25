@@ -4,7 +4,7 @@ import { CacheNamespace, CacheService, CacheTtl } from '@cache';
 import { AppError, ErrorCode, NotFoundError, type TenantId } from '@kernel';
 
 import { PlanRepository } from '../../infrastructure/persistence/plan.repository';
-import { isFeatureAllowed, quotaExceeded, resolveEntitlements } from '../../domain/entitlements';
+import { isFeatureAllowed, resolveEntitlements } from '../../domain/entitlements';
 import { TenantRepository } from '../../infrastructure/persistence/tenant.repository';
 
 /**
@@ -96,23 +96,6 @@ export class TenantContextService {
       throw new AppError(ErrorCode.TENANT_FEATURE_DISABLED, 403, {
         message: `Feature '${feature}' is not enabled on your plan`,
         details: { feature },
-      });
-    }
-  }
-
-  /** Plan quota check before creating one more of something. No plan or a null quota = unlimited. */
-  async assertQuota(
-    tenantId: TenantId,
-    key: string,
-    currentCount: number,
-    label: string,
-  ): Promise<void> {
-    const profile = await this.getProfile(tenantId);
-    const limit = quotaExceeded(profile.quotas, key, currentCount);
-    if (limit !== null) {
-      throw new AppError(ErrorCode.TENANT_QUOTA_EXCEEDED, 403, {
-        message: `Your plan allows ${limit} ${label} — upgrade your plan to add more`,
-        details: { quota: key, limit, current: currentCount },
       });
     }
   }

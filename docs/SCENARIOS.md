@@ -12,8 +12,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Status | Count |
 |---|---|
 | OPEN | 2714 |
-| DONE | 912 |
-| GAP | 350 |
+| DONE | 921 |
+| GAP | 341 |
 | CONFLICT | 76 |
 | INFRA | 20 |
 | DUP | 9 |
@@ -22,7 +22,7 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 ## #1–#500
 
-CONFLICT 20, DONE 316, GAP 150, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 325, GAP 141, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -77,8 +77,8 @@ CONFLICT 20, DONE 316, GAP 150, INFRA 17, PROCESS 3
 | 49 | Trigger manual full database backup | INFRA | DevOps/monitoring runbook (not an app feature) |
 | 50 | Trigger incremental backup | INFRA | DevOps/monitoring runbook (not an app feature) |
 | 51 | Test backup restore on staging | INFRA | DevOps/monitoring runbook (not an app feature) |
-| 52 | Export platform audit logs for last 30 days | GAP | verified manually: not built yet |
-| 53 | Export platform audit logs for last 90 days | GAP | verified manually: not built yet |
+| 52 | Export platform audit logs for last 30 days | DONE | GET /admin/tenants/audit-log/export?days=30/90 (CSV) |
+| 53 | Export platform audit logs for last 90 days | DONE | GET /admin/tenants/audit-log/export?days=30/90 (CSV) |
 | 54 | Configure suspicious login activity alerts | DONE | PUT /admin/policies/suspicious-login (SecurityAlertService) |
 | 55 | Set high CPU usage alert threshold | INFRA | DevOps/monitoring runbook (not an app feature) |
 | 56 | Set high memory usage alert threshold | INFRA | DevOps/monitoring runbook (not an app feature) |
@@ -87,9 +87,9 @@ CONFLICT 20, DONE 316, GAP 150, INFRA 17, PROCESS 3
 | 59 | Disable feature flag for specific operator | DONE | PUT /admin/tenants/:id/features/:feature, POST /admin/tenants/features/:feature/rollback |
 | 60 | Rollback feature flag globally | DONE | PUT /admin/tenants/:id/features/:feature, POST /admin/tenants/features/:feature/rollback |
 | 61 | Set global API rate limits | DONE | verified manually: existing module/API |
-| 62 | Set per-operator API rate limits | GAP | verified manually: not built yet |
+| 62 | Set per-operator API rate limits | DONE | PUT /admin/tenants/:id/rate-limit (RateLimitGuard reads it, cached) |
 | 63 | Configure webhook endpoints for events | DONE | verified manually: existing module/API |
-| 64 | Test webhook delivery | GAP | verified manually: not built yet |
+| 64 | Test webhook delivery | DONE | verified: POST /webhooks/:id/test, POST /admin/gds/partners/:id/webhook/test |
 | 65 | Set white-label primary color for operator | DONE | verified manually: existing module/API |
 | 66 | Set white-label secondary color for operator | DONE | verified manually: existing module/API |
 | 67 | Set white-label favicon for operator | DONE | PUT /admin/tenants/:id/favicon; GET /operator/branding (public) |
@@ -125,11 +125,11 @@ CONFLICT 20, DONE 316, GAP 150, INFRA 17, PROCESS 3
 | 97 | Set suspension reason | DONE | verified manually: existing module/API |
 | 98 | Reactivate suspended operator | DONE | verified manually: existing module/API |
 | 99 | Change operator subscription plan | DONE | verified manually: existing module/API |
-| 100 | Generate platform invoice for operator | GAP | verified manually: not built yet |
-| 101 | Apply platform-level discount | GAP | verified manually: not built yet |
+| 100 | Generate platform invoice for operator | DONE | POST/GET /admin/billing/invoices (GST, FY numbering); GET /operator/platform-invoices |
+| 101 | Apply platform-level discount | DONE | POST/GET/DELETE /admin/billing/discounts (applied on platform invoices) |
 | 102 | Set maximum buses allowed per plan | DONE | plan maxVehicles enforced on bus create |
-| 103 | Set maximum branches allowed per plan | GAP | verified manually: not built yet |
-| 104 | Set maximum agents allowed per plan | GAP | verified manually: not built yet |
+| 103 | Set maximum branches allowed per plan | DONE | plan quotas max_branches / max_agents enforced (entitlements module; also users, routes, buses) |
+| 104 | Set maximum agents allowed per plan | DONE | plan quotas max_branches / max_agents enforced (entitlements module; also users, routes, buses) |
 | 105 | Configure platform commission percentage | DONE | verified manually: existing module/API |
 | 106 | View operator-wise performance ranking | GAP | verified manually: not built yet |
 | 107 | Export complete operator list with status | GAP | verified manually: not built yet |
@@ -154,7 +154,7 @@ CONFLICT 20, DONE 316, GAP 150, INFRA 17, PROCESS 3
 | 126 | Enter branch full address | DONE | verified manually: existing module/API |
 | 127 | Enter branch phone numbers | DONE | verified manually: existing module/API |
 | 128 | Assign branch manager | DONE | verified manually: existing module/API |
-| 129 | Set branch working hours | GAP | verified manually: not built yet |
+| 129 | Set branch working hours | DONE | branches.working_hours via POST/PATCH /branches |
 | 130 | Deactivate branch temporarily | DONE | verified manually: existing module/API |
 | 131 | Reactivate branch | DONE | verified manually: existing module/API |
 | 132 | Add new bus with registration number | DONE | verified manually: existing module/API |
@@ -777,7 +777,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 316, GAP 150, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 325, GAP 141, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -892,7 +892,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 316, GAP 150, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 325, GAP 141, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1007,7 +1007,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 316, GAP 150, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 325, GAP 141, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1102,7 +1102,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 316, GAP 150, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 325, GAP 141, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1217,7 +1217,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 316, GAP 150, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 325, GAP 141, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|
@@ -1292,7 +1292,7 @@ CONFLICT 12, DONE 127, DUP 1, GAP 128, OPEN 171, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 316, GAP 150, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 325, GAP 141, INFRA 17, PROCESS 3
 
 | # | Scenario | Status | Where / note |
 |---|---|---|---|

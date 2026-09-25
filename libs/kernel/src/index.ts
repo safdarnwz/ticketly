@@ -24,3 +24,4 @@ export * from './domain/entity';
 export * from './domain/value-object';
 export * from './domain/aggregate-root';
 export * from './concurrency';
+export * from './csv';

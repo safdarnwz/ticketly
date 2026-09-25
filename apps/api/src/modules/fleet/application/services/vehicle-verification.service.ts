@@ -18,7 +18,7 @@ import { EventBus } from '@messaging';
 import { Logger } from '@observability';
 
 import { FileService, MAX_PHOTOS_PER_BUS } from '../../../files';
-import { quotaExceeded } from '../../../tenancy';
+import { PlanQuotaService, QUOTA_KEYS } from '../../../entitlements';
 import {
   ALL_DOC_TYPES,
   DOC_LABELS,
@@ -82,6 +82,7 @@ export class VehicleVerificationService {
     private readonly files: FileService,
     private readonly uow: UnitOfWork,
     private readonly events: EventBus,
+    private readonly quotas: PlanQuotaService,
     logger: Logger,
   ) {
     this.log = logger.forContext('VehicleVerification');
@@ -91,13 +92,7 @@ export class VehicleVerificationService {
 
   async create(input: CreateVehicleRequest): Promise<VehicleId> {
     // Plan quota (102): a Starter plan's bus limit is actually enforced now.
-    const q = await this.vehicles.quotaState('maxVehicles');
-    const limit = quotaExceeded(q.quotas, 'maxVehicles', q.count);
-    if (limit !== null)
-      throw new DomainError(
-        ErrorCode.TENANT_QUOTA_EXCEEDED,
-        `Your plan allows ${limit} buses — upgrade your plan to add more`,
-      );
+    await this.quotas.assertCanAdd(QUOTA_KEYS.vehicles, await this.vehicles.countActive(), 'buses');
     const reg = validateRegistration(input.registrationNo);
     if (!reg.ok) throw new DomainError(ErrorCode.COMMON_VALIDATION, reg.error);
     this.validateDetails(input);

@@ -116,6 +116,16 @@ export class AgentRepository {
     return id;
   }
 
+  /** Agents counting towards the plan quota: every one not rejected. */
+  async countActive(): Promise<number> {
+    const row = await this.db.queryOne<{ n: string }>(
+      `SELECT count(*) AS n FROM agents WHERE tenant_id = $1 AND status <> 'rejected'`,
+      [requireTenantId()],
+      { name: 'agent.countActive', primary: true },
+    );
+    return Number(row?.n ?? 0);
+  }
+
   async codeExists(code: string): Promise<boolean> {
     const row = await this.db.queryOne<{ one: number }>(
       `SELECT 1 AS one FROM agents WHERE tenant_id = $1 AND lower(code) = lower($2)`,

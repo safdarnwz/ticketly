@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 
+import { EntitlementsModule } from '../entitlements/entitlements.module';
+
 import { DatabaseModule } from '@database';
 import { MessagingModule } from '@messaging';
 
@@ -28,6 +30,7 @@ import { PlatformSettingsModule } from '../platform-settings/platform-settings.m
     QuotasModule,
     AmendmentsModule,
     PlatformSettingsModule,
+    EntitlementsModule,
   ],
   controllers: [AgentController, AgentPortalController],
   providers: [AgentService, AgentRepository, AgentRefundService],

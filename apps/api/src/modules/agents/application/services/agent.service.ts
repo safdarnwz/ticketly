@@ -16,6 +16,7 @@ import {
   type RoleId,
   type UserId,
 } from '@kernel';
+import { PlanQuotaService, QUOTA_KEYS } from '../../../entitlements';
 import { EventBus } from '@messaging';
 import { Logger } from '@observability';
 import { PasswordHasher } from '@security';
@@ -110,6 +111,7 @@ export class AgentService {
     private readonly events: EventBus,
     logger: Logger,
     private readonly policies: PlatformPoliciesService,
+    private readonly planQuotas: PlanQuotaService,
   ) {
     this.log = logger.forContext('AgentService');
   }
@@ -120,6 +122,11 @@ export class AgentService {
     input: CreateAgentRequest,
   ): Promise<{ agentId: AgentId; userId: UserId; code: string }> {
     const tenantId = requireTenantId();
+    await this.planQuotas.assertCanAdd(
+      QUOTA_KEYS.agents,
+      await this.agents.countActive(),
+      'agents',
+    );
     const credit = resolveAgentCreditLimit(
       await this.policies.agentCreditPolicy(),
       input.billingMode,

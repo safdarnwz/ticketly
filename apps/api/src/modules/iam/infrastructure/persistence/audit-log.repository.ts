@@ -15,11 +15,26 @@ export interface AuditLogRow {
   correlationId: string | null;
 }
 
+export interface AuditLogEntry extends Record<string, unknown> {
+  id: string;
+  tenantId: string | null;
+  actorId: string | null;
+  actorType: string;
+  action: string;
+  resourceType: string;
+  resourceId: string | null;
+  changes: unknown;
+  ip: string | null;
+  occurredAt: Date;
+}
+
 export interface AuditLogFilter {
   tenantId?: string;
   /** Partial, case-insensitive match. */
   action?: string;
   resourceType?: string;
+  /** Only entries at or after this instant. */
+  since?: Date;
   limit: number;
 }
 
@@ -53,7 +68,7 @@ export class AuditLogRepository {
     );
   }
 
-  list(filter: AuditLogFilter): Promise<unknown[]> {
+  list(filter: AuditLogFilter): Promise<AuditLogEntry[]> {
     const conditions: string[] = [];
     const params: unknown[] = [];
     if (filter.tenantId) {
@@ -68,6 +83,10 @@ export class AuditLogRepository {
       params.push(filter.resourceType);
       conditions.push(`resource_type = $${params.length}`);
     }
+    if (filter.since) {
+      params.push(filter.since);
+      conditions.push(`occurred_at >= $${params.length}`);
+    }
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     params.push(filter.limit);
     return this.db.query(
@@ -77,7 +96,7 @@ export class AuditLogRepository {
          FROM audit_log ${where}
         ORDER BY occurred_at DESC LIMIT $${params.length}`,
       params,
-      { name: 'audit.list' },
+      { name: 'audit.list', timeoutMs: 60_000 },
     );
   }
 

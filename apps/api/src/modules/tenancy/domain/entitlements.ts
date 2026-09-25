@@ -35,13 +35,3 @@ export function isFeatureAllowed(e: { disabled: Iterable<string> }, feature: str
   for (const d of e.disabled) if (d === feature) return false;
   return true;
 }
-
-/** null = within quota; otherwise the limit that would be exceeded by adding one more. */
-export function quotaExceeded(
-  quotas: Record<string, number>,
-  key: string,
-  currentCount: number,
-): number | null {
-  const limit = quotas[key];
-  return typeof limit === 'number' && currentCount >= limit ? limit : null;
-}

@@ -7,11 +7,13 @@ import { getContext, RateLimitedError } from '@kernel';
 
 import { RATE_LIMIT_KEY, type RateLimitSpec } from '../decorators/rate-limit.decorator';
 import { RateLimiter } from '../ratelimit/rate-limiter';
+import { TenantRateLimits } from '../ratelimit/tenant-rate-limits';
 
 /**
  * Applies rate limits in layers, cheapest identity first:
  *
  *   1. per authenticated tenant  — the real unit of fair use in a SaaS
+ *      (the platform default, or the operator's own limit — #62)
  *   2. per IP                    — catches unauthenticated abuse
  *   3. per route (optional)      — protects specific expensive endpoints
  *
@@ -26,6 +28,7 @@ export class RateLimitGuard implements CanActivate {
     private readonly limiter: RateLimiter,
     private readonly config: AppConfig,
     private readonly reflector: Reflector,
+    private readonly tenantLimits: TenantRateLimits,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -48,7 +51,7 @@ export class RateLimitGuard implements CanActivate {
     if (ctx?.tenantId) {
       checks.push({
         key: `t:${ctx.tenantId}`,
-        limit: rateLimit.maxPerTenant,
+        limit: (await this.tenantLimits.limitFor(ctx.tenantId)) ?? rateLimit.maxPerTenant,
         windowMs: rateLimit.windowMs,
       });
     }
@@ -60,12 +63,18 @@ export class RateLimitGuard implements CanActivate {
       checks.push({ key: `r:${route}:${scope}`, limit: spec.limit, windowMs: spec.windowMs });
     }
 
+    // Advertise the tightest limit (fewest requests left), not whichever ran last.
+    let tightest: Awaited<ReturnType<RateLimiter['consume']>> | undefined;
     for (const check of checks) {
       const result = await this.limiter.consume(check.key, check.limit, check.windowMs);
-      void reply.header('RateLimit-Limit', String(result.limit));
-      void reply.header('RateLimit-Remaining', String(result.remaining));
-      void reply.header('RateLimit-Reset', String(result.resetAfterSeconds));
-      if (!result.allowed) throw new RateLimitedError(result.resetAfterSeconds);
+      if (!tightest || !result.allowed || result.remaining < tightest.remaining) tightest = result;
+      if (!result.allowed) break;
+    }
+    if (tightest) {
+      void reply.header('RateLimit-Limit', String(tightest.limit));
+      void reply.header('RateLimit-Remaining', String(tightest.remaining));
+      void reply.header('RateLimit-Reset', String(tightest.resetAfterSeconds));
+      if (!tightest.allowed) throw new RateLimitedError(tightest.resetAfterSeconds);
     }
 
     return true;

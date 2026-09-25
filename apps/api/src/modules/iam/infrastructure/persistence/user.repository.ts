@@ -55,6 +55,17 @@ export class UserRepository {
     return row ? this.toDomain(row) : null;
   }
 
+  /** Staff users counting towards the plan quota: active, not deleted. */
+  async countActiveStaff(): Promise<number> {
+    const row = await this.db.queryOne<{ n: string }>(
+      `SELECT count(*) AS n FROM users
+        WHERE tenant_id = $1 AND kind = 'staff' AND status = 'active' AND deleted_at IS NULL`,
+      [requireTenantId()],
+      { name: 'user.countActiveStaff', primary: true },
+    );
+    return Number(row?.n ?? 0);
+  }
+
   async findByEmail(email: string): Promise<User | null> {
     return this.findByBlind('email_blind', this.encryptor.blindIndex(email));
   }

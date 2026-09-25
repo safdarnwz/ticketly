@@ -1,4 +1,5 @@
 import { Module, type MiddlewareConsumer, type NestModule } from '@nestjs/common';
+import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { APP_GUARD } from '@nestjs/core';
 import { MaintenanceGuard } from './presentation/guards/maintenance.guard';
 import { StaffAccessService } from './application/services/staff-access.service';
@@ -58,6 +59,7 @@ import { OtpDeliveryRouter } from './infrastructure/otp/otp-delivery.router';
     TenancyModule,
     IntegrationsModule,
     NotificationModule,
+    EntitlementsModule,
   ],
   controllers: [
     AuthController,

@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 
+import { EntitlementsModule } from '../entitlements/entitlements.module';
+
 import { DatabaseModule } from '@database';
 import { MessagingModule } from '@messaging';
 
@@ -24,7 +26,13 @@ import { VehicleAdminController } from './presentation/vehicle-admin.controller'
  * FleetController.createVehicle).
  */
 @Module({
-  imports: [DatabaseModule, MessagingModule, PlatformSettingsModule, FilesModule],
+  imports: [
+    DatabaseModule,
+    MessagingModule,
+    PlatformSettingsModule,
+    FilesModule,
+    EntitlementsModule,
+  ],
   controllers: [FleetController, VehicleAdminController],
   providers: [
     VehicleRepository,

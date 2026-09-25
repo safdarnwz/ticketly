@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
 import { DomainError, ErrorCode, requireTenantId, type CityId, type RouteId } from '@kernel';
+import { PlanQuotaService, QUOTA_KEYS } from '../../../entitlements';
 import { EventBus } from '@messaging';
 
 import { StopRepository } from '../../infrastructure/persistence/stop.repository';
@@ -24,6 +25,7 @@ export class RouteService {
     private readonly stops: StopRepository,
     private readonly uow: UnitOfWork,
     private readonly events: EventBus,
+    private readonly planQuotas: PlanQuotaService,
   ) {}
 
   async create(input: {
@@ -34,6 +36,11 @@ export class RouteService {
     startTime: string;
     stops: RouteStopInput[];
   }): Promise<RouteId> {
+    await this.planQuotas.assertCanAdd(
+      QUOTA_KEYS.routes,
+      await this.routes.countActive(),
+      'routes',
+    );
     // Referential check: all stops exist for this tenant.
     await this.stops.assertExist(input.stops.map((s) => s.stopId));
 

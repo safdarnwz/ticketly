@@ -356,6 +356,25 @@ export class TenantRepository {
     return row ?? null;
   }
 
+  /** Per-operator API rate limit (#62): requests per rate-limit window, null = platform default. */
+  async apiRateLimit(tenantId: string): Promise<number | null> {
+    const row = await this.db.queryOne<{ api_rate_limit: number | null }>(
+      `SELECT api_rate_limit FROM tenants WHERE id = $1`,
+      [tenantId],
+      { name: 'tenant.apiRateLimit' },
+    );
+    return row?.api_rate_limit ?? null;
+  }
+
+  async setApiRateLimit(tenantId: string, limit: number | null): Promise<boolean> {
+    const n = await this.db.execute_(
+      `UPDATE tenants SET api_rate_limit = $2, version = version + 1 WHERE id = $1 AND deleted_at IS NULL`,
+      [tenantId, limit],
+      { name: 'tenant.setApiRateLimit', primary: true },
+    );
+    return n > 0;
+  }
+
   /** White-label favicon (#67), a small data URI; null removes it. */
   async setFavicon(tenantId: string, dataUri: string | null): Promise<boolean> {
     const n = await this.db.execute_(

@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Post, Put, Query, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query, HttpCode, Res } from '@nestjs/common';
+import type { FastifyReply } from 'fastify';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { AppConfig } from '@config';
@@ -12,7 +13,7 @@ import {
   zodBody,
   zodQuery,
 } from '@http';
-import { BadRequestError, getContext, type TenantId } from '@kernel';
+import { BadRequestError, csvField, getContext, type TenantId } from '@kernel';
 
 import { AuditService } from '../../iam';
 import { BookingRepository } from '../../booking';
@@ -24,6 +25,7 @@ import {
   type SuspendTenantDto,
 } from './dto/tenant.dto';
 import {
+  AuditLogExportQuerySchema,
   AuditLogQuerySchema,
   ChangePlanSchema,
   FeatureKeySchema,
@@ -34,7 +36,9 @@ import {
   SetDomainSchema,
   SetFaviconSchema,
   SetFeatureSchema,
+  SetRateLimitSchema,
   SetPlanActiveSchema,
+  type AuditLogExportQueryDto,
   type AuditLogQueryDto,
   type ChangePlanDto,
   type MarkPayoutsSentDto,
@@ -44,9 +48,11 @@ import {
   type SetDomainDto,
   type SetFaviconDto,
   type SetFeatureDto,
+  type SetRateLimitDto,
   type SetPlanActiveDto,
 } from './dto/tenant-admin.dto';
 import { PlanRepository } from '../infrastructure/persistence/plan.repository';
+import { TenantRateLimitService } from '../application/services/tenant-rate-limit.service';
 import { TenantBrandingService } from '../application/services/tenant-branding.service';
 import { TenantContextService } from '../application/services/tenant-context.service';
 import { PlatformSettingsRepository } from '../../platform-settings';
@@ -79,6 +85,7 @@ export class TenantAdminController {
     private readonly config: AppConfig,
     private readonly tenantContext: TenantContextService,
     private readonly branding: TenantBrandingService,
+    private readonly rateLimits: TenantRateLimitService,
   ) {}
 
   @Get()
@@ -131,6 +138,15 @@ export class TenantAdminController {
   @ApiOperation({ summary: "Assign (or clear) an operator's custom booking domain" })
   setDomain(@UuidParam('id') id: string, @Body(zodBody(SetDomainSchema)) dto: SetDomainDto) {
     return this.branding.setDomain(id, dto.domain);
+  }
+
+  @Put(':id/rate-limit')
+  @ApiOperation({ summary: "Set an operator's own API rate limit (null = platform default)" })
+  setRateLimit(
+    @UuidParam('id') id: string,
+    @Body(zodBody(SetRateLimitSchema)) dto: SetRateLimitDto,
+  ) {
+    return this.rateLimits.set(id, dto.limit);
   }
 
   @Put(':id/favicon')
@@ -239,6 +255,24 @@ export class TenantAdminController {
     return { entries: await this.audit.list(q) };
   }
 
+  @Get('audit-log/export')
+  @ApiOperation({
+    summary:
+      'Audit trail of the last N days (default 30, max 365) as CSV; X-Truncated: true when capped at 100 000 rows',
+  })
+  async auditLogExport(
+    @Query(zodQuery(AuditLogExportQuerySchema)) q: AuditLogExportQueryDto,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    const { csv, rows, truncated } = await this.audit.exportCsv(q);
+    void reply
+      .header('Content-Type', 'text/csv; charset=utf-8')
+      .header('Content-Disposition', `attachment; filename="audit-log-${q.days}d.csv"`)
+      .header('X-Row-Count', String(rows))
+      .header('X-Truncated', String(truncated));
+    return csv;
+  }
+
   /**
    * Platform-wide monetization defaults — commission % and the per-bus fee.
    * Unlike a per-operator commission override (see PaymentController's
@@ -341,12 +375,12 @@ export class TenantAdminController {
     const header = 'Beneficiary Name,Account Number,IFSC Code,Amount,Currency,Narration';
     const rows = pending.map((p) =>
       [
-        csvEscape(p.beneficiaryName),
+        csvField(p.beneficiaryName),
         p.bankAccountNumber,
         p.bankIfsc,
         (p.amountMinor / 100).toFixed(2),
         p.currency,
-        csvEscape(`Ticketly payout ${p.settlementId.slice(0, 8)}`),
+        csvField(`Ticketly payout ${p.settlementId.slice(0, 8)}`),
       ].join(','),
     );
     await this.payouts.markInBatch(
@@ -414,10 +448,4 @@ export class TenantAdminController {
     await this.payouts.rejectBankChange(id, getContext()?.userId ?? null, dto.reason);
     return { ok: true };
   }
-}
-
-/** Quote a CSV field only if it needs it (contains a comma, quote, or newline) — keeps the common case readable. */
-function csvEscape(value: string): string {
-  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
 }

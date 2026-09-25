@@ -65,6 +65,12 @@ export const AuditLogQuerySchema = z.object({
 });
 export type AuditLogQueryDto = z.infer<typeof AuditLogQuerySchema>;
 
+/** #52 / #53 — export the last N days (30 and 90 are the usual picks). */
+export const AuditLogExportQuerySchema = AuditLogQuerySchema.omit({ resourceType: true }).extend({
+  days: z.coerce.number().int().min(1).max(365).default(30),
+});
+export type AuditLogExportQueryDto = z.infer<typeof AuditLogExportQuerySchema>;
+
 /** #4 — a hostname the operator controls, e.g. "book.orangetravels.in"; null removes it. */
 export const SetDomainSchema = z.object({
   domain: z
@@ -92,3 +98,9 @@ export const SetFaviconSchema = z.object({
     .nullable(),
 });
 export type SetFaviconDto = z.infer<typeof SetFaviconSchema>;
+
+/** #62 — requests per rate-limit window for this operator; null = platform default. */
+export const SetRateLimitSchema = z.object({
+  limit: z.number().int().min(10).max(1_000_000).nullable(),
+});
+export type SetRateLimitDto = z.infer<typeof SetRateLimitSchema>;

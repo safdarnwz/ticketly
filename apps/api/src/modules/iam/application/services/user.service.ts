@@ -17,6 +17,7 @@ import { User } from '../../domain/user.entity';
 import { RoleRepository } from '../../infrastructure/persistence/role.repository';
 import { SessionRepository } from '../../infrastructure/persistence/session.repository';
 import { UserRepository } from '../../infrastructure/persistence/user.repository';
+import { PlanQuotaService, QUOTA_KEYS } from '../../../entitlements';
 import { PlatformPoliciesService } from '../../../platform-settings';
 
 /**
@@ -36,6 +37,7 @@ export class UserService {
     private readonly uow: UnitOfWork,
     private readonly audit: AuditService,
     private readonly policies: PlatformPoliciesService,
+    private readonly planQuotas: PlanQuotaService,
   ) {}
 
   async invite(input: {
@@ -46,6 +48,11 @@ export class UserService {
     roles: string[];
   }): Promise<UserId> {
     const tenantId = requireTenantId();
+    await this.planQuotas.assertCanAdd(
+      QUOTA_KEYS.users,
+      await this.users.countActiveStaff(),
+      'staff users',
+    );
     const existing = await this.users.findByEmail(input.email);
     if (existing) throw new ConflictError('A user with this email already exists');
 
