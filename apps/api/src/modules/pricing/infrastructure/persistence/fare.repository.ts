@@ -79,35 +79,50 @@ export class FareRepository {
           [requireTenantId(), plan.id, input.fromStopId, input.toStopId, input.seatType],
           { name: 'fare.exact' },
         );
-        if (exact)
+        // A price of zero (or less) is never a fare — it would sell free seats.
+        if (exact && Number(exact.base_fare_minor) > 0)
           return {
-            baseFareMinor: exact.base_fare_minor,
+            baseFareMinor: Number(exact.base_fare_minor),
             currency: plan.currency,
             seatType: input.seatType,
             farePlanId: plan.id,
           };
 
-        // 2. per-km fallback rule (from/to NULL) for the seat type
+        // 2. whole-route rule (from/to NULL) for the seat type: its per-km
+        //    rate times this segment's distance, never below its base fare.
         const perKm = await this.db.queryOne<{
           per_km_minor: number | null;
           base_fare_minor: number;
+          segment_m: number | null;
         }>(
-          `SELECT per_km_minor, base_fare_minor FROM fare_rules
-            WHERE tenant_id = $1 AND fare_plan_id = $2 AND from_stop_id IS NULL AND to_stop_id IS NULL AND seat_type = $3`,
-          [requireTenantId(), plan.id, input.seatType],
+          `SELECT fr.per_km_minor, fr.base_fare_minor,
+                  (SELECT t.distance_from_origin_m FROM route_stops t WHERE t.route_id = $4 AND t.stop_id = $6)
+                  - (SELECT f.distance_from_origin_m FROM route_stops f WHERE f.route_id = $4 AND f.stop_id = $5) AS segment_m
+             FROM fare_rules fr
+            WHERE fr.tenant_id = $1 AND fr.fare_plan_id = $2 AND fr.from_stop_id IS NULL AND fr.to_stop_id IS NULL
+              AND fr.seat_type = $3`,
+          [
+            requireTenantId(),
+            plan.id,
+            input.seatType,
+            input.routeId,
+            input.fromStopId,
+            input.toStopId,
+          ],
           { name: 'fare.perKm' },
         );
         if (perKm) {
-          const km = input.distanceM / 1000;
-          const fare = perKm.per_km_minor
-            ? Math.round(perKm.per_km_minor * km)
-            : perKm.base_fare_minor;
-          return {
-            baseFareMinor: Math.max(fare, perKm.base_fare_minor),
-            currency: plan.currency,
-            seatType: input.seatType,
-            farePlanId: plan.id,
-          };
+          const km = Math.max(0, Number(perKm.segment_m ?? input.distanceM)) / 1000;
+          const base = Number(perKm.base_fare_minor);
+          const fare = perKm.per_km_minor ? Math.round(Number(perKm.per_km_minor) * km) : base;
+          const minor = Math.max(fare, base);
+          if (minor > 0)
+            return {
+              baseFareMinor: minor,
+              currency: plan.currency,
+              seatType: input.seatType,
+              farePlanId: plan.id,
+            };
         }
 
         return null;
@@ -201,7 +216,7 @@ export class FareRepository {
           const r = await this.db.queryOne<{ ladder: YieldLadder }>(
             `SELECT ladder FROM pricing_policies
               WHERE tenant_id = $1 AND is_active AND (route_id = $2 OR route_id IS NULL)
-              ORDER BY route_id NULLS LAST LIMIT 1`,
+              ORDER BY route_id NULLS LAST, created_at DESC LIMIT 1`,
             [requireTenantId(), routeId],
             { name: 'fare.routePricing' },
           );
@@ -260,6 +275,7 @@ export class FareRepository {
   }): Promise<string> {
     const problem = validatePlanWindow(input);
     if (problem) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: problem });
+    await this.requireRoute(input.routeId);
     const id = newId();
     await this.db.execute_(
       `INSERT INTO fare_plans (id, tenant_id, route_id, name, currency, effective_from, effective_to, weekdays)
@@ -279,25 +295,108 @@ export class FareRepository {
     return id;
   }
 
+  /** A plan with no fare yet cannot go live — its buses would have nothing to sell at. */
   async activatePlan(planId: string): Promise<void> {
+    const plan = await this.db.queryOne<{ rules: number }>(
+      `SELECT (SELECT count(*)::int FROM fare_rules r WHERE r.fare_plan_id = p.id) AS rules
+         FROM fare_plans p WHERE p.tenant_id = $1 AND p.id = $2`,
+      [requireTenantId(), planId],
+      { name: 'fare.planRuleCount', primary: true },
+    );
+    if (!plan)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Fare plan not found' });
+    if (plan.rules === 0) {
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+        message: 'Add a fare to this plan before activating it',
+      });
+    }
     await this.db.execute_(
       `UPDATE fare_plans SET status = 'active', updated_at = now() WHERE tenant_id = $1 AND id = $2`,
       [requireTenantId(), planId],
       { name: 'fare.activatePlan', primary: true },
     );
+    await this.pricesChanged(CacheNamespace.FARE_RULE);
   }
 
-  /** `gstRatePct` is NOT accepted here — GST is a government rate, set only via PlatformSettingsRepository (super-admin), never per-policy. The column keeps its DB default; nothing reads it anymore (see routePricing). */
+  /**
+   * Ids from the request must be this operator's: a foreign key alone would
+   * accept another operator's route or plan (it does not see row-level security).
+   */
+  private async requireRoute(routeId: string): Promise<void> {
+    const found = await this.db.queryOne(
+      `SELECT 1 FROM routes WHERE tenant_id = $1 AND id = $2`,
+      [requireTenantId(), routeId],
+      { name: 'fare.requireRoute', primary: true },
+    );
+    if (!found) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Route not found' });
+  }
+
+  private async requirePlan(planId: string): Promise<void> {
+    const found = await this.db.queryOne(
+      `SELECT 1 FROM fare_plans WHERE tenant_id = $1 AND id = $2`,
+      [requireTenantId(), planId],
+      { name: 'fare.requirePlan', primary: true },
+    );
+    if (!found) {
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Fare plan not found' });
+    }
+  }
+
+  /**
+   * Drop cached fares — and the cached search results priced from them, so
+   * "starts from" on the results page does not keep showing the old price.
+   */
+  private async pricesChanged(namespace: string): Promise<void> {
+    await this.cache.invalidatePrefix(namespace);
+    await this.cache.invalidatePrefix(CacheNamespace.SEARCH);
+  }
+
+  /**
+   * One active policy per scope (a route, or operator-wide): a new one replaces
+   * the earlier one, which stays listed as switched off. `gstRatePct` is NOT
+   * accepted — GST is a government rate, set only via PlatformSettingsRepository
+   * (super-admin), never per-policy. The column keeps its DB default; nothing
+   * reads it anymore (see routePricing).
+   */
   async createPolicy(input: { routeId?: string; name: string; ladder: unknown }): Promise<string> {
+    const tenantId = requireTenantId();
+    if (input.routeId) {
+      const route = await this.db.queryOne(
+        `SELECT 1 FROM routes WHERE tenant_id = $1 AND id = $2`,
+        [tenantId, input.routeId],
+        { name: 'fare.policyRoute' },
+      );
+      if (!route)
+        throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Route not found' });
+    }
+    await this.db.execute_(
+      `UPDATE pricing_policies SET is_active = false
+        WHERE tenant_id = $1 AND is_active AND route_id IS NOT DISTINCT FROM $2::uuid`,
+      [tenantId, input.routeId ?? null],
+      { name: 'fare.replacePolicy', primary: true },
+    );
     const id = newId();
     await this.db.execute_(
       `INSERT INTO pricing_policies (id, tenant_id, route_id, name, ladder)
        VALUES ($1, $2, $3, $4, $5)`,
-      [id, requireTenantId(), input.routeId ?? null, input.name, JSON.stringify(input.ladder)],
+      [id, tenantId, input.routeId ?? null, input.name, JSON.stringify(input.ladder)],
       { name: 'fare.createPolicy', primary: true },
     );
-    await this.cache.invalidatePrefix(CacheNamespace.PRICING_POLICY);
+    await this.pricesChanged(CacheNamespace.PRICING_POLICY);
     return id;
+  }
+
+  /** Stop a policy — its routes go back to the operator-wide one, or to plain fares. */
+  async deactivatePolicy(id: string): Promise<void> {
+    const affected = await this.db.execute_(
+      `UPDATE pricing_policies SET is_active = false WHERE tenant_id = $1 AND id = $2`,
+      [requireTenantId(), id],
+      { name: 'fare.deactivatePolicy', primary: true },
+    );
+    if (affected === 0) {
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Policy not found' });
+    }
+    await this.pricesChanged(CacheNamespace.PRICING_POLICY);
   }
 
   async addRule(input: {
@@ -308,6 +407,7 @@ export class FareRepository {
     baseFareMinor: number;
     perKmMinor?: number;
   }): Promise<void> {
+    await this.requirePlan(input.farePlanId);
     await this.db.execute_(
       `INSERT INTO fare_rules (id, tenant_id, fare_plan_id, from_stop_id, to_stop_id, seat_type, base_fare_minor, per_km_minor)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
@@ -325,7 +425,7 @@ export class FareRepository {
       ],
       { name: 'fare.addRule', primary: true },
     );
-    await this.cache.invalidatePrefix(CacheNamespace.FARE_RULE);
+    await this.pricesChanged(CacheNamespace.FARE_RULE);
   }
 
   async listPlans(): Promise<
@@ -378,7 +478,7 @@ export class FareRepository {
       [requireTenantId(), farePlanId, percent, seatType, roundToMinor],
       { name: 'fare.adjustRules', primary: true },
     );
-    await this.cache.invalidatePrefix(CacheNamespace.FARE_RULE);
+    await this.pricesChanged(CacheNamespace.FARE_RULE);
     return n;
   }
 
@@ -402,11 +502,19 @@ export class FareRepository {
   }
 
   async listPolicies(): Promise<
-    { id: string; routeId: string | null; name: string; gstRatePct: number }[]
+    {
+      id: string;
+      routeId: string | null;
+      name: string;
+      ladder: YieldLadder;
+      isActive: boolean;
+      createdAt: Date;
+    }[]
   > {
     return this.db.query(
-      `SELECT id, route_id AS "routeId", name, gst_rate_pct AS "gstRatePct" FROM pricing_policies
-        WHERE tenant_id = $1 ORDER BY created_at DESC`,
+      `SELECT id, route_id AS "routeId", name, ladder, is_active AS "isActive", created_at AS "createdAt"
+         FROM pricing_policies
+        WHERE tenant_id = $1 ORDER BY is_active DESC, created_at DESC`,
       [requireTenantId()],
       { name: 'fare.listPolicies' },
     );
@@ -421,6 +529,7 @@ export class FareRepository {
    */
 
   async setSeatOverride(farePlanId: string, seatNumber: string, fareMinor: number): Promise<void> {
+    await this.requirePlan(farePlanId);
     await this.db.execute_(
       `INSERT INTO seat_fare_overrides (id, tenant_id, fare_plan_id, seat_number, fare_minor)
        VALUES ($1,$2,$3,$4,$5)
@@ -442,11 +551,14 @@ export class FareRepository {
   }
 
   async deleteSeatOverride(id: string): Promise<void> {
-    await this.db.execute_(
+    const affected = await this.db.execute_(
       `DELETE FROM seat_fare_overrides WHERE tenant_id = $1 AND id = $2`,
       [requireTenantId(), id],
       { name: 'fare.deleteSeatOverride', primary: true },
     );
+    if (affected === 0) {
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Seat price not found' });
+    }
   }
 
   /** Batch lookup for a specific set of seat numbers — what PricingService.quote actually uses when pricing a real seat selection. */

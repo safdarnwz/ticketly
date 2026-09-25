@@ -1,12 +1,14 @@
-import { Body, Controller, Delete, Get, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import {
   ApiStandardErrors,
+  Idempotent,
   RequirePermission,
   RequirePlatformAdmin,
   UuidParam,
   zodBody,
+  zodQuery,
 } from '@http';
 import { getContext } from '@kernel';
 
@@ -17,6 +19,8 @@ import {
   type SetPromotionRateDto,
   PurchasePromotionSchema,
   type PurchasePromotionDto,
+  PromotionQuoteSchema,
+  type PromotionQuoteDto,
 } from './dto/promotion.dto';
 
 @ApiTags('promotions')
@@ -60,7 +64,17 @@ export class PromotionController {
     return { rates: await this.promotions.currentRates() };
   }
 
+  @Get('promotions/quote')
+  @RequirePermission(Permission.ROUTE_MANAGE)
+  @ApiOperation({
+    summary: 'The exact price of promoting N routes over a date range — what a purchase charges',
+  })
+  async quote(@Query(zodQuery(PromotionQuoteSchema)) q: PromotionQuoteDto) {
+    return this.promotions.quote(q);
+  }
+
   @Post('promotions')
+  @Idempotent()
   @RequirePermission(Permission.ROUTE_MANAGE)
   @ApiOperation({
     summary:

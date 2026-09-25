@@ -1,9 +1,15 @@
 import { Injectable } from '@nestjs/common';
 
-import { DatabaseService } from '@database';
+import { DatabaseService, registerConstraintMessages } from '@database';
 import { AppError, ErrorCode, newId, requireTenantId } from '@kernel';
 
 import type { Coupon } from '../../domain/pricing-engine';
+
+registerConstraintMessages({
+  coupons_tenant_id_code_key: 'A coupon with this code already exists',
+  coupons_value_check: 'A percentage is 1–100 and a flat discount at least ₹1',
+  coupons_window_check: 'A coupon must end after it starts',
+});
 
 /**
  * Coupon lookup and atomic redemption.
@@ -135,11 +141,14 @@ export class CouponRepository {
   }
 
   async setActive(id: string, isActive: boolean): Promise<void> {
-    await this.db.execute_(
+    const affected = await this.db.execute_(
       `UPDATE coupons SET is_active = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2`,
       [requireTenantId(), id, isActive],
       { name: 'coupon.setActive', primary: true },
     );
+    if (affected === 0) {
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Coupon not found' });
+    }
   }
 
   async list(): Promise<
@@ -155,12 +164,17 @@ export class CouponRepository {
       isActive: boolean;
       firstBookingOnly: boolean;
       description: string | null;
+      minFareMinor: number | null;
+      maxDiscountMinor: number | null;
+      perUserLimit: number | null;
     }[]
   > {
     return this.db.query(
       `SELECT id, code, kind, value, usage_count AS "usageCount", max_redemptions AS "maxRedemptions",
               valid_from AS "validFrom", valid_to AS "validTo", is_active AS "isActive",
-              first_booking_only AS "firstBookingOnly", description
+              first_booking_only AS "firstBookingOnly", description,
+              min_fare_minor AS "minFareMinor", max_discount_minor AS "maxDiscountMinor",
+              per_user_limit AS "perUserLimit"
          FROM coupons WHERE tenant_id = $1 ORDER BY created_at DESC`,
       [requireTenantId()],
       { name: 'coupon.list' },

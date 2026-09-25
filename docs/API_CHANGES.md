@@ -211,3 +211,36 @@ an unknown id is now 404 (was 200).
   to get 409 "still in progress"), and replays no longer return a non-RFC-9457 error body.
 - Fleet: `registrationNo` is normalised (capitals, no spaces/dashes) and must be a valid state or BH-series
   number; crew `phone` must be a 10-digit mobile.
+
+### Operator pricing, promotions, distribution, branches (O4)
+
+- **Fares:** a fare rule must be at least ₹1 (`baseFareMinor` ≥ 100, at most ₹1,00,000; `perKmMinor` ≤ ₹1,000).
+  Saving the fare for a seat type now replaces the earlier one — whole-route rules used to pile up (NULL stops
+  never collide) and a quote could read a ₹0 draft. Migration 0086 keeps the newest rule of each kind, drops
+  rules at ₹0 or less and adds the checks. A per-km whole-route rule prices by the segment's real distance.
+- `POST /pricing/fare-plans/:id/activate` refuses a plan with no fare (422) and clears the cached fares, so an
+  activated plan applies at once (it could take 5 minutes). Unknown / another operator's plan: 404 — also for
+  adding a rule or a seat price to it. `POST /pricing/fare-plans` refuses another operator's route (404).
+  Seat prices are at least ₹1; removing one that is not there is a 404.
+- Any fare, plan or yield-policy change also clears cached search results, so "starts from" is not stale.
+- **Coupons:** `POST /pricing/coupons` — `value` is 1–100 for `percent`, and paise ≥ 100 for `flat`;
+  `maxDiscountMinor` only for percent coupons; `validTo` after `validFrom` and in the future; `code` is 2–40
+  of `A-Z 0-9 - _` (stored upper-case). Duplicate code: 409 "A coupon with this code already exists".
+  Enable / disable / stats of an unknown or another operator's coupon: 404. `GET /pricing/coupons` also
+  returns `minFareMinor`, `maxDiscountMinor`, `perUserLimit`. Migration 0087 adds the matching DB checks.
+- **Yield policies:** multipliers are 0.5×–3× (0× priced seats at ₹0), each occupancy level / day count once,
+  at most 10 steps each. One active policy per route and one operator-wide: a new one replaces the earlier
+  one (migration 0088, unique index). New `POST /pricing/policies/:id/deactivate`. `GET /pricing/policies`
+  returns `ladder`, `isActive`, `createdAt` (no `gstRatePct` — GST is set by the platform only).
+- **Promotions:** new `GET /promotions/quote?routeCount&startDate&endDate` — the exact price a purchase
+  charges. `POST /promotions` now requires `Idempotency-Key`; two requests for the same route and days can no
+  longer both be charged; only published routes of the operator (draft: 422, not theirs: 404); overlap errors
+  name the route. A paused promotion can be cancelled (unused days credited). `GET /promotions` items carry
+  `routeName` and `pausedAt`. Search now applies paid top slots after the customer's sort — sorting used to
+  push the promoted bus back down, so the slot was paid for and never shown.
+- **Webhooks:** the URL must be public https — no localhost, private / link-local / metadata addresses,
+  internal host names or credentials in the URL (400). Every send re-checks where the name resolves and
+  does not follow redirects. One live registration per URL (409; migration 0089), at most 10 per operator.
+  Revoke / deliveries / test of an unknown or another operator's webhook: 404.
+- **Branches:** name 2+ characters and unique per operator ignoring case (409); phone must be a number
+  with STD code (10–12 digits); opening hours are HH:MM; the manager must be staff of this operator (404).

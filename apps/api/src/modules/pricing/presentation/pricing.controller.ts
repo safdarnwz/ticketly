@@ -189,6 +189,16 @@ export class PricingController {
     return { id };
   }
 
+  @Post('policies/:id/deactivate')
+  @RequirePermission(Permission.FARE_MANAGE)
+  @ApiOperation({ summary: 'Switch a yield policy off — its routes fall back to plain fares' })
+  async deactivatePolicy(@UuidParam('id') id: string) {
+    await this.uow.run({ name: 'pricing.deactivatePolicy', tenantId: requireTenantId() }, () =>
+      this.fares.deactivatePolicy(id),
+    );
+    return { ok: true };
+  }
+
   @Get('coupons')
   @RequirePermission(Permission.FARE_READ)
   @ApiOperation({ summary: 'List coupons' })

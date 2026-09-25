@@ -15,7 +15,15 @@ import { describe, expect, it } from 'vitest';
  * This is how the "one forgotten decorator = a duplicate charge" class of bug is
  * made impossible to merge.
  */
-const GUARDED_MODULES = ['booking', 'payment', 'gds', 'agents', 'connections', 'refunds'];
+const GUARDED_MODULES = [
+  'booking',
+  'payment',
+  'gds',
+  'agents',
+  'connections',
+  'refunds',
+  'promotions',
+];
 const GUARDED_CONTROLLERS = GUARDED_MODULES.flatMap((m) => {
   const dir = join('apps/api/src/modules', m, 'presentation');
   try {
@@ -40,6 +48,8 @@ const GUARDED_CONTROLLERS = GUARDED_MODULES.flatMap((m) => {
 //    status, webhook registration/test, partner API key issue.
 //  - release-hold: held → expired guarded by the status, so a replay finds
 //    nothing to release; no money moves and seats only ever become free.
+//  - promotion pause/resume: status-guarded switches (a replay is a 422), no
+//    money moves; buying a promotion charges and IS guarded.
 // The genuine double-charge/double-book surfaces — hold, extend-hold, confirm,
 // cancel, intent, receipts — are NOT exempt and must carry @Idempotent().
 const EXEMPT = new Set([
@@ -62,6 +72,9 @@ const EXEMPT = new Set([
   'status',
   'setStatus',
   'issueKey',
+  'pause',
+  'resume',
+  'setRate',
 ]);
 
 /** The handler name: the first line after the route decorator that is a method signature. */

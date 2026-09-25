@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { DatabaseService } from '@database';
+import { DatabaseService, registerConstraintMessages } from '@database';
 import { newId, requireTenantId, type BranchId } from '@kernel';
 
 import type { WorkingHours } from '../../domain/working-hours';
@@ -15,6 +15,10 @@ export interface Branch {
   workingHours: WorkingHours;
   createdAt: Date;
 }
+
+registerConstraintMessages({
+  branches_tenant_id_name_key: 'A branch with this name already exists',
+});
 
 @Injectable()
 export class BranchRepository {
@@ -43,6 +47,27 @@ export class BranchRepository {
       { name: 'branch.create', primary: true },
     );
     return id;
+  }
+
+  /** Another branch of this operator already using the name, ignoring case and spaces. */
+  async nameTaken(name: string, exceptId?: BranchId): Promise<boolean> {
+    const row = await this.db.queryOne(
+      `SELECT 1 FROM branches
+        WHERE tenant_id = $1 AND lower(btrim(name)) = lower(btrim($2)) AND ($3::uuid IS NULL OR id <> $3)`,
+      [requireTenantId(), name, exceptId ?? null],
+      { name: 'branch.nameTaken', primary: true },
+    );
+    return !!row;
+  }
+
+  /** A manager must be staff of this operator (a foreign key alone accepts anyone's user). */
+  async isStaff(userId: string): Promise<boolean> {
+    const row = await this.db.queryOne(
+      `SELECT 1 FROM users WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+      [requireTenantId(), userId],
+      { name: 'branch.isStaff', primary: true },
+    );
+    return !!row;
   }
 
   /** Branches counting towards the plan quota: the active ones. */

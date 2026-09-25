@@ -23,6 +23,8 @@ export interface TestApp {
   post(path: string, body: unknown, opts?: CallOptions): Promise<HttpResult>;
   put(path: string, body: unknown, opts?: CallOptions): Promise<HttpResult>;
   get(path: string, opts?: CallOptions): Promise<HttpResult>;
+  del(path: string, opts?: CallOptions): Promise<HttpResult>;
+  patch(path: string, body: unknown, opts?: CallOptions): Promise<HttpResult>;
   close(): Promise<void>;
   fixtures: E2eFixtures;
   /** The Nest app, for tests that drive a service directly (e.g. a scheduled job). */
@@ -76,7 +78,7 @@ export async function bootstrapTestApp(): Promise<TestApp> {
   };
 
   const call = async (
-    method: 'GET' | 'POST' | 'PUT',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     path: string,
     body?: unknown,
     opts: CallOptions = {},
@@ -100,6 +102,8 @@ export async function bootstrapTestApp(): Promise<TestApp> {
     post: (p, b, o) => call('POST', p, b, o),
     put: (p, b, o) => call('PUT', p, b, o),
     get: (p, o) => call('GET', p, undefined, o),
+    del: (p, o) => call('DELETE', p, undefined, o),
+    patch: (p, b, o) => call('PATCH', p, b, o),
     close: () => app.close(),
     fixtures,
     nest: app,

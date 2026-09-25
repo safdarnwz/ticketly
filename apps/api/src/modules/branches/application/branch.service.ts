@@ -27,6 +27,7 @@ export class BranchService {
       'branches',
     );
     if (input.workingHours) assertHours(input.workingHours);
+    await this.assertDetails(input);
     return this.branches.create(input);
   }
 
@@ -41,7 +42,23 @@ export class BranchService {
     },
   ): Promise<void> {
     if (input.workingHours) assertHours(input.workingHours);
+    if (!(await this.branches.find(id))) throw new NotFoundError('Branch', id);
+    await this.assertDetails(input, id);
     if (!(await this.branches.update(id, input))) throw new NotFoundError('Branch', id);
+  }
+
+  private async assertDetails(
+    input: { name?: string; managerUserId?: string },
+    exceptId?: BranchId,
+  ): Promise<void> {
+    if (input.name !== undefined && (await this.branches.nameTaken(input.name, exceptId))) {
+      throw new AppError(ErrorCode.COMMON_CONFLICT, 409, {
+        message: 'A branch with this name already exists',
+      });
+    }
+    if (input.managerUserId && !(await this.branches.isStaff(input.managerUserId))) {
+      throw new NotFoundError('Staff member', input.managerUserId);
+    }
   }
 
   async deactivate(id: BranchId): Promise<void> {

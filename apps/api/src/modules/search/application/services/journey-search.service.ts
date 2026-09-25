@@ -61,15 +61,23 @@ export class JourneySearchService {
     private readonly config: AppConfig,
   ) {}
 
+  /**
+   * The customer's filter and sort first, THEN the paid promotion slots on top
+   * — sorting after promoting used to push the promoted bus back into place,
+   * so an operator paid for a top slot that never showed.
+   */
   async trips(q: TripQuery): Promise<SearchResult[]> {
-    const results = await this.search.search({
-      originCityId: q.originCityId,
-      destCityId: q.destCityId,
-      journeyDate: q.journeyDate,
-      seatType: q.seatType,
-      fromStopId: q.fromStopId,
-      toStopId: q.toStopId,
-    });
+    const results = await this.search.search(
+      {
+        originCityId: q.originCityId,
+        destCityId: q.destCityId,
+        journeyDate: q.journeyDate,
+        seatType: q.seatType,
+        fromStopId: q.fromStopId,
+        toStopId: q.toStopId,
+      },
+      { promote: false },
+    );
     // The filter engine matches amenity CODES; results carry full Amenity
     // objects. Filter a code-only projection, then map back by tripId so the
     // caller still gets the full objects.
@@ -82,7 +90,7 @@ export class JourneySearchService {
     }));
     const filtered = filterAndSort(filterable, q.filter ?? {}, q.sort ?? 'departure', q.sortDir);
     const byTripId = new Map(results.map((r) => [r.tripId, r]));
-    return filtered.map((f) => byTripId.get(f.tripId)!);
+    return this.search.promote(filtered.map((f) => byTripId.get(f.tripId)!));
   }
 
   async roundTrip(

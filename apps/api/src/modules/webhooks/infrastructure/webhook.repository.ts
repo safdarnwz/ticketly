@@ -2,10 +2,18 @@ import { randomBytes } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
 
-import { DatabaseService, UnitOfWork } from '@database';
-import { newId, requireTenantId } from '@kernel';
+import { DatabaseService, registerConstraintMessages, UnitOfWork } from '@database';
+import { AppError, ErrorCode, newId, NotFoundError, requireTenantId } from '@kernel';
 
 import { nextRetryMinutes } from '../domain/webhook-event';
+
+/** Enough for an ERP and a few directly-contracted OTAs; more is a mistake or abuse. */
+const MAX_TENANT_WEBHOOKS = 10;
+
+registerConstraintMessages({
+  partner_webhooks_one_per_url:
+    'This URL is already registered — revoke it first to get a new secret',
+});
 
 export interface WebhookEndpoint {
   id: string;
@@ -71,12 +79,28 @@ export class WebhookRepository {
     eventTypes: string[];
     createdBy: string | null;
   }): Promise<{ id: string; secret: string }> {
+    const tenantId = requireTenantId();
+    const existing = await this.db.query<{ url: string }>(
+      `SELECT url FROM partner_webhooks WHERE tenant_id = $1 AND revoked_at IS NULL`,
+      [tenantId],
+      { name: 'webhook.tenantEndpoints', primary: true },
+    );
+    if (existing.some((e) => e.url === input.url)) {
+      throw new AppError(ErrorCode.COMMON_CONFLICT, 409, {
+        message: 'This URL is already registered — revoke it first to get a new secret',
+      });
+    }
+    if (existing.length >= MAX_TENANT_WEBHOOKS) {
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+        message: `At most ${MAX_TENANT_WEBHOOKS} webhooks — revoke one you no longer use`,
+      });
+    }
     const id = newId();
     const secret = newSecret();
     await this.db.execute_(
       `INSERT INTO partner_webhooks (id, tenant_id, name, url, secret, event_types, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [id, requireTenantId(), input.name, input.url, secret, input.eventTypes, input.createdBy],
+      [id, tenantId, input.name, input.url, secret, input.eventTypes, input.createdBy],
       { name: 'webhook.registerForTenant', primary: true },
     );
     return { id, secret };
@@ -100,11 +124,13 @@ export class WebhookRepository {
   }
 
   async revokeForTenant(id: string): Promise<void> {
-    await this.db.execute_(
-      `UPDATE partner_webhooks SET revoked_at = now(), is_active = false WHERE id = $1 AND tenant_id = $2`,
+    const affected = await this.db.execute_(
+      `UPDATE partner_webhooks SET revoked_at = now(), is_active = false
+        WHERE id = $1 AND tenant_id = $2 AND revoked_at IS NULL`,
       [id, requireTenantId()],
       { name: 'webhook.revokeForTenant', primary: true },
     );
+    if (affected === 0) throw new NotFoundError('Webhook', id);
   }
 
   async deliveriesForTenant(webhookId: string, limit = 20): Promise<WebhookDelivery[]> {

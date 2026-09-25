@@ -34,10 +34,19 @@ function result(tripId: string, departsAt: string, arrivesAt: string, price = 50
 }
 
 /** Fake core search keyed by "origin>dest@date". */
-function service(byKey: Record<string, SearchResult[]>, hubs = [{ cityId: H, name: 'Hub' }]) {
+function service(
+  byKey: Record<string, SearchResult[]>,
+  hubs = [{ cityId: H, name: 'Hub' }],
+  /** Trips whose paid promotion puts them on top (the real rule lives in SearchService.promote). */
+  promoted = new Set<string>(),
+) {
   const search = {
     search: async (i: { originCityId: string; destCityId: string; journeyDate: string }) =>
       byKey[`${i.originCityId}>${i.destCityId}@${i.journeyDate}`] ?? [],
+    promote: async (rows: SearchResult[]) => [
+      ...rows.filter((r) => promoted.has(r.tripId)).map((r) => ({ ...r, isPromoted: true })),
+      ...rows.filter((r) => !promoted.has(r.tripId)),
+    ],
   };
   const hubRepo = { hubsBetween: async () => hubs };
   return new JourneySearchService(
@@ -114,6 +123,15 @@ describe('JourneySearchService.trips', () => {
     });
     expect(out.map((r) => r.tripId)).toEqual(['cheap', 'dear']);
     expect(out[0].amenities[0]).toMatchObject({ code: 'wifi', name: 'WiFi' });
+  });
+
+  it("promotes after the customer's sort, so a paid top slot is not sorted away", async () => {
+    const cheap = result('cheap', '2026-10-01T08:00:00Z', '2026-10-01T12:00:00Z', 30000);
+    const dear = result('dear', '2026-10-01T06:00:00Z', '2026-10-01T10:00:00Z', 90000);
+    const svc = service({ [`${A}>${B}@${D1}`]: [cheap, dear] }, undefined, new Set(['dear']));
+    const out = await svc.trips({ originCityId: A, destCityId: B, journeyDate: D1, sort: 'price' });
+    expect(out.map((r) => r.tripId)).toEqual(['dear', 'cheap']);
+    expect(out[0].isPromoted).toBe(true);
   });
 });
 

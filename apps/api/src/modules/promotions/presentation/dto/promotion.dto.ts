@@ -14,3 +14,10 @@ export const PurchasePromotionSchema = z.object({
   autoRenew: z.boolean().default(false),
 });
 export type PurchasePromotionDto = z.infer<typeof PurchasePromotionSchema>;
+
+export const PromotionQuoteSchema = z.object({
+  routeCount: z.coerce.number().int().min(1).max(50),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'startDate must be YYYY-MM-DD'),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'endDate must be YYYY-MM-DD'),
+});
+export type PromotionQuoteDto = z.infer<typeof PromotionQuoteSchema>;

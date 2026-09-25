@@ -67,6 +67,62 @@ export class PromotionService {
    * platform charges, so there is deliberately nothing new for the
    * operator to reconcile against a different bill.
    */
+  /**
+   * The exact price of promoting `routeCount` routes over a date range — the
+   * same computation a purchase charges, so the screen never guesses.
+   */
+  async quote(input: { routeCount: number; startDate: string; endDate: string }): Promise<{
+    days: number;
+    perRouteMinor: number;
+    totalMinor: number;
+    currency: string;
+    breakdown: { months: number; weeks: number; days: number };
+  }> {
+    let days: number;
+    try {
+      ({ days } = validateDateRange(input.startDate, input.endDate, todayIn()));
+    } catch (err) {
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: (err as Error).message });
+    }
+    const isMultiRoute = input.routeCount > 1;
+    const [dailyRate, weeklyRate, monthlyRate] = await Promise.all([
+      this.promotions.rateFor('daily', isMultiRoute),
+      this.promotions.rateFor('weekly', isMultiRoute),
+      this.promotions.rateFor('monthly', isMultiRoute),
+    ]);
+    // All three buckets are needed together to price an arbitrary day-count.
+    if (!dailyRate || !weeklyRate || !monthlyRate) {
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, {
+        message: 'Pricing is not fully configured for this plan yet — contact the platform',
+      });
+    }
+    const { totalMinor: perRouteMinor, breakdown } = computeBucketPrice(days, {
+      dailyRateMinor: dailyRate.priceMinor,
+      weeklyRateMinor: weeklyRate.priceMinor,
+      monthlyRateMinor: monthlyRate.priceMinor,
+    });
+    return {
+      days,
+      perRouteMinor,
+      totalMinor: perRouteMinor * input.routeCount,
+      currency: dailyRate.currency,
+      breakdown,
+    };
+  }
+
+  /**
+   * Purchases promotion for one or more routes over an EXPLICIT calendar
+   * date-range the operator picked (today or later). Priced by `quote` —
+   * the exact day-count split greedily into monthly/weekly/daily buckets;
+   * 2+ routes in one purchase get the multi-route rate. All routes share a
+   * groupId and are billed as ONE platform_charges entry, which rides the
+   * operator's regular settlement — there is no separate bill.
+   *
+   * Only this operator's published routes can be promoted (a draft route is
+   * not in search, so its promotion would be paid for and never seen). Two
+   * requests for the same route are serialised, so a double click cannot
+   * pass the overlap check twice and charge twice.
+   */
   async purchase(input: {
     routeIds: RouteId[];
     startDate: string;
@@ -80,66 +136,43 @@ export class PromotionService {
     days: number;
   }> {
     const tenantId = requireTenantId();
-    if (input.routeIds.length === 0)
+    const uniqueRouteIds = [...new Set(input.routeIds)];
+    if (uniqueRouteIds.length === 0)
       throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
         message: 'Select at least one route to promote',
       });
-    const uniqueRouteIds = [...new Set(input.routeIds)];
-    const isMultiRoute = uniqueRouteIds.length > 1;
 
-    const today = todayIn();
-    let days: number;
-    try {
-      ({ days } = validateDateRange(input.startDate, input.endDate, today));
-    } catch (err) {
-      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: (err as Error).message });
-    }
-    const window = dateRangeToWindow(input.startDate, input.endDate);
-
-    // Every route must actually belong to THIS operator — promoting a
-    // route you don't own isn't a pricing edge case, it's a straightforward
-    // authorization check that has to happen before anything else here.
+    const names = new Map<string, string>();
     for (const routeId of uniqueRouteIds) {
-      const owned = await this.routes.findById(routeId);
-      if (!owned)
-        throw new AppError(ErrorCode.COMMON_FORBIDDEN, 403, {
-          message: `Route ${routeId} does not belong to your fleet`,
+      const route = await this.routes.findById(routeId);
+      if (!route)
+        throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, {
+          message: 'One of these routes is not in your fleet',
         });
+      if (route.status !== 'published')
+        throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+          message: `${route.name} is not published yet — publish it before promoting it`,
+        });
+      names.set(routeId, route.name);
     }
 
-    // All three buckets needed together for the decomposition — a rate
-    // card missing any one of them can't price an arbitrary day-count.
-    const [dailyRate, weeklyRate, monthlyRate] = await Promise.all([
-      this.promotions.rateFor('daily', isMultiRoute),
-      this.promotions.rateFor('weekly', isMultiRoute),
-      this.promotions.rateFor('monthly', isMultiRoute),
-    ]);
-    if (!dailyRate || !weeklyRate || !monthlyRate) {
-      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, {
-        message: 'Pricing is not fully configured for this plan yet — contact the platform',
-      });
-    }
-    const currency = dailyRate.currency;
-    const { totalMinor: perRouteMinor } = computeBucketPrice(days, {
-      dailyRateMinor: dailyRate.priceMinor,
-      weeklyRateMinor: weeklyRate.priceMinor,
-      monthlyRateMinor: monthlyRate.priceMinor,
+    const price = await this.quote({
+      routeCount: uniqueRouteIds.length,
+      startDate: input.startDate,
+      endDate: input.endDate,
     });
-
+    const { days, currency, perRouteMinor, totalMinor } = price;
+    const window = dateRangeToWindow(input.startDate, input.endDate);
     const groupId = newId();
 
     return this.uow.run({ name: 'promotion.purchase', tenantId }, async () => {
-      // A route already promoted during any part of this SAME window
-      // blocks the purchase — not a blanket "any active promotion ever"
-      // check, since date-ranges are now explicit and non-overlapping
-      // future promotions for the same route are perfectly legitimate
-      // (e.g. promoting a route for this week AND separately for a
-      // festival week two months from now). Overlap, not mere existence,
-      // is what actually double-sells the same search-result slot.
+      await this.promotions.lockRoutes(uniqueRouteIds);
+      // Overlap — not mere existence — is what double-sells a search slot:
+      // separate future windows for the same route are fine.
       for (const routeId of uniqueRouteIds) {
         if (await this.promotions.hasOverlap(routeId, window.startsAt, window.endsAt)) {
           throw new AppError(ErrorCode.COMMON_CONFLICT, 409, {
-            message: `Route ${routeId} already has a promotion overlapping these dates`,
+            message: `${names.get(routeId)} is already promoted on some of these dates`,
           });
         }
       }
@@ -158,12 +191,9 @@ export class PromotionService {
         promotionIds.push(id);
       }
 
-      const totalMinor = perRouteMinor * uniqueRouteIds.length;
-      // Billed via the existing platform_charges mechanism — same "rolls
-      // into the next settlement that can cover it" machinery per-bus-fees
-      // already use, rather than building a parallel billing pipeline for
-      // what is, from the settlement engine's point of view, just another
-      // kind of platform charge against the operator.
+      // Billed via platform_charges — deducted from a FUTURE settlement, not
+      // paid upfront, so the promotions go active straight away (a future
+      // start simply is not shown in search yet).
       const platformChargeId = await this.charges.add({
         tenantId,
         kind: 'route_promotion',
@@ -172,15 +202,6 @@ export class PromotionService {
         description: `Route promotion — ${days} day(s), ${input.startDate} to ${input.endDate}, ${uniqueRouteIds.length} route${uniqueRouteIds.length > 1 ? 's' : ''}`,
       });
       if (!platformChargeId) throw new Error('Promotion charge was not recorded');
-
-      // Activated immediately — platform_charges are settled against a
-      // FUTURE payout, not paid upfront by card, so there's no separate
-      // "waiting for payment to clear" state to sit in here (unlike a
-      // customer's booking payment). The charge itself is what eventually
-      // gets deducted from the operator's own settlement. A FUTURE-dated
-      // startsAt simply means the row is active but not yet SHOWING in
-      // search (see SearchService.activePromotionsForRoutes' own
-      // starts_at <= now check) — no separate "scheduled" status needed.
       for (const id of promotionIds) await this.promotions.activate(id, platformChargeId, 0);
 
       return { groupId, promotionIds, totalMinor, currency, days };
@@ -218,14 +239,14 @@ export class PromotionService {
       const promo = await this.promotions.findForUpdate(id);
       if (!promo)
         throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Promotion not found' });
-      if (promo.status !== 'active' && promo.status !== 'pending_payment') {
+      if (!['active', 'paused', 'pending_payment'].includes(promo.status)) {
         throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
           message: 'This promotion is already cancelled or has ended',
         });
       }
 
       let adjustedMinor = 0;
-      if (promo.status === 'active' && promo.platformChargeId) {
+      if ((promo.status === 'active' || promo.status === 'paused') && promo.platformChargeId) {
         // Whole days, cut at midnight IST; the cancellation day is charged
         // (see earlyCancelCredit).
         const nextMidnight = new Date(
@@ -234,7 +255,12 @@ export class PromotionService {
         const { unusedDays: unusedFullDays, creditMinor: unusedMinor } = earlyCancelCredit({
           priceMinor: promo.priceMinor,
           startsAt: promo.startsAt,
-          endsAt: promo.endsAt,
+          // A paused promotion still owes the days it was paused for (resume
+          // would add them back to the end), so count them as unused too.
+          endsAt:
+            promo.status === 'paused' && promo.pausedAt
+              ? new Date(promo.endsAt.getTime() + (Date.now() - promo.pausedAt.getTime()))
+              : promo.endsAt,
           nextMidnight,
         });
         const usedMinor = promo.priceMinor - unusedMinor;

@@ -1,3 +1,6 @@
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
+
 import { Injectable } from '@nestjs/common';
 
 import { newId } from '@kernel';
@@ -8,6 +11,7 @@ import {
   WEBHOOK_SIGNATURE_HEADER,
   WEBHOOK_TEST_EVENT,
 } from '../domain/webhook-event';
+import { isPrivateAddress, webhookUrlProblem } from '../domain/webhook-target';
 import { WebhookRepository, type WebhookTarget } from '../infrastructure/webhook.repository';
 import { WebhookAudienceRegistry } from './webhook-audience.registry';
 
@@ -119,8 +123,14 @@ export class WebhookDeliveryService {
   private async post(target: WebhookTarget, payload: unknown): Promise<WebhookAttemptResult> {
     const body = JSON.stringify(payload);
     const started = Date.now();
+    const refused = await unsafeTarget(target.url);
+    if (refused) {
+      return { ok: false, responseStatus: null, error: refused, latencyMs: 0 };
+    }
     try {
       const res = await fetch(target.url, {
+        // A redirect could lead anywhere, including inside our own network.
+        redirect: 'manual',
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -132,7 +142,11 @@ export class WebhookDeliveryService {
       return {
         ok: res.ok,
         responseStatus: res.status,
-        error: res.ok ? null : `HTTP ${res.status}`,
+        error: res.ok
+          ? null
+          : res.status >= 300 && res.status < 400
+            ? `HTTP ${res.status} — redirects are not followed; give the final URL`
+            : `HTTP ${res.status}`,
         latencyMs: Date.now() - started,
       };
     } catch (err) {
@@ -143,5 +157,25 @@ export class WebhookDeliveryService {
         latencyMs: Date.now() - started,
       };
     }
+  }
+}
+
+/**
+ * Re-checked on every send: the URL passed when it was saved, but its name
+ * may resolve somewhere private now (DNS rebinding). Null when it is safe.
+ */
+async function unsafeTarget(raw: string): Promise<string | null> {
+  const problem = webhookUrlProblem(raw);
+  if (problem) return problem;
+  const host = new URL(raw).hostname.replace(/^\[|\]$/g, '');
+  if (isIP(host) !== 0) return null;
+  try {
+    const addresses = await lookup(host, { all: true });
+    if (addresses.length === 0) return `Cannot resolve ${host}`;
+    return addresses.some((a) => isPrivateAddress(a.address))
+      ? `${host} resolves to a private address — not sent`
+      : null;
+  } catch {
+    return `Cannot resolve ${host}`;
   }
 }

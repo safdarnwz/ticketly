@@ -57,6 +57,7 @@ export class WebhookController {
   @RequirePermission(Permission.TENANT_MANAGE)
   @ApiOperation({ summary: 'Recent delivery attempts for an endpoint' })
   async deliveries(@UuidParam('id') id: string) {
+    if (!(await this.webhooks.targetForTenant(id))) throw new NotFoundError('Webhook', id);
     return { items: await this.webhooks.deliveriesForTenant(id) };
   }
 

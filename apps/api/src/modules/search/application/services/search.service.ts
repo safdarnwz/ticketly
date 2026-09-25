@@ -55,7 +55,7 @@ export interface SearchResult {
   /** Average stars of the route's published reviews (1 dp); null until the first review. */
   rating: number | null;
   ratingCount: number;
-  /** True when this trip's route currently has an active, paid promotion — the frontend renders the "Prio" badge on these. Never set by anything upstream of applyPromotionBubbling. */
+  /** True when this trip's route currently has an active, paid promotion — the frontend renders the "Prio" badge on these. Never set by anything upstream of promote(). */
   isPromoted?: boolean;
 }
 
@@ -145,14 +145,18 @@ export class SearchService {
    * all three callers (public storefront, tenant console, GDS)
    * without three diverging code paths.
    */
-  async search(input: {
-    originCityId: CityId;
-    destCityId: CityId;
-    journeyDate: LocalDate;
-    seatType?: string;
-    fromStopId?: StopId;
-    toStopId?: StopId;
-  }): Promise<SearchResult[]> {
+  async search(
+    input: {
+      originCityId: CityId;
+      destCityId: CityId;
+      journeyDate: LocalDate;
+      seatType?: string;
+      fromStopId?: StopId;
+      toStopId?: StopId;
+    },
+    /** `promote: false` for a caller that re-sorts and then calls `promote` itself. */
+    opts: { promote?: boolean } = {},
+  ): Promise<SearchResult[]> {
     const boundTenantId = getTenantId();
     // Every input that changes the result must be in the key — the boarding/
     // dropping stops change the segment, hence availability and price.
@@ -175,7 +179,7 @@ export class SearchService {
     );
 
     this.metrics.searchRequests.inc({ cached: 'served' });
-    return this.applyPromotionBubbling(results);
+    return opts.promote === false ? results : this.promote(results);
   }
 
   /**
@@ -186,7 +190,7 @@ export class SearchService {
    * longer or shorter than an hour. Recomputing this cheap reorder on
    * every read (cached or fresh) is what keeps the rotation honest.
    */
-  private async applyPromotionBubbling(results: SearchResult[]): Promise<SearchResult[]> {
+  async promote(results: SearchResult[]): Promise<SearchResult[]> {
     const routeIds = [...new Set(results.map((r) => r.routeId))];
     if (routeIds.length === 0) return results;
     const active = await this.promotions.activePromotionsForRoutes(routeIds, new Date());

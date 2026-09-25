@@ -24,25 +24,52 @@ export const AddFareRuleSchema = z.object({
   fromStopId: uuid.optional(),
   toStopId: uuid.optional(),
   seatType: z.enum(['seater', 'sleeper', 'semi_sleeper']).default('seater'),
-  baseFareMinor: z.number().int().min(0),
-  perKmMinor: z.number().int().min(0).optional(),
+  /** A fare is at least ₹1 — zero would sell free seats. At most ₹1,00,000. */
+  baseFareMinor: z.number().int().min(100, 'A fare is at least ₹1').max(10_000_000),
+  perKmMinor: z.number().int().min(0).max(100_000).optional(),
 });
 export type AddFareRuleDto = z.infer<typeof AddFareRuleSchema>;
 
-const YieldLadderSchema = z.object({
-  occupancy: z.array(
-    z.object({ atPct: z.number().min(0).max(100), mult: z.number().min(0).max(10) }),
-  ),
-  advancePurchase: z.array(
-    z.object({ withinDays: z.number().int().min(0), mult: z.number().min(0).max(10) }),
-  ),
-  maxMultiplier: z.number().min(1).max(10),
-  minMultiplier: z.number().min(0).max(1),
-});
+/**
+ * Multipliers stay between 0.5× and 3× — a 0× step used to price seats at ₹0.
+ * Each threshold appears once, so which step applies is never ambiguous.
+ */
+const multiplier = z.number().min(0.5).max(3);
+const YieldLadderSchema = z
+  .object({
+    occupancy: z
+      .array(z.object({ atPct: z.number().int().min(1).max(100), mult: multiplier }))
+      .max(10),
+    advancePurchase: z
+      .array(z.object({ withinDays: z.number().int().min(0).max(365), mult: multiplier }))
+      .max(10),
+    maxMultiplier: z.number().min(1).max(3),
+    minMultiplier: z.number().min(0.5).max(1),
+  })
+  .superRefine((l, ctx) => {
+    const dup = (xs: number[]) => xs.findIndex((x, i) => xs.indexOf(x) !== i);
+    const o = dup(l.occupancy.map((s) => s.atPct));
+    if (o >= 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['occupancy', o, 'atPct'],
+        message: 'Each occupancy level once',
+      });
+    }
+    const a = dup(l.advancePurchase.map((s) => s.withinDays));
+    if (a >= 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['advancePurchase', a, 'withinDays'],
+        message: 'Each day count once',
+      });
+    }
+  });
 
 export const CreatePricingPolicySchema = z.object({
+  /** Omit for the operator-wide policy; a route's own policy wins over it. */
   routeId: uuid.optional(),
-  name: z.string().min(1).max(120),
+  name: z.string().trim().min(1).max(120),
   ladder: YieldLadderSchema,
   // NOTE: gstRatePct deliberately removed — GST is a government-mandated
   // rate set ONLY by the platform (super admin), never per-operator. See
@@ -50,24 +77,59 @@ export const CreatePricingPolicySchema = z.object({
 });
 export type CreatePricingPolicyDto = z.infer<typeof CreatePricingPolicySchema>;
 
-export const CreateCouponSchema = z.object({
-  /** Journey dates (YYYY-MM-DD) on which the coupon cannot be used, e.g. festivals. */
-  blackoutDates: z
-    .array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/))
-    .max(366)
-    .optional(),
-  code: z.string().min(2).max(40),
-  kind: z.enum(['percent', 'flat']),
-  value: z.number().int().min(0),
-  maxDiscountMinor: z.number().int().min(0).optional(),
-  minFareMinor: z.number().int().min(0).optional(),
-  validFrom: z.string().datetime().optional(),
-  validTo: z.string().datetime().optional(),
-  maxRedemptions: z.number().int().min(1).optional(),
-  perUserLimit: z.number().int().min(1).optional(),
-  firstBookingOnly: z.boolean().optional(),
-  description: z.string().max(300).optional(),
-});
+export const CreateCouponSchema = z
+  .object({
+    /** Journey dates (YYYY-MM-DD) on which the coupon cannot be used, e.g. festivals. */
+    blackoutDates: z
+      .array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/))
+      .max(366)
+      .optional(),
+    /** Stored upper-case; letters, digits, '-' and '_' only — what a customer can type. */
+    code: z
+      .string()
+      .trim()
+      .transform((c) => c.toUpperCase())
+      .pipe(
+        z
+          .string()
+          .regex(
+            /^[A-Z0-9][A-Z0-9_-]{1,39}$/,
+            'Use 2–40 letters or digits (dash and underscore allowed)',
+          ),
+      ),
+    kind: z.enum(['percent', 'flat']),
+    /** Percent (1–100) or, for a flat coupon, paise (at least ₹1). */
+    value: z.number().int().min(1).max(10_000_000),
+    maxDiscountMinor: z.number().int().min(100).max(10_000_000).optional(),
+    minFareMinor: z.number().int().min(0).max(10_000_000).optional(),
+    validFrom: z.string().datetime({ offset: true }).optional(),
+    validTo: z.string().datetime({ offset: true }).optional(),
+    maxRedemptions: z.number().int().min(1).max(10_000_000).optional(),
+    perUserLimit: z.number().int().min(1).max(100).optional(),
+    firstBookingOnly: z.boolean().optional(),
+    description: z.string().max(300).optional(),
+  })
+  .superRefine((c, ctx) => {
+    if (c.kind === 'percent' && c.value > 100) {
+      ctx.addIssue({ code: 'custom', path: ['value'], message: 'A percentage is at most 100' });
+    }
+    if (c.kind === 'flat' && c.value < 100) {
+      ctx.addIssue({ code: 'custom', path: ['value'], message: 'A flat discount is at least ₹1' });
+    }
+    if (c.kind === 'flat' && c.maxDiscountMinor !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['maxDiscountMinor'],
+        message: 'A cap only applies to a percentage coupon',
+      });
+    }
+    if (c.validFrom && c.validTo && Date.parse(c.validTo) <= Date.parse(c.validFrom)) {
+      ctx.addIssue({ code: 'custom', path: ['validTo'], message: 'Must be after the start' });
+    }
+    if (c.validTo && Date.parse(c.validTo) <= Date.now()) {
+      ctx.addIssue({ code: 'custom', path: ['validTo'], message: 'Must be in the future' });
+    }
+  });
 export type CreateCouponDto = z.infer<typeof CreateCouponSchema>;
 
 export const QuoteSchema = z
@@ -91,7 +153,7 @@ export type QuoteDto = z.infer<typeof QuoteSchema>;
 /** One seat number's fare on a plan (overrides the seat-type rule for that seat). */
 export const SeatFareOverrideSchema = z.object({
   seatNumber: z.string().trim().min(1).max(10),
-  fareMinor: z.number().int().positive(),
+  fareMinor: z.number().int().min(100, 'A fare is at least ₹1').max(10_000_000),
 });
 export type SeatFareOverrideDto = z.infer<typeof SeatFareOverrideSchema>;
 

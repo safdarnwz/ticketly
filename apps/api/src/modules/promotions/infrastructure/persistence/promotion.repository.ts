@@ -29,6 +29,10 @@ export interface RoutePromotion {
   version: number;
   /** The platform charge that bills it, once active. */
   platformChargeId: string | null;
+  /** Set while paused; resume() extends ends_at by the time since. */
+  pausedAt: Date | null;
+  /** Listing only. */
+  routeName?: string;
 }
 
 @Injectable()
@@ -124,7 +128,7 @@ export class PromotionRepository {
       { name: 'promotion.activeForRoutes', bypassRls: true },
       async (scope) =>
         scope.client.query<Row>(
-          `SELECT id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, status, auto_renew, created_at, version, platform_charge_id
+          `SELECT id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, status, auto_renew, created_at, version, platform_charge_id, paused_at
            FROM route_promotions
           WHERE route_id = ANY($1::uuid[]) AND status = 'active' AND starts_at <= $2 AND ends_at > $2`,
           [routeIds, now],
@@ -165,10 +169,25 @@ export class PromotionRepository {
   }
 
   /** Is the route already promoted (active or awaiting payment) during any part of the window? */
+  /**
+   * Serialise purchases for these routes until the transaction ends, so two
+   * requests (a double click, a retry) cannot both pass the overlap check and
+   * both be charged. Sorted, so two multi-route purchases never deadlock.
+   */
+  async lockRoutes(routeIds: readonly string[]): Promise<void> {
+    for (const id of [...routeIds].sort()) {
+      await this.db.execute_(
+        `SELECT pg_advisory_xact_lock(hashtextextended('route_promotion:' || $1, 0))`,
+        [id],
+        { name: 'promotion.lockRoute', primary: true },
+      );
+    }
+  }
+
   async hasOverlap(routeId: RouteId, startsAt: Date, endsAt: Date): Promise<boolean> {
     const row = await this.db.queryOne<{ id: string }>(
       `SELECT id FROM route_promotions
-        WHERE tenant_id = $1 AND route_id = $2 AND status IN ('pending_payment','active')
+        WHERE tenant_id = $1 AND route_id = $2 AND status IN ('pending_payment','active','paused')
           AND starts_at < $4 AND ends_at > $3
         LIMIT 1`,
       [requireTenantId(), routeId, startsAt, endsAt],
@@ -179,14 +198,17 @@ export class PromotionRepository {
 
   async listForTenant(status?: string): Promise<RoutePromotion[]> {
     const params: unknown[] = [requireTenantId()];
-    let where = 'tenant_id = $1';
+    let where = 'p.tenant_id = $1';
     if (status) {
       params.push(status);
-      where += ` AND status = $${params.length}`;
+      where += ` AND p.status = $${params.length}`;
     }
     const rows = await this.db.query<Row>(
-      `SELECT id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, status, auto_renew, created_at, version, platform_charge_id
-         FROM route_promotions WHERE ${where} ORDER BY created_at DESC`,
+      `SELECT p.id, p.tenant_id, p.route_id, p.group_id, p.billing_cycle, p.price_minor, p.currency, p.starts_at,
+              p.ends_at, p.status, p.auto_renew, p.created_at, p.version, p.platform_charge_id, p.paused_at,
+              r.name AS route_name
+         FROM route_promotions p JOIN routes r ON r.id = p.route_id
+        WHERE ${where} ORDER BY p.created_at DESC`,
       params,
       { name: 'promotion.listForTenant' },
     );
@@ -195,7 +217,7 @@ export class PromotionRepository {
 
   async findForUpdate(id: string): Promise<RoutePromotion | null> {
     const row = await this.db.queryOne<Row>(
-      `SELECT id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, status, auto_renew, created_at, version, platform_charge_id
+      `SELECT id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, status, auto_renew, created_at, version, platform_charge_id, paused_at
          FROM route_promotions WHERE tenant_id = $1 AND id = $2 FOR UPDATE`,
       [requireTenantId(), id],
       { name: 'promotion.findForUpdate', primary: true },
@@ -216,7 +238,7 @@ export class PromotionRepository {
   async cancel(id: string, expectedVersion: number): Promise<boolean> {
     const affected = await this.db.execute_(
       `UPDATE route_promotions SET status = 'cancelled', cancelled_at = now(), version = version + 1
-        WHERE tenant_id = $1 AND id = $2 AND version = $3 AND status IN ('pending_payment','active')`,
+        WHERE tenant_id = $1 AND id = $2 AND version = $3 AND status IN ('pending_payment','active','paused')`,
       [requireTenantId(), id, expectedVersion],
       { name: 'promotion.cancel', primary: true },
     );
@@ -255,7 +277,7 @@ export class PromotionRepository {
               paused_at = NULL,
               version = version + 1
         WHERE tenant_id = $1 AND id = $2 AND version = $3 AND status = 'paused'
-        RETURNING id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, status, auto_renew, created_at, version, platform_charge_id`,
+        RETURNING id, tenant_id, route_id, group_id, billing_cycle, price_minor, currency, starts_at, ends_at, status, auto_renew, created_at, version, platform_charge_id, paused_at`,
       [requireTenantId(), id, expectedVersion],
       { name: 'promotion.resume', primary: true },
     );
@@ -287,6 +309,8 @@ interface Row {
   created_at: Date;
   version: number;
   platform_charge_id: string | null;
+  paused_at: Date | null;
+  route_name?: string;
 }
 function map(r: Row): RoutePromotion {
   return {
@@ -304,5 +328,7 @@ function map(r: Row): RoutePromotion {
     createdAt: r.created_at,
     version: r.version,
     platformChargeId: r.platform_charge_id,
+    pausedAt: r.paused_at,
+    ...(r.route_name !== undefined ? { routeName: r.route_name } : {}),
   };
 }

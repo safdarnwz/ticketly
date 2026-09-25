@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3124 |
-| TODO | 924 |
-| DONE | 30 |
+| TODO | 910 |
+| DONE | 44 |
 | DUP | 9 |
 
 
@@ -97,8 +97,8 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 60 | Rollback feature flag globally | DONE | TODO | PUT /admin/tenants/:id/features/:feature, POST /admin/tenants/features/:feature/rollback |
 | 61 | Set global API rate limits | DONE | TODO | verified manually: existing module/API |
 | 62 | Set per-operator API rate limits | DONE | TODO | PUT /admin/tenants/:id/rate-limit (RateLimitGuard reads it, cached) |
-| 63 | Configure webhook endpoints for events | DONE | TODO | verified manually: existing module/API |
-| 64 | Test webhook delivery | DONE | TODO | verified: POST /webhooks/:id/test, POST /admin/gds/partners/:id/webhook/test |
+| 63 | Configure webhook endpoints for events | DONE | DONE | POST/GET/DELETE /webhooks, POST /webhooks/:id/test — public https URLs only (no localhost / private / metadata addresses, re-checked per send, no redirects), one registration per URL, 10 per operator, 404 across operators · UI: Distribution: register with event choice + URL checks, secret shown once, send test (status/latency), deliveries, revoke with confirm |
+| 64 | Test webhook delivery | DONE | DONE | POST/GET/DELETE /webhooks, POST /webhooks/:id/test — public https URLs only (no localhost / private / metadata addresses, re-checked per send, no redirects), one registration per URL, 10 per operator, 404 across operators · UI: Distribution: register with event choice + URL checks, secret shown once, send test (status/latency), deliveries, revoke with confirm |
 | 65 | Set white-label primary color for operator | DONE | TODO | verified manually: existing module/API |
 | 66 | Set white-label secondary color for operator | DONE | TODO | verified manually: existing module/API |
 | 67 | Set white-label favicon for operator | DONE | TODO | PUT /admin/tenants/:id/favicon; GET /operator/branding (public) |
@@ -158,14 +158,14 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 121 | Complete operator profile with full address | DONE | TODO | verified manually: existing module/API |
 | 122 | Upload company logo | DONE | TODO | verified manually: existing module/API |
 | 123 | Set primary and secondary contact | DONE | TODO | verified manually: existing module/API |
-| 124 | Add new branch office | DONE | TODO | verified manually: existing module/API |
+| 124 | Add new branch office | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
 | 125 | Enter branch name and code | DONE | TODO | verified manually: existing module/API |
-| 126 | Enter branch full address | DONE | TODO | verified manually: existing module/API |
-| 127 | Enter branch phone numbers | DONE | TODO | verified manually: existing module/API |
+| 126 | Enter branch full address | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
+| 127 | Enter branch phone numbers | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
 | 128 | Assign branch manager | DONE | TODO | verified manually: existing module/API |
-| 129 | Set branch working hours | DONE | TODO | branches.working_hours via POST/PATCH /branches |
-| 130 | Deactivate branch temporarily | DONE | TODO | verified manually: existing module/API |
-| 131 | Reactivate branch | DONE | TODO | verified manually: existing module/API |
+| 129 | Set branch working hours | DONE | DONE | branches.working_hours via POST/PATCH /branches · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
+| 130 | Deactivate branch temporarily | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
+| 131 | Reactivate branch | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
 | 132 | Add new bus with registration number | DONE | DONE | verified manually: existing module/API · UI: Fleet › Add vehicle (reg validated) + vehicle page |
 | 133 | Select bus type (Seater, Sleeper, Semi-Sleeper, Multi-Axle) | DONE | TODO | verified manually: existing module/API |
 | 134 | Enter total seat capacity | DONE | TODO | verified manually: existing module/API |
@@ -210,10 +210,10 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 173 | Set ladies quota percentage or seats | DONE | TODO | sales-rules categoryQuotas.female/senior (seats or pct, releaseHours), enforced on hold |
 | 174 | Set senior citizen quota | DONE | TODO | sales-rules categoryQuotas.female/senior (seats or pct, releaseHours), enforced on hold |
 | 175 | Enable dynamic pricing on selected routes | DONE | TODO | verified manually: existing module/API |
-| 176 | Create percentage based coupon | DONE | TODO | verified manually: existing module/API |
-| 177 | Create flat amount coupon | DONE | TODO | verified manually: existing module/API |
-| 178 | Set coupon validity dates | DONE | TODO | verified manually: existing module/API |
-| 179 | Set coupon usage limit | DONE | TODO | verified manually: existing module/API |
+| 176 | Create percentage based coupon | DONE | DONE | POST /pricing/coupons: percent 1–100, flat ≥ ₹1, end after start and in the future, code A-Z0-9-_; DB checks (0087); 404 on another operator's coupon · UI: Pricing › Coupons: percent 1–100 or flat ₹ (paise), cap, min fare, valid till, total and per-customer uses, first-booking; switch off/on; stats; applied at checkout |
+| 177 | Create flat amount coupon | DONE | DONE | POST /pricing/coupons: percent 1–100, flat ≥ ₹1, end after start and in the future, code A-Z0-9-_; DB checks (0087); 404 on another operator's coupon · UI: Pricing › Coupons: percent 1–100 or flat ₹ (paise), cap, min fare, valid till, total and per-customer uses, first-booking; switch off/on; stats; applied at checkout |
+| 178 | Set coupon validity dates | DONE | DONE | POST /pricing/coupons: percent 1–100, flat ≥ ₹1, end after start and in the future, code A-Z0-9-_; DB checks (0087); 404 on another operator's coupon · UI: Pricing › Coupons: percent 1–100 or flat ₹ (paise), cap, min fare, valid till, total and per-customer uses, first-booking; switch off/on; stats; applied at checkout |
+| 179 | Set coupon usage limit | DONE | DONE | POST /pricing/coupons: percent 1–100, flat ≥ ₹1, end after start and in the future, code A-Z0-9-_; DB checks (0087); 404 on another operator's coupon · UI: Pricing › Coupons: percent 1–100 or flat ₹ (paise), cap, min fare, valid till, total and per-customer uses, first-booking; switch off/on; stats; applied at checkout |
 | 180 | Configure privilege card program | CONFLICT | — | earlier product decision |
 | 181 | Configure loyalty points rules | CONFLICT | — | earlier product decision |
 | 182 | Create new agent account | DONE | TODO | verified manually: existing module/API |
@@ -357,8 +357,8 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 320 | View branch expense versus collection | GAP | — | verified manually: not built yet |
 | 321 | Approve or reject branch expense claims | GAP | — | verified manually: not built yet |
 | 322 | Transfer staff from one branch to another | DONE | TODO | verified manually: existing module/API |
-| 323 | Temporarily close a branch | DONE | TODO | verified manually: existing module/API |
-| 324 | Reopen a closed branch | DONE | TODO | verified manually: existing module/API |
+| 323 | Temporarily close a branch | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
+| 324 | Reopen a closed branch | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
 | 325 | View complete financial dashboard | DONE | TODO | verified manually: existing module/API |
 | 326 | View total outstanding receivables | GAP | — | verified manually: not built yet |
 | 327 | View total payables to OTAs | GAP | — | verified manually: not built yet |
