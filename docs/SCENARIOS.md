@@ -24,8 +24,9 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3127 |
-| TODO | 951 |
+| TODO | 949 |
 | DUP | 9 |
+| DONE | 2 |
 
 
 ## #1–#500
@@ -521,8 +522,8 @@ CONFLICT 20, DONE 355, GAP 111, INFRA 17, PROCESS 3
 | 485 | Select recharge amount | GAP | — | verified manually: not built yet |
 | 486 | Complete recharge payment | GAP | — | verified manually: not built yet |
 | 487 | View updated wallet balance | DONE | TODO | verified manually: existing module/API |
-| 488 | Search buses by origin and destination | DONE | TODO | verified manually: existing module/API |
-| 489 | Select journey date | DONE | TODO | verified manually: existing module/API |
+| 488 | Search buses by origin and destination | DONE | DONE | verified manually: existing module/API · UI: storefront home + /results (verified in browser) |
+| 489 | Select journey date | DONE | DONE | verified manually: existing module/API · UI: storefront home + /results (verified in browser) |
 | 490 | View list of available services | DONE | TODO | verified manually: existing module/API |
 | 491 | View departure and arrival timings | DONE | TODO | verified manually: existing module/API |
 | 492 | View fare for each service | DONE | TODO | verified manually: existing module/API |
