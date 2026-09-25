@@ -1,16 +1,30 @@
 import { get, post } from './client';
 
-export interface CustomerProfile {
-  id: string; fullName: string | null; email: string | null; phone: string | null;
-  blacklistedAt: string | null; blacklistReason: string | null; preferences: Record<string, unknown>;
-  totalBookings: number; totalSpentMinor: number; isFrequentTraveller: boolean;
+/** A customer of this operator — keyed by their account (booked signed in) or their mobile (guest). */
+export interface Customer {
+  key: string; customerId: string | null; name: string | null; phone: string | null; email: string | null;
+  bookings: number; trips: number; cancelled: number; spentMinor: number;
+  firstBookedAt: string; lastBookedAt: string; lastJourneyDate: string | null;
+  frequent: boolean; blocked: boolean;
 }
+export interface CustomerBooking {
+  id: string; pnr: string; status: string; seatCount: number; totalMinor: number; paidMinor: number;
+  journeyDate: string | null; routeName: string | null; channel: string; createdAt: string;
+}
+export interface CustomerDetail extends Customer {
+  block: { id: string; reason: string; blockedAt: string; blockedByName: string | null } | null;
+  history: CustomerBooking[];
+}
+export type CustomerFilter = 'all' | 'frequent' | 'blocked';
 
 export const crmApi = {
-  search: (q: string) => get<{ items: CustomerProfile[] }>(`/v1/customers/search?q=${encodeURIComponent(q)}`),
-  profile: (id: string) => get<CustomerProfile>(`/v1/customers/${id}`),
-  bookings: (id: string) => get<{ items: { id: string; pnr: string; status: string; totalMinor: number; createdAt: string }[] }>(`/v1/customers/${id}/bookings`),
-  blacklist: (id: string, reason: string) => post<{ ok: boolean }>(`/v1/customers/${id}/blacklist`, { reason }),
-  unblacklist: (id: string) => post<{ ok: boolean }>(`/v1/customers/${id}/unblacklist`, {}),
-  setPreferences: (id: string, preferences: Record<string, unknown>) => post<{ ok: boolean }>(`/v1/customers/${id}/preferences`, preferences),
+  list: (opts: { q?: string; filter: CustomerFilter; page: number }) => {
+    const q = new URLSearchParams({ filter: opts.filter, page: String(opts.page) });
+    if (opts.q) q.set('q', opts.q);
+    return get<{ items: Customer[]; page: number; hasMore: boolean }>(`/v1/customers?${q}`);
+  },
+  profile: (key: string) => get<CustomerDetail>(`/v1/customers/${encodeURIComponent(key)}`),
+  /** Stops new bookings with this operator, by account and mobile. */
+  block: (key: string, reason: string) => post<{ ok: boolean }>(`/v1/customers/${encodeURIComponent(key)}/block`, { reason }),
+  unblock: (key: string) => post<{ ok: boolean }>(`/v1/customers/${encodeURIComponent(key)}/unblock`, {}),
 };

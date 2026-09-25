@@ -1,118 +1,161 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Search, User, ShieldAlert, Star, Table as TableIcon } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Ban, Search, ShieldCheck, Users } from 'lucide-react';
 
-import { Button, Card, CardBody, Badge, Table, type Column, Modal, Input, PageLoader, EmptyState, useToast } from '@/components/ui';
+import { Badge, Button, Card, CardBody, EmptyState, ErrorState, Input, Modal, PageLoader, Table, statusTone, useToast, type Column } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
-import { crmApi, type CustomerProfile } from '@/lib/api/crm';
-import { formatMoney } from '@/lib/utils';
+import { crmApi, type Customer, type CustomerBooking, type CustomerFilter } from '@/lib/api/crm';
+import { cn, formatDateLabel, formatDateTime, formatMoney } from '@/lib/utils';
 
+const FILTERS: { key: CustomerFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'frequent', label: 'Frequent (5+ trips)' },
+  { key: 'blocked', label: 'Blocked' },
+];
+const dateOf = (d: string | null) => (d ? formatDateLabel(d, { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
+
+/**
+ * Everyone who booked with this operator — signed-in accounts and guests by
+ * mobile. Open one for their trips; block someone from booking with you
+ * (their existing bookings stay as they are).
+ */
 export function CustomersPage() {
-  const qc = useQueryClient();
-  const toast = useToast();
-  const [query, setQuery] = useState('');
-  const [searched, setSearched] = useState('');
-  const [viewing, setViewing] = useState<CustomerProfile | null>(null);
-  const [blacklisting, setBlacklisting] = useState(false);
-  const [reason, setReason] = useState('');
-  const [prefsText, setPrefsText] = useState('');
+  const [q, setQ] = useState('');
+  const [filter, setFilter] = useState<CustomerFilter>('all');
+  const [page, setPage] = useState(1);
+  const [open, setOpen] = useState<string | null>(null);
+  const query = q.trim();
 
-  const results = useQuery({ queryKey: ['customer-search', searched], queryFn: () => crmApi.search(searched), enabled: !!searched });
-  const bookings = useQuery({ queryKey: ['customer-bookings', viewing?.id], queryFn: () => crmApi.bookings(viewing!.id), enabled: !!viewing });
+  const list = useQuery({
+    queryKey: ['customers', query, filter, page],
+    queryFn: () => crmApi.list({ q: query || undefined, filter, page }),
+    placeholderData: keepPreviousData,
+  });
+  const rows = list.data?.items ?? [];
 
-  const blacklist = useMutation({
-    mutationFn: () => crmApi.blacklist(viewing!.id, reason),
-    onSuccess: () => { toast.success('Customer blacklisted — cannot make new bookings'); setBlacklisting(false); setReason(''); setViewing(null); void qc.invalidateQueries({ queryKey: ['customer-search'] }); },
-    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
-  });
-  const unblacklist = useMutation({
-    mutationFn: () => crmApi.unblacklist(viewing!.id),
-    onSuccess: () => { toast.success('Removed from blacklist'); setViewing(null); void qc.invalidateQueries({ queryKey: ['customer-search'] }); },
-    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
-  });
-  const savePrefs = useMutation({
-    mutationFn: () => crmApi.setPreferences(viewing!.id, JSON.parse(prefsText || '{}')),
-    onSuccess: () => { toast.success('Preferences saved'); },
-    onError: () => toast.error('Invalid JSON'),
-  });
-
-  const columns: Column<CustomerProfile>[] = [
-    { key: 'name', header: 'Name', render: (c) => <button className="font-medium text-text underline decoration-dotted" onClick={() => { setViewing(c); setPrefsText(JSON.stringify(c.preferences ?? {}, null, 2)); }}>{c.fullName ?? '—'}</button> },
-    { key: 'contact', header: 'Contact', render: (c) => <span className="text-text-muted">{c.phone ?? c.email ?? '—'}</span> },
-    { key: 'bookings', header: 'Bookings', render: (c) => <span className="flex items-center gap-1">{c.totalBookings}{c.isFrequentTraveller && <Star className="h-3.5 w-3.5 text-warning" />}</span> },
-    { key: 'spent', header: 'Total spent', render: (c) => formatMoney(c.totalSpentMinor, 'INR') },
-    { key: 'status', header: 'Status', render: (c) => c.blacklistedAt ? <Badge tone="danger">Blacklisted</Badge> : <Badge tone="success">Good standing</Badge> },
+  const columns: Column<Customer>[] = [
+    {
+      key: 'name', header: 'Customer', render: (c) => (
+        <div>
+          <div className="flex items-center gap-2 font-medium text-text">{c.name ?? 'Unnamed'}{c.frequent && <Badge tone="success">Frequent</Badge>}{c.blocked && <Badge tone="danger">Blocked</Badge>}</div>
+          <div className="text-xs text-text-muted">{c.customerId ? 'Account' : 'Guest'}{c.email ? ` · ${c.email}` : ''}</div>
+        </div>
+      ),
+    },
+    { key: 'phone', header: 'Mobile', render: (c) => <span className="font-mono text-sm">{c.phone ?? '—'}</span> },
+    { key: 'trips', header: 'Trips', render: (c) => <span>{c.trips}{c.cancelled ? <span className="text-xs text-text-muted"> · {c.cancelled} cancelled</span> : ''}</span> },
+    { key: 'spent', header: 'Spent', render: (c) => formatMoney(c.spentMinor, 'INR') },
+    { key: 'last', header: 'Last journey', render: (c) => <span className="text-sm text-text-muted">{dateOf(c.lastJourneyDate)}</span> },
   ];
 
   return (
     <>
-      <PageHeader title="Customers" subtitle="Search by name, or exact phone/email" />
-
-      <Card className="mb-6">
-        <CardBody>
-          <form onSubmit={(e) => { e.preventDefault(); setSearched(query); }} className="flex gap-2">
-            <div className="flex-1"><Input label="Search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Name, phone, or email" /></div>
-            <Button type="submit" leftIcon={<Search className="h-4 w-4" />}>Search</Button>
-          </form>
+      <PageHeader title="Customers" subtitle="Everyone who booked with you — accounts and guests, their trips and spend" />
+      <Card className="mb-4">
+        <CardBody className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex overflow-hidden rounded-md border border-border text-sm" role="tablist">
+            {FILTERS.map((f) => (
+              <button key={f.key} role="tab" aria-selected={filter === f.key} onClick={() => { setFilter(f.key); setPage(1); }}
+                className={cn('px-3 py-2', filter === f.key ? 'bg-primary text-white' : 'bg-surface text-text hover:bg-surface-muted')}>{f.label}</button>
+            ))}
+          </div>
+          <div className="w-80"><Input aria-label="Search customers" placeholder="Name, mobile, email or PNR" leftIcon={<Search className="h-4 w-4" />} value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} /></div>
         </CardBody>
       </Card>
 
-      {results.isLoading ? <PageLoader /> : searched ? (
-        results.data?.items.length ? <Table columns={columns} rows={results.data.items} /> : <EmptyState title="No customers found" icon={<User className="h-10 w-10" />} />
-      ) : <EmptyState title="Search for a customer to see their profile" icon={<Search className="h-10 w-10" />} />}
-
-      <Modal open={!!viewing} onClose={() => setViewing(null)} title={viewing?.fullName ?? 'Customer'} size="lg">
-        {viewing && (
-          <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-3 gap-3 text-sm">
-              <div><div className="text-text-muted">Phone</div><div className="font-medium text-text">{viewing.phone ?? '—'}</div></div>
-              <div><div className="text-text-muted">Email</div><div className="font-medium text-text">{viewing.email ?? '—'}</div></div>
-              <div><div className="text-text-muted">Total spent</div><div className="font-medium text-text">{formatMoney(viewing.totalSpentMinor, 'INR')}</div></div>
-            </div>
-
-            {viewing.blacklistedAt ? (
-              <Card className="border-danger/40"><CardBody className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm text-danger"><ShieldAlert className="h-4 w-4" /> Blacklisted{viewing.blacklistReason ? `: ${viewing.blacklistReason}` : ''}</div>
-                <Button size="sm" variant="outline" loading={unblacklist.isPending} onClick={() => unblacklist.mutate()}>Remove from blacklist</Button>
-              </CardBody></Card>
-            ) : (
-              <Button size="sm" variant="outline" className="self-start text-danger" leftIcon={<ShieldAlert className="h-4 w-4" />} onClick={() => setBlacklisting(true)}>Blacklist this customer</Button>
-            )}
-
-            <div>
-              <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-text"><TableIcon className="h-4 w-4" /> Booking history</div>
-              {bookings.isLoading ? <PageLoader /> : (
-                <div className="flex flex-col gap-1 text-sm">
-                  {(bookings.data?.items ?? []).map((b) => (
-                    <div key={b.id} className="flex justify-between border-b border-border py-1.5">
-                      <span className="font-mono text-xs">{b.pnr}</span>
-                      <Badge>{b.status}</Badge>
-                      <span>{formatMoney(b.totalMinor, 'INR')}</span>
-                      <span className="text-text-muted">{new Date(b.createdAt).toLocaleDateString()}</span>
-                    </div>
-                  ))}
-                  {!bookings.data?.items.length && <p className="text-text-muted">No bookings yet.</p>}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <div className="mb-2 text-sm font-semibold text-text">Preferences (JSON)</div>
-              <textarea value={prefsText} onChange={(e) => setPrefsText(e.target.value)} rows={5}
-                className="w-full rounded-md border border-border bg-surface-muted p-3 font-mono text-xs text-text" spellCheck={false} />
-              <Button size="sm" className="mt-2" loading={savePrefs.isPending} onClick={() => savePrefs.mutate()}>Save preferences</Button>
-            </div>
+      {list.isLoading ? <PageLoader /> : list.isError ? <ErrorState error={list.error} onRetry={list.refetch} /> : rows.length === 0 ? (
+        <EmptyState title={query ? 'No customer matches' : filter === 'blocked' ? 'Nobody is blocked' : 'No customers yet'} description={query ? 'Try part of the name, 4+ digits of the mobile, the exact email or a PNR.' : 'Customers appear once they book with you.'} icon={<Users className="h-10 w-10" />} />
+      ) : (
+        <>
+          <Table columns={columns} rows={rows} onRowClick={(c) => setOpen(c.key)} />
+          <div className="mt-3 flex items-center justify-center gap-2">
+            <Button variant="outline" size="sm" disabled={page === 1 || list.isFetching} onClick={() => setPage((p) => p - 1)}>Previous</Button>
+            <span className="text-sm text-text-muted">Page {page}</span>
+            <Button variant="outline" size="sm" disabled={!list.data?.hasMore || list.isFetching} onClick={() => setPage((p) => p + 1)}>Next</Button>
           </div>
-        )}
-      </Modal>
+        </>
+      )}
 
-      <Modal open={blacklisting} onClose={() => setBlacklisting(false)} title="Blacklist customer"
-        footer={<><Button variant="ghost" onClick={() => setBlacklisting(false)}>Cancel</Button><Button variant="danger" loading={blacklist.isPending} disabled={!reason.trim()} onClick={() => blacklist.mutate()}>Blacklist</Button></>}>
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-text-muted">They will be blocked from making NEW bookings. Existing bookings and history remain visible to support.</p>
-          <Input label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Repeated no-shows" />
-        </div>
-      </Modal>
+      {open && <CustomerModal customerKey={open} onClose={() => setOpen(null)} />}
     </>
+  );
+}
+
+function CustomerModal({ customerKey, onClose }: { customerKey: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [blocking, setBlocking] = useState(false);
+  const [reason, setReason] = useState('');
+  const [tried, setTried] = useState(false);
+  const c = useQuery({ queryKey: ['customer', customerKey], queryFn: () => crmApi.profile(customerKey) });
+  const refresh = () => { void qc.invalidateQueries({ queryKey: ['customer', customerKey] }); void qc.invalidateQueries({ queryKey: ['customers'] }); };
+  const reasonError = reason.trim().length < 5 ? 'Say why, in a few words' : undefined;
+  const block = useMutation({
+    mutationFn: () => crmApi.block(customerKey, reason.trim()),
+    onSuccess: () => { toast.success('Blocked — they cannot book with you any more'); setBlocking(false); setReason(''); refresh(); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  });
+  const unblock = useMutation({
+    mutationFn: () => crmApi.unblock(customerKey),
+    onSuccess: () => { toast.success('Unblocked — they can book again'); refresh(); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  });
+
+  const history: Column<CustomerBooking>[] = [
+    { key: 'pnr', header: 'PNR', render: (b) => <Link to={`/bookings/${b.id}`} className="font-mono text-primary hover:underline">{b.pnr}</Link> },
+    { key: 'journey', header: 'Journey', render: (b) => <div className="text-sm"><div>{b.routeName ?? '—'}</div><div className="text-xs text-text-muted">{dateOf(b.journeyDate)} · {b.seatCount} seat{b.seatCount === 1 ? '' : 's'}</div></div> },
+    { key: 'amount', header: 'Amount', render: (b) => formatMoney(b.totalMinor, 'INR') },
+    { key: 'status', header: 'Status', render: (b) => <Badge tone={statusTone(b.status)}>{b.status}</Badge> },
+    { key: 'booked', header: 'Booked', render: (b) => <span className="text-xs text-text-muted">{formatDateTime(b.createdAt)}</span> },
+  ];
+  const d = c.data;
+
+  return (
+    <Modal open onClose={onClose} size="lg" title={d?.name ?? 'Customer'}>
+      {c.isLoading ? <PageLoader /> : c.isError ? <ErrorState error={c.error} onRetry={c.refetch} /> : d && (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-text-muted">
+            <span className="font-mono text-text">{d.phone ?? '—'}</span>{d.email && <span>· {d.email}</span>}
+            <span>· {d.customerId ? 'Account' : 'Guest (by mobile)'}</span>
+            {d.frequent && <Badge tone="success">Frequent</Badge>}
+            <span className="ml-auto">Customer since {dateOf(d.firstBookedAt.slice(0, 10))}</span>
+          </div>
+          <div className="grid grid-cols-4 gap-2 rounded-md bg-surface-muted p-3 text-sm">
+            <div><div className="text-xs text-text-muted">Trips</div><div className="text-lg font-semibold">{d.trips}</div></div>
+            <div><div className="text-xs text-text-muted">Cancelled</div><div className="text-lg font-semibold">{d.cancelled}</div></div>
+            <div><div className="text-xs text-text-muted">Spent</div><div className="text-lg font-semibold">{formatMoney(d.spentMinor, 'INR')}</div></div>
+            <div><div className="text-xs text-text-muted">Last journey</div><div className="text-lg font-semibold">{dateOf(d.lastJourneyDate)}</div></div>
+          </div>
+
+          {d.block ? (
+            <div className="flex items-start justify-between gap-3 rounded-md border border-danger/40 bg-danger/5 p-3 text-sm">
+              <div>
+                <div className="font-semibold text-danger">Blocked from booking with you</div>
+                <div className="text-text">{d.block.reason}</div>
+                <div className="text-xs text-text-muted">{formatDateTime(d.block.blockedAt)}{d.block.blockedByName ? ` · by ${d.block.blockedByName}` : ''}</div>
+              </div>
+              <Button size="sm" variant="outline" leftIcon={<ShieldCheck className="h-4 w-4" />} loading={unblock.isPending} onClick={() => unblock.mutate()}>Unblock</Button>
+            </div>
+          ) : blocking ? (
+            <div className="flex flex-col gap-2 rounded-md border border-border p-3">
+              <Input label="Why block them?" placeholder="e.g. abused the driver on 12 Sept" maxLength={500} value={reason} error={tried ? reasonError : undefined} onChange={(e) => setReason(e.target.value)} />
+              <p className="text-xs text-text-muted">They cannot book with you any more — signed in or with this mobile. Bookings they already have stay as they are. Other operators are not affected.</p>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => { setBlocking(false); setTried(false); }}>Cancel</Button>
+                <Button variant="danger" size="sm" loading={block.isPending} disabled={block.isPending || (tried && !!reasonError)} onClick={() => { setTried(true); if (!reasonError) block.mutate(); }}>Block</Button>
+              </div>
+            </div>
+          ) : (
+            <div><Button size="sm" variant="ghost" className="text-danger" leftIcon={<Ban className="h-4 w-4" />} onClick={() => setBlocking(true)}>Block from booking</Button></div>
+          )}
+
+          <div>
+            <div className="mb-2 text-sm font-semibold text-text">Bookings ({d.bookings})</div>
+            <Table columns={history} rows={d.history} />
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }
