@@ -16,7 +16,7 @@ import { Logger, Metrics } from '@observability';
 
 import { PricingService, CouponRepository } from '../../../pricing';
 import { TripRepository } from '../../../scheduling';
-import { CustomerRepository } from '../../../crm/infrastructure/persistence/customer.repository';
+import { CustomerRepository } from '../../../crm';
 import { assertTransition, isCancellable } from '../../domain/booking-state';
 import {
   computeRefund,
@@ -32,7 +32,7 @@ import {
   resolveSeatFares,
   validateHoldSelection,
 } from '../../domain/hold-validation';
-import { QuotaRuleError, validatePhoneHoldUntil } from '../../../quotas/domain/quota-rules';
+import { QuotaRuleError, validatePhoneHoldUntil } from '../../../quotas';
 import {
   applyConcessions,
   checkBookingWindow,

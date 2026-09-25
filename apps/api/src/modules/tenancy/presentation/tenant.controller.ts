@@ -1,6 +1,6 @@
 import { Query, Body, Controller, Get, Patch, Post, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { FileService } from '../../files/application/file.service';
+import { FileService } from '../../files';
 import { BadRequestError } from '@kernel';
 
 import { Permission } from '@contracts';

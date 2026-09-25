@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { currentTransaction, registerConstraintMessages, UnitOfWork } from '@database';
 import { newId, requireTenantId, type BookingId } from '@kernel';
 
-import { signedAmount, type AgentLedgerKind } from '../../agents/domain/agent-account';
+import { signedAmount, type AgentLedgerKind } from '../../agents';
 import { type BillingMode, type PartnerKind, type PartnerStatus } from '../domain/gds-partner';
 
 registerConstraintMessages({

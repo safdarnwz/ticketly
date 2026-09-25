@@ -17,8 +17,7 @@ import {
 import { EventBus } from '@messaging';
 import { Logger } from '@observability';
 
-import { FileService } from '../../../files/application/file.service';
-import { MAX_PHOTOS_PER_BUS } from '../../../files/domain/upload-policy';
+import { FileService, MAX_PHOTOS_PER_BUS } from '../../../files';
 import { quotaExceeded } from '../../../tenancy';
 import {
   ALL_DOC_TYPES,

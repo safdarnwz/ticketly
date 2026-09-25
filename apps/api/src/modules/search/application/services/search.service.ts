@@ -20,8 +20,7 @@ import { Logger, Metrics } from '@observability';
 import { TenantRepository } from '../../../tenancy';
 import { PricingEngine, FareRepository } from '../../../pricing';
 import { AmenityRepository, RouteRepository, type Amenity } from '../../../master-data';
-import { PromotionRepository } from '../../../promotions/infrastructure/persistence/promotion.repository';
-import { bubblePromotedToTop } from '../../../promotions/domain/promotion-pricing';
+import { PromotionRepository, bubblePromotedToTop } from '../../../promotions';
 import { InventoryRepository, TripRepository } from '../../../scheduling';
 
 export interface StopRef {

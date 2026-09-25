@@ -6,7 +6,7 @@ import { AppError, ErrorCode, newId, type Json, type UserId } from '@kernel';
 import { PasswordHasher } from '@security';
 
 import { Mailer, renderOperatorStatusEmail } from '../../../notification';
-import { FileService } from '../../../files/application/file.service';
+import { FileService } from '../../../files';
 import {
   approvalBlockers,
   assertReview,

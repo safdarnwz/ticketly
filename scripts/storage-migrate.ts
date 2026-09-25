@@ -30,7 +30,7 @@ import { buildAppConfig, loadEnv, type AppConfig } from '@config';
 import type { DatabaseService } from '@database';
 import { createContext, runWithContext, type TenantId } from '@kernel';
 
-import { createStorage } from '../apps/api/src/modules/files/infrastructure/storage/storage.factory';
+import { createStorage } from '../apps/api/src/modules/files';
 
 function targetSettings(base: AppConfig['storage']): AppConfig['storage'] {
   const e = process.env;

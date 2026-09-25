@@ -13,7 +13,7 @@ import {
 } from '@http';
 import type { VehicleId } from '@kernel';
 
-import { sendStoredFile } from '../../files/presentation/file-response';
+import { sendStoredFile } from '../../files';
 import { VehicleVerificationService } from '../application/services/vehicle-verification.service';
 import {
   OptionalNoteSchema,

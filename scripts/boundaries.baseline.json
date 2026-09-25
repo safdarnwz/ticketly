@@ -1,15 +1,1 @@
-[
-  "agents/application/services/agent.service.ts -> quotas/application",
-  "booking/application/services/booking.service.ts -> crm/infrastructure",
-  "booking/application/services/booking.service.ts -> quotas/domain",
-  "fleet/application/services/vehicle-verification.service.ts -> files/application",
-  "fleet/application/services/vehicle-verification.service.ts -> files/domain",
-  "fleet/presentation/vehicle-admin.controller.ts -> files/presentation",
-  "gds/application/gds.service.ts -> agents/domain",
-  "gds/application/gds.service.ts -> search/application",
-  "gds/infrastructure/gds.repository.ts -> agents/domain",
-  "onboarding/application/services/onboarding.service.ts -> files/application",
-  "search/application/services/search.service.ts -> promotions/domain",
-  "search/application/services/search.service.ts -> promotions/infrastructure",
-  "tenancy/presentation/tenant.controller.ts -> files/application"
-]
+[]

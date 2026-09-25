@@ -71,8 +71,8 @@ import { RefundService } from '../apps/api/src/modules/refunds/application/servi
 import { InvoiceService } from '../apps/api/src/modules/invoicing/application/services/invoice.service';
 import { JourneySearchService } from '../apps/api/src/modules/search';
 import { ConnectingBookingService } from '../apps/api/src/modules/connections/application/services/connecting-booking.service';
-import { AgentService } from '../apps/api/src/modules/agents/application/services/agent.service';
-import { SeatQuotaService } from '../apps/api/src/modules/quotas/application/seat-quota.service';
+import { AgentService } from '../apps/api/src/modules/agents';
+import { SeatQuotaService } from '../apps/api/src/modules/quotas';
 
 const CUSTOMER_PASSWORD = 'pass@123';
 const TOTAL_CUSTOMERS = 1000;

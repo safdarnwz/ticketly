@@ -16,16 +16,12 @@ import {
   type TripId,
 } from '@kernel';
 
-import {
-  agentCommissionMinor,
-  checkFunds,
-  spendableMinor,
-} from '../../agents/domain/agent-account';
+import { agentCommissionMinor, checkFunds, spendableMinor } from '../../agents';
 import { BookingService, BookingRepository } from '../../booking';
 import { PaymentService } from '../../payment';
 import { PricingService } from '../../pricing';
 import { InventoryRepository } from '../../scheduling';
-import { SearchService } from '../../search/application/services/search.service';
+import { SearchService } from '../../search';
 import { generateKey } from '../domain/gds-keys';
 import { WebhookDeliveryService, WebhookRepository } from '../../webhooks';
 import { GdsRepository, type GdsPartner } from '../infrastructure/gds.repository';

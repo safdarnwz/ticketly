@@ -22,7 +22,7 @@ import { PasswordHasher } from '@security';
 
 import { BookingService, BookingRepository, type HoldRequest } from '../../../booking';
 import { PaymentService } from '../../../payment';
-import { SeatQuotaService } from '../../../quotas/application/seat-quota.service';
+import { SeatQuotaService } from '../../../quotas';
 import { User, RoleRepository, UserRepository } from '../../../iam';
 import {
   agentCommissionMinor,
