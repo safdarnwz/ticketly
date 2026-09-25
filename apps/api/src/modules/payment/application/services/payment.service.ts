@@ -4,6 +4,7 @@ import { AppConfig } from '@config';
 import { UnitOfWork } from '@database';
 import {
   AppError,
+  BadRequestError,
   ErrorCode,
   newId,
   requireTenantId,
@@ -521,16 +522,40 @@ export class PaymentService {
    * confirms a REAL capture for this intent — see the 'seat_upgrade'
    * metadata branch there.
    */
+  /**
+   * Customer self-service upgrade: the contact mobile proves ownership (as for
+   * self-cancel), then the same upgrade as staff — restricted to a ticket of
+   * that booking.
+   */
+  async upgradeSeatAsCustomer(input: {
+    bookingId: string;
+    mobile: string;
+    ticketId: string;
+    toSeatNumber: string;
+  }): Promise<{
+    intentId: PaymentId;
+    clientPayload: Record<string, unknown>;
+    differentialMinor: number;
+  }> {
+    const owned = await this.bookings.verifyOwnership(input.bookingId, input.mobile);
+    if (!owned) throw new BadRequestError('Booking not found for this mobile number');
+    return runAsTenant(owned.tenantId as TenantId, () =>
+      this.upgradeSeat(input.ticketId, input.toSeatNumber, input.bookingId),
+    );
+  }
+
   async upgradeSeat(
     ticketId: string,
     toSeatNumber: string,
+    /** When set, the ticket must belong to this booking. */
+    onlyBookingId?: string,
   ): Promise<{
     intentId: PaymentId;
     clientPayload: Record<string, unknown>;
     differentialMinor: number;
   }> {
     const ticket = await this.seatUpgrades.getTicketWithSeatType(ticketId);
-    if (!ticket)
+    if (!ticket || (onlyBookingId && ticket.bookingId !== onlyBookingId))
       throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Ticket not found' });
     if (ticket.seatNumber === toSeatNumber)
       throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: 'Already in that seat' });

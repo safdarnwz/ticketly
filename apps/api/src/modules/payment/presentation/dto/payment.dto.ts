@@ -63,6 +63,13 @@ export const UpgradeSeatSchema = z.object({
 });
 export type UpgradeSeatDto = z.infer<typeof UpgradeSeatSchema>;
 
+/** Customer self-service: the booking's contact mobile proves ownership. */
+export const SelfUpgradeSeatSchema = UpgradeSeatSchema.extend({
+  bookingId: uuid,
+  mobile: z.string().trim().min(6).max(20),
+});
+export type SelfUpgradeSeatDto = z.infer<typeof SelfUpgradeSeatSchema>;
+
 /** Razorpay Checkout's client-side callback, verified server-side. */
 export const VerifyPaymentSchema = z.object({
   bookingId: uuid,

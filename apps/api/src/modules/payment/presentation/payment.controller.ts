@@ -24,9 +24,11 @@ import {
   GenerateSettlementSchema,
   type GenerateSettlementDto,
   SetCommissionSchema,
+  SelfUpgradeSeatSchema,
   UpgradeSeatSchema,
   VerifyPaymentSchema,
   type SetCommissionDto,
+  type SelfUpgradeSeatDto,
   type UpgradeSeatDto,
   type VerifyPaymentDto,
 } from './dto/payment.dto';
@@ -104,6 +106,19 @@ export class PaymentController {
   })
   async upgradeSeat(@Body(zodBody(UpgradeSeatSchema)) dto: UpgradeSeatDto) {
     return this.payment.upgradeSeat(dto.ticketId, dto.toSeatNumber);
+  }
+
+  @Post('upgrade-seat/self')
+  @HttpCode(200)
+  @Public()
+  @RateLimit(20, 60_000, 'ip')
+  @Idempotent()
+  @ApiOperation({
+    summary:
+      'Customer self-service seat upgrade (the booking mobile proves ownership) — returns the payment for the fare difference',
+  })
+  async selfUpgradeSeat(@Body(zodBody(SelfUpgradeSeatSchema)) dto: SelfUpgradeSeatDto) {
+    return this.payment.upgradeSeatAsCustomer(dto);
   }
 
   @Post('intent')

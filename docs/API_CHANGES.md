@@ -73,7 +73,16 @@ wrong thing, now get a `400` with an `issues[]` array naming the field:
 - `GET /bookings/search` needs at least one of `pnr`, `mobile`, `ticket`;
   `GET /bookings/by-pnr/:pnr` and `GET /bookings/mine` need `mobile`.
 
+## New customer self-service endpoints
+- `POST /payments/upgrade-seat/self` — `{ bookingId, mobile, ticketId, toSeatNumber }`:
+  the booking's contact mobile proves ownership (as for `self-cancel`); returns
+  the payment for the fare difference. Staff keep `POST /payments/upgrade-seat`.
+- `POST /me/ancillaries/attach` and `GET /me/ancillaries` are open to guest
+  checkout (held bookings only), like hold / payment intent / charge.
+
 ## Permission fixes
 - `GET /admin/tenants/plans` now requires the platform admin (it had no check).
+- `admin/operator-applications/*` require a platform (tenant-less) principal; an
+  operator owner's `*` no longer opens them.
 - DPDP self-service (`/privacy/consents`, `POST /privacy/erasure-requests`) needs only a signed-in
   user (it wrongly required `booking:read`, which customers never have).
