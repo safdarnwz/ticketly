@@ -7,6 +7,9 @@ import { PlatformSettingsRepository } from './infrastructure/platform-settings.r
 import { PlatformBillingService } from './application/platform-billing.service';
 import { PlatformPoliciesService } from './application/platform-policies.service';
 import { PlatformChargeRepository } from './infrastructure/platform-charge.repository';
+import { DataRetentionService } from './application/data-retention.service';
+import { RetentionPurgeRepository } from './infrastructure/retention-purge.repository';
+import { PlatformPoliciesController } from './presentation/platform-policies.controller';
 
 /**
  * Deliberately standalone — depends on nothing but DatabaseModule/CacheModule,
@@ -29,17 +32,21 @@ import { PlatformChargeRepository } from './infrastructure/platform-charge.repos
  */
 @Module({
   imports: [DatabaseModule, CacheModule],
+  controllers: [PlatformPoliciesController],
   providers: [
     PlatformSettingsRepository,
     PlatformChargeRepository,
     PlatformBillingService,
     PlatformPoliciesService,
+    RetentionPurgeRepository,
+    DataRetentionService,
   ],
   exports: [
     PlatformSettingsRepository,
     PlatformChargeRepository,
     PlatformBillingService,
     PlatformPoliciesService,
+    DataRetentionService,
   ],
 })
 export class PlatformSettingsModule {}

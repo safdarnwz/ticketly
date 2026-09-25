@@ -61,7 +61,14 @@ export class Msg91SmsProvider implements NotificationProvider {
   }
 
   async send(req: SendRequest): Promise<SendResult> {
-    const msg91 = this.settings();
+    return this.sendWith(this.settings(), req);
+  }
+
+  /** Send with the given (possibly not yet enabled) credentials — the admin "test SMS" (#19). */
+  async sendWith(
+    msg91: { authKey: string; senderId: string; route: string },
+    req: SendRequest,
+  ): Promise<SendResult> {
     const mobile = normaliseIndianMobile(req.recipient);
     if (!mobile) return { ok: false, error: `Not a valid Indian mobile number: ${req.recipient}` };
 

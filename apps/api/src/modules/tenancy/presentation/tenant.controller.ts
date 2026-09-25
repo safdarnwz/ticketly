@@ -7,6 +7,7 @@ import { Permission } from '@contracts';
 import {
   ApiStandardErrors,
   FileUploadQuerySchema,
+  Public,
   RequirePermission,
   zodBody,
   zodQuery,
@@ -26,6 +27,7 @@ import {
   SetInvoicePrefixSchema,
   type SetInvoicePrefixDto,
 } from './dto/tenant.dto';
+import { TenantBrandingService } from '../application/services/tenant-branding.service';
 import { TenantContextService } from '../application/services/tenant-context.service';
 import { TenantRepository } from '../infrastructure/persistence/tenant.repository';
 import { PayoutRepository } from '../infrastructure/persistence/payout.repository';
@@ -49,6 +51,7 @@ export class TenantController {
     private readonly payouts: PayoutRepository,
     private readonly uow: UnitOfWork,
     private readonly files: FileService,
+    private readonly brandingService: TenantBrandingService,
   ) {}
 
   @Get('profile')
@@ -162,6 +165,16 @@ export class TenantController {
   async resetRefundPolicy() {
     await this.tenants.setRefundPolicy(null);
     return { ok: true, policy: DEFAULT_REFUND_POLICY };
+  }
+
+  @Get('branding')
+  @Public()
+  @ApiOperation({
+    summary:
+      "The operator's public branding (name, logo, favicon, domain) for the site it is served on",
+  })
+  branding() {
+    return this.brandingService.branding(requireTenantId());
   }
 
   @Get('logo')

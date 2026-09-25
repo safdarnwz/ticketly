@@ -200,6 +200,30 @@ export class RoleRepository {
     return { ...mapRole(row), permissions: await this.permissionsOf(row.id) };
   }
 
+  /** A role of the CURRENT tenant (never another tenant's, never a platform template), or null. */
+  async findTenantRole(roleId: RoleId): Promise<Role | null> {
+    const row = await this.db.queryOne<RoleRow>(
+      `SELECT id, tenant_id, code, name, description, is_system, conditions
+         FROM roles WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL`,
+      [roleId, requireTenantId()],
+      { name: 'rbac.findTenantRole', primary: true },
+    );
+    if (!row) return null;
+    return { ...mapRole(row), permissions: await this.permissionsOf(row.id) };
+  }
+
+  /** A role this tenant can copy: its own, or a platform template. With permissions. */
+  async findCopyableRole(roleId: RoleId): Promise<Role | null> {
+    const row = await this.db.queryOne<RoleRow>(
+      `SELECT id, tenant_id, code, name, description, is_system, conditions
+         FROM roles WHERE id = $1 AND deleted_at IS NULL AND (tenant_id = $2 OR tenant_id IS NULL)`,
+      [roleId, requireTenantId()],
+      { name: 'rbac.findCopyableRole', primary: true },
+    );
+    if (!row) return null;
+    return { ...mapRole(row), permissions: await this.permissionsOf(row.id) };
+  }
+
   /** A platform-level role (tenant_id IS NULL), whatever tenant is in context. */
   async findPlatformRole(code: string): Promise<Role | null> {
     const row = await this.db.queryOne<RoleRow>(

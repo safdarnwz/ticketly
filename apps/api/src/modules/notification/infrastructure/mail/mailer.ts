@@ -95,6 +95,44 @@ export class Mailer {
     );
   }
 
+  /**
+   * Send one message through the given SMTP settings (saved but maybe not yet
+   * enabled) — the admin "test email" (#21). Verifies the connection first so
+   * a wrong host or password fails with the server's own error.
+   */
+  async sendTest(
+    smtp: {
+      host: string;
+      port: number;
+      secure: boolean;
+      user: string;
+      password: string;
+      fromAddress: string;
+      fromName: string;
+    },
+    input: { to: string; subject: string; text: string },
+  ): Promise<void> {
+    const transporter = nodemailer.createTransport({
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.secure,
+      auth: { user: smtp.user, pass: smtp.password },
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+    });
+    try {
+      await transporter.verify();
+      await transporter.sendMail({
+        from: `${smtp.fromName} <${smtp.fromAddress}>`,
+        to: input.to,
+        subject: input.subject,
+        text: input.text,
+      });
+    } finally {
+      transporter.close();
+    }
+  }
+
   /** The admin-configured SMTP transport, or undefined to use the Gmail env account. */
   private savedSmtp(): { transporter: Transporter; from: string; fromAddress: string } | undefined {
     const saved = this.credentials.active('smtp');

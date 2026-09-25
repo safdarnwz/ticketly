@@ -3,6 +3,9 @@ import { APP_GUARD } from '@nestjs/core';
 import { MaintenanceGuard } from './presentation/guards/maintenance.guard';
 import { StaffAccessService } from './application/services/staff-access.service';
 import { StaffAccessRepository } from './infrastructure/persistence/staff-access.repository';
+import { RoleTemplateAdminController } from './presentation/role-template-admin.controller';
+import { RoleTemplateRepository } from './infrastructure/persistence/role-template.repository';
+import { RoleTemplateService } from './application/services/role-template.service';
 import { MaintenanceController } from './presentation/maintenance.controller';
 
 import { CacheModule } from '@cache';
@@ -62,10 +65,13 @@ import { OtpDeliveryRouter } from './infrastructure/otp/otp-delivery.router';
     RoleController,
     ApiKeyController,
     MaintenanceController,
+    RoleTemplateAdminController,
   ],
   providers: [
     StaffAccessRepository,
     StaffAccessService,
+    RoleTemplateRepository,
+    RoleTemplateService,
     ApiKeyRepository,
     OtpChallengeRepository,
     ApiKeyService,

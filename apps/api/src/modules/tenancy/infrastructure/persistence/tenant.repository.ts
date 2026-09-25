@@ -340,6 +340,53 @@ export class TenantRepository {
    * needs neither one nor a CDN to just work everywhere the logo is used
    * (HTML e-tickets, PDF invoices) at the modest size a logo actually is.
    */
+  /** Assign (or clear, with null) an operator's custom domain (#4). Returns the previous one. */
+  async setPrimaryDomain(
+    tenantId: string,
+    domain: string | null,
+  ): Promise<{ previous: string | null } | null> {
+    const row = await this.db.queryOne<{ previous: string | null }>(
+      `UPDATE tenants t SET primary_domain = $2, version = t.version + 1
+         FROM (SELECT primary_domain AS previous FROM tenants WHERE id = $1) old
+        WHERE t.id = $1 AND t.deleted_at IS NULL
+        RETURNING old.previous`,
+      [tenantId, domain],
+      { name: 'tenant.setPrimaryDomain', primary: true },
+    );
+    return row ?? null;
+  }
+
+  /** White-label favicon (#67), a small data URI; null removes it. */
+  async setFavicon(tenantId: string, dataUri: string | null): Promise<boolean> {
+    const n = await this.db.execute_(
+      `UPDATE tenants SET settings = CASE WHEN $2::text IS NULL THEN settings - 'faviconUrl'
+                                          ELSE jsonb_set(settings, '{faviconUrl}', to_jsonb($2::text)) END,
+              version = version + 1
+        WHERE id = $1 AND deleted_at IS NULL`,
+      [tenantId, dataUri],
+      { name: 'tenant.setFavicon', primary: true },
+    );
+    return n > 0;
+  }
+
+  /** What a customer-facing site needs to brand itself as this operator. */
+  async branding(tenantId: string): Promise<{
+    displayName: string;
+    logoUrl: string | null;
+    faviconUrl: string | null;
+    primaryDomain: string | null;
+  } | null> {
+    return this.db.queryOne(
+      `SELECT display_name AS "displayName",
+              coalesce(settings->>'logoCdnUrl', settings->>'logoUrl') AS "logoUrl",
+              settings->>'faviconUrl' AS "faviconUrl",
+              primary_domain AS "primaryDomain"
+         FROM tenants WHERE id = $1 AND deleted_at IS NULL`,
+      [tenantId],
+      { name: 'tenant.branding' },
+    );
+  }
+
   async getLogoUrl(tenantId?: string): Promise<string | null> {
     const row = await this.db.queryOne<{ logo_url: string | null }>(
       `SELECT settings->>'logoUrl' AS logo_url FROM tenants WHERE id = $1`,

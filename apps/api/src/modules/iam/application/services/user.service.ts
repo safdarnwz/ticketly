@@ -1,10 +1,18 @@
 import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
-import { ConflictError, NotFoundError, newId, requireTenantId, type UserId } from '@kernel';
+import {
+  ConflictError,
+  NotFoundError,
+  getUserId,
+  newId,
+  requireTenantId,
+  type UserId,
+} from '@kernel';
 import { PasswordHasher } from '@security';
 
 import { AuditService } from './audit.service';
+import { assertGrantable } from './permission-grant';
 import { User } from '../../domain/user.entity';
 import { RoleRepository } from '../../infrastructure/persistence/role.repository';
 import { SessionRepository } from '../../infrastructure/persistence/session.repository';
@@ -61,7 +69,8 @@ export class UserService {
       for (const code of input.roles) {
         const role = await this.roles.findByCode(code);
         if (!role) throw new NotFoundError('Role', code);
-        await this.roles.grantToUser(user.id, role.id, null);
+        assertGrantable(role.permissions);
+        await this.roles.grantToUser(user.id, role.id, getUserId() ?? null);
       }
       await this.audit.recordInTx({
         action: 'user.invited',
@@ -109,9 +118,11 @@ export class UserService {
       for (const code of roleCodes) {
         const role = await this.roles.findByCode(code);
         if (!role) throw new NotFoundError('Role', code);
+        assertGrantable(role.permissions);
         roleIds.push(role.id);
       }
-      for (const roleId of roleIds) await this.roles.grantToUser(userId, roleId, null);
+      for (const roleId of roleIds)
+        await this.roles.grantToUser(userId, roleId, getUserId() ?? null);
       // Role change → existing access tokens carry stale permissions. Force a
       // re-login by revoking sessions (the customer app refreshes silently).
       await this.sessions.revokeAllForUser(userId, 'roles-changed');

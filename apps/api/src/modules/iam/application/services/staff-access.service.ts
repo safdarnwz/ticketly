@@ -1,16 +1,20 @@
 import { Injectable } from '@nestjs/common';
 
+import { UnitOfWork } from '@database';
+
 import {
   AppError,
   ErrorCode,
   NotFoundError,
   getUserId,
   requireTenantId,
+  type Json,
   type RoleId,
   type UserId,
 } from '@kernel';
 
 import { validateWindow, type LoginWindow } from '../../domain/access-policy';
+import { assertGrantable } from './permission-grant';
 import { RoleRepository } from '../../infrastructure/persistence/role.repository';
 import { SessionRepository } from '../../infrastructure/persistence/session.repository';
 import { StaffAccessRepository } from '../../infrastructure/persistence/staff-access.repository';
@@ -28,6 +32,7 @@ export class StaffAccessService {
     private readonly staff: StaffAccessRepository,
     private readonly roles: RoleRepository,
     private readonly sessions: SessionRepository,
+    private readonly uow: UnitOfWork,
   ) {}
 
   private async assertStaff(userId: string): Promise<void> {
@@ -82,6 +87,9 @@ export class StaffAccessService {
       throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
         message: 'The end date must be in the future',
       });
+    const role = await this.roles.findTenantRole(roleId as RoleId);
+    if (!role) throw new NotFoundError('Role', roleId);
+    assertGrantable(role.permissions);
     await this.roles.grantToUser(
       userId as UserId,
       roleId as RoleId,
@@ -90,8 +98,40 @@ export class StaffAccessService {
     );
   }
 
-  duplicateRole(roleId: string, code: string, name: string) {
-    return this.roles.duplicate(roleId as RoleId, code, name);
+  /** A custom role; every permission must be one the caller may hand out. */
+  createRole(input: {
+    code: string;
+    name: string;
+    description?: string;
+    permissions: string[];
+    conditions?: Record<string, Json>;
+  }): Promise<RoleId> {
+    assertGrantable(input.permissions);
+    const tenantId = requireTenantId();
+    return this.uow.run({ name: 'role.create', tenantId }, () =>
+      this.roles.createRole({ tenantId, ...input, isSystem: false }),
+    );
+  }
+
+  /**
+   * Replace a role's permissions. Only this tenant's roles, and the caller must
+   * hold both what the role has now and what it will have — so nobody edits a
+   * role that is bigger than their own.
+   */
+  async setRolePermissions(roleId: string, permissions: string[]): Promise<void> {
+    const role = await this.roles.findTenantRole(roleId as RoleId);
+    if (!role) throw new NotFoundError('Role', roleId);
+    assertGrantable([...role.permissions, ...permissions]);
+    await this.uow.run({ name: 'role.setPermissions', tenantId: requireTenantId() }, () =>
+      this.roles.setPermissions(role.id, permissions),
+    );
+  }
+
+  async duplicateRole(roleId: string, code: string, name: string) {
+    const source = await this.roles.findCopyableRole(roleId as RoleId);
+    if (!source) throw new NotFoundError('Role', roleId);
+    assertGrantable(source.permissions);
+    return this.roles.duplicate(source.id, code, name);
   }
   deleteRole(roleId: string) {
     return this.roles.softDelete(roleId as RoleId);

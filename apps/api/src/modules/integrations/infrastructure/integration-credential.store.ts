@@ -97,6 +97,17 @@ export class IntegrationCredentialStore implements OnModuleInit, OnModuleDestroy
     };
   }
 
+  /** Saved credentials whether or not the provider is enabled (for a test send), or null. */
+  async stored<P extends IntegrationProvider>(provider: P): Promise<ActiveIntegration<P> | null> {
+    const row = (await this.rows()).find((r) => r.provider === provider);
+    const secrets = row ? this.decrypt(row.secrets) : null;
+    if (!row || !secrets) return null;
+    return {
+      config: row.config as IntegrationConfig<P>,
+      secrets: secrets as IntegrationSecrets<P>,
+    };
+  }
+
   async list(): Promise<IntegrationView[]> {
     const rows = await this.rows();
     const byProvider = new Map(rows.map((r) => [r.provider, r]));

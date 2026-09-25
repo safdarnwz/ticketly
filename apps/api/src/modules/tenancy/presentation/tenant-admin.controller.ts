@@ -31,6 +31,8 @@ import {
   PlanSchema,
   PlatformSettingsSchema,
   ReasonSchema,
+  SetDomainSchema,
+  SetFaviconSchema,
   SetFeatureSchema,
   SetPlanActiveSchema,
   type AuditLogQueryDto,
@@ -39,10 +41,13 @@ import {
   type PlanDto,
   type PlatformSettingsDto,
   type ReasonDto,
+  type SetDomainDto,
+  type SetFaviconDto,
   type SetFeatureDto,
   type SetPlanActiveDto,
 } from './dto/tenant-admin.dto';
 import { PlanRepository } from '../infrastructure/persistence/plan.repository';
+import { TenantBrandingService } from '../application/services/tenant-branding.service';
 import { TenantContextService } from '../application/services/tenant-context.service';
 import { PlatformSettingsRepository } from '../../platform-settings';
 import { TenantProvisioningService } from '../application/services/tenant-provisioning.service';
@@ -73,6 +78,7 @@ export class TenantAdminController {
     private readonly payouts: PayoutRepository,
     private readonly config: AppConfig,
     private readonly tenantContext: TenantContextService,
+    private readonly branding: TenantBrandingService,
   ) {}
 
   @Get()
@@ -118,6 +124,22 @@ export class TenantAdminController {
   @ApiOperation({ summary: 'Re-activate a suspended operator' })
   async activate(@UuidParam('id') id: string) {
     await this.provisioning.activate(id as TenantId);
+    return { ok: true };
+  }
+
+  @Put(':id/domain')
+  @ApiOperation({ summary: "Assign (or clear) an operator's custom booking domain" })
+  setDomain(@UuidParam('id') id: string, @Body(zodBody(SetDomainSchema)) dto: SetDomainDto) {
+    return this.branding.setDomain(id, dto.domain);
+  }
+
+  @Put(':id/favicon')
+  @ApiOperation({ summary: "Set (or remove) an operator's white-label favicon" })
+  async setFavicon(
+    @UuidParam('id') id: string,
+    @Body(zodBody(SetFaviconSchema)) dto: SetFaviconDto,
+  ) {
+    await this.branding.setFavicon(id, dto.dataUri);
     return { ok: true };
   }
 

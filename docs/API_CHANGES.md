@@ -80,6 +80,22 @@ wrong thing, now get a `400` with an `issues[]` array naming the field:
 - `POST /me/ancillaries/attach` and `GET /me/ancillaries` are open to guest
   checkout (held bookings only), like hold / payment intent / charge.
 
+## New platform-admin endpoints (scenario tracker #1–#120)
+All require a platform (tenant-less) principal.
+- `GET /admin/integrations`, `GET|PUT /admin/integrations/:provider`,
+  `POST /admin/integrations/:provider/enabled` (`{enabled}`),
+  `POST /admin/integrations/:provider/test` (`{to}`) — Razorpay / PayU /
+  Easebuzz / Paytm / MSG91 SMS / WhatsApp / SMTP credentials. Secrets are
+  encrypted and only ever returned masked; a test sends one real message (or,
+  for Razorpay, makes one authenticated read) with the saved credentials.
+- `GET /admin/policies`, `PUT /admin/policies/{password|admin-ip-allowlist|
+  suspicious-login|gst-slabs|agent-credit|data-retention|ota-release}`.
+- `GET|POST /admin/role-templates`, `PUT|DELETE /admin/role-templates/:id`;
+  operators: `GET /roles/templates`, `POST /roles/templates/:templateId/apply`.
+- `PUT /admin/tenants/:id/domain` (`{domain}` or `null`), `PUT
+  /admin/tenants/:id/favicon` (`{dataUri}` or `null`); public
+  `GET /operator/branding` for the site a request is served on.
+
 ## Changed responses
 - `POST /bookings/:id/reschedule` now returns `status`. `rescheduled`: the
   booking moved (any refund due is paid automatically). `payment_required`:
@@ -95,3 +111,9 @@ wrong thing, now get a `400` with an `issues[]` array naming the field:
   operator owner's `*` no longer opens them.
 - DPDP self-service (`/privacy/consents`, `POST /privacy/erasure-requests`) needs only a signed-in
   user (it wrongly required `booking:read`, which customers never have).
+- Roles: an operator can only change or grant roles of its OWN tenant
+  (`PUT /roles/:id/permissions` and `PUT /users/:id/roles/:roleId` used to
+  accept any role id, including another operator's or a platform template).
+  Role permissions must be catalogue permissions, never `*` / `platform:*`,
+  and a user can only put into a role — or give someone a role holding —
+  permissions they hold themselves (403 otherwise).

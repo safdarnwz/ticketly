@@ -11,6 +11,7 @@ import { NotificationController } from './presentation/notification.controller';
 import { NotificationLogRepository } from './infrastructure/persistence/notification-log.repository';
 import { NotificationTemplateRepository } from './infrastructure/persistence/notification-template.repository';
 import { NotificationService } from './application/services/notification.service';
+import { NotificationIntegrationTester } from './application/services/notification-integration.tester';
 import { ProviderRegistry } from './infrastructure/provider-registry';
 import { EmailNotificationProvider } from './infrastructure/providers/email.provider';
 import { LogProviderFactory } from './infrastructure/providers/log.provider';
@@ -42,6 +43,7 @@ import { Msg91WhatsAppProvider } from './infrastructure/providers/msg91-whatsapp
   providers: [
     NotificationLogRepository,
     NotificationService,
+    NotificationIntegrationTester,
     NotificationTemplateRepository,
     ProviderRegistry,
     LogProviderFactory,

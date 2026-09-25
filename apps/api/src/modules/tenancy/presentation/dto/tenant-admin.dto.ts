@@ -64,3 +64,31 @@ export const AuditLogQuerySchema = z.object({
   resourceType: z.string().trim().max(80).optional(),
 });
 export type AuditLogQueryDto = z.infer<typeof AuditLogQuerySchema>;
+
+/** #4 — a hostname the operator controls, e.g. "book.orangetravels.in"; null removes it. */
+export const SetDomainSchema = z.object({
+  domain: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(253)
+    .regex(
+      /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/,
+      'must be a hostname like book.example.com',
+    )
+    .nullable(),
+});
+export type SetDomainDto = z.infer<typeof SetDomainSchema>;
+
+/** #67 — ICO / PNG / SVG favicon as a data URI (≤ ~100 KB); null removes it. */
+export const SetFaviconSchema = z.object({
+  dataUri: z
+    .string()
+    .max(140_000)
+    .regex(
+      /^data:image\/(x-icon|vnd\.microsoft\.icon|png|svg\+xml);base64,/,
+      'Must be an ICO, PNG or SVG data URI',
+    )
+    .nullable(),
+});
+export type SetFaviconDto = z.infer<typeof SetFaviconSchema>;

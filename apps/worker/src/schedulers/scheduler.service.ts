@@ -5,6 +5,7 @@ import { AppConfig } from '@config';
 import { DatabaseService } from '@database';
 import { Logger, Metrics } from '@observability';
 
+import { DataRetentionService } from '@api/modules/platform-settings';
 import { WebhookDeliveryService } from '@api/modules/webhooks';
 import { PayoutScheduler } from './payout.scheduler';
 import { TripReminderScheduler } from './trip-reminder.scheduler';
@@ -54,6 +55,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly refunds: RefundService,
     private readonly quotas: SeatQuotaService,
     private readonly payments: PaymentService,
+    private readonly retention: DataRetentionService,
   ) {
     this.log = logger.forContext('Scheduler');
   }
@@ -64,6 +66,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     this.every(60_000, 'outbox-requeue', () => this.requeueFailedOutbox());
     this.every(3_600_000, 'partition-maintenance', () => this.maintainPartitions());
     this.every(3_600_000, 'idempotency-purge', () => this.purgeIdempotency());
+    this.every(6 * 3_600_000, 'data-retention', () => this.applyRetention());
     this.every(300_000, 'reporting-refresh', () => this.refreshReports());
     this.every(60_000, 'webhook-retry', () => this.retryWebhooks());
     this.every(600_000, 'trip-reminders', () => this.tripReminders.run().then(() => undefined));
@@ -219,6 +222,12 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
       primary: true,
     });
     if (n > 0) this.log.debug({ n }, 'purged idempotency keys');
+  }
+
+  /** Delete operational logs older than the platform's data retention policy (#75). */
+  private async applyRetention(): Promise<void> {
+    const deleted = await this.retention.run();
+    if (Object.keys(deleted).length > 0) this.log.info({ deleted }, 'data retention purge');
   }
 
   /** Re-attempt webhook deliveries that failed and are due for their next backoff try. */

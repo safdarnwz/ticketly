@@ -20,6 +20,7 @@ import {
   passwordViolations,
   type PasswordPolicy,
 } from '../domain/password-policy';
+import { normaliseOtaReleasePolicy, type OtaReleasePolicy } from '../domain/ota-release';
 import {
   normaliseSuspiciousLoginPolicy,
   type SuspiciousLoginPolicy,
@@ -32,6 +33,7 @@ export const POLICY_KEYS = {
   gstSlabs: 'gst_slabs',
   agentCredit: 'agent_credit_policy',
   dataRetention: 'data_retention',
+  otaRelease: 'ota_inventory_release',
 } as const;
 
 /**
@@ -152,6 +154,22 @@ export class PlatformPoliciesService {
     const next = { ...(await this.dataRetention()), ...patch };
     await this.settings.set(POLICY_KEYS.dataRetention, next, actorId);
     return next;
+  }
+
+  /* ── OTA inventory release default (#42) ───────────────────────────── */
+
+  async otaReleasePolicy(): Promise<OtaReleasePolicy> {
+    return normaliseOtaReleasePolicy(
+      await this.settings.get<Partial<OtaReleasePolicy> | null>(POLICY_KEYS.otaRelease, null),
+    );
+  }
+
+  async setOtaReleasePolicy(
+    policy: OtaReleasePolicy,
+    actorId: string | null,
+  ): Promise<OtaReleasePolicy> {
+    await this.settings.set(POLICY_KEYS.otaRelease, policy, actorId);
+    return policy;
   }
 }
 

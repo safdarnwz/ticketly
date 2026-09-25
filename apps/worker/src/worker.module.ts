@@ -26,6 +26,7 @@ import { SchedulerService } from './schedulers/scheduler.service';
 import { FleetModule } from '@api/modules/fleet/fleet.module';
 import { QuotasModule } from '@api/modules/quotas/quotas.module';
 import { DemandModule } from '@api/modules/demand/demand.module';
+import { PlatformSettingsModule } from '@api/modules/platform-settings/platform-settings.module';
 import { WaitlistConsumer } from './consumers/waitlist.consumer';
 import { PayoutScheduler } from './schedulers/payout.scheduler';
 import { TripReminderScheduler } from './schedulers/trip-reminder.scheduler';
@@ -68,6 +69,7 @@ import { ConnectionMonitorScheduler } from './schedulers/connection-monitor.sche
     FleetModule,
     QuotasModule,
     DemandModule,
+    PlatformSettingsModule,
   ],
   providers: [
     EventDispatcher,
