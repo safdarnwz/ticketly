@@ -162,4 +162,24 @@ describe('agents (e2e)', () => {
       creditLimitMinor: 0,
     });
   });
+
+  it('API keys carry no more than the issuer holds, and stop working once revoked', async () => {
+    const issue = (body: object) =>
+      app.post('/api-keys', { name: `E2E key ${run}`, scopes: ['agent:read'], ...body }, op);
+    expect((await issue({ scopes: ['*'] })).status).toBe(403);
+    expect((await issue({ scopes: ['platform:admin'] })).status).toBe(403);
+    expect((await issue({ scopes: ['agents:read'] })).status).toBe(403); // typo
+    expect((await issue({ ipAllowlist: ['not-an-ip'] })).status).toBe(400);
+    expect((await issue({ expiresAt: '2020-01-01T00:00:00Z' })).status).toBe(400);
+    const made = await issue({});
+    expect(made.status, JSON.stringify(made.body)).toBe(201);
+    const withKey = {
+      headers: { 'x-api-key': made.body.apiKey, 'x-tenant-slug': app.fixtures.tenantSlug },
+    };
+    expect((await app.get('/agents', withKey)).status).toBe(200);
+    expect((await app.get('/users', withKey)).status).toBe(403);
+    expect((await app.del(`/api-keys/${made.body.id}`, { headers: other })).status).toBe(404);
+    expect((await app.del(`/api-keys/${made.body.id}`, op)).status).toBe(204);
+    expect((await app.get('/agents', withKey)).status).toBe(401);
+  });
 });

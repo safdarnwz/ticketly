@@ -329,3 +329,8 @@ an unknown id is now 404 (was 200).
   `target`. New `POST /auth/password { currentPassword, newPassword }` changes your own password (it did
   not exist); other sessions end, this one stays. Access tokens carry `iatMs`: signing in within the same
   second as a forced sign-out was refused. Migration 0095.
+- **Agents & API keys:** an agent's `branchId` must be an active branch of this operator (404 for an
+  unknown or other operator's branch — it used to be linked, or fail as a generic 409). `POST /api-keys`:
+  scopes become the key's permissions, so they must be catalogue permissions the issuer holds — never `*`
+  or platform ones (403; any `role:manage`-style escalation was possible before); IP allow-list entries
+  are checked, the expiry must be in the future, the name is trimmed, and the issuer is recorded.

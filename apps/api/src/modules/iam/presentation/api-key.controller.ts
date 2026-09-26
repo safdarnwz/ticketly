@@ -3,9 +3,10 @@ import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
 import { ApiStandardErrors, RequirePermission, UuidParam, zodBody } from '@http';
-import { type ApiKeyId } from '@kernel';
+import { getUserId, type ApiKeyId } from '@kernel';
 
 import { ApiKeyService } from '../application/services/api-key.service';
+import { assertGrantable } from '../application/services/permission-grant';
 import { CreateApiKeySchema, type CreateApiKeyDto } from './dto/api-key.dto';
 
 @ApiTags('api-keys')
@@ -27,7 +28,10 @@ export class ApiKeyController {
   @RequirePermission(Permission.TENANT_MANAGE)
   @ApiOperation({ summary: 'Issue an API key — the plaintext is shown ONCE' })
   async create(@Body(zodBody(CreateApiKeySchema)) dto: CreateApiKeyDto) {
+    // Scopes become the key's permissions: never more than the issuer holds, never platform ones.
+    assertGrantable(dto.scopes);
     const result = await this.apiKeys.issue({
+      createdBy: getUserId() ?? null,
       name: dto.name,
       scopes: dto.scopes,
       ipAllowlist: dto.ipAllowlist,
