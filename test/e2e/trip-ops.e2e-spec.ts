@@ -208,4 +208,26 @@ describe('trip operations (e2e)', () => {
     expect((await set([])).status).toBe(200);
     expect((await chart(f.tripId)).body.trip.closedOnTrip).toEqual([]);
   });
+
+  it('a no-show is marked only after the bus was due to leave', async () => {
+    const f = app.fixtures;
+    const seats = (await chart(f.tripId)).body.seats as {
+      seatNumber: string;
+      blocked: boolean;
+      bookable: boolean;
+      occupants: unknown[];
+    }[];
+    const free = seats.filter((s) => s.bookable && !s.blocked && !s.occupants.length);
+    const { bookingId } = await confirmedBooking(app, free[1].seatNumber, {
+      fullName: 'Early Bird',
+    });
+    const t = (await app.get(`/bookings/${bookingId}/tickets`, op)).body.tickets[0];
+    const r = await app.post(`/bookings/tickets/${t.ticketId}/no-show`, {}, op);
+    expect(r.status, JSON.stringify(r.body)).toBe(422);
+    expect(r.body.detail).toMatch(/not left yet/);
+    expect(
+      (await app.post('/bookings/tickets/00000000-0000-4000-8000-000000000000/no-show', {}, op))
+        .status,
+    ).toBe(404);
+  });
 });

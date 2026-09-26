@@ -352,3 +352,5 @@ an unknown id is now 404 (was 200).
   and every allocation was a 409. The check is now done in SQL.
 - **Trip sales channels:** the chart's `trip` carries `closedOnTrip` and `closedByService`;
   `PUT /trips/:tripId/closed-channels` is refused (422) once the bus has left or the trip was cancelled.
+- **No-show:** `POST /bookings/tickets/:ticketId/no-show` only after the bus's departure time (the
+  passenger could still turn up) and never on a cancelled ticket (422).

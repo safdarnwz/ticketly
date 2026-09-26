@@ -172,12 +172,21 @@ export class TripOpsService {
    */
   async markNoShow(ticketId: TicketId): Promise<void> {
     await this.uow.run({ name: 'trip.markNoShow', tenantId: requireTenantId() }, async () => {
-      const status = await this.bookings.lockTicketStatus(ticketId);
-      if (!status)
+      const ticket = await this.bookings.lockTicket(ticketId);
+      if (!ticket)
         throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Ticket not found' });
-      if (status === 'boarded')
+      if (ticket.status === 'boarded')
         throw new AppError(ErrorCode.COMMON_CONFLICT, 422, {
           message: 'Passenger already boarded — cannot mark as no-show',
+        });
+      if (ticket.status === 'cancelled')
+        throw new AppError(ErrorCode.COMMON_CONFLICT, 422, {
+          message: 'This ticket was cancelled — it is not a no-show',
+        });
+      // Before departure the passenger can still turn up.
+      if (!ticket.departed)
+        throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+          message: 'The bus has not left yet — mark a no-show after the departure time',
         });
       await this.bookings.setTicketStatus(ticketId, 'no_show');
     });

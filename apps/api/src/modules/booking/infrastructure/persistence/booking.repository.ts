@@ -690,12 +690,18 @@ export class BookingRepository {
   }
 
   async lockTicketStatus(ticketId: string): Promise<string | null> {
-    const row = await this.db.queryOne<{ status: string }>(
-      `SELECT status FROM tickets WHERE tenant_id = $1 AND id = $2 FOR UPDATE`,
+    return (await this.lockTicket(ticketId))?.status ?? null;
+  }
+
+  /** The ticket (locked) with whether its bus's departure time has passed. */
+  async lockTicket(ticketId: string): Promise<{ status: string; departed: boolean } | null> {
+    return this.db.queryOne<{ status: string; departed: boolean }>(
+      `SELECT tk.status, (t.departs_at <= now()) AS departed
+         FROM tickets tk JOIN trips t ON t.id = tk.trip_id
+        WHERE tk.tenant_id = $1 AND tk.id = $2 FOR UPDATE OF tk`,
       [requireTenantId(), ticketId],
       { name: 'booking.lockTicket', primary: true },
     );
-    return row?.status ?? null;
   }
 
   async setTicketStatus(ticketId: string, status: 'boarded' | 'no_show'): Promise<void> {
