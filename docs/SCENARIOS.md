@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3104 |
-| TODO | 776 |
-| DONE | 198 |
+| TODO | 764 |
+| DONE | 210 |
 | DUP | 9 |
 
 
@@ -393,23 +393,23 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 356 | Assign daily booking targets to staff members | DONE | DONE | PUT/DELETE /users/:id/target; targets in /users/performance · UI: Staff modal target + Performance vs target |
 | 357 | View individual staff booking performance | DONE | DONE | GET /users/performance (bookings, seats, sales, cancellations per seller; bookings.booked_by) · UI: Staff page |
 | 358 | View individual staff cancellation rate | DONE | DONE | GET /users/performance (bookings, seats, sales, cancellations per seller; bookings.booked_by) · UI: Staff page |
-| 359 | Hold seats temporarily for walk-in passenger | DONE | TODO | verified manually: existing module/API |
-| 360 | Convert held seats to confirmed booking | DONE | TODO | verified manually: existing module/API |
+| 359 | Hold seats temporarily for walk-in passenger | DONE | DONE | verified manually: existing module/API · UI: Search & Book → hold then pay |
+| 360 | Convert held seats to confirmed booking | DONE | DONE | verified manually: existing module/API · UI: Search & Book → hold then pay |
 | 361 | Confirm booking received on phone | DONE | TODO | verified manually: existing module/API |
 | 362 | Verify booking done by agent | DONE | TODO | verified manually: existing module/API |
 | 363 | Approve agent booking | GAP | — | verified manually: not built yet |
 | 364 | Generate boarding chart in PDF | GAP | — | verified manually: not built yet |
 | 365 | Print boarding chart | DONE | DONE | GET /bookings/trips/:tripId/chart (passenger list by boarding point) — printed from the web chart · UI: Trips & Charts › chart: Print chart + passenger list |
 | 366 | Share boarding chart with conductor | GAP | — | verified manually: not built yet |
-| 367 | Approve passenger boarding point change request | DONE | TODO | verified manually: existing module/API |
-| 368 | Approve passenger drop point change request | DONE | TODO | verified manually: existing module/API |
-| 369 | Process seat shift request on same bus | DONE | TODO | verified manually: existing module/API |
-| 370 | Process date change request | DONE | TODO | verified manually: existing module/API |
-| 371 | Calculate fare difference on date change | DONE | TODO | verified manually: existing module/API |
-| 372 | Process full cancellation request | DONE | TODO | verified manually: existing module/API |
-| 373 | Initiate refund after cancellation | DONE | TODO | verified manually: existing module/API |
+| 367 | Approve passenger boarding point change request | DONE | DONE | verified manually: existing module/API · UI: Booking → Change… |
+| 368 | Approve passenger drop point change request | DONE | DONE | verified manually: existing module/API · UI: Booking → Change… |
+| 369 | Process seat shift request on same bus | DONE | DONE | verified manually: existing module/API · UI: Booking → Change… |
+| 370 | Process date change request | DONE | DONE | verified manually: existing module/API · UI: Booking → Change… |
+| 371 | Calculate fare difference on date change | DONE | DONE | verified manually: existing module/API · UI: Booking → Change… |
+| 372 | Process full cancellation request | DONE | DONE | verified manually: existing module/API · UI: Booking → Cancel… (refund shown first) |
+| 373 | Initiate refund after cancellation | DONE | DONE | verified manually: existing module/API · UI: Booking → Cancel… (refund shown first) |
 | 374 | Process partial cancellation of one passenger | DONE | DONE | POST /bookings/:id/cancel-seats (staff / owner / booking mobile; seat_count kept in step) · UI: booking detail › Cancel… (pick seats, refund preview, reason) |
-| 375 | Mark passenger as no-show | DONE | TODO | verified manually: existing module/API |
+| 375 | Mark passenger as no-show | DONE | DONE | verified manually: existing module/API · UI: Booking → No-show (after departure) |
 | 376 | Generate daily cash collection summary | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 377 | View digital payment collection summary | GAP | — | verified manually: not built yet |
 | 378 | Reconcile total cash plus digital collection | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
@@ -448,7 +448,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 411 | View real-time seat availability of any service | DONE | DONE | verified manually: existing module/API · UI: Trip chart (live seat map) |
 | 412 | Block seats for VIP or special movement | DONE | DONE | verified manually: existing module/API · UI: Trips & Charts › chart: Block / open seats |
 | 413 | Release previously blocked VIP seats | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Block / open seats |
-| 414 | Change boarding point for multiple passengers together | DONE | TODO | verified manually: existing module/API |
+| 414 | Change boarding point for multiple passengers together | DONE | DONE | verified manually: existing module/API · UI: Booking → Change… |
 | 415 | Search booking using PNR number | DONE | DONE | verified manually: existing module/API · UI: operator Bookings list + detail (find by PNR/mobile/ticket, filters, CSV) |
 | 416 | Search booking using mobile number | DONE | DONE | GET /bookings/search?mobile= (last-10-digit match) · UI: operator Bookings list + detail (find by PNR/mobile/ticket, filters, CSV) |
 | 417 | Search booking using ticket number | DONE | DONE | GET /bookings/search?ticket= · UI: operator Bookings list + detail (find by PNR/mobile/ticket, filters, CSV) |
@@ -456,7 +456,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 419 | Manually apply senior citizen discount | DONE | TODO | verified manually: existing module/API |
 | 420 | Manually apply student discount | DONE | TODO | verified manually: existing module/API |
 | 421 | Override ladies seat restriction with proper reason | DONE | TODO | POST /bookings/hold ladiesSeatOverrideReason (staff only, event booking.ladies_seat_override) |
-| 422 | Show cancellation charges to passenger before confirming | DONE | TODO | verified manually: existing module/API |
+| 422 | Show cancellation charges to passenger before confirming | DONE | DONE | verified manually: existing module/API · UI: Booking → Cancel… (refund shown first) |
 | 423 | Process refund back to original payment method | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
 | 424 | Process refund in cash | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 425 | View list of pending refunds for branch | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
