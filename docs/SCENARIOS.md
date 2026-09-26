@@ -14,8 +14,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Backend status | Count |
 |---|---|
 | OPEN | 2711 |
-| DONE | 974 |
-| GAP | 291 |
+| DONE | 975 |
+| GAP | 290 |
 | CONFLICT | 76 |
 | INFRA | 20 |
 | DUP | 9 |
@@ -23,9 +23,9 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 | Frontend status | Count |
 |---|---|
-| — | 3104 |
-| TODO | 764 |
-| DONE | 210 |
+| — | 3103 |
+| TODO | 747 |
+| DONE | 228 |
 | DUP | 9 |
 
 
@@ -191,11 +191,11 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 154 | Map primary pickup points | DONE | TODO | verified manually: existing module/API |
 | 155 | Map secondary pickup points | DONE | TODO | verified manually: existing module/API |
 | 156 | Map drop points | DONE | TODO | verified manually: existing module/API |
-| 157 | Create complete stage-to-stage fare matrix | DONE | TODO | verified manually: existing module/API |
-| 158 | Set base fare for main route | DONE | TODO | verified manually: existing module/API |
-| 159 | Set peak hour fare multiplier | DONE | TODO | PUT /pricing/routes/:id/rules peakWindows |
-| 160 | Set off-peak fare multiplier | DONE | TODO | PUT /pricing/routes/:id/rules peakWindows (−%) |
-| 161 | Apply festive season fare hike percentage | DONE | TODO | verified manually: existing module/API |
+| 157 | Create complete stage-to-stage fare matrix | DONE | DONE | verified manually: existing module/API · UI: Pricing → Fare plans (seat-type fares, seat overrides) |
+| 158 | Set base fare for main route | DONE | DONE | verified manually: existing module/API · UI: Pricing → Fare plans (seat-type fares, seat overrides) |
+| 159 | Set peak hour fare multiplier | DONE | DONE | PUT /pricing/routes/:id/rules peakWindows · UI: Pricing → Route limits & peak times |
+| 160 | Set off-peak fare multiplier | DONE | DONE | PUT /pricing/routes/:id/rules peakWindows (−%) · UI: Pricing → Route limits & peak times |
+| 161 | Apply festive season fare hike percentage | DONE | DONE | verified manually: existing module/API · UI: Pricing → Fare plan: sheet download/upload, change all by % |
 | 162 | Create daily service for specific date | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
 | 163 | Set service departure time | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
 | 164 | Set service arrival time | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
@@ -265,7 +265,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 228 | View OTA vs Direct booking percentage | GAP | — | verified manually: not built yet |
 | 229 | View cash vs digital collection split | CONFLICT | — | earlier product decision |
 | 230 | Configure occupancy-based dynamic pricing rule | DONE | TODO | verified manually: existing module/API |
-| 231 | Configure time-based pricing rule | DONE | TODO | peak windows by departure time |
+| 231 | Configure time-based pricing rule | DONE | DONE | peak windows by departure time · UI: Pricing → Route limits & peak times |
 | 232 | Configure demand surge pricing rule | GAP | — | verified manually: not built yet |
 | 233 | Block complete inventory for charter | DONE | DONE | verified manually: existing module/API · UI: Trips & Charts › chart: Block / open seats |
 | 234 | Release previously blocked inventory | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Block / open seats |
@@ -301,7 +301,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 264 | Change allocated crew last minute | DONE | TODO | verified manually: existing module/API |
 | 265 | Add internal remark on service | DONE | DONE | POST/GET /scheduling/trips/:id/remarks · UI: Trips & Charts › chart: Staff remarks |
 | 266 | Clone an existing service to new date | DONE | DONE | POST /scheduling/services/:id/clone · UI: Schedule → Manage service |
-| 267 | Bulk update fares using Excel | DONE | TODO | GET rules.csv + POST /pricing/fare-plans/:id/rules/import / adjust |
+| 267 | Bulk update fares using Excel | DONE | DONE | GET rules.csv + POST /pricing/fare-plans/:id/rules/import / adjust · UI: Pricing → Fare plan: sheet download/upload, change all by % |
 | 268 | Bulk create schedules using Excel | GAP | — | verified manually: not built yet |
 | 269 | View complete schedule version history | DONE | DONE | GET /scheduling/services/:id/versions · UI: Schedule → Manage service |
 | 270 | Rollback schedule to previous version | DONE | DONE | POST /scheduling/services/:id/versions/:n/restore · UI: Schedule → Manage service |
@@ -315,8 +315,8 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 278 | View occupancy forecast for next 15 days | DONE | TODO | GET /reports/occupancy-forecast?days=15 |
 | 279 | Accept AI suggestion for adding extra trip | DONE | DONE | verified manually: existing module/API · UI: Schedule → Busy trips suggestions |
 | 280 | Reject AI suggestion for cancelling service | DONE | TODO | GET /reports/cancel-suggestions; POST /trips/:tripId/cancel-suggestion/decision |
-| 281 | Set minimum fare floor value | DONE | TODO | route floor (engine, after yield) |
-| 282 | Set maximum fare ceiling value | DONE | TODO | route ceiling (engine, after yield) |
+| 281 | Set minimum fare floor value | DONE | DONE | route floor (engine, after yield) · UI: Pricing → Route limits & peak times |
+| 282 | Set maximum fare ceiling value | DONE | DONE | route ceiling (engine, after yield) · UI: Pricing → Route limits & peak times |
 | 283 | Configure round-trip discount percentage | GAP | — | verified manually: not built yet |
 | 284 | Manage master list of boarding points | DONE | TODO | verified manually: existing module/API |
 | 285 | Manage master list of drop points | DONE | TODO | verified manually: existing module/API |
@@ -388,8 +388,8 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 351 | Login to assigned branch dashboard | GAP | — | verified manually: not built yet |
 | 352 | View list of today’s services under branch | GAP | — | verified manually: not built yet |
 | 353 | View real-time seat occupancy of each service | DONE | DONE | verified manually: existing module/API · UI: Trip chart (live seat map) |
-| 354 | Apply special discount on low occupancy service | DONE | TODO | PUT /pricing/trips/:id/adjustment (−%) |
-| 355 | Temporarily increase fare on high demand service | DONE | TODO | PUT /pricing/trips/:id/adjustment (+%) |
+| 354 | Apply special discount on low occupancy service | DONE | DONE | PUT /pricing/trips/:id/adjustment (−%) · UI: Trip chart → Fare for this trip |
+| 355 | Temporarily increase fare on high demand service | DONE | DONE | PUT /pricing/trips/:id/adjustment (+%) · UI: Trip chart → Fare for this trip |
 | 356 | Assign daily booking targets to staff members | DONE | DONE | PUT/DELETE /users/:id/target; targets in /users/performance · UI: Staff modal target + Performance vs target |
 | 357 | View individual staff booking performance | DONE | DONE | GET /users/performance (bookings, seats, sales, cancellations per seller; bookings.booked_by) · UI: Staff page |
 | 358 | View individual staff cancellation rate | DONE | DONE | GET /users/performance (bookings, seats, sales, cancellations per seller; bookings.booked_by) · UI: Staff page |
@@ -538,7 +538,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 ## #501–#1000
 
-CONFLICT 11, DONE 259, DUP 2, GAP 64, INFRA 3, PROCESS 2
+CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -751,13 +751,13 @@ CONFLICT 11, DONE 259, DUP 2, GAP 64, INFRA 3, PROCESS 2
 | 707 | Set percentage of inventory to release to OTAs | DONE | DONE | PUT /scheduling/services/:id/sales-rules (same as #173/#174/#170) · UI: Schedule → Manage service |
 | 708 | Pull back inventory from OTA at last moment | DONE | DONE | PUT /trips/:tripId/closed-channels (ota off/on per trip) · UI: Trip chart → Sales channels |
 | 709 | Apply dynamic pricing rule on selected service | DONE | TODO | verified manually: existing module/API |
-| 710 | Define peak time fare | DONE | TODO | verified manually: existing module/API |
-| 711 | Define off-peak time fare | DONE | TODO | verified manually: existing module/API |
-| 712 | Apply festive season fare increase | DONE | TODO | verified manually: existing module/API |
-| 713 | Release seats under promotional discount | DONE | TODO | verified manually: existing module/API |
-| 714 | Update complete fare matrix | DONE | TODO | verified manually: existing module/API |
-| 715 | Perform bulk fare update for multiple services | GAP | — | verified manually: not built yet |
-| 716 | Set different fare for different seat types | DONE | TODO | verified manually: existing module/API |
+| 710 | Define peak time fare | DONE | DONE | verified manually: existing module/API · UI: Pricing → Route limits & peak times |
+| 711 | Define off-peak time fare | DONE | DONE | verified manually: existing module/API · UI: Pricing → Route limits & peak times |
+| 712 | Apply festive season fare increase | DONE | DONE | verified manually: existing module/API · UI: Pricing → Fare plan: sheet download/upload, change all by % |
+| 713 | Release seats under promotional discount | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Fare for this trip |
+| 714 | Update complete fare matrix | DONE | DONE | verified manually: existing module/API · UI: Pricing → Fare plan: sheet download/upload, change all by % |
+| 715 | Perform bulk fare update for multiple services | DONE | DONE | POST /pricing/fare-plans/:id/rules/adjust (all fares of a route's plan by %) · UI: Pricing → Fare plan: sheet download/upload, change all by % |
+| 716 | Set different fare for different seat types | DONE | DONE | verified manually: existing module/API · UI: Pricing → Fare plans (seat-type fares, seat overrides) |
 | 717 | View current inventory utilization report | DONE | TODO | verified manually: existing module/API |
 | 718 | Identify services running with low occupancy | DONE | TODO | verified manually: existing module/API |
 | 719 | Add extra seats or service on high demand | DONE | DONE | verified manually: existing module/API · UI: Schedule → Busy trips suggestions |
@@ -794,7 +794,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 ## #501–#1000
 
-CONFLICT 11, DONE 259, DUP 2, GAP 64, INFRA 3, PROCESS 2
+CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
