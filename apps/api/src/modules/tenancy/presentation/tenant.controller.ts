@@ -1,4 +1,4 @@
-import { Query, Body, Controller, Delete, Get, Patch, Post, HttpCode } from '@nestjs/common';
+import { Query, Body, Controller, Delete, Get, Patch, Post, Put, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { FileService } from '../../files';
 import { AppError, BadRequestError, ErrorCode, NotFoundError } from '@kernel';
@@ -26,6 +26,8 @@ import {
   type SetLogoDto,
   SetInvoicePrefixSchema,
   type SetInvoicePrefixDto,
+  ConnectionRulesSchema,
+  type ConnectionRulesDto,
 } from './dto/tenant.dto';
 import { TenantBrandingService } from '../application/services/tenant-branding.service';
 import { TenantContextService } from '../application/services/tenant-context.service';
@@ -34,6 +36,7 @@ import { PayoutRepository } from '../infrastructure/persistence/payout.repositor
 import { UnitOfWork } from '@database';
 import { getUserId } from '@kernel';
 import { DEFAULT_REFUND_POLICY } from '../../booking';
+import { DEFAULT_LAYOVER } from '../../search';
 
 /**
  * The operator's own settings surface (tenant-scoped). Unlike the admin
@@ -289,5 +292,38 @@ export class TenantController {
   async setInvoicePrefix(@Body(zodBody(SetInvoicePrefixSchema)) dto: SetInvoicePrefixDto) {
     await this.tenants.setInvoicePrefix(dto.prefix);
     return { ok: true };
+  }
+
+  @Get('connection-rules')
+  @RequirePermission(Permission.TENANT_READ)
+  @ApiOperation({
+    summary:
+      "Connections onto this operator's buses: taking part, shortest and longest change (platform default until set)",
+  })
+  async getConnectionRules() {
+    const custom = (await this.tenants.getConnectionRules()) as ConnectionRulesDto | null;
+    return {
+      rules: custom ?? { enabled: true, ...DEFAULT_LAYOVER },
+      isCustom: custom !== null,
+    };
+  }
+
+  @Put('connection-rules')
+  @RequirePermission(Permission.TENANT_MANAGE)
+  @ApiOperation({
+    summary: "Set this operator's connection rules (applies to searches from now on)",
+  })
+  async setConnectionRules(@Body(zodBody(ConnectionRulesSchema)) dto: ConnectionRulesDto) {
+    await this.tenants.setConnectionRules(dto);
+    return { ok: true, rules: dto };
+  }
+
+  @Post('connection-rules/reset')
+  @HttpCode(200)
+  @RequirePermission(Permission.TENANT_MANAGE)
+  @ApiOperation({ summary: 'Back to the platform default connection rules' })
+  async resetConnectionRules() {
+    await this.tenants.setConnectionRules(null);
+    return { ok: true, rules: { enabled: true, ...DEFAULT_LAYOVER } };
   }
 }

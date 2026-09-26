@@ -527,6 +527,26 @@ export class TenantRepository {
     return row?.prefix ?? null;
   }
 
+  /** This operator's rule for connections that change onto its buses, or null (platform default). */
+  async getConnectionRules(): Promise<unknown> {
+    const row = await this.db.queryOne<{ rules: unknown }>(
+      `SELECT settings->'connections' AS rules FROM tenants WHERE id = $1`,
+      [requireTenantId()],
+      { name: 'tenant.getConnectionRules', primary: true },
+    );
+    return row?.rules ?? null;
+  }
+
+  async setConnectionRules(rules: object | null): Promise<void> {
+    await this.db.execute_(
+      `UPDATE tenants SET settings = CASE WHEN $2::jsonb IS NULL THEN settings - 'connections'
+                                          ELSE jsonb_set(settings, '{connections}', $2::jsonb) END,
+              version = version + 1 WHERE id = $1`,
+      [requireTenantId(), rules ? JSON.stringify(rules) : null],
+      { name: 'tenant.setConnectionRules', primary: true },
+    );
+  }
+
   async setInvoicePrefix(prefix: string): Promise<void> {
     await this.db.execute_(
       `UPDATE tenants SET settings = jsonb_set(settings, '{invoicePrefix}', to_jsonb($2::text)), version = version + 1 WHERE id = $1`,

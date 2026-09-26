@@ -435,3 +435,7 @@ an unknown id is now 404 (was 200).
   false = customers, agents and partners must cancel whole bookings — `cancel-seats` of some seats is 422,
   staff can still split) and `noShowGraceMinutes` (0–240; a no-show can be marked only that long after
   departure, 422 before).
+- **Connection rules:** new `GET/PUT /operator/connection-rules {enabled, minLayoverMin 15–720,
+  maxLayoverMin ≤ 1440 and > min}` and `POST /operator/connection-rules/reset`. `POST /search/connecting`
+  now leaves out every bus of an operator that opted out, and a change onto an operator's bus uses its own
+  window (its minimum is a floor the traveller's `minLayoverMin` cannot go under).

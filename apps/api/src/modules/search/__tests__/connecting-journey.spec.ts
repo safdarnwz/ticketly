@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 
-import { buildConnections, type JourneyLeg } from '../domain/connecting-journey';
+import {
+  buildConnections,
+  DEFAULT_LAYOVER,
+  layoverWindow,
+  type JourneyLeg,
+} from '../domain/connecting-journey';
 
 const leg = (o: Partial<JourneyLeg>): JourneyLeg => ({
   tripId: 't',
@@ -94,5 +99,46 @@ describe('buildConnections', () => {
 
   it('negative: an inverted layover window throws', () => {
     expect(() => buildConnections([], [], { minLayoverMin: 200, maxLayoverMin: 30 })).toThrow();
+  });
+});
+
+describe('layoverWindow (operator connection rules)', () => {
+  const rule = { enabled: true, minLayoverMin: 45, maxLayoverMin: 300 };
+  it('without a rule, the traveller window or the default', () => {
+    expect(layoverWindow({}, null)).toEqual(DEFAULT_LAYOVER);
+    expect(layoverWindow({ minLayoverMin: 30 }, null)).toEqual({
+      minLayoverMin: 30,
+      maxLayoverMin: DEFAULT_LAYOVER.maxLayoverMin,
+    });
+  });
+  it("the operator's minimum is a floor and its maximum a ceiling", () => {
+    expect(layoverWindow({}, rule)).toEqual({ minLayoverMin: 45, maxLayoverMin: 300 });
+    expect(layoverWindow({ minLayoverMin: 10, maxLayoverMin: 1000 }, rule)).toEqual({
+      minLayoverMin: 45,
+      maxLayoverMin: 300,
+    });
+    expect(layoverWindow({ minLayoverMin: 90, maxLayoverMin: 120 }, rule)).toEqual({
+      minLayoverMin: 90,
+      maxLayoverMin: 120,
+    });
+  });
+  it('a per-bus window decides each pair', () => {
+    const at = (h: number) => new Date(Date.UTC(2026, 0, 1, h)).toISOString();
+    const leg = (id: string, from: string, to: string, dep: number, arr: number) => ({
+      tripId: id,
+      fromHub: from,
+      toHub: to,
+      departsAt: at(dep),
+      arrivesAt: at(arr),
+      priceMinor: 100,
+      availableSeats: 5,
+      currency: 'INR',
+    });
+    const first = [leg('a', 'O', 'H', 1, 5)];
+    const second = [leg('b', 'H', 'D', 6, 9), leg('c', 'H', 'D', 8, 11)]; // 60 and 180 min layovers
+    const strict = (s: { tripId: string }) =>
+      s.tripId === 'b' ? { minLayoverMin: 90, maxLayoverMin: 300 } : DEFAULT_LAYOVER;
+    const r = buildConnections(first, second, { minLayoverMin: 0, maxLayoverMin: 1440 }, strict);
+    expect(r.map((j) => j.legs[1].tripId)).toEqual(['c']);
   });
 });

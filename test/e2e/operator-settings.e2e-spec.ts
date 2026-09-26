@@ -95,6 +95,44 @@ describe('operator settings (e2e)', () => {
     }
   });
 
+  it('connection rules: a sane layover window, back to the default on reset', async () => {
+    const before = (await app.get('/operator/connection-rules', op)).body;
+    expect(before.rules).toMatchObject({ enabled: expect.any(Boolean) });
+    const put = (body: object) => app.put('/operator/connection-rules', body, op);
+    try {
+      expect((await put({ enabled: true, minLayoverMin: 60, maxLayoverMin: 60 })).status).toBe(400);
+      expect((await put({ enabled: true, minLayoverMin: 5, maxLayoverMin: 300 })).status).toBe(400);
+      expect((await put({ enabled: true, minLayoverMin: 60 })).status).toBe(400);
+      expect(
+        (
+          await app.put('/operator/connection-rules', {
+            enabled: false,
+            minLayoverMin: 60,
+            maxLayoverMin: 300,
+          })
+        ).status,
+      ).toBe(403);
+      expect((await put({ enabled: false, minLayoverMin: 45, maxLayoverMin: 300 })).status).toBe(
+        200,
+      );
+      const now = (await app.get('/operator/connection-rules', op)).body;
+      expect(now).toEqual({
+        rules: { enabled: false, minLayoverMin: 45, maxLayoverMin: 300 },
+        isCustom: true,
+      });
+    } finally {
+      if (before.isCustom) await put(before.rules);
+      else {
+        const reset = await app.post('/operator/connection-rules/reset', {}, op);
+        expect(reset.body.rules).toEqual({
+          enabled: true,
+          minLayoverMin: 120,
+          maxLayoverMin: 1440,
+        });
+      }
+    }
+  });
+
   it('templates: known events and placeholders only, with the catalogue served', async () => {
     const list = await app.get('/notifications/templates', op);
     expect(list.status).toBe(200);

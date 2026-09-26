@@ -39,6 +39,8 @@ function service(
   hubs = [{ cityId: H, name: 'Hub' }],
   /** Trips whose paid promotion puts them on top (the real rule lives in SearchService.promote). */
   promoted = new Set<string>(),
+  /** Operators' own connection rules, by tenant id. */
+  rules = new Map<string, { enabled: boolean; minLayoverMin: number; maxLayoverMin: number }>(),
 ) {
   const search = {
     search: async (i: { originCityId: string; destCityId: string; journeyDate: string }) =>
@@ -48,7 +50,7 @@ function service(
       ...rows.filter((r) => !promoted.has(r.tripId)),
     ],
   };
-  const hubRepo = { hubsBetween: async () => hubs };
+  const hubRepo = { hubsBetween: async () => hubs, connectionRules: async () => rules };
   return new JourneySearchService(
     search as never,
     hubRepo as never,
@@ -82,6 +84,37 @@ describe('JourneySearchService.connecting', () => {
     expect(
       await svc.connecting({ originCityId: A, destCityId: B, journeyDate: D1, minLayoverMin: 30 }),
     ).toHaveLength(1);
+  });
+
+  it("follows each operator's connection rule for changes onto its buses", async () => {
+    const onto = (tenant: string) => ({
+      ...result('leg2', '2026-10-01T11:00:00Z', '2026-10-01T15:00:00Z'),
+      tenantId: tenant as never,
+    });
+    const trips = (tenant: string) => ({
+      [`${A}>${H}@${D1}`]: [result('leg1', '2026-10-01T06:00:00Z', '2026-10-01T10:00:00Z')],
+      [`${H}>${B}@${D1}`]: [onto(tenant)],
+    });
+    const q = { originCityId: A, destCityId: B, journeyDate: D1 };
+    // A 60-minute change: too short by default, fine for an operator that allows 45.
+    const quick = new Map([['fast', { enabled: true, minLayoverMin: 45, maxLayoverMin: 300 }]]);
+    expect(await service(trips('fast'), undefined, undefined, quick).connecting(q)).toHaveLength(1);
+    // …and a traveller cannot go under an operator's own minimum.
+    const careful = new Map([['slow', { enabled: true, minLayoverMin: 90, maxLayoverMin: 300 }]]);
+    expect(
+      await service(trips('slow'), undefined, undefined, careful).connecting({
+        ...q,
+        minLayoverMin: 30,
+      }),
+    ).toEqual([]);
+    // An operator that opted out is never a leg.
+    const out = new Map([['off', { enabled: false, minLayoverMin: 45, maxLayoverMin: 300 }]]);
+    expect(
+      await service(trips('off'), undefined, undefined, out).connecting({
+        ...q,
+        minLayoverMin: 30,
+      }),
+    ).toEqual([]);
   });
 
   it('only uses the requested hub when one is given', async () => {

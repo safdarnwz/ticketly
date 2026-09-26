@@ -60,6 +60,8 @@ export function buildConnections<L extends JourneyLeg>(
   firstLegs: L[],
   secondLegs: L[],
   options: ConnectionOptions,
+  /** A narrower window for one onward bus (its operator's own rule); `options` when absent. */
+  windowFor?: (second: L) => ConnectionOptions,
 ): ConnectingJourney<L>[] {
   if (options.minLayoverMin < 0 || options.maxLayoverMin < options.minLayoverMin) {
     throw new DomainError(ErrorCode.CONNECTION_INVALID_LAYOVER, 'Layover window is invalid', {
@@ -75,7 +77,8 @@ export function buildConnections<L extends JourneyLeg>(
       if (second.toHub === first.fromHub) continue;
 
       const layoverMin = Math.round((toMs(second.departsAt) - toMs(first.arrivesAt)) / 60000);
-      if (layoverMin < options.minLayoverMin || layoverMin > options.maxLayoverMin) continue;
+      const w = windowFor?.(second) ?? options;
+      if (layoverMin < w.minLayoverMin || layoverMin > w.maxLayoverMin) continue;
 
       out.push({
         legs: [first, second],
@@ -94,4 +97,33 @@ export function buildConnections<L extends JourneyLeg>(
     (a, b) => a.totalDurationMin - b.totalDurationMin || a.totalPriceMinor - b.totalPriceMinor,
   );
   return out;
+}
+
+/** An operator's own rule for connections that change onto its buses. */
+export interface OperatorConnectionRule {
+  /** False: none of this operator's buses is sold as part of a connection. */
+  enabled: boolean;
+  minLayoverMin: number;
+  maxLayoverMin: number;
+}
+
+/**
+ * The layover window for changing onto one operator's bus. Without a rule of
+ * its own the traveller's window (or the default) applies; with one, the
+ * operator's minimum is a floor the traveller cannot go under (it is how long
+ * that operator says a change takes) and its maximum a ceiling.
+ */
+export function layoverWindow(
+  requested: Partial<ConnectionOptions>,
+  rule: OperatorConnectionRule | null,
+): ConnectionOptions {
+  if (!rule)
+    return {
+      minLayoverMin: requested.minLayoverMin ?? DEFAULT_LAYOVER.minLayoverMin,
+      maxLayoverMin: requested.maxLayoverMin ?? DEFAULT_LAYOVER.maxLayoverMin,
+    };
+  return {
+    minLayoverMin: Math.max(requested.minLayoverMin ?? 0, rule.minLayoverMin),
+    maxLayoverMin: Math.min(requested.maxLayoverMin ?? rule.maxLayoverMin, rule.maxLayoverMin),
+  };
 }

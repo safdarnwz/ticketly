@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 569 |
-| DONE | 406 |
+| TODO | 566 |
+| DONE | 409 |
 | DUP | 9 |
 
 
@@ -269,8 +269,8 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 232 | Configure demand surge pricing rule | GAP | — | verified manually: not built yet |
 | 233 | Block complete inventory for charter | DONE | DONE | verified manually: existing module/API · UI: Trips & Charts › chart: Block / open seats |
 | 234 | Release previously blocked inventory | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Block / open seats |
-| 235 | Create multi-hop connecting service | DONE | TODO | verified manually: existing module/API |
-| 236 | Define layover time rules | DONE | TODO | verified manually: existing module/API |
+| 235 | Create multi-hop connecting service | DONE | DONE | verified manually: existing module/API · UI: Settings → Connections: take part in two-bus journeys, shortest/longest change; preview your own connections |
+| 236 | Define layover time rules | DONE | DONE | verified manually: existing module/API · UI: Settings → Connections: take part in two-bus journeys, shortest/longest change; preview your own connections |
 | 237 | Configure waitlist maximum size | GAP | — | verified manually: not built yet |
 | 238 | Set waitlist auto-confirm rules | GAP | — | verified manually: not built yet |
 | 239 | Set waitlist entry expiry hours | GAP | — | verified manually: not built yet |
@@ -766,7 +766,7 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 722 | Resolve schedule clash | GAP | — | verified manually: not built yet |
 | 723 | Allocate specific bus to service | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Assign / Change bus |
 | 724 | Configure merge of two buses into one service | GAP | — | verified manually: not built yet |
-| 725 | Set up multi-hop connecting service | DONE | TODO | verified manually: existing module/API |
+| 725 | Set up multi-hop connecting service | DONE | DONE | verified manually: existing module/API · UI: Settings → Connections: take part in two-bus journeys, shortest/longest change; preview your own connections |
 | 726 | Define blackout dates when service will not run | DONE | DONE | POST /scheduling/routes/:id/blackouts (same as #271) · UI: Schedule → Route blackouts |
 | 727 | Increase frequency of service | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
 | 728 | Decrease frequency of service | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |

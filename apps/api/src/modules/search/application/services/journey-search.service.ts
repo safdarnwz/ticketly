@@ -5,7 +5,7 @@ import { addDays, formatInstantTime, type CityId, type LocalDate, type StopId } 
 
 import {
   buildConnections,
-  DEFAULT_LAYOVER,
+  layoverWindow,
   type ConnectingJourney,
   type JourneyLeg,
 } from '../../domain/connecting-journey';
@@ -126,10 +126,8 @@ export class JourneySearchService {
       q.hubCityId ? 1000 : MAX_HUBS,
     );
     const chosen = q.hubCityId ? hubs.filter((h) => h.cityId === q.hubCityId) : hubs;
-    const layover = {
-      minLayoverMin: q.minLayoverMin ?? DEFAULT_LAYOVER.minLayoverMin,
-      maxLayoverMin: q.maxLayoverMin ?? DEFAULT_LAYOVER.maxLayoverMin,
-    };
+    const requested = { minLayoverMin: q.minLayoverMin, maxLayoverMin: q.maxLayoverMin };
+    const layover = layoverWindow(requested, null);
 
     const perHub = await Promise.all(
       chosen.map(async (hub) => {
@@ -156,10 +154,18 @@ export class JourneySearchService {
           toHub,
           priceMinor: r.fromPriceMinor,
         });
+        const second = [...secondSameDay, ...secondNextDay];
+        // Each operator decides whether its buses take part, and how long a
+        // change onto its bus must (and may) take.
+        const rules = await this.hubs.connectionRules([
+          ...new Set([...first, ...second].map((r) => r.tenantId)),
+        ]);
+        const takesPart = (r: SearchResult) => rules.get(r.tenantId)?.enabled !== false;
         return buildConnections(
-          first.map((r) => leg(r, q.originCityId, hub.cityId)),
-          [...secondSameDay, ...secondNextDay].map((r) => leg(r, hub.cityId, q.destCityId)),
+          first.filter(takesPart).map((r) => leg(r, q.originCityId, hub.cityId)),
+          second.filter(takesPart).map((r) => leg(r, hub.cityId, q.destCityId)),
           layover,
+          (onward) => layoverWindow(requested, rules.get(onward.tenantId) ?? null),
         ).map((j) => ({ ...j, hubCity: hub }));
       }),
     );

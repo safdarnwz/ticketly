@@ -3,6 +3,8 @@ import { Injectable } from '@nestjs/common';
 import { UnitOfWork } from '@database';
 import type { CityId } from '@kernel';
 
+import type { OperatorConnectionRule } from '../domain/connecting-journey';
+
 export interface HubCity {
   cityId: CityId;
   name: string;
@@ -37,6 +39,22 @@ export class ConnectionHubRepository {
           [originCityId, destCityId, limit],
         );
         return r.rows.map((row) => ({ cityId: row.city_id, name: row.name }));
+      },
+    );
+  }
+
+  /** Each operator's own connection rule (null when it keeps the platform default). */
+  async connectionRules(tenantIds: string[]): Promise<Map<string, OperatorConnectionRule>> {
+    if (!tenantIds.length) return new Map();
+    return this.uow.run(
+      { name: 'search.connectionRules', bypassRls: true, readOnly: true },
+      async (scope) => {
+        const r = await scope.client.query<{ id: string; rules: OperatorConnectionRule }>(
+          `SELECT id, settings->'connections' AS rules FROM tenants
+            WHERE id = ANY($1::uuid[]) AND settings ? 'connections'`,
+          [tenantIds],
+        );
+        return new Map(r.rows.map((row) => [row.id, row.rules]));
       },
     );
   }

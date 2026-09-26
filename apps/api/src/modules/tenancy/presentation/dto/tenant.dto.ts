@@ -172,3 +172,19 @@ export const SetInvoicePrefixSchema = z.object({
     .regex(/^[A-Za-z0-9]*$/, 'Letters and digits only'),
 });
 export type SetInvoicePrefixDto = z.infer<typeof SetInvoicePrefixSchema>;
+
+/**
+ * Connections that change onto this operator's buses: whether it takes part
+ * at all, and how long a change must take at least / may take at most.
+ */
+export const ConnectionRulesSchema = z
+  .object({
+    enabled: z.boolean(),
+    minLayoverMin: z.number().int().min(15).max(720),
+    maxLayoverMin: z.number().int().min(30).max(1440),
+  })
+  .refine((r) => r.maxLayoverMin > r.minLayoverMin, {
+    message: 'The longest wait must be more than the shortest',
+    path: ['maxLayoverMin'],
+  });
+export type ConnectionRulesDto = z.infer<typeof ConnectionRulesSchema>;
