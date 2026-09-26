@@ -45,6 +45,7 @@ import { PromotionsPage } from '@/pages/promotions/PromotionsPage';
 import { PlatformSettingsPage } from '@/pages/settings/PlatformSettingsPage';
 import { StaffTripPage } from '@/pages/storefront/StaffTripPage';
 import { BranchesPage } from '@/pages/branches/BranchesPage';
+import { StaffPage } from '@/pages/staff/StaffPage';
 import { CustomersPage } from '@/pages/crm/CustomersPage';
 import { ReportsPage } from '@/pages/reports/ReportsPage';
 import { AnnouncementsPage } from '@/pages/announcements/AnnouncementsPage';
@@ -123,6 +124,7 @@ const tenantAdminRouter = createBrowserRouter([
             ],
           },
           { path: '/branches', element: <BranchesPage /> },
+          { path: '/staff', element: <StaffPage /> },
           { path: '/customers', element: <CustomersPage /> },
           { path: '/reports', element: <ReportsPage /> },
           { path: '/search', element: <SearchPage /> },

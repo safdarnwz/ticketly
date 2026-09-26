@@ -2,14 +2,15 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Building2, PauseCircle, PlayCircle, Pencil } from 'lucide-react';
 
-import { Button, Badge, Table, type Column, Modal, Input, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
+import { Button, Badge, Table, type Column, Modal, Input, PageLoader, ErrorState, EmptyState, useToast, Select } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ApiError } from '@/lib/api/client';
 import { branchesApi, WEEKDAYS, type Branch, type Weekday, type WorkingHours } from '@/lib/api/branches';
+import { staffApi } from '@/lib/api/staff';
 
 const DAY_LABEL: Record<Weekday, string> = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
 const DEFAULT_HOURS: WorkingHours = Object.fromEntries(WEEKDAYS.map((d) => [d, { open: '06:00', close: '22:00' }]));
-const EMPTY = { name: '', address: '', phone: '', hours: DEFAULT_HOURS };
+const EMPTY = { name: '', address: '', phone: '', managerUserId: '', hours: DEFAULT_HOURS };
 type Form = typeof EMPTY;
 
 /** Same rules as the API, shown next to each field. */
@@ -44,10 +45,12 @@ export function BranchesPage() {
   const [form, setForm] = useState<Form>(EMPTY);
 
   const branches = useQuery({ queryKey: ['branches'], queryFn: branchesApi.list });
+  const staff = useQuery({ queryKey: ['staff', 'managers'], queryFn: () => staffApi.list({ status: 'active', page: 1 }) });
+  const staffName = (id: string | null) => (id ? staff.data?.items.find((x) => x.id === id)?.fullName ?? '—' : '—');
 
   const save = useMutation({
     mutationFn: () => {
-      const body = { name: form.name.trim(), address: form.address.trim(), phone: form.phone.trim(), workingHours: form.hours };
+      const body = { name: form.name.trim(), address: form.address.trim(), phone: form.phone.trim(), workingHours: form.hours, managerUserId: form.managerUserId || undefined };
       return editing === 'new' ? branchesApi.create(body).then(() => undefined) : branchesApi.update((editing as Branch).id, body).then(() => undefined);
     },
     onSuccess: () => { toast.success(editing === 'new' ? `${form.name.trim()} added` : 'Branch saved'); setEditing(null); void qc.invalidateQueries({ queryKey: ['branches'] }); },
@@ -63,7 +66,7 @@ export function BranchesPage() {
   const server = save.error instanceof ApiError ? save.error.fieldErrors : {};
   const err = (k: string) => (tried ? errors[k] : undefined) ?? server[k];
   const open = (b: Branch | 'new') => {
-    setForm(b === 'new' ? EMPTY : { name: b.name, address: b.address ?? '', phone: b.phone ?? '', hours: Object.keys(b.workingHours ?? {}).length ? b.workingHours : DEFAULT_HOURS });
+    setForm(b === 'new' ? EMPTY : { name: b.name, address: b.address ?? '', phone: b.phone ?? '', managerUserId: b.managerUserId ?? '', hours: Object.keys(b.workingHours ?? {}).length ? b.workingHours : DEFAULT_HOURS });
     setTried(false); save.reset(); setEditing(b);
   };
   const submit = () => { setTried(true); if (Object.keys(errors).length === 0) save.mutate(); };
@@ -74,6 +77,7 @@ export function BranchesPage() {
     { key: 'address', header: 'Address', render: (b) => <span className="text-text-muted">{b.address || '—'}</span> },
     { key: 'phone', header: 'Phone', render: (b) => b.phone || '—' },
     { key: 'hours', header: 'Hours', render: (b) => <span className="text-xs text-text-muted">{hoursSummary(b.workingHours)}</span> },
+    { key: 'manager', header: 'Manager', render: (b) => <span className="text-sm">{staffName(b.managerUserId)}</span> },
     { key: 'staff', header: 'Staff', render: (b) => b.staffCount },
     { key: 'status', header: 'Status', render: (b) => <Badge tone={b.status === 'active' ? 'success' : 'neutral'}>{b.status === 'active' ? 'Active' : 'Inactive'}</Badge> },
     {
@@ -103,7 +107,11 @@ export function BranchesPage() {
             <Input label="Branch name" placeholder="Delhi ISBT Counter" maxLength={160} value={form.name} error={err('name')} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
             <Input label="Phone" placeholder="011 2345 6789" value={form.phone} error={err('phone')} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
           </div>
-          <Input label="Address" maxLength={500} value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Address" maxLength={500} value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
+            <Select label="Manager" value={form.managerUserId} onChange={(e) => setForm((f) => ({ ...f, managerUserId: e.target.value }))}
+              options={[{ label: form.managerUserId ? 'Keep current' : 'No manager', value: form.managerUserId && !staff.data?.items.some((x) => x.id === form.managerUserId) ? form.managerUserId : '' }, ...(staff.data?.items ?? []).map((x) => ({ label: x.fullName, value: x.id }))]} />
+          </div>
           <div>
             <div className="mb-1.5 text-sm font-medium text-text">Opening hours <span className="text-xs font-normal text-text-muted">— closing before opening means it stays open past midnight</span></div>
             <div className="flex flex-col gap-1.5 rounded-md border border-border p-2">

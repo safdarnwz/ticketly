@@ -3,7 +3,7 @@ import {
   Activity,
   LayoutDashboard, Search, Ticket, RotateCcw, Star, LifeBuoy,
   Megaphone, ShieldAlert, Bus, Building2, ClipboardList, Settings as SettingsIcon,
-  Route as RouteIcon, Truck, Calendar, IndianRupee, TrendingUp, Radio, Users, BarChart3,
+  Route as RouteIcon, Truck, Calendar, IndianRupee, TrendingUp, Radio, Users, BarChart3, UserCog,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -20,6 +20,7 @@ const tenantAdminNav = [
   { to: '/distribution', label: 'Distribution', icon: Radio },
   { to: '/promotions', label: 'Promotions', icon: TrendingUp },
   { to: '/branches', label: 'Branches', icon: Building2 },
+  { to: '/staff', label: 'Staff', icon: UserCog },
   { to: '/customers', label: 'Customers', icon: Users },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/search', label: 'Search & Book', icon: Search },
