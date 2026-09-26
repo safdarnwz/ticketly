@@ -9,9 +9,11 @@ import { flowApi } from '@/lib/api/booking-flow';
 import { bookingsApi } from '@/lib/api/bookings';
 import { ApiError } from '@/lib/api/client';
 import { paymentsApi } from '@/lib/api/payments';
+import { agentPortalApi } from '@/lib/api/agentPortal';
+import { useIsAgent } from '@/lib/useAgent';
 import type { SearchResult } from '@/lib/api/types';
 import { CATEGORY_LABEL, normalizeMobile, validatePassengers, type Category, type PassengerForm } from '@/lib/checkout';
-import { formatDateTime, formatMoney, fromAppDateTimeInput, toAppDateTimeInput } from '@/lib/utils';
+import { formatDateTime, formatMoney, fromAppDateTimeInput, idempotencyKey, toAppDateTimeInput } from '@/lib/utils';
 
 /** Phone-booking release window (the server enforces the same). */
 const RELEASE_MIN_MS = 5 * 60_000;
@@ -38,7 +40,11 @@ export function StaffTripPage() {
   const [email, setEmail] = useState('');
   const [vpa, setVpa] = useState('');
   const [showErrors, setShowErrors] = useState(false);
-  const [confirmed, setConfirmed] = useState<{ pnr: string; bookingId: string; heldUntil?: string } | null>(null);
+  const [confirmed, setConfirmed] = useState<{ pnr: string; bookingId: string; heldUntil?: string; agent?: { totalMinor: number; commissionMinor: number; balanceMinor: number } } | null>(null);
+  /** A travel agent sells from their own account: no UPI, no phone holds, no counter overrides. */
+  const { isAgent } = useIsAgent();
+  const agentMe = useQuery({ queryKey: ['agent-me'], queryFn: agentPortalApi.me, enabled: isAgent });
+  const [agentKey, setAgentKey] = useState(() => idempotencyKey('agent-book'));
   /** Pay now at the counter, or keep the seats for a caller who pays later. */
   const [mode, setMode] = useState<'now' | 'later'>('now');
   const departsMs = trip ? Date.parse(trip.departsAt) : 0;
@@ -65,7 +71,7 @@ export function StaffTripPage() {
   const patch = (seat: string, p: Partial<PassengerForm>) =>
     setForms((f) => ({ ...f, [seat]: { ...(f[seat] ?? { seatNumber: seat, fullName: '', age: '', gender: '', category: 'adult', idProof: '' }), ...p } }));
   const rules = useQuery({ queryKey: ['concessions', trip?.tripId, trip?.departsAt.slice(0, 10)], queryFn: () => flowApi.concessions(trip!.departsAt.slice(0, 10)), enabled: Boolean(trip) });
-  const concessions = useMemo(() => rules.data?.concessions ?? [], [rules.data]);
+  const concessions = useMemo(() => (isAgent ? [] : rules.data?.concessions ?? []), [rules.data, isAgent]);
   const ladiesSeats = sel.seats.filter((s) => s.ladiesOnly).map((s) => s.seatNumber);
   /** Staff may seat a man on a ladies seat (e.g. a family travelling together) — with a written reason, logged. */
   const [ladiesReason, setLadiesReason] = useState('');
@@ -85,7 +91,9 @@ export function StaffTripPage() {
   const priceOf = (t: string) => trip?.fares?.find((f) => f.seatType === t)?.priceMinor;
   const estimate = sel.seats.reduce((a, s) => a + (priceOf(s.seatType) ?? 0), 0);
   const vpaOk = /^[\w.-]{2,}@[a-zA-Z]{2,}$/.test(vpa.trim());
-  const ready = sel.seats.length > 0 && Object.keys(errors).length === 0 && mobile && (mode === 'now' ? vpaOk : !releaseError);
+  const agentShort = isAgent && agentMe.data ? estimate > agentMe.data.spendableMinor : false;
+  const agentBlocked = isAgent && agentMe.data ? agentMe.data.status !== 'active' : false;
+  const ready = sel.seats.length > 0 && Object.keys(errors).length === 0 && mobile && (isAgent ? !agentShort && !agentBlocked && !ladiesClash : mode === 'now' ? vpaOk : !releaseError);
   const secondsLeft = held ? Math.max(0, Math.round((Date.parse(held.holdExpiresAt) - now) / 1000)) : 0;
 
   /** Step 1: quote and hold the seats. */
@@ -143,6 +151,29 @@ export function StaffTripPage() {
     onError: (e) => toast.error(e instanceof ApiError ? `Payment failed — ${e.message}` : 'Payment failed'),
     onSettled: () => { inFlight.current = false; },
   });
+  /** Agent: quote, then book against the agent's account in one step (the API holds, debits and confirms). */
+  const agentBook = useMutation({
+    mutationFn: async () => {
+      const q = await flowApi.quote({
+        tripId: trip!.tripId,
+        fromStopId: sel.fromStop!.stopId,
+        toStopId: sel.toStop!.stopId,
+        seatType: sel.seatType,
+        seatNumbers: sel.seats.map((s) => s.seatNumber),
+      });
+      return agentPortalApi.book({
+        quoteId: q.quoteId,
+        seatNumbers: sel.seats.map((s) => s.seatNumber),
+        passengers: passengers.map((p) => ({ seatNumber: p.seatNumber, fullName: p.fullName.trim(), age: Number(p.age), gender: p.gender || undefined })),
+        contactPhone: mobile!,
+        contactEmail: email.trim() || undefined,
+      }, agentKey);
+    },
+    onSuccess: (r) => { setConfirmed({ pnr: r.pnr, bookingId: r.bookingId, agent: { totalMinor: r.totalMinor, commissionMinor: r.commissionMinor, balanceMinor: r.balanceMinor } }); void agentMe.refetch(); toast.success('Booking confirmed'); },
+    // A failed attempt (seat gone, balance short) gets a fresh key so a corrected retry is a new request.
+    onError: (e) => { setAgentKey(idempotencyKey('agent-book')); toast.error(e instanceof ApiError ? e.message : 'Could not book'); },
+    onSettled: () => { inFlight.current = false; },
+  });
   const release = useMutation({
     mutationFn: () => bookingsApi.releaseHold(held!.bookingId, mobile ?? undefined),
     onSuccess: () => { setHeld(null); pay.reset(); toast.success('Seats released'); },
@@ -151,7 +182,7 @@ export function StaffTripPage() {
   useEffect(() => {
     if (held && secondsLeft === 0) { setHeld(null); pay.reset(); toast.error('The hold expired — the seats are free again. Select them once more.'); }
   }, [held, secondsLeft]); // eslint-disable-line react-hooks/exhaustive-deps
-  const busy = hold.isPending || pay.isPending || release.isPending || phoneHold.isPending;
+  const busy = hold.isPending || pay.isPending || release.isPending || phoneHold.isPending || agentBook.isPending;
 
   if (!trip) return null;
   if (confirmed) {
@@ -159,12 +190,21 @@ export function StaffTripPage() {
       <div className="mx-auto flex max-w-lg flex-col items-center gap-4 px-4 py-16 text-center">
         <CheckCircle2 className="h-14 w-14 text-success" />
         <h1 className="font-display text-2xl text-text">{confirmed.heldUntil ? 'Seats held for the caller' : 'Booking confirmed'}</h1>
-        {confirmed.heldUntil
+        {confirmed.agent ? (
+          <div className="text-text-muted">
+            <p>PNR <b className="text-text">{confirmed.pnr}</b> — the passenger gets the e-ticket by SMS/email.</p>
+            <div className="mt-3 grid grid-cols-3 gap-3 rounded-md border border-border p-3 text-sm">
+              <div><div className="text-xs">Fare</div><div className="font-semibold text-text">{formatMoney(confirmed.agent.totalMinor, trip.currency)}</div></div>
+              <div><div className="text-xs">Your commission</div><div className="font-semibold text-success">{formatMoney(confirmed.agent.commissionMinor, trip.currency)}</div></div>
+              <div><div className="text-xs">Balance now</div><div className="font-semibold text-text">{formatMoney(confirmed.agent.balanceMinor, trip.currency)}</div></div>
+            </div>
+          </div>
+        ) : confirmed.heldUntil
           ? <p className="text-text-muted">PNR <b className="text-text">{confirmed.pnr}</b> — held until <b className="text-text">{formatDateTime(confirmed.heldUntil)}</b>. Take the UPI payment on the booking before then; unpaid seats are released automatically.</p>
           : <p className="text-text-muted">PNR <b className="text-text">{confirmed.pnr}</b> — paid by UPI. The customer gets the e-ticket by SMS/email.</p>}
         <div className="flex gap-3">
           <Button variant="outline" onClick={() => navigate('/search')}>Book another</Button>
-          <Button onClick={() => navigate(`/bookings/${confirmed.pnr}`)}>View booking</Button>
+          <Button onClick={() => navigate(confirmed.agent ? `/agent/bookings/${confirmed.bookingId}` : `/bookings/${confirmed.pnr}`)}>View booking</Button>
         </div>
       </div>
     );
@@ -212,7 +252,8 @@ export function StaffTripPage() {
                 </div>
               ))}
               {showErrors && errors.form && <p className="text-sm text-danger">{errors.form}</p>}
-              {ladiesClash && (
+              {ladiesClash && isAgent && <p className="text-sm text-danger" role="alert">A ladies seat is for a woman passenger — pick another seat for him.</p>}
+              {ladiesClash && !isAgent && (
                 <div className="rounded-md border border-warning/50 bg-warning/5 p-3 text-sm">
                   <div className="font-medium text-text">A male passenger is on a ladies seat</div>
                   <p className="text-xs text-text-muted">Allowed at the counter only with a reason (e.g. husband travelling with his wife). It is recorded.</p>
@@ -228,6 +269,27 @@ export function StaffTripPage() {
         )}
       </div>
 
+      {isAgent ? (
+        <Card className="h-fit lg:sticky lg:top-20">
+          <CardHeader title="Pay from your account" subtitle="The fare comes off your agent balance; your commission is credited at once" />
+          <CardBody className="flex flex-col gap-3 text-sm">
+            <div className="flex justify-between"><span className="text-text-muted">Seats</span><span className="font-medium">{sel.seats.map((s) => s.seatNumber).join(', ') || '—'}</span></div>
+            <div className="flex justify-between"><span className="text-text-muted">Total fare</span><span className="font-semibold">{sel.seats.length ? formatMoney(estimate, trip.currency) : '—'}</span></div>
+            {agentMe.data && sel.seats.length > 0 && (
+              <div className="flex justify-between"><span className="text-text-muted">Your commission ({agentMe.data.currentCommission.pct}% of the net fare)</span><span className="font-medium text-success">about {formatMoney(Math.round((estimate / 1.05) * agentMe.data.currentCommission.pct / 100), trip.currency)}</span></div>
+            )}
+            {agentMe.data && (
+              <div className="flex justify-between border-t border-border pt-2"><span className="text-text-muted">You can sell up to</span><span className="font-medium">{formatMoney(agentMe.data.spendableMinor, trip.currency)}</span></div>
+            )}
+            {agentShort && <p className="text-xs text-danger" role="alert">Not enough balance for this booking — top up with the operator, or book fewer seats.</p>}
+            {agentBlocked && <p className="text-xs text-danger" role="alert">Your agent account is {agentMe.data?.status} — you cannot book.</p>}
+            <Button fullWidth loading={agentBook.isPending} disabled={sel.seats.length === 0 || busy || agentShort || agentBlocked}
+              onClick={() => { setShowErrors(true); if (!ready || inFlight.current) return; inFlight.current = true; agentBook.mutate(); }}>
+              Confirm booking
+            </Button>
+          </CardBody>
+        </Card>
+      ) : (
       <Card className="h-fit lg:sticky lg:top-20">
         <CardHeader title="Payment" subtitle={mode === 'now' ? 'Customer pays by UPI' : 'Caller pays later, before the release time'} />
         <CardBody className="flex flex-col gap-3 text-sm">
@@ -277,6 +339,7 @@ export function StaffTripPage() {
           )}
         </CardBody>
       </Card>
+      )}
     </div>
   );
 }

@@ -51,6 +51,11 @@ import { StaffPage } from '@/pages/staff/StaffPage';
 import { CompanyProfilePage } from '@/pages/settings/CompanyProfilePage';
 import { PlatformBillsPage } from '@/pages/settings/PlatformBillsPage';
 import { MyAccountPage } from '@/pages/staff/MyAccountPage';
+import { AgentHomePage } from '@/pages/agent/AgentHomePage';
+import { AgentBookingsPage } from '@/pages/agent/AgentBookingsPage';
+import { AgentBookingPage } from '@/pages/agent/AgentBookingPage';
+import { AgentStatementPage } from '@/pages/agent/AgentStatementPage';
+import { AgentHelpPage } from '@/pages/agent/AgentHelpPage';
 import { CustomersPage } from '@/pages/crm/CustomersPage';
 import { ReportsPage } from '@/pages/reports/ReportsPage';
 import { AnnouncementsPage } from '@/pages/announcements/AnnouncementsPage';
@@ -136,6 +141,12 @@ const tenantAdminRouter = createBrowserRouter([
           { path: '/branches', element: <BranchesPage /> },
           { path: '/staff', element: <StaffPage /> },
           { path: '/me', element: <MyAccountPage /> },
+          { path: '/agent', element: <AgentHomePage /> },
+          { path: '/agent/bookings', element: <AgentBookingsPage /> },
+          { path: '/agent/bookings/:id', element: <AgentBookingPage /> },
+          { path: '/agent/statement', element: <AgentStatementPage /> },
+          { path: '/agent/help', element: <AgentHelpPage /> },
+          { path: '/legal/:slug', element: <LegalPage /> },
           { path: '/customers', element: <CustomersPage /> },
           { path: '/reports', element: <ReportsPage /> },
           { path: '/search', element: <SearchPage /> },

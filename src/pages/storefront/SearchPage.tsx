@@ -8,6 +8,8 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { CityInput } from '@/components/customer/CityInput';
 import { TripResultCard } from '@/components/customer/TripResultCard';
 import { storefrontApi, type SearchInput } from '@/lib/api/storefront';
+import type { SearchResult } from '@/lib/api/types';
+import { WaitlistModal } from '@/components/booking/WaitlistModal';
 import { todayLocal } from '@/lib/utils';
 
 export function SearchPage() {
@@ -18,6 +20,7 @@ export function SearchPage() {
   const [originLabel, setOriginLabel] = useState('');
   const [destLabel, setDestLabel] = useState('');
   const [priceMax, setPriceMax] = useState('');
+  const [waitFor, setWaitFor] = useState<SearchResult | null>(null);
 
   const search = useMutation({
     mutationFn: () =>
@@ -76,11 +79,15 @@ export function SearchPage() {
           <div className="flex flex-col gap-3">
             <div className="text-sm text-text-muted">{search.data.count} trip(s) found</div>
             {search.data.results.map((r) => (
-              <TripResultCard key={r.tripId} trip={r} actionLabel="Select seats" onSelect={(trip) => navigate('/staff-trip', { state: { trip } })} />
+              <div key={r.tripId}>
+                <TripResultCard trip={r} actionLabel={r.availableSeats > 0 ? 'Select seats' : 'Full — add to waitlist'}
+                  onSelect={(trip) => (trip.availableSeats > 0 ? navigate('/staff-trip', { state: { trip } }) : setWaitFor(trip))} />
+              </div>
             ))}
           </div>
         )
       )}
+      {waitFor && <WaitlistModal trip={waitFor} onClose={() => setWaitFor(null)} />}
     </>
   );
 }

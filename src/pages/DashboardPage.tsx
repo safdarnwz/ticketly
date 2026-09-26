@@ -1,9 +1,10 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowUpRight, BarChart3, CheckCircle2, IndianRupee, RotateCcw, Search, Star, Ticket, Timer, XCircle } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { Badge, Card, CardBody, CardHeader, ErrorState, Skeleton, Table, statusTone, type Column } from '@/components/ui';
+import { Badge, Card, CardBody, CardHeader, ErrorState, PageLoader, Skeleton, Table, statusTone, type Column } from '@/components/ui';
+import { useIsAgent } from '@/lib/useAgent';
 import { useAuth } from '@/stores/auth';
 import { reportsApi } from '@/lib/api/reports';
 import { schedulingApi, type TripRow } from '@/lib/api/scheduling';
@@ -56,7 +57,14 @@ function Occupancy({ t }: { t: TripRow }) {
   );
 }
 
+/** Staff land on the operator dashboard; a travel agent's login lands on their own portal. */
 export function DashboardPage() {
+  const { isAgent, loading } = useIsAgent();
+  if (loading) return <PageLoader />;
+  return isAgent ? <Navigate to="/agent" replace /> : <StaffDashboard />;
+}
+
+function StaffDashboard() {
   const navigate = useNavigate();
   const user = useAuth((s) => s.user);
   const today = todayLocal();

@@ -33,6 +33,9 @@ export const tripOpsExtraApi = {
   /** Is this trip reaching the OTAs: seats partners see now, partner sold/holding, and what blocks them. */
   partnerSync: (tripId: string) => get<PartnerSync>(`/v1/trips/${tripId}/partner-sync`),
   setClosedChannels: (tripId: string, closed: Channel[]) => put<{ ok: boolean; closed: Channel[] }>(`/v1/trips/${tripId}/closed-channels`, { closed }),
+  /** Join the waitlist of a full trip: told by SMS if seats free up. The key keeps a double tap to one entry. */
+  joinWaitlist: (tripId: string, body: { fromStopId: string; toStopId: string; seatCount: number; contactPhone: string; contactEmail?: string }, key: string, tenantId?: string) =>
+    post<{ id: string; position?: number }>(`/v1/trips/${tripId}/waitlist`, body, { ...withIdempotency(key), ...(tenantId ? { headers: { 'idempotency-key': key, 'X-Tenant-Id': tenantId } } : {}) }),
   waitlist: (tripId: string) => get<{ items: WaitlistEntry[] }>(`/v1/trips/${tripId}/waitlist`),
   expenses: (tripId: string, includeVoided = true) => get<{ items: Expense[] }>(`/v1/trips/${tripId}/expenses${includeVoided ? '?includeVoided=1' : ''}`),
   /** Upload a receipt (raw bytes) first; pass the fileId with the expense. */

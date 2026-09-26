@@ -4,6 +4,7 @@ import { Phone, Lock, Eye, EyeOff, Bus, ShieldCheck, Sparkles } from 'lucide-rea
 
 import { Button, useToast } from '@/components/ui';
 import { useAuth, homeForRoles } from '@/stores/auth';
+import { SURFACE } from '@/lib/host';
 import { ApiError } from '@/lib/api/client';
 
 export function LoginPage() {
@@ -27,7 +28,7 @@ export function LoginPage() {
     try {
       const user = await login(identifier.trim(), password);
       toast.success('Welcome back');
-      navigate(from ?? homeForRoles(user.roles), { replace: true });
+      navigate(from ?? homeForRoles(user.roles, SURFACE), { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Sign-in failed');
     }

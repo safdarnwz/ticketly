@@ -3,12 +3,44 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Button, ErrorState, Input, Modal, PageLoader, Select, useToast } from '@/components/ui';
 import { amendmentsApi } from '@/lib/api/amendments';
+import { agentPortalApi } from '@/lib/api/agentPortal';
+import { flowApi } from '@/lib/api/booking-flow';
 import { openRazorpayCheckout, paymentsApi } from '@/lib/api/payments';
 import { schedulingApi, tripOpsApi, type TripChart } from '@/lib/api/scheduling';
 import { cn, formatDateTime, formatMoney, fromAppDateTimeInput, idempotencyKey, todayLocal } from '@/lib/utils';
 
 export type ChangeKind = 'seats' | 'points' | 'name' | 'reschedule' | 'hold';
-interface Props { bookingId: string; pnr: string; tripId: string; seats: string[]; passengers: { seatNumber: string; fullName: string }[]; onClose: () => void; onDone: () => void }
+interface Props {
+  bookingId: string; pnr: string; tripId: string; seats: string[]; passengers: { seatNumber: string; fullName: string }[]; onClose: () => void; onDone: () => void;
+  /** A travel agent changing their own booking: its leg, read from the booking (agents have no trip chart). */
+  agentLeg?: { fromSeq: number; toSeq: number };
+}
+type Stop = { stopId: string; sequence: number; name: string | null; departsAt: string; arrivesAt: string; canBoard: boolean; canAlight: boolean };
+
+/**
+ * What the change dialogs need: the trip's stops, this booking's leg, and the
+ * seats free on it. Staff read the trip chart; an agent reads the public trip
+ * and seat map (their own seats show as taken there, and are excluded anyway).
+ */
+function useLeg(p: Props) {
+  const staff = useQuery({ queryKey: ['trip-chart', p.tripId], queryFn: () => tripOpsApi.chart(p.tripId), enabled: !p.agentLeg });
+  const trip = useQuery({ queryKey: ['trip-public', p.tripId], queryFn: () => flowApi.trip(p.tripId), enabled: !!p.agentLeg });
+  const stops: Stop[] = (p.agentLeg ? trip.data?.stops : staff.data?.stops) ?? [];
+  const leg = p.agentLeg
+    ? (() => { const from = stops.find((s) => s.sequence === p.agentLeg!.fromSeq); const to = stops.find((s) => s.sequence === p.agentLeg!.toSeq); return from && to ? { from, to } : null; })()
+    : legOf(staff.data, p.bookingId);
+  const seatMap = useQuery({
+    queryKey: ['seat-map', p.tripId, leg?.from.stopId, leg?.to.stopId],
+    queryFn: () => flowApi.availability(p.tripId, leg!.from.stopId, leg!.to.stopId),
+    enabled: !!p.agentLeg && !!leg,
+  });
+  const free = p.agentLeg
+    ? (seatMap.data?.seats ?? []).filter((s) => s.available).map((s) => s.seatNumber)
+    : staff.data && leg ? freeSeats(staff.data, leg.from.sequence, leg.to.sequence, p.bookingId).map((s) => s.seatNumber) : [];
+  const q = p.agentLeg ? (trip.isError ? trip : seatMap) : staff;
+  return { stops, leg, free, isLoading: p.agentLeg ? trip.isLoading || seatMap.isLoading : staff.isLoading, isError: q.isError, error: q.error, refetch: q.refetch };
+}
+const apiFor = (p: Props) => (p.agentLeg ? agentPortalApi : amendmentsApi);
 const errText = (e: unknown) => (e instanceof Error ? e.message : 'Failed');
 
 function useTripChart(tripId: string | null) {
@@ -43,15 +75,15 @@ export function BookingChangeModal({ kind, ...p }: Props & { kind: ChangeKind })
   return kind === 'seats' ? <SeatsChange {...p} /> : kind === 'points' ? <PointsChange {...p} /> : kind === 'name' ? <NameChange {...p} /> : kind === 'reschedule' ? <Reschedule {...p} /> : <HoldChange {...p} />;
 }
 
-function SeatsChange({ bookingId, tripId, seats, onClose, onDone }: Props) {
+function SeatsChange(p: Props) {
+  const { bookingId, seats, onClose, onDone } = p;
   const toast = useToast();
   const [key] = useState(() => idempotencyKey('seats'));
-  const chart = useTripChart(tripId);
+  const chart = useLeg(p);
   const [picked, setPicked] = useState<string[]>([]);
-  const leg = legOf(chart.data, bookingId);
-  const options = chart.data && leg ? freeSeats(chart.data, leg.from.sequence, leg.to.sequence, bookingId).map((s) => s.seatNumber).filter((n) => !seats.includes(n)) : [];
+  const options = chart.free.filter((n) => !seats.includes(n));
   const go = useMutation({
-    mutationFn: () => amendmentsApi.changeSeats(bookingId, picked, key),
+    mutationFn: () => apiFor(p).changeSeats(bookingId, picked, key),
     onSuccess: () => { toast.success(`Moved to seat ${picked.join(', ')} — the ticket was re-issued`); onDone(); },
     onError: (e) => toast.error(errText(e)),
   });
@@ -69,21 +101,22 @@ function SeatsChange({ bookingId, tripId, seats, onClose, onDone }: Props) {
   );
 }
 
-function PointsChange({ bookingId, tripId, onClose, onDone }: Props) {
+function PointsChange(p: Props) {
+  const { bookingId, onClose, onDone } = p;
   const toast = useToast();
   const [key] = useState(() => idempotencyKey('points'));
-  const chart = useTripChart(tripId);
-  const leg = legOf(chart.data, bookingId);
+  const chart = useLeg(p);
+  const leg = chart.leg;
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const stops = chart.data?.stops ?? [];
+  const stops = chart.stops;
   const fromId = from || leg?.from.stopId || '';
   const toId = to || leg?.to.stopId || '';
   const seqOf = (id: string) => stops.find((s) => s.stopId === id)?.sequence ?? 0;
   const e = fromId && toId && seqOf(fromId) >= seqOf(toId) ? 'The drop must come after the boarding point' : undefined;
   const unchanged = fromId === leg?.from.stopId && toId === leg?.to.stopId;
   const go = useMutation({
-    mutationFn: () => amendmentsApi.changePoints(bookingId, { fromStopId: fromId !== leg?.from.stopId ? fromId : undefined, toStopId: toId !== leg?.to.stopId ? toId : undefined }, key),
+    mutationFn: () => apiFor(p).changePoints(bookingId, { fromStopId: fromId !== leg?.from.stopId ? fromId : undefined, toStopId: toId !== leg?.to.stopId ? toId : undefined }, key),
     onSuccess: () => { toast.success('Boarding / drop point changed — the passenger is told'); onDone(); },
     onError: (x) => toast.error(errText(x)),
   });
@@ -101,7 +134,8 @@ function PointsChange({ bookingId, tripId, onClose, onDone }: Props) {
   );
 }
 
-function NameChange({ bookingId, passengers, onClose, onDone }: Props) {
+function NameChange(p: Props) {
+  const { bookingId, passengers, onClose, onDone } = p;
   const toast = useToast();
   const [key] = useState(() => idempotencyKey('name'));
   const [seat, setSeat] = useState(passengers[0]?.seatNumber ?? '');
@@ -109,7 +143,7 @@ function NameChange({ bookingId, passengers, onClose, onDone }: Props) {
   const [name, setName] = useState('');
   const e = name && name.trim().length < 2 ? 'At least 2 characters' : name.trim().toLowerCase() === current.toLowerCase() ? 'Same as now' : undefined;
   const go = useMutation({
-    mutationFn: () => amendmentsApi.correctName(bookingId, seat, name.trim(), key),
+    mutationFn: () => apiFor(p).correctName(bookingId, seat, name.trim(), key),
     onSuccess: () => { toast.success('Name corrected — the ticket was re-issued'); onDone(); },
     onError: (x) => toast.error(errText(x)),
   });

@@ -30,8 +30,11 @@ function userFromToken(token: string, fallbackIdentifier?: string): AuthUser {
 }
 
 /** The canonical role → determines post-login destination. */
-export function homeForRoles(roles: string[]): string {
+export function homeForRoles(roles: string[], surface?: string): string {
   if (roles.includes('super_admin') || roles.includes('platform_admin')) return '/admin/tenants';
+  if (roles.includes('agent')) return '/agent';
+  // On an operator's console every signed-in user is staff (custom role names included).
+  if (surface === 'tenantAdmin') return '/dashboard';
   if (roles.includes('operator_admin') || roles.includes('operator_staff')
     || roles.some((r) => ['owner', 'manager', 'finance', 'ops', 'support'].includes(r))) return '/dashboard';
   return '/account'; // customer

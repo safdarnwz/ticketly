@@ -4,7 +4,7 @@ import {
   Activity,
   LayoutDashboard, Search, Ticket, RotateCcw, Star, LifeBuoy,
   Megaphone, ShieldAlert, Bus, Building2, ClipboardList, Settings as SettingsIcon,
-  Route as RouteIcon, Truck, Calendar, IndianRupee, TrendingUp, Radio, Users, BarChart3, UserCog,
+  Route as RouteIcon, Truck, Calendar, IndianRupee, TrendingUp, Radio, Users, BarChart3, UserCog, Wallet, FileText,
 } from 'lucide-react';
 
 import { authApi } from '@/lib/api/auth';
@@ -53,12 +53,23 @@ const superAdminNav = [
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
+/** A travel agent's own portal on the operator's console: sell, manage own bookings, own money. */
+const agentNav = [
+  { to: '/agent', label: 'My account', icon: Wallet },
+  { to: '/search', label: 'Book seats', icon: Search },
+  { to: '/agent/bookings', label: 'My bookings', icon: Ticket },
+  { to: '/agent/statement', label: 'Statement', icon: FileText },
+  { to: '/agent/help', label: 'Help & support', icon: LifeBuoy },
+];
+
 export function Sidebar() {
   // Staff only see the menus their roles open (any one of `needs`); the API refuses the rest anyway.
   const me = useQuery({ queryKey: ['auth-me'], queryFn: authApi.me, enabled: !isSuperAdmin, staleTime: 60_000 });
   const held = new Set(me.data?.permissions ?? []);
+  const agent = (me.data?.roles ?? []).length === 1 && me.data?.roles.includes('agent') === true;
   const nav = isSuperAdmin
     ? superAdminNav
+    : agent ? agentNav
     : tenantAdminNav.filter((n) => n.needs.length === 0 || held.has('*') || n.needs.some((p) => held.has(p)));
 
   return (
@@ -101,7 +112,7 @@ export function Sidebar() {
         ))}
       </nav>
       <div className="border-t border-border p-4 text-[11px] leading-relaxed text-text-muted">
-        {isSuperAdmin ? 'Ticketly Platform Admin' : 'Ticketly Console'} · v1.0
+        {isSuperAdmin ? 'Ticketly Platform Admin' : agent ? 'Ticketly Agent Portal' : 'Ticketly Console'} · v1.0
       </div>
     </aside>
   );

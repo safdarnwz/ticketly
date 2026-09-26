@@ -3,17 +3,19 @@ import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui';
 import { useAuth } from '@/stores/auth';
+import { useIsAgent } from '@/lib/useAgent';
 
 export function Topbar() {
   const navigate = useNavigate();
   const user = useAuth((s) => s.user);
   const role = useAuth((s) => s.user?.roles?.[0]);
   const logout = useAuth((s) => s.logout);
+  const { isAgent } = useIsAgent();
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-6">
       <div className="text-sm font-medium text-text-muted">
-        {user?.tenantId ? 'Operator console' : 'Platform console'}
+        {isAgent ? 'Agent portal' : user?.tenantId ? 'Operator console' : 'Platform console'}
       </div>
       <div className="flex items-center gap-4">
         <button type="button" disabled={!user?.tenantId} onClick={() => navigate('/me')} title={user?.tenantId ? 'My account' : undefined} className="flex items-center gap-2.5 rounded-md px-1 hover:bg-surface-muted">
