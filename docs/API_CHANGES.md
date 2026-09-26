@@ -402,3 +402,5 @@ an unknown id is now 404 (was 200).
   its passengers it had left.
 - **Staff booking search:** `GET /bookings/search` takes `channel=phone|agent`, `agentId` and `noShow=1`;
   each row adds `agentName` and `noShowSeats`.
+- **Renewals:** new `GET /fleet/expiring?days=30` (1–365): bus documents expiring within the window or
+  already expired (active buses), and drivers whose licence is expiring, expired or not on file.

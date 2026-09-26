@@ -34,6 +34,7 @@ import {
   BulkImportVehiclesSchema,
   CreateCrewSchema,
   CreateVehicleSchema,
+  ExpiringQuerySchema,
   CrewRulesSchema,
   ListCrewQuerySchema,
   ListVehiclesQuerySchema,
@@ -50,6 +51,7 @@ import {
   type BulkImportVehiclesDto,
   type CreateCrewDto,
   type CreateVehicleDto,
+  type ExpiringQueryDto,
   type ListCrewQueryDto,
   type ListVehiclesQueryDto,
   type MaintenanceLogDto,
@@ -281,6 +283,20 @@ export class FleetController {
   async withdrawVehicle(@UuidParam('id') id: string) {
     await this.verification.withdraw(id as VehicleId);
     return { ok: true };
+  }
+
+  @Get('expiring')
+  @RequirePermission(Permission.VEHICLE_READ)
+  @ApiOperation({
+    summary:
+      'Renewals due: bus documents expiring within `days` (or expired) and drivers whose licence is expiring, expired or missing',
+  })
+  async expiring(@Query(zodQuery(ExpiringQuerySchema)) q: ExpiringQueryDto) {
+    const [documents, licences] = await Promise.all([
+      this.vehicles.expiringDocuments(q.days),
+      this.crew.expiringLicences(q.days),
+    ]);
+    return { days: q.days, documents, licences };
   }
 
   @Get('vehicles/:id/compliance')

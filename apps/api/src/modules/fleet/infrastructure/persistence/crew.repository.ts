@@ -174,6 +174,28 @@ export class CrewRepository {
    * INSERT fails with a unique/exclusion violation, which the mapper turns into
    * a clean 409 rather than a double-booked driver.
    */
+  /** Active drivers whose licence expires within `days`, has expired, or is not on file. */
+  expiringLicences(days: number): Promise<
+    {
+      crewId: string;
+      fullName: string;
+      licenceNo: string | null;
+      expiresOn: string | null;
+      daysLeft: number | null;
+    }[]
+  > {
+    return this.db.query(
+      `SELECT id AS "crewId", full_name AS "fullName", licence_no AS "licenceNo",
+              licence_expires_on::text AS "expiresOn", (licence_expires_on - current_date)::int AS "daysLeft"
+         FROM crew
+        WHERE tenant_id = $1 AND deleted_at IS NULL AND role = 'driver' AND status <> 'inactive'
+          AND (licence_expires_on IS NULL OR licence_expires_on <= current_date + $2::int)
+        ORDER BY licence_expires_on NULLS FIRST, full_name`,
+      [requireTenantId(), days],
+      { name: 'crew.expiringLicences' },
+    );
+  }
+
   /** The trip a duty is for — this operator's only; null when not found. */
   async tripForDuty(tripId: TripId): Promise<{ status: string } | null> {
     return this.db.queryOne<{ status: string }>(

@@ -174,4 +174,15 @@ describe('fleet (e2e)', () => {
       404,
     );
   });
+
+  it('renewals: documents and driver licences due within the window, bounded', async () => {
+    expect((await app.get('/fleet/expiring?days=0', { as: 'operator' })).status).toBe(400);
+    expect((await app.get('/fleet/expiring?days=400', { as: 'operator' })).status).toBe(400);
+    const r = await app.get('/fleet/expiring?days=365', { as: 'operator' });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.days).toBe(365);
+    for (const d of r.body.documents) expect(d.daysLeft).toBeLessThanOrEqual(365);
+    for (const l of r.body.licences) expect(l.daysLeft === null || l.daysLeft <= 365).toBe(true);
+    expect((await app.get('/fleet/expiring', { as: 'customer' })).status).toBe(403);
+  });
 });

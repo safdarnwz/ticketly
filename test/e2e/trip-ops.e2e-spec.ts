@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { bootstrapTestApp, type TestApp } from './support/bootstrap';
-import { confirmedBooking, departingSoon } from './support/flows';
+import { confirmedBooking, departingSoon, sqlOne } from './support/flows';
 
 /**
  * A bus's operations: the reservation chart, stopping and resuming sales,
@@ -265,5 +265,30 @@ describe('trip operations (e2e)', () => {
     expect(list.body.items.find((x: { id: string }) => x.id === added.body.id)).toMatchObject({
       receiptFileId: up.body.fileId,
     });
+  });
+
+  it('waitlist: staff see who is waiting and can take someone off (their phone must match)', async () => {
+    const f = app.fixtures;
+    const phone = `98${String(Date.now()).slice(-8)}`;
+    const id = await sqlOne<{ id: string }>(
+      app,
+      `INSERT INTO trip_waitlist (tenant_id, trip_id, from_stop_id, to_stop_id, from_seq, to_seq, seat_count, contact_phone)
+       SELECT t.tenant_id, t.id, $2, $3,
+              (SELECT sequence FROM route_stops WHERE route_id = t.route_id AND stop_id = $2),
+              (SELECT sequence FROM route_stops WHERE route_id = t.route_id AND stop_id = $3), 2, $4
+         FROM trips t WHERE t.id = $1 RETURNING id`,
+      [f.tripId, f.fromStopId, f.toStopId, phone],
+    );
+    const list = await app.get(`/trips/${f.tripId}/waitlist`, op);
+    expect(list.status).toBe(200);
+    expect(list.body.items.find((w: { id: string }) => w.id === id.id)).toMatchObject({
+      status: 'waiting',
+      seatCount: 2,
+    });
+    const leave = (p: string) =>
+      app.post(`/trips/${f.tripId}/waitlist/${id.id}/leave`, { contactPhone: p }, op);
+    expect((await leave('9000000000')).status).toBe(404);
+    expect((await leave(phone)).status).toBe(200);
+    expect((await leave(phone)).status).toBe(404);
   });
 });

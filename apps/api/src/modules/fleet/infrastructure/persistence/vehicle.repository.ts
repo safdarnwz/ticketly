@@ -270,6 +270,31 @@ export class VehicleRepository {
     return row ? map(row) : null;
   }
 
+  /** Documents of active buses that expire within `days` (or already have) — soonest first. */
+  expiringDocuments(
+    days: number,
+  ): Promise<
+    {
+      vehicleId: string;
+      registrationNo: string;
+      docType: string;
+      documentNo: string | null;
+      expiresOn: string;
+      daysLeft: number;
+    }[]
+  > {
+    return this.db.query(
+      `SELECT v.id AS "vehicleId", v.registration_no AS "registrationNo", d.doc_type AS "docType",
+              d.document_no AS "documentNo", d.expires_on::text AS "expiresOn", (d.expires_on - current_date)::int AS "daysLeft"
+         FROM vehicle_documents d JOIN vehicles v ON v.id = d.vehicle_id AND v.tenant_id = d.tenant_id
+        WHERE d.tenant_id = $1 AND v.status <> 'retired' AND v.deleted_at IS NULL
+          AND d.expires_on <= current_date + $2::int
+        ORDER BY d.expires_on, v.registration_no`,
+      [requireTenantId(), days],
+      { name: 'vehicle.expiringDocuments' },
+    );
+  }
+
   async getById(id: VehicleId): Promise<Vehicle> {
     const found = await this.findById(id);
     if (!found) throw new NotFoundError('Vehicle', id);

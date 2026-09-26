@@ -56,21 +56,28 @@ export async function confirmedBooking(
   return { bookingId, pnr };
 }
 
+/** Run one SQL statement as the demo operator (tests only) and return its first row. */
+export async function sqlOne<T>(app: TestApp, sql: string, params: unknown[] = []): Promise<T> {
+  return runWithContext(createContext({ actorType: 'system' }), () =>
+    runAsTenant(app.fixtures.tenantId as TenantId, () =>
+      app.nest.get(UnitOfWork).run({ name: 'e2e.sql' }, async (s) => {
+        const r = await s.client.query(sql, params);
+        return r.rows[0] as T;
+      }),
+    ),
+  );
+}
+
 /**
  * Bring a test trip's departure to 30 minutes from now (arrival moves with it), so
  * it may be marked departed — a bus can only be marked departed near its time.
  */
 export async function departingSoon(app: TestApp, tripId: string): Promise<void> {
-  await runWithContext(createContext({ actorType: 'system' }), () =>
-    runAsTenant(app.fixtures.tenantId as TenantId, () =>
-      app.nest.get(UnitOfWork).run({ name: 'e2e.departingSoon' }, async (s) => {
-        await s.client.query(
-          `UPDATE trips SET arrives_at = arrives_at - (departs_at - (now() + interval '30 minutes')),
-                            departs_at = now() + interval '30 minutes'
-            WHERE id = $1`,
-          [tripId],
-        );
-      }),
-    ),
+  await sqlOne(
+    app,
+    `UPDATE trips SET arrives_at = arrives_at - (departs_at - (now() + interval '30 minutes')),
+                      departs_at = now() + interval '30 minutes'
+      WHERE id = $1`,
+    [tripId],
   );
 }

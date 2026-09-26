@@ -197,6 +197,12 @@ export const VehiclePhotoNoteSchema = z.object({
 });
 export type VehiclePhotoNoteDto = z.infer<typeof VehiclePhotoNoteSchema>;
 
+/** How far ahead to look for renewals. */
+export const ExpiringQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(365).default(30),
+});
+export type ExpiringQueryDto = z.infer<typeof ExpiringQuerySchema>;
+
 export const ListVehiclesQuerySchema = z.object({
   status: z.enum(VEHICLE_STATUSES).optional(),
   verification: z.enum(VERIFICATION_STATUSES).optional(),

@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 618 |
-| DONE | 357 |
+| TODO | 611 |
+| DONE | 364 |
 | DUP | 9 |
 
 
@@ -331,9 +331,9 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 294 | Configure disability-friendly seat rules | DONE | DONE | PUT /concessions/accessible-seats (release hours), enforced on hold · UI: Pricing → Concessions & booking rules |
 | 295 | Upload and manage bus permit documents | DONE | DONE | verified manually: existing module/API · UI: Fleet › vehicle page › documents upload/replace + submit for verification |
 | 296 | Upload and manage insurance documents | DONE | DONE | verified manually: existing module/API · UI: Fleet › vehicle page › documents upload/replace + submit for verification |
-| 297 | Upload and manage fitness certificate | DONE | TODO | verified manually: existing module/API |
+| 297 | Upload and manage fitness certificate | DONE | DONE | verified manually: existing module/API · UI: Fleet → bus page documents (upload, expiry) + Fleet → Renewals |
 | 298 | Set document expiry reminder days | GAP | — | verified manually: not built yet |
-| 299 | View document expiry dashboard | DONE | TODO | verified manually: existing module/API |
+| 299 | View document expiry dashboard | DONE | DONE | verified manually: existing module/API · UI: Fleet → bus page documents (upload, expiry) + Fleet → Renewals |
 | 300 | Upload bus exterior and interior photos | DONE | DONE | verified manually: existing module/API · UI: Fleet → bus page → Photos (max 10, no video) |
 | 301 | Set bus public display name | GAP | — | verified manually: not built yet |
 | 302 | View agent performance ranking by bookings | GAP | — | verified manually: not built yet |
@@ -452,7 +452,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 415 | Search booking using PNR number | DONE | DONE | verified manually: existing module/API · UI: operator Bookings list + detail (find by PNR/mobile/ticket, filters, CSV) |
 | 416 | Search booking using mobile number | DONE | DONE | GET /bookings/search?mobile= (last-10-digit match) · UI: operator Bookings list + detail (find by PNR/mobile/ticket, filters, CSV) |
 | 417 | Search booking using ticket number | DONE | DONE | GET /bookings/search?ticket= · UI: operator Bookings list + detail (find by PNR/mobile/ticket, filters, CSV) |
-| 418 | View complete passenger travel history | DONE | TODO | verified manually: existing module/API |
+| 418 | View complete passenger travel history | DONE | DONE | verified manually: existing module/API · UI: Customers → open a customer: every trip |
 | 419 | Manually apply senior citizen discount | DONE | DONE | verified manually: existing module/API · UI: Search & Book (counter): concession per passenger with ID; ladies seat for a man only with a written reason |
 | 420 | Manually apply student discount | DONE | DONE | verified manually: existing module/API · UI: Search & Book (counter): concession per passenger with ID; ladies seat for a man only with a written reason |
 | 421 | Override ladies seat restriction with proper reason | DONE | DONE | POST /bookings/hold ladiesSeatOverrideReason (staff only, event booking.ladies_seat_override) · UI: Search & Book (counter): concession per passenger with ID; ladies seat for a man only with a written reason |
@@ -469,7 +469,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 432 | Release no-show seat to waitlist | GAP | — | verified manually: not built yet |
 | 433 | View current waitlist for services | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Waitlist |
 | 434 | Confirm passenger from waitlist | GAP | — | verified manually: not built yet |
-| 435 | Cancel entry from waitlist | DONE | TODO | verified manually: existing module/API |
+| 435 | Cancel entry from waitlist | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Waitlist: Remove |
 | 436 | View all group bookings | GAP | — | verified manually: not built yet |
 | 437 | Modify existing group booking | GAP | — | verified manually: not built yet |
 | 438 | Split one group booking into multiple | GAP | — | verified manually: not built yet |
@@ -499,11 +499,11 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 462 | Handle medical emergency at branch | DONE | DONE | incidents type=medical (critical alert) · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
 | 463 | Arrange emergency support | DONE | DONE | incident.critical → emergency contacts · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
 | 464 | Communicate with dispatch manager on issues | PROCESS | — | operational practice, not software |
-| 465 | View crew currently allocated to services | DONE | TODO | verified manually: existing module/API |
-| 466 | Request change of crew | DONE | TODO | verified manually: existing module/API |
+| 465 | View crew currently allocated to services | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties → Duty roster (who is on which bus; cancel and reassign) |
+| 466 | Request change of crew | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties → Duty roster (who is on which bus; cancel and reassign) |
 | 467 | Report bus cleaning issue | DONE | TODO | verified manually: existing module/API |
 | 468 | Report bus maintenance issue | DONE | TODO | verified manually: existing module/API |
-| 469 | View upcoming document expiry of buses | DONE | TODO | verified manually: existing module/API |
+| 469 | View upcoming document expiry of buses | DONE | DONE | verified manually: existing module/API · UI: Fleet → bus page documents (upload, expiry) + Fleet → Renewals |
 | 470 | Handle enquiry from police or RTO | PROCESS | — | operational practice, not software |
 | 471 | Provide official passenger list to authorities | DONE | DONE | GET /bookings/trips/:tripId/chart (passenger list by boarding point) — printed from the web chart · UI: Trips & Charts › chart: Print chart + passenger list |
 | 472 | Manage passenger queue during peak hours | PROCESS | — | operational practice, not software |
