@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 559 |
-| DONE | 416 |
+| TODO | 542 |
+| DONE | 433 |
 | DUP | 9 |
 
 
@@ -798,24 +798,24 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
-| 901 | Two different users select the same seat at the same second | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 901 | Two different users select the same seat at the same second | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: e2e concurrency spec (parallel holds: one wins, rest INVENTORY.SEAT_UNAVAILABLE) · checkout shows 'Seat N is being booked by someone else' + Choose other seats (browser-verified) |
 | 902 | User A holds seat and User B tries to book it | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: seat map shows held seats as booked; hold refused → 'Choose other seats' |
 | 903 | Payment is being processed while another user books same seat | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 904 | OTA booking and direct booking hit same seat together | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 905 | Agent booking and branch booking conflict on same seat | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 906 | Waitlist confirmation and new booking race for last seat | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 907 | Seat hold timer expires exactly during payment | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: checkout HoldTimer: expiry screen, re-pick seats; changing seats releases the hold |
-| 908 | User opens multiple browser tabs and books same seat | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 908 | User opens multiple browser tabs and books same seat | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: e2e concurrency spec (parallel holds: one wins, rest INVENTORY.SEAT_UNAVAILABLE) · checkout shows 'Seat N is being booked by someone else' + Choose other seats (browser-verified) |
 | 909 | User refreshes page during payment processing | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 910 | User presses browser back button after successful payment | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 911 | User double-clicks on Confirm Booking button | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 912 | Network automatically retries payment request | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 913 | Booking API called without idempotency key | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 914 | Two requests with same idempotency key arrive | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 911 | User double-clicks on Confirm Booking button | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: e2e concurrency spec (same idempotency key in parallel → one booking; missing key → 400) · web sends one key per quote and disables the button while holding |
+| 912 | Network automatically retries payment request | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: e2e concurrency spec (same idempotency key in parallel → one booking; missing key → 400) · web sends one key per quote and disables the button while holding |
+| 913 | Booking API called without idempotency key | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: e2e concurrency spec (same idempotency key in parallel → one booking; missing key → 400) · web sends one key per quote and disables the button while holding |
+| 914 | Two requests with same idempotency key arrive | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: e2e concurrency spec (same idempotency key in parallel → one booking; missing key → 400) · web sends one key per quote and disables the button while holding |
 | 915 | Distributed lock could not be acquired in time | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 916 | Optimistic locking detects version mismatch | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 917 | Database throws unique constraint error on seat | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 918 | Seat auto-released by timeout while payment callback arrives | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 918 | Seat auto-released by timeout while payment callback arrives | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: e2e concurrency spec (a timed-out hold cannot be paid; seat free again) · checkout timer ends the hold |
 | 919 | In group booking some seats succeed and some fail | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 920 | Multi-hop booking first leg succeeds second leg fails | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 921 | Inventory service updates seat but booking service fails | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
@@ -839,19 +839,19 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 939 | Database connection pool is fully exhausted | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 940 | Cache is invalidated in middle of booking flow | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 941 | Server clocks are skewed causing time validation failure | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 942 | System shows negative available seats due to race | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 942 | System shows negative available seats due to race | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: e2e concurrency spec (unique PNRs, no seatless confirmed booking, no seat sold twice on a leg) |
 | 943 | Eventual consistency causes temporary overselling | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 944 | Seat appears available but booking is rejected | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 944 | Seat appears available but booking is rejected | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: e2e concurrency spec (parallel holds: one wins, rest INVENTORY.SEAT_UNAVAILABLE) · checkout shows 'Seat N is being booked by someone else' + Choose other seats (browser-verified) |
 | 945 | Booking is successful but seat map still shows free | DONE | DONE | seat map excludes live holds (inventory LIVE_HOLD); POST /bookings/:id/release-hold frees the holder's own hold early; e2e hold-release · UI: seat map shows held seats as booked; hold refused → 'Choose other seats' |
-| 946 | Booking record is created without actual seat assignment | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 947 | Two cancellations for same booking arrive together | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 946 | Booking record is created without actual seat assignment | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: e2e concurrency spec (unique PNRs, no seatless confirmed booking, no seat sold twice on a leg) |
+| 947 | Two cancellations for same booking arrive together | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: e2e concurrency spec (two cancels at once → one cancellation; the seat rebooks at once) |
 | 948 | Refund and new booking on same seat happen together | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 949 | Schedule change and booking happen concurrently | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 950 | Inventory release and booking happen concurrently | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 951 | Multiple agents try to book last available seat | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 952 | Branch staff and agent book last seat together | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 951 | Multiple agents try to book last available seat | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: e2e concurrency spec (parallel holds: one wins, rest INVENTORY.SEAT_UNAVAILABLE) · checkout shows 'Seat N is being booked by someone else' + Choose other seats (browser-verified) |
+| 952 | Branch staff and agent book last seat together | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: e2e concurrency spec (parallel holds: one wins, rest INVENTORY.SEAT_UNAVAILABLE) · checkout shows 'Seat N is being booked by someone else' + Choose other seats (browser-verified) |
 | 953 | Waitlist and regular booking compete for released seat | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 954 | Seat is released by cancellation and immediately rebooked | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 954 | Seat is released by cancellation and immediately rebooked | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: e2e concurrency spec (two cancels at once → one cancellation; the seat rebooks at once) |
 | 955 | High concurrency on popular festival service | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 956 | Flash sale causes thousands of simultaneous requests | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 957 | Database deadlocks under heavy concurrent load | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
@@ -861,8 +861,8 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 961 | Saga step fails in middle of distributed transaction | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 962 | Compensating transaction also fails | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 963 | Manual intervention required for stuck booking | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 964 | Duplicate booking IDs generated | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 965 | PNR collision occurs | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 964 | Duplicate booking IDs generated | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: e2e concurrency spec (unique PNRs, no seatless confirmed booking, no seat sold twice on a leg) |
+| 965 | PNR collision occurs | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: e2e concurrency spec (unique PNRs, no seatless confirmed booking, no seat sold twice on a leg) |
 | 966 | Same passenger books multiple seats in race | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 967 | Seat preference logic conflicts under concurrency | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 968 | Ladies quota and general quota race | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
@@ -870,7 +870,7 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 970 | Group booking splits under concurrent load | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 971 | Multi-seat selection partially fails | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 972 | Temporary hold is not released properly | DONE | DONE | seat map excludes live holds (inventory LIVE_HOLD); POST /bookings/:id/release-hold frees the holder's own hold early; e2e hold-release · UI: checkout HoldTimer: expiry screen, re-pick seats; changing seats releases the hold |
-| 973 | Hold expiry job and booking job conflict | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 973 | Hold expiry job and booking job conflict | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: e2e concurrency spec (a timed-out hold cannot be paid; seat free again) · checkout timer ends the hold |
 | 974 | Cleanup job runs during active booking | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 975 | Report generation locks tables during booking | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 976 | Backup process causes locking | INFRA | — | DB operations (backup, index rebuild, sharding) — runbook |
