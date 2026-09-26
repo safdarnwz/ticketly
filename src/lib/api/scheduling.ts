@@ -73,7 +73,7 @@ export interface ChartSeat {
   occupants: ChartOccupant[];
 }
 export interface TripChart {
-  trip: { id: string; routeId: string; journeyDate: string; departsAt: string; arrivesAt: string; totalSeats: number; status: string; vehicleId: string | null; hasRun: boolean };
+  trip: { id: string; routeId: string; journeyDate: string; departsAt: string; arrivesAt: string; totalSeats: number; status: string; vehicleId: string | null; hasRun: boolean; closedOnTrip?: string[]; closedByService?: string[] };
   stops: { sequence: number; stopId: string; name: string | null; arrivesAt: string; departsAt: string; canBoard: boolean; canAlight: boolean }[];
   layout: { decks: number; rows: number; columns: number };
   seats: ChartSeat[];

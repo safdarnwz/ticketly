@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, Bus as BusIcon, Clock, Lock, PauseCircle, PlayCircle, Printer, TimerReset, Unlock, XCircle } from 'lucide-react';
 
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Input, Modal, PageLoader, Select, statusTone, useToast } from '@/components/ui';
+import { TripOpsSection } from './TripOpsSection';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ApiError } from '@/lib/api/client';
 import { tripOpsApi, type ChartOccupant, type ChartSeat, type TripChart } from '@/lib/api/scheduling';
@@ -165,6 +166,8 @@ export function TripChartPage() {
           <Remarks tripId={id} locked={t.status === 'cancelled'} />
         </div>
       </div>
+
+      <TripOpsSection chart={data} locked={locked} onChanged={refresh} />
 
       <Manifest chart={data} />
 

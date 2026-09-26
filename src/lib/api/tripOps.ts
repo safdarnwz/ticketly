@@ -1,0 +1,36 @@
+import { get, post, put, withIdempotency } from './client';
+
+export interface Quota { id: string; seatNumber: string; holderType: 'agent' | 'branch'; holderId: string; holderName: string | null; releaseAt: string; releasedAt: string | null; releaseReason: string | null; consumedAt: string | null }
+export interface WaitlistEntry { id: string; seatCount: number; contactPhone: string; status: string; notifiedAt: string | null; createdAt: string; fromStop: string; toStop: string }
+export const EXPENSE_CATEGORIES = ['diesel', 'cng', 'toll', 'driver_bata', 'cleaner_bata', 'parking', 'permit_fee', 'state_tax', 'repair', 'food', 'cleaning', 'other'] as const;
+export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
+export interface Expense { id: string; category: ExpenseCategory; amountMinor: number; note: string | null; receiptFileId: string | null; incurredAt: string; voidedAt: string | null; voidReason: string | null; createdBy: string | null }
+export interface TripPnl { salesMinor: number; gstMinor: number; commissionMinor: number; commissionGstMinor: number; expensesMinor: number; seatsSold: number; seatsTotal: number; netRevenueMinor: number; profitMinor: number; marginPct: number | null; occupancyPct: number; costPerSeatMinor: number }
+export interface TripForecast { currentSold: number; totalSeats: number; daysToDeparture: number; forecastSeats: number | null; forecastPct: number | null; samples: number; confidence: string }
+export const CHANNELS = [
+  { key: 'ota', label: 'OTAs (redBus, Paytm…)' },
+  { key: 'agent', label: 'Travel agents' },
+  { key: 'direct_web', label: 'Your website & app' },
+  { key: 'phone', label: 'Phone bookings' },
+] as const;
+export type Channel = (typeof CHANNELS)[number]['key'];
+
+/** Per-trip controls beside the chart: who may sell which seats, the waitlist, and the bus's money. */
+export const tripOpsExtraApi = {
+  quotas: (tripId: string, all = false) => get<{ items: Quota[] }>(`/v1/trips/${tripId}/quotas${all ? '?all=1' : ''}`),
+  allocate: (tripId: string, body: { seatNumbers: string[]; holderType: 'agent' | 'branch'; holderId: string; releaseMinutesBefore: number }, key: string) =>
+    post<{ allocated: number; releaseAt: string }>(`/v1/trips/${tripId}/quotas`, body, withIdempotency(key)),
+  allocatePercent: (tripId: string, body: { percent: number; holderType: 'agent' | 'branch'; holderId: string; releaseMinutesBefore: number }, key: string) =>
+    post<{ allocated: number; releaseAt: string }>(`/v1/trips/${tripId}/quotas/percentage`, body, withIdempotency(key)),
+  release: (tripId: string, seatNumbers: string[], reason: string, key: string) =>
+    post<{ released: number }>(`/v1/trips/${tripId}/quotas/release`, { seatNumbers, reason }, withIdempotency(key)),
+  setClosedChannels: (tripId: string, closed: Channel[]) => put<{ ok: boolean; closed: Channel[] }>(`/v1/trips/${tripId}/closed-channels`, { closed }),
+  waitlist: (tripId: string) => get<{ items: WaitlistEntry[] }>(`/v1/trips/${tripId}/waitlist`),
+  expenses: (tripId: string, includeVoided = true) => get<{ items: Expense[] }>(`/v1/trips/${tripId}/expenses${includeVoided ? '?includeVoided=1' : ''}`),
+  addExpense: (tripId: string, body: { category: ExpenseCategory; amountMinor: number; note?: string }, key: string) =>
+    post<{ id: string }>(`/v1/trips/${tripId}/expenses`, body, withIdempotency(key)),
+  voidExpense: (tripId: string, expenseId: string, reason: string, key: string) =>
+    post<{ ok: boolean }>(`/v1/trips/${tripId}/expenses/${expenseId}/void`, { reason }, withIdempotency(key)),
+  pnl: (tripId: string) => get<TripPnl>(`/v1/trips/${tripId}/pnl`),
+  forecast: (tripId: string) => get<TripForecast>(`/v1/trips/${tripId}/occupancy-forecast`),
+};
