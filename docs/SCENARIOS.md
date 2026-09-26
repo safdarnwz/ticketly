@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3112 |
-| TODO | 861 |
-| DONE | 105 |
+| TODO | 845 |
+| DONE | 121 |
 | DUP | 9 |
 
 
@@ -216,15 +216,15 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 179 | Set coupon usage limit | DONE | DONE | POST /pricing/coupons: percent 1–100, flat ≥ ₹1, end after start and in the future, code A-Z0-9-_; DB checks (0087); 404 on another operator's coupon · UI: Pricing › Coupons: percent 1–100 or flat ₹ (paise), cap, min fare, valid till, total and per-customer uses, first-booking; switch off/on; stats; applied at checkout |
 | 180 | Configure privilege card program | CONFLICT | — | earlier product decision |
 | 181 | Configure loyalty points rules | CONFLICT | — | earlier product decision |
-| 182 | Create new agent account | DONE | TODO | verified manually: existing module/API |
-| 183 | Enter agent name and contact | DONE | TODO | verified manually: existing module/API |
-| 184 | Assign agent code | DONE | TODO | verified manually: existing module/API |
-| 185 | Set agent credit limit amount | DONE | TODO | verified manually: existing module/API |
-| 186 | Set agent commission percentage | DONE | TODO | verified manually: existing module/API |
+| 182 | Create new agent account | DONE | DONE | verified manually: existing module/API · UI: Distribution → Travel agents |
+| 183 | Enter agent name and contact | DONE | DONE | verified manually: existing module/API · UI: Distribution → Travel agents |
+| 184 | Assign agent code | DONE | DONE | verified manually: existing module/API · UI: Distribution → Travel agents |
+| 185 | Set agent credit limit amount | DONE | DONE | verified manually: existing module/API · UI: Distribution → Travel agents |
+| 186 | Set agent commission percentage | DONE | DONE | verified manually: existing module/API · UI: Distribution → Travel agents |
 | 187 | Set agent commission type (percentage or flat) | GAP | — | verified manually: not built yet |
-| 188 | Temporarily block agent | DONE | TODO | verified manually: existing module/API |
-| 189 | Set block reason | DONE | TODO | verified manually: existing module/API |
-| 190 | Unblock agent | DONE | TODO | verified manually: existing module/API |
+| 188 | Temporarily block agent | DONE | DONE | verified manually: existing module/API · UI: Distribution → Travel agents |
+| 189 | Set block reason | DONE | DONE | verified manually: existing module/API · UI: Distribution → Travel agents |
+| 190 | Unblock agent | DONE | DONE | verified manually: existing module/API · UI: Distribution → Travel agents |
 | 191 | Create new staff user | DONE | DONE | verified manually: existing module/API · UI: Staff page |
 | 192 | Assign staff name, mobile, email | DONE | DONE | verified manually: existing module/API · UI: Staff page |
 | 193 | Assign staff to one or more branches | DONE | DONE | PUT /users/:id/branch (one home branch per person; active branches of this operator only) · UI: Staff page |
@@ -238,7 +238,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 201 | Edit permissions of existing role | DONE | DONE | verified manually: existing module/API · UI: Staff → Roles & permissions |
 | 202 | Duplicate role and modify | DONE | DONE | POST /iam/roles/:id/duplicate · UI: Staff → Roles & permissions |
 | 203 | Delete unused custom role | DONE | DONE | DELETE /iam/roles/:id (not built-in, not assigned) · UI: Staff → Roles & permissions |
-| 204 | View complete permission matrix | DONE | TODO | verified manually: existing module/API |
+| 204 | View complete permission matrix | DONE | DONE | verified manually: existing module/API · UI: Staff → Roles & permissions (catalogue per role) |
 | 205 | Set branch-level permission override | GAP | — | verified manually: not built yet |
 | 206 | Give temporary permission with end date | DONE | DONE | PUT /users/:id/roles/:roleId {expiresAt} · UI: Staff modal (roles until, access & hours, reports to, new password) |
 | 207 | View staff activity logs | DONE | DONE | verified manually: existing module/API · UI: Staff page |
@@ -340,13 +340,13 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 303 | View agent performance ranking by revenue | GAP | — | verified manually: not built yet |
 | 304 | Give performance incentive to top agents | GAP | — | verified manually: not built yet |
 | 305 | Apply penalty to high cancellation agents | GAP | — | verified manually: not built yet |
-| 306 | Increase credit limit of good performing agent | DONE | TODO | verified manually: existing module/API |
-| 307 | Decrease credit limit of risky agent | DONE | TODO | verified manually: existing module/API |
-| 308 | View complete agent ledger | DONE | TODO | verified manually: existing module/API |
-| 309 | Process agent payment settlement | DONE | TODO | verified manually: existing module/API |
+| 306 | Increase credit limit of good performing agent | DONE | DONE | verified manually: existing module/API · UI: Distribution → Travel agents |
+| 307 | Decrease credit limit of risky agent | DONE | DONE | verified manually: existing module/API · UI: Distribution → Travel agents |
+| 308 | View complete agent ledger | DONE | DONE | verified manually: existing module/API · UI: Distribution → Travel agents |
+| 309 | Process agent payment settlement | DONE | DONE | verified manually: existing module/API · UI: Distribution → Travel agents |
 | 310 | Generate agent tax invoice | GAP | — | verified manually: not built yet |
 | 311 | Generate agent TDS report | GAP | — | verified manually: not built yet |
-| 312 | Download agent commission statement | DONE | TODO | verified manually: existing module/API |
+| 312 | Download agent commission statement | DONE | DONE | verified manually: existing module/API · UI: Distribution → Travel agents |
 | 313 | Block agent from booking specific routes | GAP | — | verified manually: not built yet |
 | 314 | Allocate exclusive inventory to preferred agents | DONE | TODO | verified manually: existing module/API |
 | 315 | Set maximum discount percentage agent can give | GAP | — | verified manually: not built yet |
@@ -423,8 +423,8 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 386 | Identify top performing staff | DONE | DONE | GET /users/performance (bookings, seats, sales, cancellations per seller; bookings.booked_by) · UI: Staff page |
 | 387 | Identify under-performing staff | DONE | DONE | GET /users/performance (bookings, seats, sales, cancellations per seller; bookings.booked_by) · UI: Staff page |
 | 388 | Issue warning to under-performing staff | DONE | DONE | POST /users/:id/warnings; GET /users/me + acknowledge · UI: Staff modal warnings; My account acknowledge |
-| 389 | Grant temporary system access to new staff | DONE | TODO | verified manually: existing module/API |
-| 390 | Temporarily block access of a staff member | DONE | TODO | verified manually: existing module/API |
+| 389 | Grant temporary system access to new staff | DONE | DONE | verified manually: existing module/API · UI: Staff modal (access ends / disable) |
+| 390 | Temporarily block access of a staff member | DONE | DONE | verified manually: existing module/API · UI: Staff modal (access ends / disable) |
 | 391 | Activate special promotional offer for branch | GAP | — | verified manually: not built yet |
 | 392 | Raise request for extra service on festival | GAP | — | verified manually: not built yet |
 | 393 | Send delay notification to all passengers | DONE | TODO | verified manually: existing module/API |
