@@ -64,6 +64,8 @@ function TripPicker({ value, onChange, label = 'Trip' }: { value: string; onChan
 /* ── on the road ───────────────────────────────────────────────────────── */
 
 const SIGNAL_LOST_MS = 10 * 60_000;
+/** Minutes late at which the platform alerts passengers (tracking service threshold). */
+const LATE_ALERT_MIN = 15;
 
 /** Every bus that has left and not arrived, with its last GPS fix — refreshes every 30 seconds. */
 function OnTheRoad() {
@@ -84,8 +86,16 @@ function OnTheRoad() {
   if (q.isError) return <ErrorState error={q.error} onRetry={q.refetch} />;
   const items = q.data?.items ?? [];
   const lost = items.filter((r) => !r.lastPingAt || now - new Date(r.lastPingAt).getTime() > SIGNAL_LOST_MS).length;
+  // The same threshold at which passengers are told automatically.
+  const late = items.filter((r) => Number(r.delayMinutes) > LATE_ALERT_MIN && Number(r.delayMinutes) < 1440);
   return (
     <>
+      {late.length > 0 && (
+        <div role="alert" className="mb-3 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
+          <div className="font-medium text-text">{late.length} bus{late.length === 1 ? '' : 'es'} running more than {LATE_ALERT_MIN} min late — passengers are being told automatically</div>
+          <ul className="mt-1 text-text-muted">{late.map((r) => <li key={r.tripId}><Link className="text-primary hover:underline" to={`/trips/${r.tripId}`}>{r.routeName}</Link> · {r.bus ?? 'no bus'} · {r.delayMinutes} min late{r.nextStop ? ` · next ${r.nextStop}` : ''}</li>)}</ul>
+        </div>
+      )}
       <p className="mb-3 text-sm text-text-muted">{items.length} bus{items.length === 1 ? '' : 'es'} on the road{lost ? ` · ${lost} without a recent GPS signal` : ''}. Positions come from the crew app.</p>
       {items.length ? <Table columns={columns} rows={items} /> : <EmptyState title="No bus is on the road right now" icon={<Navigation className="h-10 w-10" />} />}
     </>

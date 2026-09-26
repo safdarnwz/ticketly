@@ -1,7 +1,7 @@
 import { get, post, withIdempotency } from './client';
 
 export const INCIDENT_TYPES = [
-  { value: 'breakdown', label: 'Breakdown' }, { value: 'delay', label: 'Delay' }, { value: 'diversion', label: 'Diversion' },
+  { value: 'breakdown', label: 'Breakdown' }, { value: 'fuel', label: 'Fuel problem' }, { value: 'delay', label: 'Delay' }, { value: 'diversion', label: 'Diversion' },
   { value: 'accident', label: 'Accident' }, { value: 'medical', label: 'Medical emergency' }, { value: 'security', label: 'Security / police' },
   { value: 'complaint', label: 'Passenger complaint' }, { value: 'other', label: 'Other' },
 ] as const;
