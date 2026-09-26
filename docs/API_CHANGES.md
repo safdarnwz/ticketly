@@ -404,3 +404,5 @@ an unknown id is now 404 (was 200).
   each row adds `agentName` and `noShowSeats`.
 - **Renewals:** new `GET /fleet/expiring?days=30` (1–365): bus documents expiring within the window or
   already expired (active buses), and drivers whose licence is expiring, expired or not on file.
+- **Branch code:** branches take an optional `code` (2–12 letters, digits or dashes, stored in capitals),
+  unique per operator ignoring case (409). Migration 0097.

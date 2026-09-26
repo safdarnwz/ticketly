@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 611 |
-| DONE | 364 |
+| TODO | 602 |
+| DONE | 373 |
 | DUP | 9 |
 
 
@@ -159,7 +159,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 122 | Upload company logo | DONE | DONE | verified manually: existing module/API · UI: Settings → Branding |
 | 123 | Set primary and secondary contact | DONE | DONE | PATCH /operator/profile {address, contacts} · UI: Settings → Company profile |
 | 124 | Add new branch office | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
-| 125 | Enter branch name and code | DONE | TODO | verified manually: existing module/API |
+| 125 | Enter branch name and code | DONE | DONE | verified manually: existing module/API · UI: Branches → name and code |
 | 126 | Enter branch full address | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
 | 127 | Enter branch phone numbers | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
 | 128 | Assign branch manager | DONE | DONE | verified manually: existing module/API · UI: Branches page (manager) |
@@ -322,7 +322,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 285 | Manage master list of drop points | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops → stops with km, running time, boarding/dropping points |
 | 286 | Set additional charges for specific pickup points | GAP | — | verified manually: not built yet |
 | 287 | Set additional charges for specific drop points | GAP | — | verified manually: not built yet |
-| 288 | Configure complete ladies special service rules | DONE | TODO | verified manually: existing module/API |
+| 288 | Configure complete ladies special service rules | DONE | DONE | verified manually: existing module/API · UI: Schedule → service → Sales: women quota up to 100% (ladies special) |
 | 289 | Configure senior citizen concession percentage | DONE | DONE | verified manually: existing module/API · UI: Pricing → Concessions & booking rules |
 | 290 | Configure student concession percentage | DONE | DONE | verified manually: existing module/API · UI: Pricing → Concessions & booking rules |
 | 291 | Configure defense personnel concession | DONE | DONE | verified manually: existing module/API · UI: Pricing → Concessions & booking rules |
@@ -359,7 +359,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 322 | Transfer staff from one branch to another | DONE | DONE | verified manually: existing module/API · UI: Staff page |
 | 323 | Temporarily close a branch | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
 | 324 | Reopen a closed branch | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
-| 325 | View complete financial dashboard | DONE | TODO | verified manually: existing module/API |
+| 325 | View complete financial dashboard | DONE | DONE | verified manually: existing module/API · UI: Reports → Revenue, Profit & Loss; Settings → Platform bills |
 | 326 | View total outstanding receivables | GAP | — | verified manually: not built yet |
 | 327 | View total payables to OTAs | GAP | — | verified manually: not built yet |
 | 328 | Match OTA settlement file | GAP | — | verified manually: not built yet |
@@ -439,7 +439,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 402 | Enter lost and found item details | DONE | DONE | POST /lost-found (+claim with PNR check, 30-day disposal) · UI: Operations → Lost & found |
 | 403 | Manage stock of ticket rolls | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 404 | Manage stock of printer paper | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
-| 405 | Report printer or hardware problem | DONE | TODO | verified manually: existing module/API |
+| 405 | Report printer or hardware problem | DONE | DONE | verified manually: existing module/API · UI: Operations → Report incident (other / breakdown) with details |
 | 406 | Create booking in offline mode | GAP | — | verified manually: not built yet |
 | 407 | Sync offline bookings when internet returns | GAP | — | verified manually: not built yet |
 | 408 | Manually resolve sync conflict | GAP | — | verified manually: not built yet |
@@ -461,7 +461,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 424 | Process refund in cash | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 425 | View list of pending refunds for branch | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
 | 426 | Escalate high value cancellation to operator admin | GAP | — | verified manually: not built yet |
-| 427 | View live GPS location of branch services | DONE | TODO | verified manually: existing module/API |
+| 427 | View live GPS location of branch services | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Live location (GPS, speed, next stop ETA, signal lost) |
 | 428 | Mark service as departed from this branch | DONE | DONE | verified manually: existing module/API · UI: Trips (On the road / Cancelled filter) → chart: Mark departed / arrived, Change bus |
 | 429 | Enter detailed delay reason | DONE | DONE | verified manually: existing module/API · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
 | 430 | View complete no-show passenger list | DONE | DONE | verified manually: existing module/API · UI: Bookings → No-shows only (seats shown), tap the mobile to call |
@@ -482,7 +482,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 445 | Respond to passenger complaint | DONE | DONE | support tickets: staff raise by PNR / reply / priority / assign / resolve; customers own tickets only; author from account · UI: Support: queue views (active/mine/unassigned/…), search, ticket thread with reply, resolve/reopen/close, priority, assign; raise for a caller by PNR |
 | 446 | View ranking of own branch among all branches | GAP | — | verified manually: not built yet |
 | 447 | Customize personal dashboard widgets | GAP | — | verified manually: not built yet |
-| 448 | Export daily operational report to Excel | DONE | TODO | verified manually: existing module/API |
+| 448 | Export daily operational report to Excel | DONE | DONE | verified manually: existing module/API · UI: Reports → Dispatch → Export to Excel (CSV) |
 | 449 | View list of offline bookings still pending sync | GAP | — | verified manually: not built yet |
 | 450 | Force synchronize offline data | GAP | — | verified manually: not built yet |
 | 451 | View list of sync conflicts | GAP | — | verified manually: not built yet |
@@ -501,8 +501,8 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 464 | Communicate with dispatch manager on issues | PROCESS | — | operational practice, not software |
 | 465 | View crew currently allocated to services | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties → Duty roster (who is on which bus; cancel and reassign) |
 | 466 | Request change of crew | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties → Duty roster (who is on which bus; cancel and reassign) |
-| 467 | Report bus cleaning issue | DONE | TODO | verified manually: existing module/API |
-| 468 | Report bus maintenance issue | DONE | TODO | verified manually: existing module/API |
+| 467 | Report bus cleaning issue | DONE | DONE | verified manually: existing module/API · UI: Operations → Report incident (other / breakdown) with details |
+| 468 | Report bus maintenance issue | DONE | DONE | verified manually: existing module/API · UI: Operations → Report incident (other / breakdown) with details |
 | 469 | View upcoming document expiry of buses | DONE | DONE | verified manually: existing module/API · UI: Fleet → bus page documents (upload, expiry) + Fleet → Renewals |
 | 470 | Handle enquiry from police or RTO | PROCESS | — | operational practice, not software |
 | 471 | Provide official passenger list to authorities | DONE | DONE | GET /bookings/trips/:tripId/chart (passenger list by boarding point) — printed from the web chart · UI: Trips & Charts › chart: Print chart + passenger list |
@@ -510,7 +510,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 473 | Open additional temporary counter | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 474 | Close under-utilized counter | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 475 | Escalate unresolved technical issue to support | DONE | TODO | verified manually: existing module/API |
-| 476 | View system notifications | DONE | TODO | verified manually: existing module/API |
+| 476 | View system notifications | DONE | DONE | verified manually: existing module/API · UI: Platform announcements banner in the console |
 | 477 | Clear system notifications | GAP | — | verified manually: not built yet |
 | 478 | Change own login password | DONE | DONE | POST /auth/password (current required; other sessions end) · UI: My account (/me) |
 | 479 | View own activity log | DONE | DONE | GET /users/me (activity) · UI: My account (/me) |

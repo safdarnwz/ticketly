@@ -90,4 +90,20 @@ describe('branches (e2e)', () => {
     expect((await app.post(`/branches/${id}/activate`, {}, op)).status).toBe(201);
     expect((await find(id))?.status).toBe('active');
   });
+
+  it('a short code, once per operator whatever its case', async () => {
+    const code = `E${Date.now().toString(36).slice(-5)}`.toUpperCase();
+    expect((await create({ name: `${name} code`, code: 'x' })).status).toBe(400);
+    expect((await create({ name: `${name} code`, code: 'has space' })).status).toBe(400);
+    const a = await create({ name: `${name} code A`, code: code.toLowerCase() });
+    expect(a.status, JSON.stringify(a.body)).toBe(201);
+    expect(
+      ((await app.get('/branches', op)).body.items as { id: string; code: string }[]).find(
+        (b) => b.id === a.body.id,
+      )?.code,
+    ).toBe(code);
+    const b = await create({ name: `${name} code B`, code });
+    expect(b.status).toBe(409);
+    await app.post(`/branches/${a.body.id}/deactivate`, {}, op);
+  });
 });

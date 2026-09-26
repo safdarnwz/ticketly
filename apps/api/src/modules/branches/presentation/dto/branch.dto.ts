@@ -4,6 +4,13 @@ import { WEEKDAYS } from '../../domain/working-hours';
 
 export const CreateBranchSchema = z.object({
   name: z.string().trim().min(2, 'At least 2 characters').max(160),
+  /** Short branch code, e.g. JPR-SND — letters, digits and dashes, stored in capitals. */
+  code: z
+    .string()
+    .trim()
+    .transform((v) => v.toUpperCase())
+    .refine((v) => /^[A-Z0-9][A-Z0-9-]{1,11}$/.test(v), { message: '2 to 12 letters, digits or dashes' })
+    .optional(),
   address: z.string().trim().max(500).optional(),
   /** A mobile or a landline with STD code — 10 to 12 digits; empty clears it. */
   phone: z

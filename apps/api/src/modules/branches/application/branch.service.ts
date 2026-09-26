@@ -16,6 +16,7 @@ export class BranchService {
 
   async create(input: {
     name: string;
+    code?: string;
     address?: string;
     phone?: string;
     managerUserId?: string;
@@ -35,6 +36,7 @@ export class BranchService {
     id: BranchId,
     input: {
       name?: string;
+      code?: string;
       address?: string;
       phone?: string;
       managerUserId?: string;
