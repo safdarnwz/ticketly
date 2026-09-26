@@ -386,3 +386,6 @@ an unknown id is now 404 (was 200).
 - **Dispatch report:** `GET /reports/dispatch` covers at most 366 days (422).
 - **Cancel suggestions:** `POST /trips/:tripId/cancel-suggestion/decision` is refused (422) for a trip that
   already left or was cancelled.
+- **Agent refunds (fix):** `POST /refunds` for a booking an agent sold (offline capture) was a 500
+  "Database error" — the refund ledger split compared a text id with a uuid. It now settles and credits
+  the agent's account.
