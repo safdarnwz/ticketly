@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Bus, Users, LayoutGrid, Sparkles, FileWarning, Upload } from 'lucide-react';
+import { Plus, Bus, Users, LayoutGrid, Sparkles, Upload } from 'lucide-react';
 
 import { Button, Card, CardBody, Badge, statusTone, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { masterDataApi, type VehicleType, type Amenity, type SeatLayoutRow } from '@/lib/api/masterData';
-import { fleetApi, type Vehicle, type Crew, type Duty } from '@/lib/api/fleet';
+import { fleetApi, type Vehicle } from '@/lib/api/fleet';
 import { SeatLayoutsTab } from './SeatLayoutsTab';
+import { CrewTab } from './CrewTab';
 import { isRegistration, normReg } from '@/lib/vehicle';
-import { normalizeMobile } from '@/lib/checkout';
 import { cn } from '@/lib/utils';
 import { parseCsv } from '@/lib/csv';
 
@@ -281,71 +281,5 @@ function SetupTab() {
         </CardBody>
       </Card>
     </div>
-  );
-}
-
-// ── Crew & Duties ────────────────────────────────────────────────────────
-function CrewTab() {
-  const qc = useQueryClient();
-  const toast = useToast();
-  const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ role: 'driver', fullName: '', phone: '', licenceNo: '' });
-
-  const crew = useQuery({ queryKey: ['crew'], queryFn: () => fleetApi.listCrew() });
-  const duties = useQuery({ queryKey: ['duties'], queryFn: () => fleetApi.listDuties() });
-
-  const create = useMutation({
-    mutationFn: () => fleetApi.createCrew({
-      role: form.role,
-      fullName: form.fullName.trim(),
-      phone: form.phone.trim() || undefined,
-      licenceNo: form.licenceNo.trim() || undefined,
-    }),
-    onSuccess: () => { toast.success('Crew member added'); setAdding(false); setTriedCrew(false); setForm({ role: 'driver', fullName: '', phone: '', licenceNo: '' }); void qc.invalidateQueries({ queryKey: ['crew'] }); },
-    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
-  });
-
-  const [triedCrew, setTriedCrew] = useState(false);
-  const crewErrors = {
-    name: form.fullName.trim().length < 2 ? 'Enter the full name' : '',
-    phone: form.phone.trim() && !normalizeMobile(form.phone) ? 'Enter a 10-digit mobile number' : '',
-    licence: form.role === 'driver' && !form.licenceNo.trim() ? 'A driver needs a licence number' : '',
-  };
-  const crewColumns: Column<Crew>[] = [
-    { key: 'name', header: 'Name', render: (r) => <span className="font-medium text-text">{r.fullName}</span> },
-    { key: 'role', header: 'Role', render: (r) => <Badge>{r.role}</Badge> },
-    { key: 'licence', header: 'Licence', render: (r) => <span className="text-text-muted">{r.licenceNo ?? '—'}</span> },
-    { key: 'status', header: 'Status', render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge> },
-  ];
-  const dutyColumns: Column<Duty>[] = [
-    { key: 'crew', header: 'Crew', render: (r) => <span className="font-medium text-text">{r.crewName}</span> },
-    { key: 'starts', header: 'Starts', render: (r) => new Date(r.startsAt).toLocaleString() },
-    { key: 'ends', header: 'Ends', render: (r) => new Date(r.endsAt).toLocaleString() },
-    { key: 'driving', header: 'Driving (min)', render: (r) => r.drivingMinutes },
-  ];
-
-  return (
-    <>
-      <div className="mb-4 flex justify-end"><Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setAdding(true)}>Add crew</Button></div>
-
-      <div className="mb-3 text-sm font-semibold text-text">Crew</div>
-      {crew.isLoading ? <PageLoader /> : crew.isError ? <ErrorState error={crew.error} onRetry={crew.refetch} /> :
-        (crew.data?.items.length ? <Table columns={crewColumns} rows={crew.data.items} /> : <EmptyState title="No crew yet" icon={<Users className="h-10 w-10" />} />)}
-
-      <div className="mb-3 mt-8 text-sm font-semibold text-text">Upcoming duties</div>
-      {duties.isLoading ? <PageLoader /> : duties.isError ? <ErrorState error={duties.error} onRetry={duties.refetch} /> :
-        (duties.data?.duties.length ? <Table columns={dutyColumns} rows={duties.data.duties} /> : <EmptyState title="No duties assigned" icon={<FileWarning className="h-10 w-10" />} />)}
-
-      <Modal open={adding} onClose={() => setAdding(false)} title="Add crew member"
-        footer={<><Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button><Button loading={create.isPending} disabled={create.isPending} onClick={() => { setTriedCrew(true); if (!crewErrors.name && !crewErrors.phone && !crewErrors.licence) create.mutate(); }}>Add</Button></>}>
-        <div className="flex flex-col gap-3">
-          <Select label="Role" value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-            options={[{ label: 'Driver', value: 'driver' }, { label: 'Conductor', value: 'conductor' }, { label: 'Attendant', value: 'attendant' }]} />
-          <Input label="Full name" value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} error={triedCrew ? crewErrors.name : undefined} />
-          <Input label="Phone" inputMode="tel" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} error={triedCrew ? crewErrors.phone : undefined} />
-          <Input label="Licence no." value={form.licenceNo} onChange={(e) => setForm((f) => ({ ...f, licenceNo: e.target.value.toUpperCase() }))} error={triedCrew ? crewErrors.licence : undefined} hint={form.role === 'driver' ? 'Required for drivers' : undefined} />
-        </div>
-      </Modal>
-    </>
   );
 }

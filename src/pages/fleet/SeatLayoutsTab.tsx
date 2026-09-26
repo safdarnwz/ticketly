@@ -12,6 +12,8 @@ type Position = '' | 'front' | 'aisle' | 'window';
 interface CellState {
   type: SeatType;
   ladiesOnly?: boolean;
+  /** Disability-friendly: kept for passengers who need it. */
+  accessible?: boolean;
   bookable?: boolean;
   position?: Position;
   rowSpan?: number;
@@ -70,9 +72,9 @@ export function SeatLayoutsTab() {
     enabled: !!viewingVersionsOf,
   });
 
-  const gridToGrid = (map: { decks: number; rows: number; columns: number; seats: Array<{ number: string; deck: number; row: number; column: number; rowSpan?: number; colSpan?: number; type: SeatType; ladiesOnly?: boolean; bookable?: boolean; position?: Position }> }) => {
+  const gridToGrid = (map: { decks: number; rows: number; columns: number; seats: Array<{ number: string; deck: number; row: number; column: number; rowSpan?: number; colSpan?: number; type: SeatType; ladiesOnly?: boolean; accessible?: boolean; bookable?: boolean; position?: Position }> }) => {
     const grid: Record<string, CellState> = {};
-    for (const s of map.seats) grid[cellKey(s.deck, s.row, s.column)] = { type: s.type, ladiesOnly: s.ladiesOnly, bookable: s.bookable, position: s.position, rowSpan: s.rowSpan, colSpan: s.colSpan, label: s.number };
+    for (const s of map.seats) grid[cellKey(s.deck, s.row, s.column)] = { type: s.type, ladiesOnly: s.ladiesOnly, accessible: s.accessible, bookable: s.bookable, position: s.position, rowSpan: s.rowSpan, colSpan: s.colSpan, label: s.number };
     return grid;
   };
 
@@ -121,6 +123,7 @@ export function SeatLayoutsTab() {
       semi: cells.filter((c) => c.type === 'semi_sleeper').length,
       crew: cells.filter((c) => c.type === 'crew').length,
       ladies: cells.filter((c) => c.ladiesOnly).length,
+      accessible: cells.filter((c) => c.accessible).length,
       unbookable: cells.filter((c) => c.bookable === false).length,
     };
   }, [editing]);
@@ -166,7 +169,7 @@ export function SeatLayoutsTab() {
   };
 
   const buildSeatMap = (state: { decks: number; rows: number; columns: number; grid: Record<string, CellState> }) => {
-    const seats: Array<{ number: string; deck: number; row: number; column: number; rowSpan?: number; colSpan?: number; type: SeatType; ladiesOnly?: boolean; bookable?: boolean; position?: Position }> = [];
+    const seats: Array<{ number: string; deck: number; row: number; column: number; rowSpan?: number; colSpan?: number; type: SeatType; ladiesOnly?: boolean; accessible?: boolean; bookable?: boolean; position?: Position }> = [];
     let n = 1;
     for (let d = 0; d < state.decks; d++) {
       for (let r = 0; r < state.rows; r++) {
@@ -178,7 +181,7 @@ export function SeatLayoutsTab() {
             deck: d, row: r, column: c,
             rowSpan: cell.rowSpan && cell.rowSpan > 1 ? cell.rowSpan : undefined,
             colSpan: cell.colSpan && cell.colSpan > 1 ? cell.colSpan : undefined,
-            type: cell.type, ladiesOnly: cell.ladiesOnly || undefined,
+            type: cell.type, ladiesOnly: cell.ladiesOnly || undefined, accessible: cell.accessible || undefined,
             bookable: cell.type === 'crew' ? false : (cell.bookable === false ? false : undefined),
             position: cell.position || undefined,
           });
@@ -197,7 +200,7 @@ export function SeatLayoutsTab() {
   };
   const applyJson = () => {
     try {
-      const parsed = JSON.parse(jsonText) as { decks: number; rows: number; columns: number; seats: Array<{ number: string; deck: number; row: number; column: number; rowSpan?: number; colSpan?: number; type: SeatType; ladiesOnly?: boolean; bookable?: boolean; position?: Position }> };
+      const parsed = JSON.parse(jsonText) as { decks: number; rows: number; columns: number; seats: Array<{ number: string; deck: number; row: number; column: number; rowSpan?: number; colSpan?: number; type: SeatType; ladiesOnly?: boolean; accessible?: boolean; bookable?: boolean; position?: Position }> };
       if (!parsed.decks || !parsed.rows || !parsed.columns || !Array.isArray(parsed.seats)) throw new Error('Expected {decks, rows, columns, seats[]}');
       setEditing((prev) => (prev ? { ...prev, decks: parsed.decks as 1 | 2, rows: parsed.rows, columns: parsed.columns, grid: gridToGrid(parsed) } : prev));
       setJsonMode(false); setJsonError(null); setSelected(new Set());
@@ -237,6 +240,12 @@ export function SeatLayoutsTab() {
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
   });
 
+  const autoMark = useMutation({
+    mutationFn: (id: string) => masterDataApi.autoSeatPositions(id),
+    onSuccess: () => { toast.success('Window and aisle seats marked — the previous version is in History'); void qc.invalidateQueries({ queryKey: ['seat-layouts'] }); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not mark seats'),
+  });
+
   const columns: Column<SeatLayoutRow>[] = [
     { key: 'name', header: 'Layout name', render: (r) => <button className="font-medium text-text underline decoration-dotted" onClick={() => void openEdit(r)}>{r.name}</button> },
     { key: 'decks', header: 'Decks', render: (r) => r.decks ?? '—' },
@@ -245,6 +254,8 @@ export function SeatLayoutsTab() {
       key: 'actions', header: '', render: (r) => (
         <div className="flex justify-end gap-2">
           <Button size="sm" variant="ghost" leftIcon={<Eye className="h-4 w-4" />} onClick={() => void openPreview(r)}>Preview</Button>
+          <Button size="sm" variant="ghost" leftIcon={<Wand2 className="h-4 w-4" />} loading={autoMark.isPending && autoMark.variables === r.id} disabled={autoMark.isPending}
+            title="Mark every window and aisle seat from the grid — saved as a new version you can undo from History" onClick={() => autoMark.mutate(r.id)}>Auto window/aisle</Button>
           <Button size="sm" variant="ghost" leftIcon={<History className="h-4 w-4" />} onClick={() => setViewingVersionsOf(r)}>History</Button>
           <Button size="sm" variant="ghost" leftIcon={<Copy className="h-4 w-4" />} onClick={() => void openDuplicate(r)}>Duplicate</Button>
           <Button size="sm" variant="ghost" className="text-danger" leftIcon={<Trash2 className="h-4 w-4" />} onClick={() => setDeletingLayout(r)}>Delete</Button>
@@ -314,6 +325,8 @@ export function SeatLayoutsTab() {
                         title={cell.label || undefined}
                       >
                         {cell.ladiesOnly && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-danger" />}
+                        {cell.accessible && <span className="absolute -left-1 -top-1 h-2 w-2 rounded-full bg-info" title="Disability-friendly" />}
+                        {cell.position === 'window' && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-success" />}
                         {cell.type === 'crew' ? <Car className="h-3.5 w-3.5" /> : cell.bookable === false ? '✕' : cell.type ? (cell.label || cell.type[0].toUpperCase()) : ''}
                       </button>
                     );
@@ -333,6 +346,12 @@ export function SeatLayoutsTab() {
                 <span className="mx-1 h-6 w-px bg-border" />
                 <Button size="sm" variant="outline" onClick={() => applyToSelection({ ladiesOnly: true })}>Ladies-only</Button>
                 <Button size="sm" variant="ghost" onClick={() => applyToSelection({ ladiesOnly: false })}>Unset ladies-only</Button>
+                <Button size="sm" variant="outline" onClick={() => applyToSelection({ accessible: true })}>Disability-friendly</Button>
+                <Button size="sm" variant="ghost" onClick={() => applyToSelection({ accessible: false })}>Unset disability-friendly</Button>
+                <span className="mx-1 h-6 w-px bg-border" />
+                <Button size="sm" variant="outline" onClick={() => applyToSelection({ position: 'window' })}>Window</Button>
+                <Button size="sm" variant="outline" onClick={() => applyToSelection({ position: 'aisle' })}>Aisle</Button>
+                <Button size="sm" variant="outline" onClick={() => applyToSelection({ position: 'front' })}>Front</Button>
                 <Button size="sm" variant="outline" className="text-danger" onClick={() => applyToSelection({ bookable: false })}>Mark unbookable</Button>
                 <Button size="sm" variant="ghost" onClick={() => applyToSelection({ bookable: true })}>Mark bookable</Button>
                 {selected.size === 1 && (() => {
@@ -366,6 +385,8 @@ export function SeatLayoutsTab() {
                 <span>{summary.semi} semi-sleeper</span>
                 {summary.crew > 0 && <span className="flex items-center gap-1"><Car className="h-3 w-3" /> {summary.crew} driver/crew</span>}
                 {summary.ladies > 0 && <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-danger" /> {summary.ladies} ladies-only</span>}
+                {summary.accessible > 0 && <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-info" /> {summary.accessible} disability-friendly</span>}
+                <span className="flex items-center gap-1"><span className="h-0.5 w-3 bg-success" /> window</span>
                 {summary.unbookable > 0 && <span>{summary.unbookable} unbookable</span>}
               </div>
             )}

@@ -9,6 +9,7 @@ import { ApiError } from '@/lib/api/client';
 import { fleetApi, type VehicleDetail, type VehicleDocument } from '@/lib/api/fleet';
 import { masterDataApi } from '@/lib/api/masterData';
 import { todayLocal } from '@/lib/utils';
+import { MaintenanceCard, PhotosCard } from './VehicleExtras';
 
 const errText = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
 const MAX_FILE = 5 * 1024 * 1024;
@@ -91,6 +92,11 @@ export function VehicleDetailPage() {
             })}
           </CardBody>
         </Card>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <MaintenanceCard vehicleId={id} retired={v.status === 'retired'} />
+        <PhotosCard vehicleId={id} retired={v.status === 'retired'} />
       </div>
 
       {uploading && <UploadModal vehicleId={id} docType={uploading} label={d.docLabels[uploading] ?? uploading} required={d.requiredDocTypes.includes(uploading)} registrationNo={v.registrationNo} onClose={() => setUploading(null)} onDone={() => { setUploading(null); refresh(); }} />}

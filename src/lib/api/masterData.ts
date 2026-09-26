@@ -43,6 +43,8 @@ export const masterDataApi = {
   validateSeatLayout: (layout: unknown) => post<{ summary: unknown }>('/v1/master-data/seat-layouts/validate', layout),
   seatLayoutUsage: (id: string) => get<{ vehicleCount: number }>(`/v1/master-data/seat-layouts/${id}/usage`),
   deleteSeatLayout: (id: string) => del<{ ok: boolean }>(`/v1/master-data/seat-layouts/${id}`),
+  /** Derive window / aisle for every seat from the grid; saved as a new version. */
+  autoSeatPositions: (id: string) => post<{ summary: unknown }>(`/v1/master-data/seat-layouts/${id}/seats/auto-positions`, {}),
   listSeatLayoutVersions: (id: string) => get<{ items: SeatLayoutVersion[] }>(`/v1/master-data/seat-layouts/${id}/versions`),
   restoreSeatLayoutVersion: (id: string, versionNumber: number) =>
     post<{ summary: unknown }>(`/v1/master-data/seat-layouts/${id}/versions/${versionNumber}/restore`, {}),

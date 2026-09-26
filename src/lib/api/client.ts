@@ -8,8 +8,8 @@ export interface ApiErrorBody {
   /** Older shape / network errors. */
   message?: string;
   details?: unknown;
-  /** Validation failures: one entry per bad field. */
-  errors?: { issues?: { path: string; rule?: string; message: string }[] };
+  /** Validation failures (one entry per bad field), or a domain error's structured details. */
+  errors?: { issues?: { path: string; rule?: string; message: string }[] } & Record<string, unknown>;
   requestId?: string;
   retryable?: boolean;
 }
@@ -36,7 +36,8 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.status = status;
     this.code = body.code ?? 'COMMON.INTERNAL_ERROR';
-    this.details = body.details;
+    // A domain error carries its structured details under `errors` (e.g. { conflicts: [...] }).
+    this.details = body.details ?? (body.errors && !body.errors.issues ? body.errors : undefined);
     this.requestId = body.requestId;
     this.fieldErrors = Object.fromEntries(issues.map((i) => [i.path, i.message]));
   }
