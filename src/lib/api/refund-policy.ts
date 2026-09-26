@@ -9,6 +9,10 @@ export interface RefundPolicy {
   tiers: RefundTier[];
   flatFeeMinor?: number;
   cutoffHours?: number;
+  /** Off = customers, agents and partners cancel whole bookings only (staff still can split). */
+  partialCancellation?: boolean;
+  /** Minutes after departure before a passenger can be marked a no-show (0–240). */
+  noShowGraceMinutes?: number;
 }
 
 export const refundPolicyApi = {

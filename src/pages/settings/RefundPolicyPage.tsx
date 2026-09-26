@@ -14,6 +14,8 @@ export function RefundPolicyPage() {
   const [tiers, setTiers] = useState<RefundTier[]>([]);
   const [flatFeeMinor, setFlatFeeMinor] = useState('0');
   const [cutoffHours, setCutoffHours] = useState('0');
+  const [partial, setPartial] = useState(true);
+  const [grace, setGrace] = useState('0');
   const [confirmReset, setConfirmReset] = useState(false);
 
   // Load the current policy (custom or platform default) into the editable
@@ -23,6 +25,8 @@ export function RefundPolicyPage() {
     setTiers(data.data.policy.tiers);
     setFlatFeeMinor(String((data.data.policy.flatFeeMinor ?? 0) / 100));
     setCutoffHours(String(data.data.policy.cutoffHours ?? 0));
+    setPartial(data.data.policy.partialCancellation !== false);
+    setGrace(String(data.data.policy.noShowGraceMinutes ?? 0));
   }, [data.data]);
 
   const save = useMutation({
@@ -30,6 +34,8 @@ export function RefundPolicyPage() {
       tiers: [...tiers].sort((a, b) => b.minHoursBeforeDeparture - a.minHoursBeforeDeparture),
       flatFeeMinor: Math.round(Number(flatFeeMinor) * 100) || 0,
       cutoffHours: Number(cutoffHours) || 0,
+      partialCancellation: partial,
+      noShowGraceMinutes: Number(grace) || 0,
     }),
     onSuccess: () => {
       toast.success('Cancellation policy updated — applies to any cancellation from now on, never retroactively');
@@ -66,13 +72,15 @@ export function RefundPolicyPage() {
   const inversion = sorted.find((t, i) => i > 0 && t.refundPct > sorted[i - 1].refundPct);
   const fee = Number(flatFeeMinor);
   const cutoff = Number(cutoffHours);
+  const graceMin = Number(grace);
+  const graceError = !(Number.isInteger(graceMin) && graceMin >= 0 && graceMin <= 240) ? 'Whole minutes, 0–240' : undefined;
   const formError = tiers.length === 0 ? 'Add at least one tier'
     : tiers.length > 10 ? 'At most 10 tiers'
     : inversion ? `Cancelling earlier must never refund less — the ${inversion.minHoursBeforeDeparture}h tier gives more than an earlier one`
     : !(fee >= 0 && fee <= 10_000) ? 'The flat fee is ₹0 to ₹10,000'
     : !(Number.isInteger(cutoff) && cutoff >= 0 && cutoff <= 720) ? 'The cutoff is whole hours, 0–720'
     : undefined;
-  const canSave = !formError && tierErrors.every((e) => !e.hours && !e.pct);
+  const canSave = !formError && !graceError && tierErrors.every((e) => !e.hours && !e.pct);
   const example = (h: number) => {
     if (h < cutoff) return 'not allowed';
     const tier = sorted.find((t) => h >= t.minHoursBeforeDeparture);
@@ -119,6 +127,16 @@ export function RefundPolicyPage() {
           <div className="mt-2 grid grid-cols-2 gap-3 border-t border-border pt-4">
             <Input label="Flat cancellation fee (₹, optional)" type="number" value={flatFeeMinor} onChange={(e) => setFlatFeeMinor(e.target.value)} hint="Deducted on top of the tier percentage, per ticket" />
             <Input label="Hard cutoff (hours, optional)" type="number" value={cutoffHours} onChange={(e) => setCutoffHours(e.target.value)} hint="Cancellation blocked entirely within this many hours of departure" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 border-t border-border pt-4">
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-1" checked={partial} onChange={(e) => setPartial(e.target.checked)} aria-label="Allow cancelling some seats of a booking" />
+              <span><span className="font-medium text-text">Allow cancelling some seats of a booking</span><br />
+                <span className="text-xs text-text-muted">{partial ? 'Passengers, agents and partners may drop some seats and keep the rest.' : 'Whole bookings only — passengers, agents and partners must cancel every seat. Your staff can still split a booking at the counter.'}</span></span>
+            </label>
+            <Input label="No-show grace (minutes after departure)" type="number" min={0} max={240} value={grace} onChange={(e) => setGrace(e.target.value)} error={graceError}
+              hint="Staff can mark a passenger a no-show only this long after the departure time (a late passenger may still be picked up on the way)" />
           </div>
 
           <div className="rounded-md bg-surface-muted p-3 text-sm">
