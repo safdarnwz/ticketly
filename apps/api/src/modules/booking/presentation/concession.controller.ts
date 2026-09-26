@@ -2,6 +2,10 @@ import { Body, Controller, Get, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
+import { AppConfig } from '@config';
+import { AppError, ErrorCode, todayIn } from '@kernel';
+
+import { concessionRuleProblem, policyProblem } from '../domain/passenger-categories';
 import { ApiStandardErrors, Public, RateLimit, RequirePermission, zodBody, zodQuery } from '@http';
 
 import { ConcessionRepository } from '../infrastructure/persistence/concession.repository';
@@ -24,7 +28,10 @@ import {
 @Controller({ path: 'concessions', version: '1' })
 @ApiStandardErrors()
 export class ConcessionController {
-  constructor(private readonly repo: ConcessionRepository) {}
+  constructor(
+    private readonly repo: ConcessionRepository,
+    private readonly config: AppConfig,
+  ) {}
 
   /**
    * What a passenger can claim at checkout on this operator: the active
@@ -76,6 +83,12 @@ export class ConcessionController {
       'Create or update one category concession (age band, ID proof, validity window, per-booking limit)',
   })
   async rule(@Body(zodBody(ConcessionRuleSchema)) dto: ConcessionRuleDto) {
+    const problem = concessionRuleProblem(
+      dto,
+      await this.repo.policy(),
+      todayIn(this.config.domain.timezone),
+    );
+    if (problem) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: problem });
     await this.repo.upsertRule(dto);
     return { ok: true };
   }
@@ -108,6 +121,8 @@ export class ConcessionController {
     summary: 'Adult age, infant age limit and fee, and whether unaccompanied minors may book',
   })
   async policy(@Body(zodBody(PassengerPolicySchema)) dto: PassengerPolicyDto) {
+    const problem = policyProblem(dto, await this.repo.rules());
+    if (problem) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: problem });
     await this.repo.setPolicy(dto);
     return { ok: true };
   }

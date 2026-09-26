@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3112 |
-| TODO | 845 |
-| DONE | 121 |
+| TODO | 842 |
+| DONE | 124 |
 | DUP | 9 |
 
 
@@ -155,9 +155,9 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 118 | View slow query logs | INFRA | — | DevOps/monitoring runbook (not an app feature) |
 | 119 | Manage partner API keys | DONE | TODO | verified manually: existing module/API |
 | 120 | Rotate platform encryption keys | DONE | TODO | key ring (ENCRYPTION_PREVIOUS_KEYS) + POST /admin/security/encryption/reencrypt; RUNBOOK |
-| 121 | Complete operator profile with full address | DONE | TODO | verified manually: existing module/API |
-| 122 | Upload company logo | DONE | TODO | verified manually: existing module/API |
-| 123 | Set primary and secondary contact | DONE | TODO | verified manually: existing module/API |
+| 121 | Complete operator profile with full address | DONE | DONE | PATCH /operator/profile {address, contacts} · UI: Settings → Company profile |
+| 122 | Upload company logo | DONE | DONE | verified manually: existing module/API · UI: Settings → Branding |
+| 123 | Set primary and secondary contact | DONE | DONE | PATCH /operator/profile {address, contacts} · UI: Settings → Company profile |
 | 124 | Add new branch office | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
 | 125 | Enter branch name and code | DONE | TODO | verified manually: existing module/API |
 | 126 | Enter branch full address | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |

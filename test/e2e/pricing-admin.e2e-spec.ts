@@ -285,4 +285,40 @@ describe('pricing admin (e2e)', () => {
       ).toBe(404);
     });
   });
+
+  it('concessions: age bands that make sense against the passenger policy', async () => {
+    const op = { as: 'operator' as const };
+    const put = (body: object) => app.put('/concessions/rules', body, op);
+    expect((await put({ category: 'child', discountPct: 25, maxAge: 18 })).status).toBe(422);
+    expect((await put({ category: 'senior', discountPct: 10 })).status).toBe(422);
+    expect((await put({ category: 'student', discountPct: 0 })).status).toBe(422);
+    expect(
+      (await put({ category: 'student', discountPct: 10, validTo: '2020-01-01' })).status,
+    ).toBe(422);
+    expect((await put({ category: 'child', discountPct: 25, minAge: 5, maxAge: 12 })).status).toBe(
+      200,
+    );
+    const policy = (await app.get('/concessions', op)).body.policy;
+    expect((await app.put('/concessions/policy', { ...policy, adultAge: 12 }, op)).status).toBe(
+      422,
+    );
+    expect(
+      (
+        await app.put(
+          '/concessions/booking-window',
+          { maxAdvanceDays: 0, minMinutesBeforeDeparture: 0 },
+          op,
+        )
+      ).status,
+    ).toBe(400);
+    const got = (await app.get('/concessions', op)).body.rules.find(
+      (r: { category: string }) => r.category === 'child',
+    );
+    expect(got).toMatchObject({ discountPct: 25, maxAge: 12 });
+    // Leave the operator as it was.
+    expect(
+      (await put({ category: 'child', discountPct: 25, minAge: 5, maxAge: 12, active: false }))
+        .status,
+    ).toBe(200);
+  });
 });

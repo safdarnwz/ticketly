@@ -52,6 +52,42 @@ export const DEFAULT_POLICY: PassengerPolicy = {
   allowUnaccompaniedMinors: false,
 };
 
+/**
+ * Why a concession rule would give the wrong fare — null when it is fine.
+ * A child band reaching adult age would sell adults child fares; a senior band
+ * with no lower age would give anyone the senior discount.
+ */
+export function concessionRuleProblem(
+  r: Pick<ConcessionRule, 'category' | 'discountPct' | 'minAge' | 'maxAge' | 'validTo' | 'active'>,
+  policy: PassengerPolicy,
+  today: string,
+): string | null {
+  if (r.active && r.discountPct === 0)
+    return 'A 0% concession gives nothing — switch it off instead';
+  if (r.validTo && r.validTo < today) return 'That end date has already passed';
+  if (r.category === 'child') {
+    if (r.maxAge === null) return 'Set the oldest age that counts as a child';
+    if (r.maxAge >= policy.adultAge)
+      return `A child must be younger than your adult age (${policy.adultAge})`;
+    if (r.minAge !== null && r.minAge < policy.infantMaxAge)
+      return `Children under ${policy.infantMaxAge} already travel as infants`;
+  }
+  if (r.category === 'senior') {
+    if (r.minAge === null) return 'Set the age from which someone is a senior citizen';
+    if (r.minAge < policy.adultAge) return 'A senior citizen must be at least adult age';
+  }
+  return null;
+}
+
+/** Why changing the passenger policy would break a concession already set up — null when fine. */
+export function policyProblem(policy: PassengerPolicy, rules: ConcessionRule[]): string | null {
+  const child = rules.find((r) => r.category === 'child' && r.active);
+  if (child?.maxAge != null && child.maxAge >= policy.adultAge)
+    return `Your child concession runs to age ${child.maxAge} — lower it before setting adult age to ${policy.adultAge}`;
+  if (policy.infantMaxAge >= policy.adultAge) return 'Infant age must be below adult age';
+  return null;
+}
+
 export interface SeatedPassenger {
   seatNumber: string;
   fullName: string;

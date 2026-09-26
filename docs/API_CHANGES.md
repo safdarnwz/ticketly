@@ -339,3 +339,7 @@ an unknown id is now 404 (was 200).
   (null removes) and a structured `address` (also the invoice address); mobile numbers are normalised,
   the time zone must exist, and the currency cannot change once there are bookings (422). `GET` returns
   the contacts, address, legal name and GSTIN (those two stay with the platform).
+- **Concessions:** `PUT /concessions/rules` refuses bands that sell the wrong fare (422): a child band
+  needs its oldest age, below adult age and not below infant age; a senior band needs a starting age of at
+  least adult age; no active 0% rule; no end date in the past. `PUT /concessions/policy` refuses an adult
+  age at or below an active child band's oldest age.
