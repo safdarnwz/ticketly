@@ -5,17 +5,18 @@ import { Badge, Button, Card, CardBody, EmptyState, ErrorState, Input, PageLoade
 import { agentsApi } from '@/lib/api/agents';
 import { branchesApi } from '@/lib/api/branches';
 import type { TripChart } from '@/lib/api/scheduling';
+import { fareRulesApi } from '@/lib/api/pricingAdmin';
 import { CHANNELS, EXPENSE_CATEGORIES, tripOpsExtraApi, type Channel, type Expense, type ExpenseCategory, type Quota } from '@/lib/api/tripOps';
 import { cn, formatDateTime, formatMoney, idempotencyKey } from '@/lib/utils';
 
-type Tab = 'channels' | 'quotas' | 'waitlist' | 'money' | 'forecast';
+type Tab = 'channels' | 'fare' | 'quotas' | 'waitlist' | 'money' | 'forecast';
 const errText = (e: unknown) => (e instanceof Error ? e.message : 'Failed');
 const label = (c: string) => c.replace(/_/g, ' ');
 
 /** The rest of running one bus: who may sell it, seats kept for agents/branches, the waitlist, its money. */
 export function TripOpsSection({ chart, locked, onChanged }: { chart: TripChart; locked: boolean; onChanged: () => void }) {
   const [tab, setTab] = useState<Tab>('channels');
-  const tabs: [Tab, string][] = [['channels', 'Sales channels'], ['quotas', 'Agent & branch seats'], ['waitlist', 'Waitlist'], ['money', 'Expenses & P&L'], ['forecast', 'Forecast']];
+  const tabs: [Tab, string][] = [['channels', 'Sales channels'], ['fare', 'Fare for this trip'], ['quotas', 'Agent & branch seats'], ['waitlist', 'Waitlist'], ['money', 'Expenses & P&L'], ['forecast', 'Forecast']];
   return (
     <Card className="mt-6 print:hidden">
       <CardBody>
@@ -23,6 +24,7 @@ export function TripOpsSection({ chart, locked, onChanged }: { chart: TripChart;
           {tabs.map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={cn('border-b-2 px-3 py-1.5', tab === k ? 'border-primary text-text' : 'border-transparent text-text-muted')}>{l}</button>)}
         </div>
         {tab === 'channels' ? <Channels chart={chart} locked={locked} onChanged={onChanged} />
+          : tab === 'fare' ? <TripFare tripId={chart.trip.id} locked={locked} />
           : tab === 'quotas' ? <Quotas chart={chart} locked={locked} onChanged={onChanged} />
             : tab === 'waitlist' ? <Waitlist tripId={chart.trip.id} />
               : tab === 'money' ? <Money tripId={chart.trip.id} cancelled={chart.trip.status === 'cancelled'} />
@@ -214,6 +216,36 @@ function Forecast({ tripId }: { tripId: string }) {
       <p>Sold {f.currentSold} of {f.totalSeats} with {f.daysToDeparture} day(s) to go.</p>
       {f.forecastSeats == null ? <p className="text-text-muted">Not enough past trips on this route yet to forecast ({f.samples} comparable).</p>
         : <p>Expected at departure: <b>{f.forecastSeats} seats ({f.forecastPct}%)</b> · confidence {f.confidence} ({f.samples} comparable trips)</p>}
+    </div>
+  );
+}
+
+/** Cheaper for an empty bus, dearer for a full one — this trip only, new quotes only. */
+function TripFare({ tripId, locked }: { tripId: string; locked: boolean }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const q = useQuery({ queryKey: ['trip-fare-adj', tripId], queryFn: () => fareRulesApi.tripAdjustment(tripId) });
+  const [pct, setPct] = useState('');
+  const [reason, setReason] = useState('');
+  const n = Number(pct);
+  const e = pct !== '' && (!(n >= -50 && n <= 100) || n === 0) ? '−50 to +100 %, not 0' : undefined;
+  const done = (msg: string) => ({ onSuccess: () => { toast.success(msg); setPct(''); setReason(''); void qc.invalidateQueries({ queryKey: ['trip-fare-adj', tripId] }); }, onError: (x: unknown) => toast.error(errText(x)) });
+  const set = useMutation({ mutationFn: () => fareRulesApi.setTripAdjustment(tripId, n, reason.trim()), ...done('Fare changed for this trip — new bookings pay it') });
+  const clear = useMutation({ mutationFn: () => fareRulesApi.setTripAdjustment(tripId, null), ...done('Back to the normal fare') });
+  if (q.isLoading) return <PageLoader />;
+  const cur = q.data;
+  return (
+    <div className="flex flex-col gap-3 text-sm">
+      <p>{cur?.pct != null ? <>Now <b>{cur.pct > 0 ? '+' : ''}{cur.pct}%</b> — {cur.reason}</> : 'Normal fare (route and yield rules apply).'}</p>
+      {!locked && (
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="w-40"><Input label="Change %" type="number" value={pct} error={e} placeholder="e.g. -15 or 20" onChange={(x) => setPct(x.target.value)} /></div>
+          <div className="w-72"><Input label="Reason" value={reason} maxLength={200} error={reason && reason.trim().length < 5 ? 'At least 5 characters' : undefined} onChange={(x) => setReason(x.target.value)} /></div>
+          <Button loading={set.isPending} disabled={!pct || !!e || reason.trim().length < 5 || set.isPending} onClick={() => set.mutate()}>Apply</Button>
+          {cur?.pct != null && <Button variant="ghost" loading={clear.isPending} disabled={clear.isPending} onClick={() => clear.mutate()}>Remove change</Button>}
+        </div>
+      )}
+      <p className="text-xs text-text-muted">Tickets already sold keep their price. Route limits (lowest / highest fare) still apply.</p>
     </div>
   );
 }

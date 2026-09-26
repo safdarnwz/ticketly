@@ -1,21 +1,23 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, IndianRupee, TrendingUp, Ticket, CheckCircle2, Users } from 'lucide-react';
+import { Plus, IndianRupee, TrendingUp, Ticket, CheckCircle2, Users, Clock } from 'lucide-react';
 
 import { Button, Badge, statusTone, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
 import { ConcessionsTab } from './ConcessionsTab';
+import { FareBulkTools, RouteRulesTab } from './RouteRulesTab';
 import { PageHeader } from '@/components/common/PageHeader';
 import { pricingAdminApi, type FarePlan, type Coupon, type PricingPolicy, type YieldLadder } from '@/lib/api/pricingAdmin';
 import { masterDataApi } from '@/lib/api/masterData';
 import { formatMoney, cn, formatDateLabel, localDateOf, todayLocal } from '@/lib/utils';
 import { ApiError } from '@/lib/api/client';
 
-type Tab = 'plans' | 'policies' | 'coupons' | 'concessions';
+type Tab = 'plans' | 'routeRules' | 'policies' | 'coupons' | 'concessions';
 
 export function PricingPage() {
   const [tab, setTab] = useState<Tab>('plans');
   const tabs: { key: Tab; label: string; icon: typeof IndianRupee }[] = [
     { key: 'plans', label: 'Fare Plans', icon: IndianRupee },
+    { key: 'routeRules', label: 'Route limits & peak times', icon: Clock },
     { key: 'policies', label: 'Yield Policies', icon: TrendingUp },
     { key: 'coupons', label: 'Coupons', icon: Ticket },
     { key: 'concessions', label: 'Concessions & booking rules', icon: Users },
@@ -32,6 +34,7 @@ export function PricingPage() {
         ))}
       </div>
       {tab === 'plans' && <PlansTab />}
+      {tab === 'routeRules' && <RouteRulesTab />}
       {tab === 'policies' && <PoliciesTab />}
       {tab === 'coupons' && <CouponsTab />}
       {tab === 'concessions' && <ConcessionsTab />}
@@ -114,6 +117,7 @@ function PlansTab() {
 
       <Modal open={!!ruleFor} onClose={() => setRuleFor(null)} title={`Fare rules — ${ruleFor?.name ?? ''}`} size="lg">
         <div className="flex flex-col gap-4">
+          {ruleFor && <FareBulkTools planId={ruleFor.id} onChanged={() => void qc.invalidateQueries({ queryKey: ['fare-rules', ruleFor.id] })} />}
           {rules.data?.rules.length ? (
             <div className="flex flex-col gap-2">
               {rules.data.rules.map((r) => (
