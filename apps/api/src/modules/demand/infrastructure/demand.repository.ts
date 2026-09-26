@@ -145,8 +145,10 @@ export class DemandRepository {
       departs_at: Date;
       total_seats: number;
       journey_date: string;
+      status: string;
     }>(
-      `SELECT service_id, departs_at, total_seats, journey_date::text AS journey_date FROM trips WHERE tenant_id = $1 AND id = $2`,
+      `SELECT service_id, departs_at, total_seats, journey_date::text AS journey_date, status::text AS status
+         FROM trips WHERE tenant_id = $1 AND id = $2`,
       [requireTenantId(), tripId],
       { name: 'forecast.trip' },
     );

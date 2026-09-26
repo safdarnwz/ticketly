@@ -16,6 +16,9 @@ import {
   type IncidentType,
 } from '../domain/incident-rules';
 import { IncidentRepository } from '../infrastructure/incident.repository';
+import { BranchRepository } from '../../branches';
+
+const MAX_REPORT_DAYS = 366;
 
 const ruleError = (e: unknown): never => {
   if (e instanceof IncidentRuleError)
@@ -39,6 +42,7 @@ export class IncidentService {
     private readonly uow: UnitOfWork,
     private readonly events: EventBus,
     private readonly repo: IncidentRepository,
+    private readonly branches: BranchRepository,
   ) {}
 
   async report(input: {
@@ -142,16 +146,21 @@ export class IncidentService {
     seatNumber?: string;
     storedAt?: string;
   }) {
-    const id = newId();
-    await this.repo.insertItem({
-      id,
-      tripId: input.tripId ?? null,
-      description: input.description.trim(),
-      seatNumber: input.seatNumber?.trim() || null,
-      storedAt: input.storedAt?.trim() || null,
-      foundBy: getUserId() ?? null,
+    return this.uow.run({ name: 'lostFound.log', tenantId: requireTenantId() }, async () => {
+      // Only this operator's trips — the database key alone would accept anyone's.
+      if (input.tripId && !(await this.repo.tripExists(input.tripId)))
+        throw new NotFoundError('Trip', input.tripId);
+      const id = newId();
+      await this.repo.insertItem({
+        id,
+        tripId: input.tripId ?? null,
+        description: input.description.trim(),
+        seatNumber: input.seatNumber?.trim().toUpperCase() || null,
+        storedAt: input.storedAt?.trim() || null,
+        foundBy: getUserId() ?? null,
+      });
+      return { id };
     });
-    return { id };
   }
 
   async claimItem(id: string, input: { claimantName: string; pnr?: string }) {
@@ -194,6 +203,14 @@ export class IncidentService {
 
   /* ── shift handover (453 / 454 / 613) ── */
   async addNote(scopeName: 'dispatch' | 'branch', note: string, branchId?: string | null) {
+    if (scopeName === 'branch' && !branchId) validationError('Pick the branch this note is for');
+    if (scopeName === 'dispatch' && branchId)
+      validationError('A dispatch-desk note is not tied to a branch');
+    if (branchId) {
+      const branch = await this.branches.find(branchId as never);
+      if (!branch) throw new NotFoundError('Branch', branchId);
+      if (branch.status !== 'active') validationError('That branch is closed');
+    }
     await this.repo.insertNote(scopeName, note.trim(), branchId ?? null, getUserId() ?? null);
     return { ok: true };
   }
@@ -205,6 +222,8 @@ export class IncidentService {
   async dispatchReport(from: string, to: string) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to)
       validationError('from/to must be YYYY-MM-DD with from ≤ to');
+    if ((Date.parse(to) - Date.parse(from)) / 86_400_000 >= MAX_REPORT_DAYS)
+      validationError(`Pick a period of at most ${MAX_REPORT_DAYS} days`);
     const [summary, delayed, buses, crew] = await Promise.all([
       this.repo.dispatchSummary(from, to),
       this.repo.delayedTrips(from, to),

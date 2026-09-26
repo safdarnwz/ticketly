@@ -104,7 +104,9 @@ export class IncidentRepository {
     return this.db.query<
       { severity: Severity; status: IncidentStatus; created_at: Date } & Record<string, unknown>
     >(
-      `SELECT i.*, u.full_name AS reported_by_name FROM incidents i LEFT JOIN users u ON u.id = i.reported_by
+      `SELECT i.*, u.full_name AS reported_by_name, CASE WHEN t.id IS NULL THEN NULL ELSE s.code || ' · ' || to_char(t.journey_date, 'DD Mon') END AS trip_label
+         FROM incidents i LEFT JOIN users u ON u.id = i.reported_by
+         LEFT JOIN trips t ON t.id = i.trip_id AND t.tenant_id = i.tenant_id LEFT JOIN services s ON s.id = t.service_id
         WHERE i.tenant_id = $1 AND ($2::text IS NULL OR i.status = $2 OR ($2 = 'active' AND i.status IN ('open','acknowledged')))
           AND ($3::uuid IS NULL OR i.trip_id = $3)
         ORDER BY (i.severity = 'critical') DESC, i.created_at DESC LIMIT 200`,
@@ -169,7 +171,10 @@ export class IncidentRepository {
   }
   async listItems(status?: string) {
     return this.db.query(
-      `SELECT * FROM lost_found_items WHERE tenant_id = $1 AND ($2::text IS NULL OR status = $2) ORDER BY found_at DESC LIMIT 200`,
+      `SELECT l.*, CASE WHEN t.id IS NULL THEN NULL ELSE s.code || ' · ' || to_char(t.journey_date, 'DD Mon') END AS trip_label
+         FROM lost_found_items l
+         LEFT JOIN trips t ON t.id = l.trip_id AND t.tenant_id = l.tenant_id LEFT JOIN services s ON s.id = t.service_id
+        WHERE l.tenant_id = $1 AND ($2::text IS NULL OR l.status = $2) ORDER BY l.found_at DESC LIMIT 200`,
       [requireTenantId(), status ?? null],
       { name: 'lostFound.list' },
     );

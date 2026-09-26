@@ -94,6 +94,7 @@ export class IncidentController {
 
   @Post('lost-found')
   @HttpCode(201)
+  @Idempotent()
   @RequirePermission(Permission.TRIP_OPERATE)
   logItem(@Body(zodBody(LostItemSchema)) dto: LostItemDto) {
     return this.svc.logItem(dto);
@@ -124,6 +125,7 @@ export class IncidentController {
 
   @Post('shift-notes')
   @HttpCode(201)
+  @Idempotent()
   @RequirePermission(Permission.TRIP_OPERATE)
   addNote(@Body(zodBody(HandoverNoteSchema)) dto: HandoverNoteDto) {
     return this.svc.addNote(dto.scope, dto.note, dto.branchId);

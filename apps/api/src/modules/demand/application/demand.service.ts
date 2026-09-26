@@ -247,6 +247,19 @@ export class DemandService {
     decision: 'accepted' | 'rejected',
     reason: string,
   ): Promise<{ tripId: string; decision: string }> {
+    const trip = await this.uow.run(
+      { name: 'suggestion.trip', tenantId: requireTenantId(), readOnly: true },
+      () => this.repo.tripForForecast(tripId),
+    );
+    if (!trip) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Trip not found' });
+    // Only an upcoming, running trip can still be cancelled or kept.
+    if (trip.status === 'cancelled' || trip.departs_at.getTime() <= Date.now())
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+        message:
+          trip.status === 'cancelled'
+            ? 'This trip is already cancelled'
+            : 'This trip has already left',
+      });
     const f = await this.forecast(tripId);
     await this.uow.run({ name: 'suggestion.decide', tenantId: requireTenantId() }, () =>
       this.repo.recordDecision({
