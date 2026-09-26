@@ -14,8 +14,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Backend status | Count |
 |---|---|
 | OPEN | 2711 |
-| DONE | 961 |
-| GAP | 304 |
+| DONE | 966 |
+| GAP | 299 |
 | CONFLICT | 76 |
 | INFRA | 20 |
 | DUP | 9 |
@@ -23,15 +23,15 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 | Frontend status | Count |
 |---|---|
-| — | 3117 |
-| TODO | 863 |
-| DONE | 98 |
+| — | 3112 |
+| TODO | 861 |
+| DONE | 105 |
 | DUP | 9 |
 
 
 ## #1–#500
 
-CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -246,8 +246,8 @@ CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
 | 209 | Reset staff password | DONE | DONE | PUT /users/:id/password (unlocks, signs out; not yourself) · UI: Staff modal (roles until, access & hours, reports to, new password) |
 | 210 | Deactivate staff account | DONE | DONE | verified manually: existing module/API · UI: Staff page |
 | 211 | Reactivate staff account | DONE | DONE | verified manually: existing module/API · UI: Staff page |
-| 212 | Bulk upload staff using Excel template | GAP | — | verified manually: not built yet |
-| 213 | Download staff upload template | GAP | — | verified manually: not built yet |
+| 212 | Bulk upload staff using Excel template | DONE | DONE | GET /users/import-template.csv; POST /users/bulk-import (row by row) · UI: Staff → Upload staff |
+| 213 | Download staff upload template | DONE | DONE | GET /users/import-template.csv; POST /users/bulk-import (row by row) · UI: Staff → Upload staff |
 | 214 | Export complete staff directory | DONE | DONE | GET /users/export.csv · UI: Staff page |
 | 215 | Set allowed login time window for staff | DONE | DONE | PUT /users/:id/access {loginWindow} (overnight-safe) · UI: Staff modal (roles until, access & hours, reports to, new password) |
 | 216 | View staff last login date and time | DONE | DONE | verified manually: existing module/API · UI: Staff page |
@@ -390,7 +390,7 @@ CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
 | 353 | View real-time seat occupancy of each service | DONE | TODO | verified manually: existing module/API |
 | 354 | Apply special discount on low occupancy service | DONE | TODO | PUT /pricing/trips/:id/adjustment (−%) |
 | 355 | Temporarily increase fare on high demand service | DONE | TODO | PUT /pricing/trips/:id/adjustment (+%) |
-| 356 | Assign daily booking targets to staff members | GAP | — | verified manually: not built yet |
+| 356 | Assign daily booking targets to staff members | DONE | DONE | PUT/DELETE /users/:id/target; targets in /users/performance · UI: Staff modal target + Performance vs target |
 | 357 | View individual staff booking performance | DONE | DONE | GET /users/performance (bookings, seats, sales, cancellations per seller; bookings.booked_by) · UI: Staff page |
 | 358 | View individual staff cancellation rate | DONE | DONE | GET /users/performance (bookings, seats, sales, cancellations per seller; bookings.booked_by) · UI: Staff page |
 | 359 | Hold seats temporarily for walk-in passenger | DONE | TODO | verified manually: existing module/API |
@@ -422,7 +422,7 @@ CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
 | 385 | View branch revenue trend | GAP | — | verified manually: not built yet |
 | 386 | Identify top performing staff | DONE | DONE | GET /users/performance (bookings, seats, sales, cancellations per seller; bookings.booked_by) · UI: Staff page |
 | 387 | Identify under-performing staff | DONE | DONE | GET /users/performance (bookings, seats, sales, cancellations per seller; bookings.booked_by) · UI: Staff page |
-| 388 | Issue warning to under-performing staff | GAP | — | verified manually: not built yet |
+| 388 | Issue warning to under-performing staff | DONE | DONE | POST /users/:id/warnings; GET /users/me + acknowledge · UI: Staff modal warnings; My account acknowledge |
 | 389 | Grant temporary system access to new staff | DONE | TODO | verified manually: existing module/API |
 | 390 | Temporarily block access of a staff member | DONE | TODO | verified manually: existing module/API |
 | 391 | Activate special promotional offer for branch | GAP | — | verified manually: not built yet |
@@ -512,9 +512,9 @@ CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
 | 475 | Escalate unresolved technical issue to support | DONE | TODO | verified manually: existing module/API |
 | 476 | View system notifications | DONE | TODO | verified manually: existing module/API |
 | 477 | Clear system notifications | GAP | — | verified manually: not built yet |
-| 478 | Change own login password | DONE | TODO | verified manually: existing module/API |
-| 479 | View own activity log | GAP | — | verified manually: not built yet |
-| 480 | Perform secure logout | DONE | TODO | verified manually: existing module/API |
+| 478 | Change own login password | DONE | DONE | POST /auth/password (current required; other sessions end) · UI: My account (/me) |
+| 479 | View own activity log | DONE | DONE | GET /users/me (activity) · UI: My account (/me) |
+| 480 | Perform secure logout | DONE | DONE | verified manually: existing module/API · UI: My account (/me) |
 | 481 | Login to agent portal | DONE | TODO | verified manually: existing module/API |
 | 482 | View current wallet balance | DONE | TODO | verified manually: existing module/API |
 | 483 | Receive low balance warning | DONE | TODO | verified manually: existing module/API |
@@ -786,7 +786,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -901,7 +901,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1016,7 +1016,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1111,7 +1111,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1226,7 +1226,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1301,7 +1301,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
