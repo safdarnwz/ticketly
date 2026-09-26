@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, IndianRupee, TrendingUp, Ticket, CheckCircle2 } from 'lucide-react';
+import { Plus, IndianRupee, TrendingUp, Ticket, CheckCircle2, Users } from 'lucide-react';
 
 import { Button, Badge, statusTone, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
+import { ConcessionsTab } from './ConcessionsTab';
 import { PageHeader } from '@/components/common/PageHeader';
 import { pricingAdminApi, type FarePlan, type Coupon, type PricingPolicy, type YieldLadder } from '@/lib/api/pricingAdmin';
 import { masterDataApi } from '@/lib/api/masterData';
 import { formatMoney, cn, formatDateLabel, localDateOf, todayLocal } from '@/lib/utils';
 import { ApiError } from '@/lib/api/client';
 
-type Tab = 'plans' | 'policies' | 'coupons';
+type Tab = 'plans' | 'policies' | 'coupons' | 'concessions';
 
 export function PricingPage() {
   const [tab, setTab] = useState<Tab>('plans');
@@ -17,6 +18,7 @@ export function PricingPage() {
     { key: 'plans', label: 'Fare Plans', icon: IndianRupee },
     { key: 'policies', label: 'Yield Policies', icon: TrendingUp },
     { key: 'coupons', label: 'Coupons', icon: Ticket },
+    { key: 'concessions', label: 'Concessions & booking rules', icon: Users },
   ];
   return (
     <>
@@ -32,6 +34,7 @@ export function PricingPage() {
       {tab === 'plans' && <PlansTab />}
       {tab === 'policies' && <PoliciesTab />}
       {tab === 'coupons' && <CouponsTab />}
+      {tab === 'concessions' && <ConcessionsTab />}
     </>
   );
 }
