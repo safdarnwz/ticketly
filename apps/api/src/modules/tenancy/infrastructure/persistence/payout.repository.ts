@@ -194,6 +194,18 @@ export class PayoutRepository {
     });
   }
 
+  /** The operator takes back its pending change; false when there is none. */
+  async withdrawBankChangeRequest(tenantId: string): Promise<boolean> {
+    return this.uow.run({ name: 'payout.withdrawBankChange', bypassRls: true }, async (scope) => {
+      const r = await scope.client.query(
+        `UPDATE bank_account_change_requests SET status = 'withdrawn', reviewed_at = now()
+          WHERE tenant_id = $1 AND status = 'pending'`,
+        [tenantId],
+      );
+      return (r.rowCount ?? 0) > 0;
+    });
+  }
+
   /** The operator's own pending request, if any — so their bank-details page can show "under review". */
   async pendingBankChangeRequest(tenantId: string): Promise<{
     id: string;

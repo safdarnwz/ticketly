@@ -1,7 +1,7 @@
-import { Query, Body, Controller, Get, Patch, Post, HttpCode } from '@nestjs/common';
+import { Query, Body, Controller, Delete, Get, Patch, Post, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { FileService } from '../../files';
-import { BadRequestError } from '@kernel';
+import { AppError, BadRequestError, ErrorCode, NotFoundError } from '@kernel';
 
 import { Permission } from '@contracts';
 import {
@@ -128,12 +128,35 @@ export class TenantController {
   })
   async setBankDetails(@Body(zodBody(SetBankDetailsSchema)) dto: SetBankDetailsDto) {
     const tenantId = requireTenantId();
+    const [current, pending] = await Promise.all([
+      this.tenants.getBankDetails(),
+      this.payouts.pendingBankChangeRequest(tenantId),
+    ]);
+    const same = (a?: { accountNumber: string | null; ifsc: string | null } | null) =>
+      a?.accountNumber === dto.accountNumber && a?.ifsc?.toUpperCase() === dto.ifsc;
+    if (same(current))
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+        message: 'This is already your payout account',
+      });
+    if (same(pending))
+      throw new AppError(ErrorCode.COMMON_CONFLICT, 409, {
+        message: 'This account is already waiting for approval',
+      });
     const requestId = await this.payouts.submitBankChangeRequest(
       tenantId,
       getUserId() ?? null,
       dto,
     );
     return { ok: true, requestId, status: 'pending' };
+  }
+
+  @Delete('bank-details/pending')
+  @RequirePermission(Permission.TENANT_MANAGE)
+  @ApiOperation({ summary: 'Withdraw the payout-account change waiting for approval' })
+  async withdrawBankChange() {
+    if (!(await this.payouts.withdrawBankChangeRequest(requireTenantId())))
+      throw new NotFoundError('Pending bank change', 'current');
+    return { ok: true };
   }
 
   @Get('refund-policy')

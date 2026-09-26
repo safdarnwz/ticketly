@@ -5,6 +5,7 @@ import { Permission } from '@contracts';
 import { ApiStandardErrors, RequirePermission, zodBody } from '@http';
 
 import { NotificationTemplateRepository } from '../infrastructure/persistence/notification-template.repository';
+import { TEMPLATE_CATALOGUE } from '../domain/template-catalogue';
 import { UpsertTemplateSchema, type UpsertTemplateDto } from './dto/notification.dto';
 
 @ApiTags('notifications')
@@ -18,7 +19,8 @@ export class NotificationController {
   @RequirePermission(Permission.TENANT_MANAGE)
   @ApiOperation({ summary: 'List notification templates' })
   async list() {
-    return { items: await this.templates.list() };
+    // The catalogue tells the screen which events exist and what each fills in.
+    return { items: await this.templates.list(), catalogue: TEMPLATE_CATALOGUE };
   }
 
   @Post('templates')

@@ -289,3 +289,11 @@ an unknown id is now 404 (was 200).
   and leave out cancelled trips; route performance covers the last 30 days up to today (it counted every
   future trip). `GET /reports/occupancy` rows carry `routeName`; numbers are numbers, not strings. The
   cancellation rate is over sold bookings (unpaid holds were counted). A report period is at most 366 days.
+- **Settings:** `PATCH /operator/bank-details` — account number 9–18 digits (spaces dropped), IFSC
+  upper-cased and checked, holder 2+ characters; the account already receiving payouts is refused (422) and
+  the one already waiting for approval is a 409. New `DELETE /operator/bank-details/pending` withdraws the
+  waiting change. `PATCH /operator/refund-policy` — whole hours, at most 10 tiers, each hour count once,
+  and cancelling earlier may never refund less than cancelling later; flat fee at most ₹10,000.
+  `POST /notifications/templates` only for known events, with the placeholders each event fills in (a
+  typo went out as a blank), closed braces, an email subject, and SMS up to 480 characters;
+  `GET /notifications/templates` also returns `catalogue` (event → label, placeholders).

@@ -32,17 +32,18 @@ export const UpdateTenantSchema = z.object({
 export type UpdateTenantDto = z.infer<typeof UpdateTenantSchema>;
 
 export const SetBankDetailsSchema = z.object({
-  accountHolder: z.string().min(1).max(200),
+  accountHolder: z.string().trim().min(2, 'Enter the name on the account').max(200),
+  /** Indian bank accounts are 9–18 digits; spaces are dropped. */
   accountNumber: z
     .string()
-    .min(4)
-    .max(34)
-    .regex(/^[0-9]+$/, 'Account number must be numeric'),
+    .transform((v) => v.replace(/\s/g, ''))
+    .pipe(z.string().regex(/^\d{9,18}$/, 'An account number is 9 to 18 digits')),
   ifsc: z
     .string()
-    .length(11)
-    .regex(/^[A-Z]{4}0[A-Z0-9]{6}$/i, 'Invalid IFSC format'),
-  bankName: z.string().max(120).optional(),
+    .trim()
+    .transform((v) => v.toUpperCase())
+    .pipe(z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'An IFSC is 11 characters, like HDFC0001234')),
+  bankName: z.string().trim().max(120).optional(),
 });
 export type SetBankDetailsDto = z.infer<typeof SetBankDetailsSchema>;
 
@@ -52,18 +53,45 @@ export type SetBankDetailsDto = z.infer<typeof SetBankDetailsSchema>;
  * a submitted policy must have at least one tier, and every tier's
  * refundPct must be a valid percentage.
  */
-export const RefundPolicySchema = z.object({
-  tiers: z
-    .array(
-      z.object({
-        minHoursBeforeDeparture: z.number().min(0).max(720),
-        refundPct: z.number().min(0).max(100),
-      }),
-    )
-    .min(1, 'At least one tier is required'),
-  flatFeeMinor: z.number().int().min(0).optional(),
-  cutoffHours: z.number().min(0).max(720).optional(),
-});
+export const RefundPolicySchema = z
+  .object({
+    tiers: z
+      .array(
+        z.object({
+          minHoursBeforeDeparture: z.number().int().min(0).max(720),
+          refundPct: z.number().min(0).max(100),
+        }),
+      )
+      .min(1, 'At least one tier is required')
+      .max(10, 'At most 10 tiers'),
+    /** A fixed fee kept on every cancellation, at most ₹10,000. */
+    flatFeeMinor: z.number().int().min(0).max(1_000_000).optional(),
+    cutoffHours: z.number().int().min(0).max(720).optional(),
+  })
+  .superRefine((p, ctx) => {
+    const sorted = [...p.tiers].sort(
+      (a, b) => b.minHoursBeforeDeparture - a.minHoursBeforeDeparture,
+    );
+    for (let i = 1; i < sorted.length; i += 1) {
+      if (sorted[i].minHoursBeforeDeparture === sorted[i - 1].minHoursBeforeDeparture) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['tiers'],
+          message: `Two tiers start at ${sorted[i].minHoursBeforeDeparture} hours — keep one`,
+        });
+        return;
+      }
+      // Cancelling earlier can never give back less than cancelling later.
+      if (sorted[i].refundPct > sorted[i - 1].refundPct) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['tiers'],
+          message: `Cancelling ${sorted[i - 1].minHoursBeforeDeparture}+ hours ahead refunds less than ${sorted[i].minHoursBeforeDeparture}+ hours — earlier should never refund less`,
+        });
+        return;
+      }
+    }
+  });
 export type RefundPolicyDto = z.infer<typeof RefundPolicySchema>;
 
 export const SetLogoSchema = z.object({
