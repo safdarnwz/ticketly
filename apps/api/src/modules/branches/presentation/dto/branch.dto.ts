@@ -9,7 +9,9 @@ export const CreateBranchSchema = z.object({
     .string()
     .trim()
     .transform((v) => v.toUpperCase())
-    .refine((v) => /^[A-Z0-9][A-Z0-9-]{1,11}$/.test(v), { message: '2 to 12 letters, digits or dashes' })
+    .refine((v) => /^[A-Z0-9][A-Z0-9-]{1,11}$/.test(v), {
+      message: '2 to 12 letters, digits or dashes',
+    })
     .optional(),
   address: z.string().trim().max(500).optional(),
   /** A mobile or a landline with STD code — 10 to 12 digits; empty clears it. */
