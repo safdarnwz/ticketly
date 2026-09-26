@@ -133,6 +133,58 @@ describe('agents (e2e)', () => {
     });
   });
 
+  it('an agent sale can be cancelled and refunded to the agent (offline refund ledger)', async () => {
+    const login = await app.post(
+      '/auth/login',
+      { identifier: base.loginEmail, password: base.password },
+      { headers: { 'x-tenant-slug': app.fixtures.tenantSlug, 'x-debug-surface': 'tenantAdmin' } },
+    );
+    expect(login.status, JSON.stringify(login.body)).toBe(200);
+    const agent = {
+      headers: {
+        authorization: `Bearer ${login.body.accessToken}`,
+        'x-tenant-slug': app.fixtures.tenantSlug,
+      },
+    };
+    const f = app.fixtures;
+    const seat = f.seatNumbers[3];
+    const quote = await app.post('/pricing/quote', {
+      tripId: f.tripId,
+      fromStopId: f.fromStopId,
+      toStopId: f.toStopId,
+      seatType: 'seater',
+      seatNumbers: [seat],
+    });
+    expect(quote.status, JSON.stringify(quote.body)).toBe(200);
+    const sold = await app.post(
+      '/agent-portal/bookings',
+      {
+        quoteId: quote.body.quoteId,
+        seatNumbers: [seat],
+        passengers: [{ seatNumber: seat, fullName: 'Agent Walk In', age: 40 }],
+        contactPhone: '9770000123',
+      },
+      { ...agent, idempotencyKey: `e2e-agent-sale-${run}` },
+    );
+    expect(sold.status, JSON.stringify(sold.body)).toBe(201);
+    const cancel = await app.post(
+      `/agent-portal/bookings/${sold.body.bookingId}/cancel`,
+      { reason: 'Passenger changed plans' },
+      { ...agent, idempotencyKey: `e2e-agent-cancel-${run}` },
+    );
+    expect(cancel.status, JSON.stringify(cancel.body)).toBe(200);
+    if (cancel.body.refundMinor > 0) {
+      const refund = await app.post(
+        '/refunds',
+        { bookingId: sold.body.bookingId, amountMinor: cancel.body.refundMinor },
+        key(),
+      );
+      // Was a 500: the offline split compared ledger text ids with a uuid.
+      expect(refund.status, JSON.stringify(refund.body)).toBe(200);
+      expect(refund.body.status).toBe('settled');
+    }
+  });
+
   it('suspends with a reason and cannot cut credit below what is owed', async () => {
     expect(
       (await app.post(`/agents/${agentId}/status`, { status: 'suspended', reason: 'late' }, op))

@@ -125,10 +125,10 @@ export class RefundRepository {
          coalesce(sum(CASE WHEN lp.account = 'platform_revenue' THEN -lp.amount_minor ELSE 0 END), 0) AS rc,
          coalesce(sum(CASE WHEN lp.account = 'commission_tax_payable' THEN -lp.amount_minor ELSE 0 END), 0) AS rg,
          (SELECT coalesce(max(amount_minor), 0) FROM payment_intents
-           WHERE tenant_id = $1 AND booking_id = $2 AND gateway = 'agent') AS sale
+           WHERE tenant_id = $1 AND booking_id = $2::uuid AND gateway = 'agent') AS sale
        FROM ledger_postings lp
        JOIN ledger_entries le ON le.id = lp.entry_id
-      WHERE lp.tenant_id = $1 AND le.source_type = 'booking' AND le.source_id = $2
+      WHERE lp.tenant_id = $1 AND le.source_type = 'booking' AND le.source_id = $2::text
         AND le.entry_type IN ('booking.captured_offline', 'refund.offline')`,
       [requireTenantId(), bookingId],
       { name: 'refund.offlineCapturedSplit', primary: true },
