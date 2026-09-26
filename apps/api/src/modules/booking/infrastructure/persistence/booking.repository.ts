@@ -1001,6 +1001,9 @@ export class BookingRepository {
     toStopId: StopId;
     totalMinor: number;
     seats: { seatNumber: string; legMask: bigint; fareMinor: number }[];
+    /** Each passenger's old seat → new seat; `codes[i]` is the boarding code for `moves[i].to`. */
+    moves: { from: string; to: string }[];
+    codes: string[];
   }): Promise<void> {
     const tenantId = requireTenantId();
     await this.db.execute_(
@@ -1036,6 +1039,29 @@ export class BookingRepository {
         input.seats.map((s) => s.fareMinor),
       ],
       { name: 'booking.moveToTrip.seats', primary: true },
+    );
+    // Passengers and tickets follow to the new bus and seats — the chart, the
+    // manifest and boarding scans read them (they used to stay on the old ones).
+    const from = input.moves.map((m) => m.from);
+    const to = input.moves.map((m) => m.to);
+    await this.db.execute_(
+      `UPDATE passengers p SET seat_number = u.to_seat
+         FROM unnest($2::text[], $3::text[]) AS u(from_seat, to_seat)
+        WHERE p.booking_id = $1 AND p.seat_number = u.from_seat`,
+      [input.bookingId, from, to],
+      { name: 'booking.moveToTrip.passengers', primary: true },
+    );
+    await this.db.execute_(
+      `UPDATE tickets SET boarding_code = boarding_code || ':' || id WHERE booking_id = $1`,
+      [input.bookingId],
+      { name: 'booking.moveToTrip.ticketsPark', primary: true },
+    );
+    await this.db.execute_(
+      `UPDATE tickets t SET trip_id = $2, seat_number = u.to_seat, boarding_code = u.code
+         FROM unnest($3::text[], $4::text[], $5::text[]) AS u(from_seat, to_seat, code)
+        WHERE t.booking_id = $1 AND t.seat_number = u.from_seat`,
+      [input.bookingId, input.tripId, from, to, input.codes],
+      { name: 'booking.moveToTrip.tickets', primary: true },
     );
   }
 

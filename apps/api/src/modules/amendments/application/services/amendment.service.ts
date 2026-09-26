@@ -103,6 +103,13 @@ export class AmendmentService {
           message: 'Only a confirmed booking can be rescheduled',
         });
       }
+      const current = await this.bookings.loadSeats(input.bookingId);
+      if (new Set(input.newSeatNumbers).size !== input.newSeatNumbers.length)
+        throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: 'A seat is listed twice' });
+      if (input.newSeatNumbers.length !== current.length)
+        throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+          message: `Pick ${current.length} seat(s) — one for each passenger`,
+        });
       const oldTrip = await this.trips.getById(booking.tripId);
       const target = await this.resolveTarget(input);
       const quote = await this.pricing.quote({
@@ -255,7 +262,14 @@ export class AmendmentService {
     // The new total split over the seats exactly (remainder to the first
     // seats), so a later partial cancel refunds precisely what was paid.
     const seatFares = Money.of(newTotalMinor).allocate(newLocked.length);
+    // Passenger i (and their ticket) goes to new seat i.
+    const moves = oldPassengers.map((p, i) => ({
+      from: p.seatNumber,
+      to: input.newSeatNumbers[i],
+    }));
     await this.bookings.moveToTrip({
+      moves,
+      codes: moves.map((m) => ticketCode(booking.pnr, m.to)),
       bookingId: input.bookingId,
       tripId: input.newTripId,
       fromSeq: target.seg.fromSeq,

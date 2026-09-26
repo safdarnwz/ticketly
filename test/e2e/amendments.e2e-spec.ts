@@ -55,6 +55,25 @@ describe('booking amendments (e2e)', () => {
     expect(transfer.status).toBe(422);
   });
 
+  it('a reschedule needs exactly one new seat per passenger, each once', async () => {
+    const move = (newSeatNumbers: string[]) =>
+      app.post(
+        `/bookings/${bookingId}/reschedule`,
+        {
+          newTripId: app.fixtures.tripId,
+          newFromStopId: app.fixtures.fromStopId,
+          newToStopId: app.fixtures.toStopId,
+          newSeatNumbers,
+        },
+        {
+          as: 'operator',
+          idempotencyKey: `e2e-amend-count-${newSeatNumbers.join('-')}-${bookingId}`,
+        },
+      );
+    expect((await move([seats()[2], seats()[3]])).status).toBe(422);
+    expect((await move([seats()[2], seats()[2]])).status).toBe(422);
+  });
+
   it('a reschedule that costs more is paid for first, then the booking moves', async () => {
     const res = await app.post(
       `/bookings/${bookingId}/reschedule`,
@@ -83,6 +102,15 @@ describe('booking amendments (e2e)', () => {
     expect(paid.status, JSON.stringify(paid.body)).toBe(200);
     expect(paid.body.status).toBe('captured');
     expect((await tickets()).map((t) => t.seat)).toEqual([seats()[2]]);
+    // The chart (passengers and tickets) follows the move — it used to keep the
+    // passenger on the old seat while the new one looked free.
+    const chart = (
+      await app.get(`/bookings/trips/${app.fixtures.tripId}/chart`, { as: 'operator' })
+    ).body as { seats: { seatNumber: string; occupants: { bookingId: string }[] }[] };
+    const holder = (n: string) =>
+      chart.seats.find((x) => x.seatNumber === n)!.occupants.some((o) => o.bookingId === bookingId);
+    expect(holder(seats()[2])).toBe(true);
+    expect(holder(seats()[1])).toBe(false);
 
     // Paying again changes nothing.
     const again = await pay(`e2e-amend-pay2-${bookingId}`);

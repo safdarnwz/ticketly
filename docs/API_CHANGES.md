@@ -354,3 +354,8 @@ an unknown id is now 404 (was 200).
   `PUT /trips/:tripId/closed-channels` is refused (422) once the bus has left or the trip was cancelled.
 - **No-show:** `POST /bookings/tickets/:ticketId/no-show` only after the bus's departure time (the
   passenger could still turn up) and never on a cancelled ticket (422).
+- **Reschedule (fix):** moving a booking to another bus/seat now moves its passengers and tickets too
+  (trip, seat, boarding code). Before, only `booking_seats` moved: the chart showed the passenger in the
+  old seat, the new seat looked free while its inventory was taken, and boarding on the new bus failed.
+  Migration 0096 repairs bookings already affected. A reschedule must name one new seat per passenger,
+  each once (422).
