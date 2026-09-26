@@ -69,7 +69,9 @@ describe('concurrency (e2e)', () => {
       [1, 2, 3].map(() => app.post('/bookings/hold', body, { idempotencyKey: key })),
     );
     for (const r of results) expect([201, 409]).toContain(r.status);
-    const ids = new Set(results.filter((r) => r.status === 201).map((r) => r.body.bookingId));
+    const ids = new Set(
+      results.filter((r) => r.status === 201).map((r) => r.body.bookingId as string),
+    );
     expect(ids.size).toBe(1);
     // A later retry returns the same booking, and the same key with another body is refused.
     const again = await app.post('/bookings/hold', body, { idempotencyKey: key });
@@ -107,7 +109,7 @@ describe('concurrency (e2e)', () => {
       ),
     );
     const statuses = results.map((r) => r.status).sort();
-    expect(statuses, JSON.stringify(results.map((r) => r.body))).toEqual([200, 422]);
+    expect(statuses, JSON.stringify(results.map((r) => r.body as unknown))).toEqual([200, 422]);
     const c = await sqlOne<{ n: string }>(
       app,
       'SELECT count(*) AS n FROM cancellations WHERE booking_id = $1',
