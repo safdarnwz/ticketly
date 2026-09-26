@@ -449,6 +449,10 @@ export class AgentService {
     return this.decorate(agent);
   }
 
+  operatorContact() {
+    return this.agents.operatorContact();
+  }
+
   async myBookings(opts: { status?: string; limit?: number }) {
     const agent = await this.me();
     return this.agents.bookings(agent.id, opts);
@@ -461,20 +465,27 @@ export class AgentService {
       throw new NotFoundError('Booking', bookingId);
   }
 
+  /** My sales made in a period (the operator's days) — the same rows as the latest list. */
   async myBookingsInPeriod(from?: string, to?: string) {
     const me = await this.me();
-    return this.bookings.search({ agentId: me.id, from, to });
+    return this.agents.bookings(me.id, { from, to, limit: 500 });
   }
 
   async myBooking(bookingId: BookingId) {
     const agent = await this.me();
     await this.assertOwns(agent.id, bookingId);
     const booking = await this.bookings.findForUpdate(bookingId);
-    const [passengers, tickets] = await Promise.all([
+    const [passengers, tickets, journey] = await Promise.all([
       this.bookings.loadPassengers(bookingId),
       this.bookings.listTickets(bookingId),
+      this.agents.bookingSummary(agent.id, bookingId),
     ]);
-    return { booking, passengers, tickets };
+    return {
+      booking,
+      passengers,
+      tickets,
+      journey: journey && { ...journey, commissionMinor: Number(journey.commissionMinor) },
+    };
   }
 
   /**

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
+import { AppConfig } from '@config';
 import { DatabaseService } from '@database';
 import { newId, requireTenantId, type AgentId, type BookingId, type UserId } from '@kernel';
 
@@ -79,9 +80,17 @@ const COLUMNS = `id, user_id, code, name, contact_name, contact_phone, contact_e
  * lock (`lockForUpdate`) inside a unit of work; the DB CHECK
  * `agents_spend_within_limit` is the final backstop against overspending.
  */
+/** Commission the agent keeps on one booking: credited, less any clawed back on refunds. */
+const COMMISSION_ON_BOOKING = `(SELECT coalesce(sum(l.amount_minor), 0) FROM agent_ledger l
+    WHERE l.booking_id = b.id AND l.agent_id = b.agent_id
+      AND l.kind IN ('commission_credit', 'commission_reversal'))`;
+
 @Injectable()
 export class AgentRepository {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly config: AppConfig,
+  ) {}
 
   async create(input: CreateAgentInput): Promise<AgentId> {
     const id = newId() as AgentId;
@@ -469,21 +478,70 @@ export class AgentRepository {
 
   async bookings(
     agentId: AgentId,
-    opts: { status?: string; limit?: number } = {},
+    opts: { status?: string; limit?: number; from?: string; to?: string } = {},
   ): Promise<unknown[]> {
     return this.db.query(
       `SELECT b.id, b.pnr, b.status, b.total_minor AS "totalMinor", b.currency, b.seat_count AS "seatCount",
               b.contact_phone AS "contactPhone", b.created_at AS "createdAt",
-              t.journey_date AS "journeyDate", t.departs_at AS "departsAt", r.name AS "routeName"
+              t.journey_date AS "journeyDate", t.departs_at AS "departsAt", r.name AS "routeName",
+              ${COMMISSION_ON_BOOKING} AS "commissionMinor"
          FROM bookings b
          JOIN trips t ON t.id = b.trip_id
          JOIN routes r ON r.id = b.route_id
         WHERE b.tenant_id = $1 AND b.agent_id = $2
           AND ($3::text IS NULL OR b.status::text = $3)
+          -- a history window: the day each booking was made, in the operator's time zone
+          AND ($5::date IS NULL OR (b.created_at AT TIME ZONE $7)::date >= $5::date)
+          AND ($6::date IS NULL OR (b.created_at AT TIME ZONE $7)::date <= $6::date)
         ORDER BY b.created_at DESC
         LIMIT $4`,
-      [requireTenantId(), agentId, opts.status ?? null, Math.min(opts.limit ?? 100, 500)],
+      [
+        requireTenantId(),
+        agentId,
+        opts.status ?? null,
+        Math.min(opts.limit ?? 100, 500),
+        opts.from ?? null,
+        opts.to ?? null,
+        this.config.domain.timezone,
+      ],
       { name: 'agent.bookings' },
+    );
+  }
+
+  /** One of the agent's bookings for its page: the journey, the stops, the commission it earned. */
+  async bookingSummary(
+    agentId: AgentId,
+    bookingId: BookingId,
+  ): Promise<{
+    routeName: string;
+    departsAt: Date;
+    arrivesAt: Date;
+    boardingStop: string | null;
+    droppingStop: string | null;
+    commissionMinor: number;
+  } | null> {
+    return this.db.queryOne(
+      `SELECT r.name AS "routeName", t.departs_at AS "departsAt", t.arrives_at AS "arrivesAt",
+              fs.name AS "boardingStop", ts.name AS "droppingStop",
+              ${COMMISSION_ON_BOOKING}::bigint AS "commissionMinor"
+         FROM bookings b
+         JOIN trips t ON t.id = b.trip_id
+         JOIN routes r ON r.id = b.route_id
+         LEFT JOIN stops fs ON fs.id = b.from_stop_id
+         LEFT JOIN stops ts ON ts.id = b.to_stop_id
+        WHERE b.tenant_id = $1 AND b.agent_id = $2 AND b.id = $3`,
+      [requireTenantId(), agentId, bookingId],
+      { name: 'agent.bookingSummary' },
+    );
+  }
+
+  /** Who the agent calls: the operator's name and support contacts. */
+  operatorContact(): Promise<{ name: string; phone: string | null; email: string } | null> {
+    return this.db.queryOne(
+      `SELECT display_name AS name, contact_phone AS phone, contact_email AS email
+         FROM tenants WHERE id = $1`,
+      [requireTenantId()],
+      { name: 'agent.operatorContact' },
     );
   }
 

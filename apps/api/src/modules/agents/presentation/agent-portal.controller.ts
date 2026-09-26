@@ -53,10 +53,17 @@ export class AgentPortalController {
   ) {}
 
   @Get('me')
-  @ApiOperation({ summary: 'My account: status, balance, spendable, credit limit, commission %' })
+  @ApiOperation({
+    summary:
+      "My account: status, balance, spendable, credit limit, commission %, the operator's contacts",
+  })
   async me() {
     const me = await this.agents.me();
-    return { ...me, currentCommission: await this.agents.currentRate(me.id, me.commissionPct) };
+    const [currentCommission, operator] = await Promise.all([
+      this.agents.currentRate(me.id, me.commissionPct),
+      this.agents.operatorContact(),
+    ]);
+    return { ...me, currentCommission, operator };
   }
 
   @Get('ledger')

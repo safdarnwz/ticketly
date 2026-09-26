@@ -170,6 +170,33 @@ describe('agents (e2e)', () => {
     );
     expect(sold.status, JSON.stringify(sold.body)).toBe(201);
     soldPnr = sold.body.pnr;
+    // The agent's own view: the journey, the stops and the commission this sale earned.
+    const mine = await app.get(`/agent-portal/bookings/${sold.body.bookingId}`, agent);
+    expect(mine.status).toBe(200);
+    expect(mine.body.journey).toMatchObject({
+      routeName: expect.any(String),
+      boardingStop: expect.any(String),
+      commissionMinor: sold.body.commissionMinor,
+    });
+    const listed = (await app.get('/agent-portal/bookings', agent)).body.items as {
+      id: string;
+      commissionMinor: number;
+    }[];
+    expect(listed.find((b) => b.id === sold.body.bookingId)?.commissionMinor).toBe(
+      sold.body.commissionMinor,
+    );
+    // Today's history (the operator's day) lists it the same way; a reversed window is refused.
+    const day = new Date(Date.now() + 5.5 * 3_600_000).toISOString().slice(0, 10);
+    const todays = (await app.get(`/agent-portal/bookings?from=${day}&to=${day}`, agent)).body
+      .items as { id: string; commissionMinor: number }[];
+    expect(todays.find((b) => b.id === sold.body.bookingId)?.commissionMinor).toBe(
+      sold.body.commissionMinor,
+    );
+    expect(
+      (await app.get('/agent-portal/bookings?from=2026-09-10&to=2026-09-01', agent)).status,
+    ).toBe(400);
+    const me = await app.get('/agent-portal/me', agent);
+    expect(me.body.operator).toMatchObject({ name: expect.any(String), email: expect.any(String) });
     const cancel = await app.post(
       `/agent-portal/bookings/${sold.body.bookingId}/cancel`,
       { reason: 'Passenger changed plans' },

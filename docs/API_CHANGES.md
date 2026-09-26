@@ -449,3 +449,7 @@ an unknown id is now 404 (was 200).
   paid for by partners, each partner's agreement, and what blocks them (`closed_on_trip`,
   `closed_on_service`, `no_partner`, `sold_out`). Fixes use the existing `PUT /trips/:tripId/closed-channels`
   and `PUT /gds-partners/:partnerId`.
+- **Agent portal:** `GET /agent-portal/me` adds `operator {name, phone, email}`; `GET /agent-portal/bookings`
+  rows add `commissionMinor` (earned less any taken back), and with `from/to` return the same rows for bookings
+  made on those operator days (was a different shape); `GET /agent-portal/bookings/:id` adds `journey
+  {routeName, departsAt, arrivesAt, boardingStop, droppingStop, commissionMinor}`.

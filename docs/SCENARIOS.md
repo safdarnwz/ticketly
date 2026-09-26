@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 542 |
-| DONE | 433 |
+| TODO | 501 |
+| DONE | 474 |
 | DUP | 9 |
 
 
@@ -515,26 +515,26 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 478 | Change own login password | DONE | DONE | POST /auth/password (current required; other sessions end) · UI: My account (/me) |
 | 479 | View own activity log | DONE | DONE | GET /users/me (activity) · UI: My account (/me) |
 | 480 | Perform secure logout | DONE | DONE | verified manually: existing module/API · UI: My account (/me) |
-| 481 | Login to agent portal | DONE | TODO | verified manually: existing module/API |
-| 482 | View current wallet balance | DONE | TODO | verified manually: existing module/API |
-| 483 | Receive low balance warning | DONE | TODO | verified manually: existing module/API |
+| 481 | Login to agent portal | DONE | DONE | verified manually: existing module/API · UI: Agent login → Agent portal (own nav; staff pages redirect) |
+| 482 | View current wallet balance | DONE | DONE | verified manually: existing module/API · UI: Agent portal → My account: balance, can-sell-up-to, commission %, low-balance warning |
+| 483 | Receive low balance warning | DONE | DONE | verified manually: existing module/API · UI: Agent portal → My account: balance, can-sell-up-to, commission %, low-balance warning |
 | 484 | Raise wallet recharge request | GAP | — | verified manually: not built yet |
 | 485 | Select recharge amount | GAP | — | verified manually: not built yet |
 | 486 | Complete recharge payment | GAP | — | verified manually: not built yet |
-| 487 | View updated wallet balance | DONE | TODO | verified manually: existing module/API |
+| 487 | View updated wallet balance | DONE | DONE | verified manually: existing module/API · UI: Agent portal → My account: balance, can-sell-up-to, commission %, low-balance warning |
 | 488 | Search buses by origin and destination | DONE | DONE | verified manually: existing module/API · UI: storefront home + /results (verified in browser) |
 | 489 | Select journey date | DONE | DONE | verified manually: existing module/API · UI: storefront home + /results (verified in browser) |
-| 490 | View list of available services | DONE | TODO | verified manually: existing module/API |
-| 491 | View departure and arrival timings | DONE | TODO | verified manually: existing module/API |
-| 492 | View fare for each service | DONE | TODO | verified manually: existing module/API |
+| 490 | View list of available services | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Book seats: search results with times and fares, seat map, passengers (name, age, gender, mobile), fare + commission, pay from account, confirmation with PNR/commission/new balance |
+| 491 | View departure and arrival timings | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Book seats: search results with times and fares, seat map, passengers (name, age, gender, mobile), fare + commission, pay from account, confirmation with PNR/commission/new balance |
+| 492 | View fare for each service | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Book seats: search results with times and fares, seat map, passengers (name, age, gender, mobile), fare + commission, pay from account, confirmation with PNR/commission/new balance |
 | 493 | View seat map of selected service | DONE | DONE | verified manually: existing module/API · UI: trip seat map: SeatSelector (live refresh, taken seats drop out, ladies/accessible) |
 | 494 | View agent special discounted fare | GAP | — | verified manually: not built yet |
-| 495 | Select one or more seats | DONE | TODO | verified manually: existing module/API |
-| 496 | Enter first passenger name | DONE | TODO | verified manually: existing module/API |
-| 497 | Enter first passenger age and gender | DONE | TODO | verified manually: existing module/API |
-| 498 | Enter first passenger mobile number | DONE | TODO | verified manually: existing module/API |
-| 499 | Enter additional passengers | DONE | TODO | verified manually: existing module/API |
-| 500 | View total fare and commission amount | DONE | TODO | verified manually: existing module/API |
+| 495 | Select one or more seats | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Book seats: search results with times and fares, seat map, passengers (name, age, gender, mobile), fare + commission, pay from account, confirmation with PNR/commission/new balance |
+| 496 | Enter first passenger name | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Book seats: search results with times and fares, seat map, passengers (name, age, gender, mobile), fare + commission, pay from account, confirmation with PNR/commission/new balance |
+| 497 | Enter first passenger age and gender | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Book seats: search results with times and fares, seat map, passengers (name, age, gender, mobile), fare + commission, pay from account, confirmation with PNR/commission/new balance |
+| 498 | Enter first passenger mobile number | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Book seats: search results with times and fares, seat map, passengers (name, age, gender, mobile), fare + commission, pay from account, confirmation with PNR/commission/new balance |
+| 499 | Enter additional passengers | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Book seats: search results with times and fares, seat map, passengers (name, age, gender, mobile), fare + commission, pay from account, confirmation with PNR/commission/new balance |
+| 500 | View total fare and commission amount | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Book seats: search results with times and fares, seat map, passengers (name, age, gender, mobile), fare + commission, pay from account, confirmation with PNR/commission/new balance |
 
 ## #501–#1000
 
@@ -542,28 +542,28 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
-| 501 | Confirm the booking | DONE | TODO | verified manually: existing module/API |
-| 502 | Receive booking confirmation | DONE | TODO | verified manually: existing module/API |
+| 501 | Confirm the booking | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Book seats: search results with times and fares, seat map, passengers (name, age, gender, mobile), fare + commission, pay from account, confirmation with PNR/commission/new balance |
+| 502 | Receive booking confirmation | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Book seats: search results with times and fares, seat map, passengers (name, age, gender, mobile), fare + commission, pay from account, confirmation with PNR/commission/new balance |
 | 503 | Download ticket PDF | GAP | — | verified manually: not built yet |
 | 504 | Share ticket with customer | GAP | — | verified manually: not built yet |
 | 505 | Search booking by PNR | DONE | DONE | verified manually: existing module/API · UI: operator Bookings list + detail (find by PNR/mobile/ticket, filters, CSV) |
-| 506 | Search booking by mobile number | DONE | TODO | GET /bookings/search (agent-scoped via portal) |
-| 507 | View complete booking details | DONE | TODO | verified manually: existing module/API |
-| 508 | Raise boarding point change request | DONE | TODO | POST /agent-portal/bookings/:id/change-points |
-| 509 | Raise drop point change request | DONE | TODO | POST /agent-portal/bookings/:id/change-points |
-| 510 | Correct spelling of passenger name | DONE | TODO | POST /bookings/:id/correct-name (no transfers) |
-| 511 | Request seat change on same bus | DONE | TODO | POST /agent-portal/bookings/:id/change-seats |
+| 506 | Search booking by mobile number | DONE | DONE | GET /bookings/search (agent-scoped via portal) · UI: Agent portal → My bookings: find by PNR or mobile; booking page with journey, passengers, commission |
+| 507 | View complete booking details | DONE | DONE | verified manually: existing module/API · UI: Agent portal → My bookings: find by PNR or mobile; booking page with journey, passengers, commission |
+| 508 | Raise boarding point change request | DONE | DONE | POST /agent-portal/bookings/:id/change-points · UI: Agent booking → Change boarding / drop point, Correct a name, Change seat |
+| 509 | Raise drop point change request | DONE | DONE | POST /agent-portal/bookings/:id/change-points · UI: Agent booking → Change boarding / drop point, Correct a name, Change seat |
+| 510 | Correct spelling of passenger name | DONE | DONE | POST /bookings/:id/correct-name (no transfers) · UI: Agent booking → Change boarding / drop point, Correct a name, Change seat |
+| 511 | Request seat change on same bus | DONE | DONE | POST /agent-portal/bookings/:id/change-seats · UI: Agent booking → Change boarding / drop point, Correct a name, Change seat |
 | 512 | Request date change | GAP | — | verified manually: not built yet |
 | 513 | View fare difference for date change | GAP | — | verified manually: not built yet |
 | 514 | Confirm date change | GAP | — | verified manually: not built yet |
-| 515 | Raise full cancellation request | DONE | TODO | verified manually: existing module/API |
-| 516 | View applicable cancellation charges | DONE | TODO | verified manually: existing module/API |
-| 517 | View net refund amount | DONE | TODO | verified manually: existing module/API |
-| 518 | Confirm cancellation | DONE | TODO | verified manually: existing module/API |
-| 519 | View updated commission after cancellation | DONE | TODO | verified manually: existing module/API |
-| 520 | Raise partial cancellation for one passenger | DONE | TODO | POST /bookings/:id/cancel-seats (staff / owner / booking mobile; seat_count kept in step) |
-| 521 | Add passenger to waitlist | DONE | TODO | verified manually: existing module/API |
-| 522 | Receive notification when waitlist confirms | DONE | TODO | verified manually: existing module/API |
+| 515 | Raise full cancellation request | DONE | DONE | verified manually: existing module/API · UI: Agent booking → Cancel…: whole or chosen seats, charges and refund shown first, refund credited, commission updated |
+| 516 | View applicable cancellation charges | DONE | DONE | verified manually: existing module/API · UI: Agent booking → Cancel…: whole or chosen seats, charges and refund shown first, refund credited, commission updated |
+| 517 | View net refund amount | DONE | DONE | verified manually: existing module/API · UI: Agent booking → Cancel…: whole or chosen seats, charges and refund shown first, refund credited, commission updated |
+| 518 | Confirm cancellation | DONE | DONE | verified manually: existing module/API · UI: Agent booking → Cancel…: whole or chosen seats, charges and refund shown first, refund credited, commission updated |
+| 519 | View updated commission after cancellation | DONE | DONE | verified manually: existing module/API · UI: Agent booking → Cancel…: whole or chosen seats, charges and refund shown first, refund credited, commission updated |
+| 520 | Raise partial cancellation for one passenger | DONE | DONE | POST /bookings/:id/cancel-seats (staff / owner / booking mobile; seat_count kept in step) · UI: Agent booking → Cancel…: whole or chosen seats, charges and refund shown first, refund credited, commission updated |
+| 521 | Add passenger to waitlist | DONE | DONE | verified manually: existing module/API · UI: Search & Book → full bus: Add to waitlist (SMS when seats free up) |
+| 522 | Receive notification when waitlist confirms | DONE | DONE | verified manually: existing module/API · UI: Search & Book → full bus: Add to waitlist (SMS when seats free up) |
 | 523 | Raise request for group booking | GAP | — | verified manually: not built yet |
 | 524 | Raise request for corporate bulk booking | GAP | — | verified manually: not built yet |
 | 525 | Book seats under ladies quota | GAP | — | verified manually: not built yet |
@@ -571,27 +571,27 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 527 | Create booking while offline | GAP | — | verified manually: not built yet |
 | 528 | Sync offline booking when online | GAP | — | verified manually: not built yet |
 | 529 | Handle case when seat is gone during sync | GAP | — | verified manually: not built yet |
-| 530 | View own booking history for today | DONE | TODO | GET /agent-portal/bookings?from&to |
-| 531 | View own booking history for week | DONE | TODO | GET /agent-portal/bookings?from&to |
-| 532 | View own booking history for month | DONE | TODO | GET /agent-portal/bookings?from&to |
-| 533 | Download detailed commission statement | DONE | TODO | verified manually: existing module/API |
-| 534 | View list of pending commission | DONE | TODO | verified manually: existing module/API |
+| 530 | View own booking history for today | DONE | DONE | GET /agent-portal/bookings?from&to · UI: Agent portal → My bookings: Today / This week / This month |
+| 531 | View own booking history for week | DONE | DONE | GET /agent-portal/bookings?from&to · UI: Agent portal → My bookings: Today / This week / This month |
+| 532 | View own booking history for month | DONE | DONE | GET /agent-portal/bookings?from&to · UI: Agent portal → My bookings: Today / This week / This month |
+| 533 | Download detailed commission statement | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Statement: period summary, entries, CSV download, commission still pending |
+| 534 | View list of pending commission | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Statement: period summary, entries, CSV download, commission still pending |
 | 535 | View TDS deducted amount | GAP | — | verified manually: not built yet |
 | 536 | View own performance dashboard | GAP | — | verified manually: not built yet |
 | 537 | View own conversion rate | GAP | — | verified manually: not built yet |
 | 538 | View own cancellation rate | GAP | — | verified manually: not built yet |
-| 539 | Collect feedback from customer | DONE | TODO | verified manually: existing module/API |
-| 540 | Raise complaint against bus operator | DONE | TODO | verified manually: existing module/API |
-| 541 | Raise technical support ticket | DONE | TODO | verified manually: existing module/API |
+| 539 | Collect feedback from customer | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Help & support: raise feedback / complaint / technical request, see replies |
+| 540 | Raise complaint against bus operator | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Help & support: raise feedback / complaint / technical request, see replies |
+| 541 | Raise technical support ticket | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Help & support: raise feedback / complaint / technical request, see replies |
 | 542 | Set alert for new service on favorite route | GAP | — | verified manually: not built yet |
 | 543 | Save frequently used routes | GAP | — | verified manually: not built yet |
 | 544 | Save frequent passenger details | GAP | — | verified manually: not built yet |
 | 545 | Update own profile information | GAP | — | verified manually: not built yet |
 | 546 | Update bank details for settlement | GAP | — | verified manually: not built yet |
-| 547 | Change login password | DONE | TODO | verified manually: existing module/API |
-| 548 | View terms and conditions | DONE | TODO | verified manually: existing module/API |
-| 549 | View support contact details | DONE | TODO | verified manually: existing module/API |
-| 550 | Perform logout | DONE | TODO | verified manually: existing module/API |
+| 547 | Change login password | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Help: change password (My account), terms pages, operator contacts |
+| 548 | View terms and conditions | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Help: change password (My account), terms pages, operator contacts |
+| 549 | View support contact details | DONE | DONE | verified manually: existing module/API · UI: Agent portal → Help: change password (My account), terms pages, operator contacts |
+| 550 | Perform logout | DONE | DONE | verified manually: existing module/API · UI: Agent login → Agent portal (own nav; staff pages redirect) |
 | 551 | Login to dispatch dashboard | DONE | DONE | verified manually: existing module/API · UI: Console sign-in / sign-out (every module) |
 | 552 | View complete list of today’s services | DONE | DONE | verified manually: existing module/API · UI: Trips → day list, status filter (Cancelled), bus on each trip |
 | 553 | View real-time occupancy percentage of each service | DONE | DONE | verified manually: existing module/API · UI: Trip chart (live seat map) |
