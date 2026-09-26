@@ -706,10 +706,13 @@ export class BookingRepository {
     return (await this.lockTicket(ticketId))?.status ?? null;
   }
 
-  /** The ticket (locked) with whether its bus's departure time has passed. */
-  async lockTicket(ticketId: string): Promise<{ status: string; departed: boolean } | null> {
-    return this.db.queryOne<{ status: string; departed: boolean }>(
-      `SELECT tk.status, (t.departs_at <= now()) AS departed
+  /** The ticket (locked), whether its bus's departure time has passed, and by how many minutes. */
+  async lockTicket(
+    ticketId: string,
+  ): Promise<{ status: string; departed: boolean; minutesSinceDeparture: number } | null> {
+    return this.db.queryOne<{ status: string; departed: boolean; minutesSinceDeparture: number }>(
+      `SELECT tk.status, (t.departs_at <= now()) AS departed,
+              floor(extract(epoch FROM now() - t.departs_at) / 60)::int AS "minutesSinceDeparture"
          FROM tickets tk JOIN trips t ON t.id = tk.trip_id
         WHERE tk.tenant_id = $1 AND tk.id = $2 FOR UPDATE OF tk`,
       [requireTenantId(), ticketId],

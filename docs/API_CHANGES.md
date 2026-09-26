@@ -431,3 +431,7 @@ an unknown id is now 404 (was 200).
   {category, description, pnr?}` (idempotent; the PNR must be a booking this agent sold — 404 unknown,
   422 someone else's) and `POST /agents/:id/complaints/:complaintId/decision {outcome: upheld|dismissed,
   resolution}` (idempotent; final: the same decision again is a no-op, a different one 422). Migration 0099.
+- **Cancellation policy rules:** `PATCH /operator/refund-policy` takes `partialCancellation` (default true;
+  false = customers, agents and partners must cancel whole bookings — `cancel-seats` of some seats is 422,
+  staff can still split) and `noShowGraceMinutes` (0–240; a no-show can be marked only that long after
+  departure, 422 before).

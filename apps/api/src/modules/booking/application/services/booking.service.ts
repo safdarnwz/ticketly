@@ -698,6 +698,8 @@ export class BookingService {
       ifsc: string;
       bankName?: string;
     },
+    /** Operator staff may split a booking even when the policy says whole bookings only. */
+    asStaff = false,
   ): Promise<{ refundMinor: number; refundPct: number; remainingSeats: number }> {
     if (seatNumbers.length === 0) {
       throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
@@ -746,6 +748,12 @@ export class BookingService {
           );
           return { ...full, remainingSeats: 0 };
         }
+
+        if (!asStaff && (await this.loadRefundPolicy()).partialCancellation === false)
+          throw new AppError(ErrorCode.BOOKING_NOT_CANCELLABLE, 422, {
+            message:
+              'This operator cancels whole bookings only — cancel every seat, or ask the operator',
+          });
 
         const toCancel = allSeats.filter((s) => requested.has(s.seatNumber));
         const toKeep = allSeats.filter((s) => !requested.has(s.seatNumber));

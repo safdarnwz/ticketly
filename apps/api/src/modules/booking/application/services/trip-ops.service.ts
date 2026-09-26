@@ -14,6 +14,7 @@ import { Logger } from '@observability';
 
 import { BookingRepository } from '../../infrastructure/persistence/booking.repository';
 import { JourneyConnectionRepository } from '../../infrastructure/persistence/journey-connection.repository';
+import { OperatorPolicyRepository } from '../../infrastructure/persistence/operator-policy.repository';
 import { BookingService } from './booking.service';
 import { TripRepository } from '../../../scheduling';
 
@@ -38,6 +39,7 @@ export class TripOpsService {
     private readonly trips: TripRepository,
     private readonly bookings: BookingRepository,
     private readonly bookingService: BookingService,
+    private readonly policy: OperatorPolicyRepository,
     private readonly connections: JourneyConnectionRepository,
     private readonly uow: UnitOfWork,
     logger: Logger,
@@ -187,6 +189,12 @@ export class TripOpsService {
       if (!ticket.departed)
         throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
           message: 'The bus has not left yet — mark a no-show after the departure time',
+        });
+      // …and the operator may give late passengers a grace period.
+      const grace = (await this.policy.refundPolicy(requireTenantId()))?.noShowGraceMinutes ?? 0;
+      if (ticket.minutesSinceDeparture < grace)
+        throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+          message: `Your policy waits ${grace} minutes after departure before a no-show — try again in ${grace - ticket.minutesSinceDeparture} min`,
         });
       await this.bookings.setTicketStatus(ticketId, 'no_show');
     });

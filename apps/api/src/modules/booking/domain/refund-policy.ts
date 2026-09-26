@@ -34,6 +34,16 @@ export interface RefundPolicy {
   flatFeeMinor?: number;
   /** Cancellation not allowed at all within this many hours (0 = always allowed). */
   cutoffHours?: number;
+  /**
+   * May customers, agents and partners cancel only some seats of a booking?
+   * Off = whole bookings only (staff at the counter can still do it). Default on.
+   */
+  partialCancellation?: boolean;
+  /**
+   * Minutes after the departure time before staff may mark a passenger a
+   * no-show (a late passenger may still be picked up on the way). Default 0.
+   */
+  noShowGraceMinutes?: number;
 }
 
 /** A sensible default if an operator hasn't configured one. */

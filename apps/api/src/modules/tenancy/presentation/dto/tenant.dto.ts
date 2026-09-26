@@ -110,6 +110,10 @@ export const RefundPolicySchema = z
     /** A fixed fee kept on every cancellation, at most ₹10,000. */
     flatFeeMinor: z.number().int().min(0).max(1_000_000).optional(),
     cutoffHours: z.number().int().min(0).max(720).optional(),
+    /** Off = customers, agents and partners cancel whole bookings only. */
+    partialCancellation: z.boolean().optional(),
+    /** Minutes after departure before a passenger can be marked a no-show (0–4 hours). */
+    noShowGraceMinutes: z.number().int().min(0).max(240).optional(),
   })
   .superRefine((p, ctx) => {
     const sorted = [...p.tiers].sort(

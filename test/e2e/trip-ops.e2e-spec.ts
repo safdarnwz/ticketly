@@ -233,6 +233,67 @@ describe('trip operations (e2e)', () => {
     ).toBe(404);
   });
 
+  it("a no-show waits for the operator's grace period after departure", async () => {
+    const f = app.fixtures;
+    const seats = (await chart(f.tripId)).body.seats as {
+      seatNumber: string;
+      blocked: boolean;
+      bookable: boolean;
+      occupants: unknown[];
+    }[];
+    const free = seats.filter((s) => s.bookable && !s.blocked && !s.occupants.length);
+    const { bookingId } = await confirmedBooking(app, free[2].seatNumber, {
+      fullName: 'Late Comer',
+    });
+    const t = (await app.get(`/bookings/${bookingId}/tickets`, op)).body.tickets[0];
+    const policy = (await app.get('/operator/refund-policy', op)).body;
+    const was = await sqlOne<{ d: string; a: string }>(
+      app,
+      'SELECT departs_at AS d, arrives_at AS a FROM trips WHERE id = $1',
+      [f.tripId],
+    );
+    try {
+      // The bus left 10 minutes ago; the policy waits 15.
+      await sqlOne(
+        app,
+        `UPDATE trips SET arrives_at = arrives_at - (departs_at - (now() - interval '10 minutes')),
+                          departs_at = now() - interval '10 minutes' WHERE id = $1`,
+        [f.tripId],
+      );
+      expect(
+        (
+          await app.patch(
+            '/operator/refund-policy',
+            { ...policy.policy, noShowGraceMinutes: 15 },
+            op,
+          )
+        ).status,
+      ).toBe(200);
+      expect(
+        (
+          await app.patch(
+            '/operator/refund-policy',
+            { ...policy.policy, noShowGraceMinutes: 500 },
+            op,
+          )
+        ).status,
+      ).toBe(400);
+      const early = await app.post(`/bookings/tickets/${t.ticketId}/no-show`, {}, op);
+      expect(early.status).toBe(422);
+      expect(early.body.detail).toMatch(/waits 15 minutes/);
+      await app.patch('/operator/refund-policy', { ...policy.policy, noShowGraceMinutes: 5 }, op);
+      expect((await app.post(`/bookings/tickets/${t.ticketId}/no-show`, {}, op)).status).toBe(200);
+    } finally {
+      await sqlOne(app, 'UPDATE trips SET departs_at = $2, arrives_at = $3 WHERE id = $1', [
+        f.tripId,
+        was.d,
+        was.a,
+      ]);
+      if (policy.isCustom) await app.patch('/operator/refund-policy', policy.policy, op);
+      else await app.post('/operator/refund-policy/reset', {}, op);
+    }
+  });
+
   it("an expense receipt goes on this operator's trip only, then on the expense", async () => {
     const png = Buffer.from(
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',

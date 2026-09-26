@@ -173,17 +173,18 @@ export class BookingController {
     @UuidParam('id') id: string,
     @Body(zodBody(CancelSeatsSchema)) dto: CancelSeatsDto,
   ) {
-    const run = () =>
+    const run = (asStaff = false) =>
       this.booking.cancelSeats(
         id as BookingId,
         dto.seatNumbers,
         dto.reason,
         dto.refundDestination,
         dto.altAccountDetails,
+        asStaff,
       );
     // Operator staff: the booking must be theirs (the service reads it in
     // the caller's tenant, so another operator's id is simply not found).
-    if (getContext()?.tenantId && hasPermission(Permission.BOOKING_CANCEL)) return run();
+    if (getContext()?.tenantId && hasPermission(Permission.BOOKING_CANCEL)) return run(true);
 
     // Anyone else proves the booking is theirs — it used to take any id.
     const info = await this.bookings.accessInfo(id);
@@ -198,7 +199,7 @@ export class BookingController {
       throw new ForbiddenError({
         message: 'The refund goes back to how you paid — ask the operator to send it elsewhere',
       });
-    return runAsTenant(info.tenantId as TenantId, run);
+    return runAsTenant(info.tenantId as TenantId, () => run());
   }
 
   @Get('search')

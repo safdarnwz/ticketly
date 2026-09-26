@@ -258,6 +258,26 @@ describe('operator bookings (e2e)', () => {
       expect(r.status).toBe(403);
     });
 
+    it('whole bookings only: the customer cannot split it (the policy says so)', async () => {
+      const policy = (await app.get('/operator/refund-policy', op)).body;
+      try {
+        await app.patch(
+          '/operator/refund-policy',
+          { ...policy.policy, partialCancellation: false },
+          op,
+        );
+        const r = await app.post(path(), body({ mobile: app.fixtures.customer.phone }), {
+          ...anon,
+          idempotencyKey: `cs-p-${Date.now()}`,
+        });
+        expect(r.status).toBe(422);
+        expect(r.body.detail).toMatch(/whole bookings only/);
+      } finally {
+        if (policy.isCustom) await app.patch('/operator/refund-policy', policy.policy, op);
+        else await app.post('/operator/refund-policy/reset', {}, op);
+      }
+    });
+
     it('the booking mobile cancels one seat; the rest stay confirmed', async () => {
       const r = await app.post(path(), body({ mobile: app.fixtures.customer.phone }), {
         ...anon,

@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 571 |
-| DONE | 404 |
+| TODO | 569 |
+| DONE | 406 |
 | DUP | 9 |
 
 
@@ -280,8 +280,8 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 243 | Set minimum hours before departure for booking | DONE | DONE | PUT /concessions/booking-window {minMinutesBeforeDeparture} · UI: Pricing → Concessions & booking rules |
 | 244 | Configure cancellation charge slabs by time | DONE | DONE | verified manually: existing module/API · UI: Settings → Refund policy (time slabs) |
 | 245 | Set free cancellation window in hours | GAP | — | verified manually: not built yet |
-| 246 | Configure rules for partial cancellation | DONE | TODO | verified manually: existing module/API |
-| 247 | Set no-show marking policy | DONE | TODO | verified manually: existing module/API |
+| 246 | Configure rules for partial cancellation | DONE | DONE | verified manually: existing module/API · UI: Settings → Cancellation policy → Allow cancelling some seats (off = whole bookings only for customers/agents/partners) |
+| 247 | Set no-show marking policy | DONE | DONE | verified manually: existing module/API · UI: Settings → Cancellation policy → No-show grace (minutes after departure) |
 | 248 | Enable automatic seat assignment | GAP | — | verified manually: not built yet |
 | 249 | Configure preferred seat assignment logic | GAP | — | verified manually: not built yet |
 | 250 | Set group booking minimum seats for discount | GAP | — | verified manually: not built yet |
