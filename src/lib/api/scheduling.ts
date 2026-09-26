@@ -99,6 +99,8 @@ export const tripOpsApi = {
     post<{ oldDepartsAt: string; newDepartsAt: string; shiftMinutes: number }>(`/v1/scheduling/trips/${tripId}/retime`, { newDepartsAt, reason }),
   cancel: (tripId: string, reason: string) =>
     post<{ cancelledBookings: number; failed: number }>(`/v1/bookings/trips/${tripId}/cancel`, { reason }, withIdempotency(`cancel-trip-${tripId}`)),
+  /** Mark the bus departed (from 2 hours before its time) or arrived (only after it left). */
+  setRunStatus: (tripId: string, status: 'departed' | 'closed') => post<{ ok: boolean }>(`/v1/crew/trips/${tripId}/status`, { status }),
   stopSales: (tripId: string) => post<{ ok: boolean }>(`/v1/bookings/trips/${tripId}/stop-sales`, {}),
   resumeSales: (tripId: string) => post<{ ok: boolean }>(`/v1/bookings/trips/${tripId}/resume-sales`, {}),
 };

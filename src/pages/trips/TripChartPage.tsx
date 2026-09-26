@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, Bus as BusIcon, Clock, Lock, PauseCircle, PlayCircle, Printer, TimerReset, Unlock, XCircle } from 'lucide-react';
+import { Ban, Bus as BusIcon, CheckCircle2, Clock, Lock, PauseCircle, PlayCircle, Printer, TimerReset, Unlock, XCircle } from 'lucide-react';
 
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Input, Modal, PageLoader, Select, statusTone, useToast } from '@/components/ui';
 import { TripOpsSection } from './TripOpsSection';
@@ -61,6 +61,8 @@ export function TripChartPage() {
   });
   const stopSales = useMutation(act(() => tripOpsApi.stopSales(id), () => 'Sales stopped — no channel can sell this bus'));
   const resumeSales = useMutation(act(() => tripOpsApi.resumeSales(id), () => 'Back on sale'));
+  const markDeparted = useMutation(act(() => tripOpsApi.setRunStatus(id, 'departed'), () => 'Marked departed — passengers are told the bus has left'));
+  const markArrived = useMutation(act(() => tripOpsApi.setRunStatus(id, 'closed'), () => 'Marked arrived — the journey is over'));
   const releaseHolds = useMutation(act(() => tripOpsApi.releaseHolds(id), (r) => `${r.released} hold${r.released === 1 ? '' : 's'} released`));
   const block = useMutation({
     ...act(async () => {
@@ -91,7 +93,7 @@ export function TripChartPage() {
   const last = data.stops[data.stops.length - 1];
   const locked = t.hasRun || t.status === 'departed' || t.status === 'cancelled';
   const future = new Date(t.departsAt).getTime() > Date.now();
-  const busy = stopSales.isPending || resumeSales.isPending || releaseHolds.isPending || block.isPending;
+  const busy = stopSales.isPending || resumeSales.isPending || releaseHolds.isPending || block.isPending || markDeparted.isPending || markArrived.isPending;
 
   const clickSeat = (s: ChartSeat) => {
     if (blockMode) {
@@ -127,6 +129,13 @@ export function TripChartPage() {
           ))}
           {!locked && future && <Button variant="outline" leftIcon={<Clock className="h-4 w-4" />} disabled={busy} onClick={() => setDialog('retime')}>Change departure time</Button>}
           {!locked && future && <Button variant="outline" leftIcon={<BusIcon className="h-4 w-4" />} disabled={busy} onClick={() => setDialog('bus')}>{t.vehicleId ? 'Change bus' : 'Assign bus'}</Button>}
+          {t.status !== 'cancelled' && t.status !== 'departed' && !t.hasRun && (() => {
+            const early = new Date(t.departsAt).getTime() - Date.now() > 2 * 3_600_000;
+            return <Button variant="outline" leftIcon={<PlayCircle className="h-4 w-4" />} loading={markDeparted.isPending} disabled={busy || early}
+              title={early ? 'Opens 2 hours before departure' : undefined}
+              onClick={() => { if (window.confirm('Mark this bus departed? Sales stop and passengers are told it has left.')) markDeparted.mutate(); }}>Mark departed</Button>;
+          })()}
+          {t.status === 'departed' && <Button variant="outline" leftIcon={<CheckCircle2 className="h-4 w-4" />} loading={markArrived.isPending} disabled={busy} onClick={() => markArrived.mutate()}>Mark arrived</Button>}
           <Button variant="outline" leftIcon={<Printer className="h-4 w-4" />} onClick={() => window.print()}>Print chart</Button>
           {!locked && <Button variant="danger" className="ml-auto" leftIcon={<XCircle className="h-4 w-4" />} disabled={busy} onClick={() => setDialog('cancel')}>Cancel trip</Button>}
           {locked && <span className="self-center text-sm text-text-muted"><Ban className="mr-1 inline h-4 w-4" />{t.status === 'cancelled' ? 'This trip was cancelled.' : 'This bus has left — the chart is read-only.'}</span>}
