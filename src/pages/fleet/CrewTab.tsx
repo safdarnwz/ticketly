@@ -159,7 +159,11 @@ function Roster() {
   const toast = useToast();
   const [assigning, setAssigning] = useState(false);
   const [allowanceFor, setAllowanceFor] = useState<Duty | null>(null);
-  const duties = useQuery({ queryKey: ['duties'], queryFn: () => fleetApi.listDuties() });
+  /** '' = every duty that has not ended; a date = that day's attendance sheet. */
+  const [day, setDay] = useState('');
+  const duties = useQuery({ queryKey: ['duties', day], queryFn: () => fleetApi.listDuties(day || undefined) });
+  const list = duties.data?.duties ?? [];
+  const count = (a: string) => list.filter((d) => d.attendance === a).length;
   const refresh = () => { void qc.invalidateQueries({ queryKey: ['duties'] }); void qc.invalidateQueries({ queryKey: ['crew'] }); };
   const cancel = useMutation({
     mutationFn: (id: string) => fleetApi.cancelDuty(id),
@@ -195,12 +199,24 @@ function Roster() {
   ];
   return (
     <>
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <p className="text-sm text-text-muted">Every duty that has not ended yet. Attendance opens 6 hours before a duty; after 15 minutes a present mark counts as late.</p>
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+        <div className="flex flex-wrap items-end gap-2">
+          <Button variant={day ? 'outline' : 'primary'} onClick={() => setDay('')}>Upcoming</Button>
+          <Button variant={day === todayLocal() ? 'primary' : 'outline'} onClick={() => setDay(todayLocal())}>Today's attendance</Button>
+          <Input label="Attendance for" type="date" value={day} max={addDaysIso(todayLocal(), 30)} onChange={(e) => setDay(e.target.value)} />
+        </div>
         <Button leftIcon={<CalendarClock className="h-4 w-4" />} onClick={() => setAssigning(true)}>Assign duty</Button>
       </div>
+      <p className="mb-3 text-sm text-text-muted">{day ? 'Every duty starting that day, finished ones too.' : 'Every duty that has not ended yet.'} Attendance opens 6 hours before a duty; after 15 minutes a present mark counts as late.</p>
+      {day && !duties.isLoading && !duties.isError && list.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-2 text-sm">
+          <Badge tone="success">{count('present')} present</Badge><Badge tone="warning">{count('late')} late</Badge>
+          <Badge tone="danger">{count('absent')} absent</Badge><Badge>{count('pending')} not marked</Badge>
+          <span className="text-text-muted">of {list.length} {list.length === 1 ? 'duty' : 'duties'}</span>
+        </div>
+      )}
       {duties.isLoading ? <PageLoader /> : duties.isError ? <ErrorState error={duties.error} onRetry={duties.refetch} /> :
-        duties.data?.duties.length ? <Table columns={columns} rows={duties.data.duties} /> : <EmptyState title="No upcoming duties" icon={<FileWarning className="h-10 w-10" />} />}
+        list.length ? <Table columns={columns} rows={list} /> : <EmptyState title={day ? 'No duties that day' : 'No upcoming duties'} icon={<FileWarning className="h-10 w-10" />} />}
       {assigning && <AssignDutyModal onClose={() => setAssigning(false)} onDone={() => { setAssigning(false); refresh(); }} />}
       {allowanceFor && <AllowanceModal crewId={allowanceFor.crewId} name={allowanceFor.crewName} onClose={() => setAllowanceFor(null)} />}
     </>

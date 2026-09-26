@@ -83,7 +83,8 @@ export const fleetApi = {
   createCrew: (input: { role: string; fullName: string; phone?: string; licenceNo?: string; licenceExpiresOn?: string; employeeCode?: string }) =>
     post<{ id: string }>('/v1/fleet/crew', input),
 
-  listDuties: () => get<{ duties: Duty[] }>('/v1/fleet/crew/duties'),
+  /** Upcoming duties, or every duty of one day (its attendance sheet). */
+  listDuties: (date?: string) => get<{ duties: Duty[] }>(`/v1/fleet/crew/duties${date ? `?date=${date}` : ''}`),
   assignDuty: (input: { crewId: string; tripId?: string; startsAt: string; endsAt: string; drivingMinutes: number; overrideReason?: string }) =>
     post<{ id: string }>('/v1/fleet/crew/duties', input),
   cancelDuty: (id: string) => post<{ ok: boolean }>(`/v1/fleet/crew/duties/${id}/cancel`, {}),
