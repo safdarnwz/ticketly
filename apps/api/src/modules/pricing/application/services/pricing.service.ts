@@ -13,7 +13,7 @@ import {
 
 import { PricingEngine } from '../../domain/pricing-engine';
 import { CouponRepository } from '../../infrastructure/persistence/coupon.repository';
-import { FareRepository } from '../../infrastructure/persistence/fare.repository';
+import { FareRepository, ladderFor } from '../../infrastructure/persistence/fare.repository';
 import { InventoryRepository, TripRepository } from '../../../scheduling';
 import { RouteRepository } from '../../../master-data';
 import { adjustmentPct, applyAdjustment } from '../../domain/pricing-rules';
@@ -179,7 +179,7 @@ export class PricingService {
       currency: fare.currency as never,
       occupancyPct,
       daysToDeparture: daysOut,
-      yield: routePricing.ladder,
+      yield: ladderFor(routePricing, trip.serviceId),
       coupon,
       tax: { gstRatePct: routePricing.gstRatePct, interState },
       bounds:

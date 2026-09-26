@@ -18,7 +18,7 @@ import {
 import { Logger, Metrics } from '@observability';
 
 import { TenantRepository } from '../../../tenancy';
-import { PricingEngine, FareRepository } from '../../../pricing';
+import { PricingEngine, FareRepository, ladderFor } from '../../../pricing';
 import { AmenityRepository, RouteRepository, type Amenity } from '../../../master-data';
 import { PromotionRepository, bubblePromotedToTop } from '../../../promotions';
 import { InventoryRepository, TripRepository } from '../../../scheduling';
@@ -357,7 +357,7 @@ export class SearchService {
             baseFareMinor: fare.baseFareMinor,
             occupancyPct,
             daysToDeparture: daysOut,
-            yield: routePricing.ladder,
+            yield: ladderFor(routePricing, trip.serviceId),
             tax: { gstRatePct: routePricing.gstRatePct, interState },
           });
           fares.push({ seatType, priceMinor: priced.total.minor });

@@ -184,7 +184,12 @@ export class PricingController {
     const id = await this.uow.run(
       { name: 'pricing.createPolicy', tenantId: requireTenantId() },
       async () =>
-        this.fares.createPolicy({ routeId: dto.routeId, name: dto.name, ladder: dto.ladder }),
+        this.fares.createPolicy({
+          routeId: dto.routeId,
+          serviceId: dto.serviceId,
+          name: dto.name,
+          ladder: dto.ladder,
+        }),
     );
     return { id };
   }

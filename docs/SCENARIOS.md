@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 562 |
-| DONE | 413 |
+| TODO | 561 |
+| DONE | 414 |
 | DUP | 9 |
 
 
@@ -750,7 +750,7 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 706 | Define inventory allocation for each branch | DONE | DONE | POST /trips/:tripId/quotas (fixed: every allocation used to fail) · UI: Trip chart → Agent & branch seats |
 | 707 | Set percentage of inventory to release to OTAs | DONE | DONE | PUT /scheduling/services/:id/sales-rules (same as #173/#174/#170) · UI: Schedule → Manage service |
 | 708 | Pull back inventory from OTA at last moment | DONE | DONE | PUT /trips/:tripId/closed-channels (ota off/on per trip) · UI: Trip chart → Sales channels |
-| 709 | Apply dynamic pricing rule on selected service | DONE | TODO | verified manually: existing module/API |
+| 709 | Apply dynamic pricing rule on selected service | DONE | DONE | verified manually: existing module/API · UI: Pricing → Yield Policies → New policy → Applies to: Service · <code> (time) — wins over the route policy |
 | 710 | Define peak time fare | DONE | DONE | verified manually: existing module/API · UI: Pricing → Route limits & peak times |
 | 711 | Define off-peak time fare | DONE | DONE | verified manually: existing module/API · UI: Pricing → Route limits & peak times |
 | 712 | Apply festive season fare increase | DONE | DONE | verified manually: existing module/API · UI: Pricing → Fare plan: sheet download/upload, change all by % |

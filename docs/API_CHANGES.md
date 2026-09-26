@@ -440,3 +440,7 @@ an unknown id is now 404 (was 200).
   now leaves out every bus of an operator that opted out, and a change onto an operator's bus uses its own
   window (its minimum is a floor the traveller's `minLayoverMin` cannot go under).
 - **Fuel incidents:** `POST /incidents` takes `type: 'fuel'` (high priority, like a breakdown). Migration 0100.
+- **Yield policy for one service:** `POST /pricing/policies` takes `serviceId` (not with `routeId`, 400;
+  another operator's or unknown service 404). A service's own policy wins over its route's, which wins over
+  the operator-wide one; quotes and search prices use it. `GET /pricing/policies` rows add `serviceId`.
+  Migration 0101.

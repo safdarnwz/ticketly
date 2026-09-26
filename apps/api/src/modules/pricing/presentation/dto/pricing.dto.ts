@@ -66,15 +66,22 @@ const YieldLadderSchema = z
     }
   });
 
-export const CreatePricingPolicySchema = z.object({
-  /** Omit for the operator-wide policy; a route's own policy wins over it. */
-  routeId: uuid.optional(),
-  name: z.string().trim().min(1).max(120),
-  ladder: YieldLadderSchema,
-  // NOTE: gstRatePct deliberately removed — GST is a government-mandated
-  // rate set ONLY by the platform (super admin), never per-operator. See
-  // PlatformSettingsRepository.gstRatePercent / migration 0021.
-});
+export const CreatePricingPolicySchema = z
+  .object({
+    /** Omit both for the operator-wide policy; a route's own policy wins over it… */
+    routeId: uuid.optional(),
+    /** …and one service's own policy (e.g. the 21:30 departure) wins over its route's. */
+    serviceId: uuid.optional(),
+    name: z.string().trim().min(1).max(120),
+    ladder: YieldLadderSchema,
+    // NOTE: gstRatePct deliberately removed — GST is a government-mandated
+    // rate set ONLY by the platform (super admin), never per-operator. See
+    // PlatformSettingsRepository.gstRatePercent / migration 0021.
+  })
+  .refine((p) => !(p.routeId && p.serviceId), {
+    message: 'A policy is for a route or for one service, not both',
+    path: ['serviceId'],
+  });
 export type CreatePricingPolicyDto = z.infer<typeof CreatePricingPolicySchema>;
 
 export const CreateCouponSchema = z

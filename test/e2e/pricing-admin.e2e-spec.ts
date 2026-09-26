@@ -222,6 +222,44 @@ describe('pricing admin (e2e)', () => {
       expect((await policies()).some((p) => p.routeId === routeId && p.isActive)).toBe(false);
       expect((await quote()).body.totalMinor).toBe(plain);
     });
+
+    it("one service's own policy wins over its route's; each scope has one active", async () => {
+      const trip = (await app.get(`/scheduling/trips/${app.fixtures.tripId}`, op)).body.trip;
+      const { routeId, serviceId } = trip as { routeId: string; serviceId: string };
+      const unknown = '00000000-0000-4000-8000-000000000000';
+      expect((await policy({ routeId, serviceId, name: 'both', ladder: ladder() })).status).toBe(
+        400,
+      );
+      expect((await policy({ serviceId: unknown, name: 'nope', ladder: ladder() })).status).toBe(
+        404,
+      );
+      expect(
+        (await policy({ serviceId, name: 'theirs', ladder: ladder() }, otherOperator)).status,
+      ).toBe(404);
+
+      const plain = (await quote()).body.totalMinor as number;
+      const route = await policy({
+        routeId,
+        name: 'E2E route flat',
+        ladder: ladder({ advancePurchase: [] }),
+      });
+      const svc = await policy({ serviceId, name: 'E2E 21:30 surge', ladder: ladder() });
+      expect(svc.status, JSON.stringify(svc.body)).toBe(201);
+      try {
+        expect((await quote()).body.totalMinor).toBeGreaterThan(plain);
+        const list = (await app.get('/pricing/policies', op)).body.policies as {
+          id: string;
+          serviceId: string | null;
+          isActive: boolean;
+        }[];
+        expect(list.find((p) => p.id === svc.body.id)).toMatchObject({ serviceId, isActive: true });
+        expect(list.find((p) => p.id === route.body.id)?.isActive).toBe(true);
+      } finally {
+        await app.post(`/pricing/policies/${svc.body.id}/deactivate`, {}, op);
+        await app.post(`/pricing/policies/${route.body.id}/deactivate`, {}, op);
+      }
+      expect((await quote()).body.totalMinor).toBe(plain);
+    });
   });
   describe('fare plans', () => {
     it("a plan needs a fare to go live, and another operator's plan is out of reach", async () => {

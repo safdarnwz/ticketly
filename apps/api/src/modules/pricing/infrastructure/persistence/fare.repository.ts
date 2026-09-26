@@ -22,8 +22,19 @@ export interface ResolvedFare {
 }
 
 export interface RoutePricing {
+  /** The route's own policy, else the operator-wide one, else flat fares. */
   ladder: YieldLadder;
+  /** Services of this route with a policy of their own (it wins over `ladder`). */
+  serviceLadders: Record<string, YieldLadder>;
   gstRatePct: number;
+}
+
+/** The yield ladder for one trip: its service's own policy first. */
+export function ladderFor(
+  pricing: RoutePricing,
+  serviceId: string | null | undefined,
+): YieldLadder {
+  return (serviceId && pricing.serviceLadders[serviceId]) || pricing.ladder;
 }
 
 /**
@@ -260,29 +271,42 @@ export class FareRepository {
 
   async routePricing(routeId: RouteId): Promise<RoutePricing> {
     const [row, gstRatePct] = await Promise.all([
-      this.cache.getOrLoad<{ ladder: YieldLadder } | null>(
+      this.cache.getOrLoad<{ ladder: YieldLadder | null; services: Record<string, YieldLadder> }>(
         `policy:${routeId}`,
         { namespace: CacheNamespace.PRICING_POLICY, ttlSeconds: CacheTtl.FARE_RULES },
         async () => {
-          const r = await this.db.queryOne<{ ladder: YieldLadder }>(
-            `SELECT ladder FROM pricing_policies
-              WHERE tenant_id = $1 AND is_active AND (route_id = $2 OR route_id IS NULL)
-              ORDER BY route_id NULLS LAST, created_at DESC LIMIT 1`,
-            [requireTenantId(), routeId],
-            { name: 'fare.routePricing' },
-          );
-          return r;
+          const [r, perService] = await Promise.all([
+            this.db.queryOne<{ ladder: YieldLadder }>(
+              `SELECT ladder FROM pricing_policies
+                WHERE tenant_id = $1 AND is_active AND service_id IS NULL
+                  AND (route_id = $2 OR route_id IS NULL)
+                ORDER BY route_id NULLS LAST, created_at DESC LIMIT 1`,
+              [requireTenantId(), routeId],
+              { name: 'fare.routePricing' },
+            ),
+            this.db.query<{ service_id: string; ladder: YieldLadder }>(
+              `SELECT p.service_id, p.ladder FROM pricing_policies p
+                 JOIN services s ON s.id = p.service_id AND s.tenant_id = p.tenant_id
+                WHERE p.tenant_id = $1 AND p.is_active AND s.route_id = $2`,
+              [requireTenantId(), routeId],
+              { name: 'fare.servicePricing' },
+            ),
+          ]);
+          return {
+            ladder: r?.ladder ?? null,
+            services: Object.fromEntries(perService.map((x) => [x.service_id, x.ladder])),
+          };
         },
       ),
       this.platformSettings.gstRatePercent(),
     ]);
-    const ladder = row?.ladder ?? {
+    const ladder = row.ladder ?? {
       occupancy: [],
       advancePurchase: [],
       maxMultiplier: 1,
       minMultiplier: 1,
     };
-    return { ladder, gstRatePct };
+    return { ladder, serviceLadders: row.services ?? {}, gstRatePct };
   }
 
   /** The route's active plans with their date window + weekday filter (cached; tiny). */
@@ -409,8 +433,22 @@ export class FareRepository {
    * (super-admin), never per-policy. The column keeps its DB default; nothing
    * reads it anymore (see routePricing).
    */
-  async createPolicy(input: { routeId?: string; name: string; ladder: unknown }): Promise<string> {
+  async createPolicy(input: {
+    routeId?: string;
+    serviceId?: string;
+    name: string;
+    ladder: unknown;
+  }): Promise<string> {
     const tenantId = requireTenantId();
+    if (input.serviceId) {
+      const service = await this.db.queryOne(
+        `SELECT 1 FROM services WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+        [tenantId, input.serviceId],
+        { name: 'fare.policyService' },
+      );
+      if (!service)
+        throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Service not found' });
+    }
     if (input.routeId) {
       const route = await this.db.queryOne(
         `SELECT 1 FROM routes WHERE tenant_id = $1 AND id = $2`,
@@ -422,15 +460,23 @@ export class FareRepository {
     }
     await this.db.execute_(
       `UPDATE pricing_policies SET is_active = false
-        WHERE tenant_id = $1 AND is_active AND route_id IS NOT DISTINCT FROM $2::uuid`,
-      [tenantId, input.routeId ?? null],
+        WHERE tenant_id = $1 AND is_active AND route_id IS NOT DISTINCT FROM $2::uuid
+          AND service_id IS NOT DISTINCT FROM $3::uuid`,
+      [tenantId, input.routeId ?? null, input.serviceId ?? null],
       { name: 'fare.replacePolicy', primary: true },
     );
     const id = newId();
     await this.db.execute_(
-      `INSERT INTO pricing_policies (id, tenant_id, route_id, name, ladder)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [id, tenantId, input.routeId ?? null, input.name, JSON.stringify(input.ladder)],
+      `INSERT INTO pricing_policies (id, tenant_id, route_id, service_id, name, ladder)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        id,
+        tenantId,
+        input.routeId ?? null,
+        input.serviceId ?? null,
+        input.name,
+        JSON.stringify(input.ladder),
+      ],
       { name: 'fare.createPolicy', primary: true },
     );
     await this.pricesChanged(CacheNamespace.PRICING_POLICY);
@@ -556,6 +602,7 @@ export class FareRepository {
     {
       id: string;
       routeId: string | null;
+      serviceId: string | null;
       name: string;
       ladder: YieldLadder;
       isActive: boolean;
@@ -563,7 +610,8 @@ export class FareRepository {
     }[]
   > {
     return this.db.query(
-      `SELECT id, route_id AS "routeId", name, ladder, is_active AS "isActive", created_at AS "createdAt"
+      `SELECT id, route_id AS "routeId", service_id AS "serviceId", name, ladder,
+              is_active AS "isActive", created_at AS "createdAt"
          FROM pricing_policies
         WHERE tenant_id = $1 ORDER BY is_active DESC, created_at DESC`,
       [requireTenantId()],
