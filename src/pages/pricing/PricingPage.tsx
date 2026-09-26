@@ -8,6 +8,7 @@ import { FareBulkTools, RouteRulesTab } from './RouteRulesTab';
 import { PageHeader } from '@/components/common/PageHeader';
 import { pricingAdminApi, type FarePlan, type Coupon, type PricingPolicy, type YieldLadder } from '@/lib/api/pricingAdmin';
 import { masterDataApi } from '@/lib/api/masterData';
+import { schedulingApi } from '@/lib/api/scheduling';
 import { formatMoney, cn, formatDateLabel, localDateOf, todayLocal } from '@/lib/utils';
 import { ApiError } from '@/lib/api/client';
 
@@ -217,13 +218,25 @@ function PoliciesTab() {
 
   const policies = useQuery({ queryKey: ['pricing-policies'], queryFn: pricingAdminApi.listPolicies });
   const routes = useQuery({ queryKey: ['routes'], queryFn: () => masterDataApi.listRoutes() });
+  const services = useQuery({ queryKey: ['services'], queryFn: () => schedulingApi.listServices() });
   const routeName = (id: string | null) => (id ? routes.data?.items.find((r) => r.id === id)?.name ?? 'A route' : 'All routes');
+  const hhmm = (m?: number) => (m == null ? '' : `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
+  const serviceName = (id: string) => {
+    const s = services.data?.services.find((x) => x.id === id);
+    return s ? `${s.code}${s.startMinute != null ? ` (${hhmm(s.startMinute)})` : ''} · ${routeName(s.routeId)}` : 'A service';
+  };
+  /** '' = all routes · 'route:<id>' · 'service:<id>' */
+  const scopeOf = (p: { routeId: string | null; serviceId: string | null }) => (p.serviceId ? `service:${p.serviceId}` : p.routeId ? `route:${p.routeId}` : '');
+  const scopeName = (p: { routeId: string | null; serviceId: string | null }) => (p.serviceId ? `Service ${serviceName(p.serviceId)}` : routeName(p.routeId));
+  const [scopeKind, scopeId] = form.routeId.split(':') as ['route' | 'service' | '', string | undefined];
+  const formScope = { routeId: scopeKind === 'route' ? scopeId! : null, serviceId: scopeKind === 'service' ? scopeId! : null };
   const active = policies.data?.policies.filter((p) => p.isActive) ?? [];
-  const replaces = active.find((p) => (p.routeId ?? '') === form.routeId);
+  const replaces = active.find((p) => scopeOf(p) === form.routeId);
 
   const create = useMutation({
     mutationFn: () => pricingAdminApi.createPolicy({
-      routeId: form.routeId || undefined,
+      routeId: formScope.routeId ?? undefined,
+      serviceId: formScope.serviceId ?? undefined,
       name: form.name.trim(),
       ladder: {
         occupancy: form.occupancy.map((s) => ({ atPct: Number(s.at), mult: 1 + Number(s.pct) / 100 })),
@@ -232,7 +245,7 @@ function PoliciesTab() {
         maxMultiplier: 1 + Number(form.capPct) / 100,
       },
     }),
-    onSuccess: () => { toast.success(`${form.name.trim()} now prices ${form.routeId ? routeName(form.routeId) : 'every route without its own policy'}`); setAdding(false); void qc.invalidateQueries({ queryKey: ['pricing-policies'] }); },
+    onSuccess: () => { toast.success(`${form.name.trim()} now prices ${form.routeId ? scopeName(formScope) : 'every route without its own policy'}`); setAdding(false); void qc.invalidateQueries({ queryKey: ['pricing-policies'] }); },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
   });
   const stop = useMutation({
@@ -252,7 +265,7 @@ function PoliciesTab() {
 
   const columns: Column<PricingPolicy>[] = [
     { key: 'name', header: 'Policy', render: (r) => <span className="font-medium text-text">{r.name}</span> },
-    { key: 'scope', header: 'Applies to', render: (r) => routeName(r.routeId) },
+    { key: 'scope', header: 'Applies to', render: (r) => scopeName(r) },
     { key: 'ladder', header: 'Price changes', render: (r) => <ul className="text-xs text-text-muted">{ladderSummary(r.ladder).map((l) => <li key={l}>{l}</li>)}</ul> },
     { key: 'status', header: 'Status', render: (r) => <Badge tone={r.isActive ? 'success' : 'neutral'}>{r.isActive ? 'Active' : 'Off'}</Badge> },
     { key: 'actions', header: '', render: (r) => r.isActive ? <div className="flex justify-end"><Button size="sm" variant="ghost" className="text-danger" onClick={() => setStopping(r)}>Switch off</Button></div> : null },
@@ -274,7 +287,7 @@ function PoliciesTab() {
   return (
     <>
       <div className="mb-4 flex items-center justify-between gap-4">
-        <p className="text-sm text-text-muted">A yield policy raises or lowers fares as a bus fills up and as departure gets close. A route’s own policy wins over the all-routes one.</p>
+        <p className="text-sm text-text-muted">A yield policy raises or lowers fares as a bus fills up and as departure gets close. A route’s own policy wins over the all-routes one, and one service’s own policy (say, the popular night bus) wins over its route’s.</p>
         <Button leftIcon={<Plus className="h-4 w-4" />} onClick={open}>New policy</Button>
       </div>
       {policies.isLoading ? <PageLoader /> : policies.isError ? <ErrorState error={policies.error} onRetry={policies.refetch} /> :
@@ -285,10 +298,14 @@ function PoliciesTab() {
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-3">
             <Select label="Applies to" value={form.routeId} onChange={(e) => setForm((f) => ({ ...f, routeId: e.target.value }))}
-              options={[{ label: 'All routes', value: '' }, ...(routes.data?.items.map((r) => ({ label: r.name, value: r.id })) ?? [])]} />
+              options={[
+                { label: 'All routes', value: '' },
+                ...(routes.data?.items.map((r) => ({ label: `Route · ${r.name}`, value: `route:${r.id}` })) ?? []),
+                ...(services.data?.services.filter((x) => x.status !== 'archived').map((x) => ({ label: `Service · ${serviceName(x.id)}`, value: `service:${x.id}` })) ?? []),
+              ]} />
             <Input label="Policy name" placeholder="Weekend demand" maxLength={120} value={form.name} error={err('name')} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
           </div>
-          {replaces && <p className="rounded-md bg-warning/10 p-2 text-xs text-text">This replaces <strong>{replaces.name}</strong>, the active policy for {routeName(replaces.routeId)}.</p>}
+          {replaces && <p className="rounded-md bg-warning/10 p-2 text-xs text-text">This replaces <strong>{replaces.name}</strong>, the active policy for {scopeName(replaces)}.</p>}
           <div>
             <div className="mb-2 text-sm font-semibold text-text">As the bus fills up</div>
             {stepRows('occupancy', 'When sold reaches', '%', 100)}
@@ -307,7 +324,7 @@ function PoliciesTab() {
 
       <Modal open={!!stopping} onClose={() => setStopping(null)} title="Switch off this policy?"
         footer={<><Button variant="ghost" onClick={() => setStopping(null)} disabled={stop.isPending}>Keep it</Button><Button variant="danger" loading={stop.isPending} onClick={() => stopping && stop.mutate(stopping.id)}>Switch off</Button></>}>
-        <p className="text-sm text-text">{stopping?.name} stops changing fares on {routeName(stopping?.routeId ?? null).toLowerCase() === 'all routes' ? 'routes without their own policy' : routeName(stopping?.routeId ?? null)}. Quotes already given keep their price.</p>
+        <p className="text-sm text-text">{stopping?.name} stops changing fares on {!stopping || (!stopping.routeId && !stopping.serviceId) ? 'routes without their own policy' : scopeName(stopping)}. Quotes already given keep their price.</p>
       </Modal>
     </>
   );

@@ -8,7 +8,7 @@ export interface YieldLadder {
   maxMultiplier: number;
   minMultiplier: number;
 }
-export interface PricingPolicy { id: string; routeId: string | null; name: string; ladder: YieldLadder; isActive: boolean; createdAt: string }
+export interface PricingPolicy { id: string; routeId: string | null; serviceId: string | null; name: string; ladder: YieldLadder; isActive: boolean; createdAt: string }
 export interface Coupon { id: string; code: string; kind: string; value: number; usageCount: number; maxRedemptions: number | null; validFrom: string | null; validTo: string | null; isActive?: boolean; firstBookingOnly?: boolean; description?: string | null; minFareMinor?: number | null; maxDiscountMinor?: number | null; perUserLimit?: number | null }
 export interface SeatFareOverride { id: string; seatNumber: string; fareMinor: number }
 
@@ -27,7 +27,8 @@ export const pricingAdminApi = {
   deleteSeatOverride: (overrideId: string) => del<{ ok: boolean }>(`/v1/pricing/fare-plans/seat-overrides/${overrideId}`),
 
   listPolicies: () => get<{ policies: PricingPolicy[] }>('/v1/pricing/policies'),
-  createPolicy: (input: { routeId?: string; name: string; ladder: YieldLadder }) =>
+  /** A route's own policy wins over the all-routes one; one service's own policy wins over its route's. */
+  createPolicy: (input: { routeId?: string; serviceId?: string; name: string; ladder: YieldLadder }) =>
     post<{ id: string }>('/v1/pricing/policies', input),
   deactivatePolicy: (id: string) => post<{ ok: boolean }>(`/v1/pricing/policies/${id}/deactivate`, {}),
 
