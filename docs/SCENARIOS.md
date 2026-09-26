@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 566 |
-| DONE | 409 |
+| TODO | 562 |
+| DONE | 413 |
 | DUP | 9 |
 
 
@@ -606,15 +606,15 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 562 | Assign conductor to a service | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 563 | Change already assigned crew | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 564 | View live GPS location of all buses | DONE | DONE | verified manually: existing module/API · UI: Operations → On the road (every bus: position, speed, next stop, late/early, signal lost) |
-| 565 | Receive automatic delay alert | DONE | TODO | verified manually: existing module/API |
+| 565 | Receive automatic delay alert | DONE | DONE | verified manually: existing module/API · UI: Operations → On the road: alert banner for buses >15 min late (GPS), refreshing every 30 s; passengers told automatically |
 | 566 | Enter reason for delay | DONE | DONE | verified manually: existing module/API · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
 | 567 | Select delay category (traffic, breakdown, weather, other) | DONE | DONE | incidents type=delay + delayCategory · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
 | 568 | Send delay SMS to all passengers | DONE | DONE | verified manually: existing module/API · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
-| 569 | Send delay WhatsApp to all passengers | DONE | TODO | verified manually: existing module/API |
+| 569 | Send delay WhatsApp to all passengers | DONE | DONE | verified manually: existing module/API · UI: Operations → Report incident → Delay: every booked passenger is told (SMS; WhatsApp too with a WhatsApp template in Settings → Message Templates) |
 | 570 | Identify services with very low occupancy | DONE | DONE | verified manually: existing module/API · UI: Reports → Forecast (weak trips: keep / plan to cancel) |
 | 571 | Take decision to cancel low occupancy service | DONE | DONE | verified manually: existing module/API · UI: Reports → Forecast (weak trips: keep / plan to cancel) |
 | 572 | Cancel service in system | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Cancel trip (reason) |
-| 573 | Automatically notify all booked passengers | DONE | TODO | verified manually: existing module/API |
+| 573 | Automatically notify all booked passengers | DONE | DONE | verified manually: existing module/API · UI: Operations → Report incident → Delay: every booked passenger is told (SMS; WhatsApp too with a WhatsApp template in Settings → Message Templates) |
 | 574 | Offer alternate service to cancelled passengers | GAP | — | verified manually: not built yet |
 | 575 | Shift passengers to alternate service | GAP | — | verified manually: not built yet |
 | 576 | Create new extra trip service | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
@@ -636,7 +636,7 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 592 | Mark attendance of conductor | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 593 | Approve overtime for crew | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 594 | Approve double duty for crew | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
-| 595 | Report fuel related issue | DONE | TODO | verified manually: existing module/API |
+| 595 | Report fuel related issue | DONE | DONE | verified manually: existing module/API · UI: Operations → Report incident → Fuel problem (high priority) |
 | 596 | Report maintenance related issue | DONE | DONE | verified manually: existing module/API · UI: Fleet → bus page → Maintenance |
 | 597 | View on-time performance percentage | DONE | DONE | GET /reports/dispatch onTimePct (actual_departed_at) · UI: Reports → Dispatch |
 | 598 | View average delay duration | DONE | DONE | GET /reports/dispatch avgDepartureDelayMin · UI: Reports → Dispatch |

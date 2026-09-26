@@ -22,6 +22,7 @@ describe('incident reports', () => {
       'critical',
     ]);
     expect(severityFor('breakdown')).toBe('high');
+    expect(severityFor('fuel')).toBe('high');
     expect(severityFor('complaint')).toBe('normal');
   });
   it('delay needs category and minutes (567); diversion needs the route (588)', () => {

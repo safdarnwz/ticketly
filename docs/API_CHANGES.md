@@ -439,3 +439,4 @@ an unknown id is now 404 (was 200).
   maxLayoverMin ≤ 1440 and > min}` and `POST /operator/connection-rules/reset`. `POST /search/connecting`
   now leaves out every bus of an operator that opted out, and a change onto an operator's bus uses its own
   window (its minimum is a floor the traveller's `minLayoverMin` cannot go under).
+- **Fuel incidents:** `POST /incidents` takes `type: 'fuel'` (high priority, like a breakdown). Migration 0100.

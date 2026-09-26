@@ -50,6 +50,14 @@ describe('operations (e2e)', () => {
     expect(made.body.severity).toBe('high');
     const id: string = made.body.id;
 
+    const fuel = await app.post(
+      '/incidents',
+      { type: 'fuel', tripId, description: 'Tank near empty, next pump 60 km' },
+      key('i4'),
+    );
+    expect(fuel.status, JSON.stringify(fuel.body)).toBe(201);
+    expect(fuel.body.severity).toBe('high');
+
     const listed = await app.get(`/incidents?status=active&tripId=${tripId}`, as);
     expect(listed.body.items.find((i: { id: string }) => i.id === id)).toMatchObject({
       status: 'open',

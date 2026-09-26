@@ -19,6 +19,8 @@ export const INCIDENT_TYPES = [
   'security',
   'accident',
   'breakdown',
+  /** Running low with no pump ahead, wrong fuel, a leak — dispatch sends fuel or a relief bus. */
+  'fuel',
   'diversion',
   'delay',
   'complaint',
@@ -53,7 +55,7 @@ export class IncidentRuleError extends Error {
 export function severityFor(type: IncidentType): Severity {
   if (type === 'sos' || type === 'medical' || type === 'security' || type === 'accident')
     return 'critical';
-  if (type === 'breakdown' || type === 'diversion') return 'high';
+  if (type === 'breakdown' || type === 'fuel' || type === 'diversion') return 'high';
   return 'normal';
 }
 
