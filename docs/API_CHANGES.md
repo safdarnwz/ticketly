@@ -343,3 +343,7 @@ an unknown id is now 404 (was 200).
   needs its oldest age, below adult age and not below infant age; a senior band needs a starting age of at
   least adult age; no active 0% rule; no end date in the past. `PUT /concessions/policy` refuses an adult
   age at or below an active child band's oldest age.
+- **Schedule:** a clone cannot start in the past; a timetable edit cannot end the service in the past
+  and an ended service is not edited (clone it); restoring a version that already ended is refused;
+  blackout dates must be today or later; a women / senior quota in seats cannot exceed the bus's seats
+  (a 100 % ladies-special quota stays allowed). All 422 with the reason.

@@ -19,12 +19,20 @@ export interface ServiceSalesRules {
   categoryQuotas?: Partial<Record<QuotaCategory, CategoryQuota>>;
 }
 
-export function salesRulesErrors(rules: ServiceSalesRules): string[] {
+export function salesRulesErrors(
+  rules: ServiceSalesRules,
+  seatCapacity: number | null = null,
+): string[] {
   const errors: string[] = [];
   for (const [c, q] of Object.entries(rules.categoryQuotas ?? {})) {
     if (!q) continue;
-    if ((q.seats === undefined) === (q.pct === undefined))
+    if ((q.seats === undefined) === (q.pct === undefined)) {
       errors.push(`${c}: give either seats or pct`);
+      continue;
+    }
+    // A ladies-special bus keeps every seat (pct 100); a seat count beyond the bus is a typo.
+    if (seatCapacity && q.seats !== undefined && q.seats > seatCapacity)
+      errors.push(`${c}: the bus has only ${seatCapacity} seats`);
   }
   return errors;
 }

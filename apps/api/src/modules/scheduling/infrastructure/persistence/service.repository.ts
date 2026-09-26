@@ -87,6 +87,19 @@ export class ServiceRepository {
     return map(row);
   }
 
+  /** Seats on the service's bus type (its seat layout). */
+  async seatCapacity(id: ServiceId): Promise<number | null> {
+    const row = await this.db.queryOne<{ seats: number | null }>(
+      `SELECT sl.total_seats::int AS seats
+         FROM services s JOIN vehicle_types vt ON vt.id = s.vehicle_type_id
+         LEFT JOIN seat_layouts sl ON sl.id = vt.seat_layout_id
+        WHERE s.tenant_id = $1 AND s.id = $2`,
+      [requireTenantId(), id],
+      { name: 'service.seatCapacity' },
+    );
+    return row?.seats ?? null;
+  }
+
   async salesRules(id: ServiceId): Promise<ServiceSalesRules> {
     const row = await this.db.queryOne<{ sales_rules: ServiceSalesRules }>(
       `SELECT sales_rules FROM services WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,

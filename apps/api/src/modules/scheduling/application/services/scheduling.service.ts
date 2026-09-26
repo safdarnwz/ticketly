@@ -139,7 +139,7 @@ export class SchedulingService {
 
   /** OTA release % and women / senior seat quotas of a service (#170, #173, #174). */
   async setSalesRules(serviceId: ServiceId, rules: ServiceSalesRules): Promise<ServiceSalesRules> {
-    const errors = salesRulesErrors(rules);
+    const errors = salesRulesErrors(rules, await this.services.seatCapacity(serviceId));
     if (errors.length > 0) throw new DomainError(ErrorCode.COMMON_VALIDATION, errors.join('; '));
     await this.services.setSalesRules(serviceId, rules);
     return rules;

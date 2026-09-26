@@ -151,4 +151,40 @@ describe('seat and sales rules (e2e)', () => {
     expect(man.body.detail).toMatch(/women/);
     expect((await hold(seat, { gender: 'female' })).status).toBe(201);
   });
+
+  it('schedule changes stay in the future and quotas fit the bus', async () => {
+    const op = { as: 'operator' as const };
+    const past = '2020-01-06';
+    const too = await app.put(
+      `/scheduling/services/${serviceId}/sales-rules`,
+      { categoryQuotas: { senior: { seats: 99, releaseHours: 2 } } },
+      op,
+    );
+    expect(too.status).toBe(422);
+    expect(too.body.detail).toMatch(/only \d+ seats/);
+    const svc = (await app.get('/scheduling/services', op)).body.services.find(
+      (s: { id: string }) => s.id === serviceId,
+    );
+    const clone = await app.post(
+      `/scheduling/services/${serviceId}/clone`,
+      { code: `PAST-${Date.now().toString(36)}`, startDate: past, endDate: '2020-01-31' },
+      { ...op, idempotencyKey: `e2e-clone-${Date.now()}` },
+    );
+    expect(clone.status).toBe(422);
+    const edit = await app.patch(
+      `/scheduling/services/${serviceId}`,
+      { recurrence: { ...svc.recurrence, startDate: past, endDate: '2020-01-31' } },
+      op,
+    );
+    expect(edit.status).toBe(422);
+    const black = await app.post(
+      `/scheduling/routes/${svc.routeId}/blackouts`,
+      { dates: [past], reason: 'Old date' },
+      op,
+    );
+    expect(black.status).toBe(422);
+    expect(
+      (await app.post(`/scheduling/services/${serviceId}/versions/999/restore`, {}, op)).status,
+    ).toBe(404);
+  });
 });

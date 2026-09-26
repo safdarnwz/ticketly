@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
+import { AppConfig } from '@config';
 import { UnitOfWork } from '@database';
 import {
   AppError,
@@ -14,6 +15,7 @@ import {
   type TripId,
   type VehicleId,
   type VehicleTypeId,
+  todayIn,
 } from '@kernel';
 import { EventBus } from '@messaging';
 
@@ -43,6 +45,7 @@ export class TimetableService {
     private readonly blackouts: RouteBlackoutRepository,
     private readonly uow: UnitOfWork,
     private readonly events: EventBus,
+    private readonly config: AppConfig,
   ) {}
 
   async updateTimetable(
@@ -55,7 +58,13 @@ export class TimetableService {
       note?: string;
     },
   ) {
-    if (patch.recurrence) validateRule(patch.recurrence);
+    const current = await this.services.getById(id);
+    if (current.status === 'ended') throw validation('This service has ended — clone it instead');
+    if (patch.recurrence) {
+      validateRule(patch.recurrence);
+      if (patch.recurrence.endDate < this.today())
+        throw validation('The service would already have ended — pick an end date from today on');
+    }
     return this.uow.run(
       { name: 'service.updateTimetable', tenantId: requireTenantId() },
       async () => {
@@ -75,6 +84,10 @@ export class TimetableService {
     );
   }
 
+  private today(): string {
+    return todayIn(this.config.domain.timezone);
+  }
+
   listVersions(id: ServiceId) {
     return this.services.listVersions(id);
   }
@@ -83,6 +96,8 @@ export class TimetableService {
   async restoreVersion(id: ServiceId, versionNumber: number) {
     const v = await this.services.getVersion(id, versionNumber);
     if (!v) throw new NotFoundError('Service version', String(versionNumber));
+    if (v.snapshot.recurrence.endDate < this.today())
+      throw validation('That version ended in the past — restoring it would stop the service');
     return this.uow.run(
       { name: 'service.restoreVersion', tenantId: requireTenantId() },
       async () => {
@@ -119,6 +134,7 @@ export class TimetableService {
     },
   ): Promise<{ id: ServiceId }> {
     const source = await this.services.getById(sourceId);
+    if (input.startDate < this.today()) throw validation('A copy cannot start in the past');
     const recurrence: RecurrenceRule = {
       ...source.recurrence,
       ...(input.weekdays ? { frequency: 'weekly' as const, weekdays: input.weekdays } : {}),
@@ -214,6 +230,8 @@ export class TimetableService {
    * listed for the operator to cancel (refunds) or keep.
    */
   async addBlackout(routeId: RouteId, dates: string[], reason: string) {
+    const past = dates.filter((d) => d < this.today());
+    if (past.length) throw validation(`These dates have passed: ${past.join(', ')}`);
     return this.uow.run({ name: 'route.blackout', tenantId: requireTenantId() }, async () => {
       await this.blackouts.add(routeId, dates, reason, getUserId() ?? null);
       const trips = await this.trips.tripsOnDates(routeId, dates);
