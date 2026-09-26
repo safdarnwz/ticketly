@@ -246,6 +246,7 @@ export class BookingRepository {
     channel?: string;
     tripId?: string;
     noShow?: boolean;
+    branchId?: string;
     before?: { createdAt: string; id: string };
     limit?: number;
   }): Promise<StaffBookingRow[]> {
@@ -291,6 +292,8 @@ export class BookingRepository {
           AND ($9::text IS NULL OR b.channel = $9)
           AND ($10::uuid IS NULL OR b.trip_id = $10)
           AND (NOT $14::boolean OR EXISTS (SELECT 1 FROM tickets tk WHERE tk.booking_id = b.id AND tk.status = 'no_show'))
+          AND ($15::uuid IS NULL OR EXISTS (SELECT 1 FROM users su WHERE su.id = b.booked_by AND su.tenant_id = b.tenant_id AND su.branch_id = $15)
+               OR (ag.id IS NOT NULL AND ag.branch_id = $15))
           AND ($11::timestamptz IS NULL OR (b.created_at, b.id) < ($11::timestamptz, $12::uuid))
         ORDER BY b.created_at DESC, b.id DESC
         LIMIT $13`,
@@ -309,6 +312,7 @@ export class BookingRepository {
         q.before?.id ?? null,
         Math.min(q.limit ?? 50, 201),
         q.noShow ?? false,
+        q.branchId ?? null,
       ],
       { name: 'booking.search' },
     );

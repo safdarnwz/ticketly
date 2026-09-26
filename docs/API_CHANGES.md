@@ -412,3 +412,5 @@ an unknown id is now 404 (was 200).
   after cancelling an agent- or partner-sold booking had no creditor and was marked failed ("no captured
   payment to refund") — the agent was never credited. The worker now loads both. `POST /refunds/:id/retry`
   of such a refund now credits the seller's account instead of refusing ("no captured gateway payment").
+- **Bookings by branch:** `GET /bookings/search` takes `branchId` — bookings made by that branch's counter
+  staff or by travel agents attached to the branch (an unknown branch gives an empty list; a bad id is 400).

@@ -135,6 +135,13 @@ describe('operator bookings (e2e)', () => {
         noShows.body.items.every((b: { noShowSeats: string[] }) => b.noShowSeats.length > 0),
       ).toBe(true);
       expect((await app.get('/bookings/search?channel=pigeon', op)).status).toBe(400);
+      const byBranch = await app.get(
+        `/bookings/search?${wide}&branchId=01a0dddd-0000-7000-8000-000000000000`,
+        op,
+      );
+      expect(byBranch.status).toBe(200);
+      expect(byBranch.body.items).toEqual([]);
+      expect((await app.get('/bookings/search?branchId=nope', op)).status).toBe(400);
     });
 
     it('defaults to today and rejects bad input', async () => {

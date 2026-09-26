@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 576 |
-| DONE | 399 |
+| TODO | 575 |
+| DONE | 400 |
 | DUP | 9 |
 
 
@@ -492,7 +492,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 455 | Lock all counters at end of day | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 456 | Unlock counters at start of next day | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 457 | View branch collection against monthly target | GAP | — | verified manually: not built yet |
-| 458 | View all agent bookings done through this branch | DONE | TODO | verified manually: existing module/API |
+| 458 | View all agent bookings done through this branch | DONE | DONE | verified manually: existing module/API · UI: Bookings → Branch filter (counter staff + agents of the branch) |
 | 459 | Approve agent request for higher credit | GAP | — | verified manually: not built yet |
 | 460 | View list of blacklisted passengers | DONE | DONE | customer_blocks per operator (account + mobile), GET /customers?filter=blocked, hold → 403 · UI: Customers: Blocked tab, block with reason / unblock in the profile |
 | 461 | Add passenger to branch watch list | GAP | — | verified manually: not built yet |

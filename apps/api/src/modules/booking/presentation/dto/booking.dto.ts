@@ -134,6 +134,8 @@ export const StaffBookingSearchQuerySchema = z
     tripId: z.string().uuid().optional(),
     /** Sold by this travel agent. */
     agentId: z.string().uuid().optional(),
+    /** Sold through this branch: by its counter staff, or by an agent attached to it. */
+    branchId: z.string().uuid().optional(),
     /** Only bookings with a passenger marked no-show. */
     noShow: queryFlag.optional(),
     cursor: z.string().max(200).optional(),
