@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Download } from 'lucide-react';
 
 import { Badge, Button, Card, CardBody, EmptyState, ErrorState, Input, Modal, PageLoader, Select, Table, type Column, useToast } from '@/components/ui';
 import { reportsApi, type ForecastRow, type PnlRow } from '@/lib/api/reports';
@@ -65,8 +66,26 @@ export function DispatchTab({ from, to }: { from: string; to: string }) {
   if (q.isError || !q.data) return <ErrorState error={q.error} onRetry={q.refetch} />;
   const { summary, delayed, buses, crew } = q.data;
   const idle = buses.filter((b) => b.trips === 0);
+  /** One sheet (opens in Excel): the summary, then late departures, buses and crew. */
+  const exportCsv = () => {
+    const cell = (v: unknown) => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const rows: unknown[][] = [
+      [`Dispatch report ${from} to ${to}`], [],
+      ['Trips run', 'Cancelled', 'On time %', 'Average late start (min)'],
+      [summary.tripsRun, summary.tripsCancelled, summary.onTimePct ?? '', summary.avgDepartureDelayMin ?? ''], [],
+      ['Late departures'], ['Route', 'Scheduled', 'Left at', 'Late by (min)'],
+      ...delayed.map((d) => [d.routeName, formatDateTime(d.scheduled), formatDateTime(d.actual), d.delayMin]), [],
+      ['Buses'], ['Bus', 'Trips', 'Scheduled hours'], ...buses.map((b) => [b.bus, b.trips, b.scheduledHours ?? 0]), [],
+      ['Crew'], ['Name', 'Role', 'Duties', 'Late', 'Absent', 'Driving (min)'], ...crew.map((c) => [c.name, c.role, c.duties, c.late, c.absent, c.drivingMinutes]),
+    ];
+    const blob = new Blob(['\ufeff' + rows.map((r) => r.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = `dispatch-${from}-to-${to}.csv`; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex justify-end"><Button variant="outline" leftIcon={<Download className="h-4 w-4" />} onClick={exportCsv}>Export to Excel (CSV)</Button></div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Trips run" value={String(summary.tripsRun)} />
         <Stat label="Cancelled" value={String(summary.tripsCancelled)} tone={summary.tripsCancelled ? 'danger' : undefined} />

@@ -90,6 +90,8 @@ export const tripOpsApi = {
   remarks: (tripId: string) => get<{ items: { id: string; remark: string; createdAt: string; by: string | null }[] }>(`/v1/scheduling/trips/${tripId}/remarks`),
   addRemark: (tripId: string, remark: string) => post<{ ok: boolean }>(`/v1/scheduling/trips/${tripId}/remarks`, { remark }),
   /** Put another bus on the trip; passengers keep their seat type if the layout differs. */
+  /** Last GPS position of the bus (null until the first ping). */
+  live: (tripId: string) => get<{ lat: number; lng: number; speedKmph: number | null; nextStopId: string | null; nextStopEtaAt: string | null; delayMinutes: number | null; status: string | null; lastPingAt: string } | null>(`/v1/tracking/trips/${tripId}/live`),
   busHistory: (tripId: string) => get<{ items: { id: string; reason: string; seatMoves: { from: string; to: string }[] | null; bookingsAffected: number; createdAt: string; fromBus: string | null; toBus: string; changedBy: string | null }[] }>(`/v1/trips/${tripId}/vehicle/history`),
   changeBus: (tripId: string, vehicleId: string, reason: string) =>
     post<{ changed: boolean; layoutChanged: boolean; seatMoves: { from: string; to: string; seatType: string }[]; bookingsAffected: number }>(

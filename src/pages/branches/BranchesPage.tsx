@@ -10,13 +10,14 @@ import { staffApi } from '@/lib/api/staff';
 
 const DAY_LABEL: Record<Weekday, string> = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
 const DEFAULT_HOURS: WorkingHours = Object.fromEntries(WEEKDAYS.map((d) => [d, { open: '06:00', close: '22:00' }]));
-const EMPTY = { name: '', address: '', phone: '', managerUserId: '', hours: DEFAULT_HOURS };
+const EMPTY = { name: '', code: '', address: '', phone: '', managerUserId: '', hours: DEFAULT_HOURS };
 type Form = typeof EMPTY;
 
 /** Same rules as the API, shown next to each field. */
 function formErrors(f: Form): Record<string, string> {
   const e: Record<string, string> = {};
   if (f.name.trim().length < 2) e.name = 'At least 2 characters';
+  if (f.code.trim() && !/^[A-Z0-9][A-Z0-9-]{1,11}$/i.test(f.code.trim())) e.code = '2 to 12 letters, digits or dashes';
   const digits = f.phone.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
   if (f.phone.trim() && (!/^\+?[\d\s-]{10,16}$/.test(f.phone.trim()) || !/^\d{10,12}$/.test(digits))) e.phone = 'Enter a phone number with its STD code, e.g. 011 2345 6789';
   for (const d of WEEKDAYS) {
@@ -50,7 +51,7 @@ export function BranchesPage() {
 
   const save = useMutation({
     mutationFn: () => {
-      const body = { name: form.name.trim(), address: form.address.trim(), phone: form.phone.trim(), workingHours: form.hours, managerUserId: form.managerUserId || undefined };
+      const body = { name: form.name.trim(), code: form.code.trim().toUpperCase() || undefined, address: form.address.trim(), phone: form.phone.trim(), workingHours: form.hours, managerUserId: form.managerUserId || undefined };
       return editing === 'new' ? branchesApi.create(body).then(() => undefined) : branchesApi.update((editing as Branch).id, body).then(() => undefined);
     },
     onSuccess: () => { toast.success(editing === 'new' ? `${form.name.trim()} added` : 'Branch saved'); setEditing(null); void qc.invalidateQueries({ queryKey: ['branches'] }); },
@@ -66,14 +67,14 @@ export function BranchesPage() {
   const server = save.error instanceof ApiError ? save.error.fieldErrors : {};
   const err = (k: string) => (tried ? errors[k] : undefined) ?? server[k];
   const open = (b: Branch | 'new') => {
-    setForm(b === 'new' ? EMPTY : { name: b.name, address: b.address ?? '', phone: b.phone ?? '', managerUserId: b.managerUserId ?? '', hours: Object.keys(b.workingHours ?? {}).length ? b.workingHours : DEFAULT_HOURS });
+    setForm(b === 'new' ? EMPTY : { name: b.name, code: b.code ?? '', address: b.address ?? '', phone: b.phone ?? '', managerUserId: b.managerUserId ?? '', hours: Object.keys(b.workingHours ?? {}).length ? b.workingHours : DEFAULT_HOURS });
     setTried(false); save.reset(); setEditing(b);
   };
   const submit = () => { setTried(true); if (Object.keys(errors).length === 0) save.mutate(); };
   const setDay = (d: Weekday, v: { open: string; close: string } | null) => setForm((f) => ({ ...f, hours: { ...f.hours, [d]: v } }));
 
   const columns: Column<Branch>[] = [
-    { key: 'name', header: 'Branch', render: (b) => <span className="font-medium text-text">{b.name}</span> },
+    { key: 'name', header: 'Branch', render: (b) => <div><span className="font-medium text-text">{b.name}</span>{b.code && <div className="font-mono text-xs text-text-muted">{b.code}</div>}</div> },
     { key: 'address', header: 'Address', render: (b) => <span className="text-text-muted">{b.address || '—'}</span> },
     { key: 'phone', header: 'Phone', render: (b) => b.phone || '—' },
     { key: 'hours', header: 'Hours', render: (b) => <span className="text-xs text-text-muted">{hoursSummary(b.workingHours)}</span> },
@@ -105,10 +106,13 @@ export function BranchesPage() {
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3">
             <Input label="Branch name" placeholder="Delhi ISBT Counter" maxLength={160} value={form.name} error={err('name')} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-            <Input label="Phone" placeholder="011 2345 6789" value={form.phone} error={err('phone')} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+            <Input label="Code (optional)" placeholder="DEL-ISBT" maxLength={12} value={form.code} error={err('code')} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))} />
           </div>
           <div className="grid grid-cols-2 gap-3">
+            <Input label="Phone" placeholder="011 2345 6789" value={form.phone} error={err('phone')} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
             <Input label="Address" maxLength={500} value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <Select label="Manager" value={form.managerUserId} onChange={(e) => setForm((f) => ({ ...f, managerUserId: e.target.value }))}
               options={[{ label: form.managerUserId ? 'Keep current' : 'No manager', value: form.managerUserId && !staff.data?.items.some((x) => x.id === form.managerUserId) ? form.managerUserId : '' }, ...(staff.data?.items ?? []).map((x) => ({ label: x.fullName, value: x.id }))]} />
           </div>

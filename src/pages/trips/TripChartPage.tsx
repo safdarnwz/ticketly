@@ -176,6 +176,7 @@ export function TripChartPage() {
         </div>
       </div>
 
+      {(t.status === 'departed' || t.hasRun) && <LiveLocation tripId={t.id} stops={data.stops} />}
       <TripOpsSection chart={data} locked={locked} onChanged={refresh} />
 
       <Manifest chart={data} />
@@ -436,5 +437,30 @@ function BusHistory({ tripId }: { tripId: string }) {
         ))}
       </ul>
     </div>
+  );
+}
+
+/** Where the bus is now — from the crew app's GPS pings (refreshes every 30 seconds). */
+function LiveLocation({ tripId, stops }: { tripId: string; stops: { stopId: string; name: string | null }[] }) {
+  const q = useQuery({ queryKey: ['trip-live', tripId], queryFn: () => tripOpsApi.live(tripId), refetchInterval: 30_000 });
+  const l = q.data;
+  const stale = l ? Date.now() - new Date(l.lastPingAt).getTime() > 10 * 60_000 : false;
+  return (
+    <Card className="mt-6 print:hidden">
+      <CardHeader title="Live location" subtitle="From the crew app's GPS" />
+      <CardBody className="text-sm">
+        {q.isLoading ? <PageLoader /> : q.isError ? <ErrorState error={q.error} onRetry={q.refetch} /> : !l ? (
+          <p className="text-text-muted">No GPS signal from this bus yet — the crew app sends it once the trip starts.</p>
+        ) : (
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <a className="text-primary underline" href={`https://www.google.com/maps?q=${l.lat},${l.lng}`} target="_blank" rel="noreferrer">{Number(l.lat).toFixed(5)}, {Number(l.lng).toFixed(5)}</a>
+            {l.speedKmph != null && <span>{Math.round(Number(l.speedKmph))} km/h</span>}
+            {l.nextStopId && <span>Next: {stops.find((s) => s.stopId === l.nextStopId)?.name ?? 'next stop'}{l.nextStopEtaAt ? ` at ${formatTime(l.nextStopEtaAt)}` : ''}</span>}
+            {Number(l.delayMinutes) > 0 && Number(l.delayMinutes) < 24 * 60 ? <Badge tone="warning">{l.delayMinutes} min late</Badge> : Number(l.delayMinutes) < -5 && Number(l.delayMinutes) > -24 * 60 ? <Badge tone="success">{-Number(l.delayMinutes)} min early</Badge> : null}
+            <span className={stale ? 'text-danger' : 'text-text-muted'}>{stale ? 'Signal lost — last seen ' : 'Updated '}{formatDateTime(l.lastPingAt)}</span>
+          </div>
+        )}
+      </CardBody>
+    </Card>
   );
 }

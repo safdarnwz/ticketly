@@ -8,6 +8,8 @@ export type WorkingHours = Partial<Record<Weekday, { open: string; close: string
 export interface Branch {
   id: string;
   name: string;
+  /** Short code, e.g. JPR-SND. */
+  code: string | null;
   address: string | null;
   phone: string | null;
   managerUserId: string | null;
