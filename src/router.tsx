@@ -20,6 +20,7 @@ import { ResultsPage } from '@/pages/customer/ResultsPage';
 import { TripPage } from '@/pages/customer/TripPage';
 import { CheckoutPage } from '@/pages/customer/CheckoutPage';
 import { ConfirmationPage } from '@/pages/customer/ConfirmationPage';
+import { ManageBookingPage } from '@/pages/customer/ManageBookingPage';
 import { AccountPage } from '@/pages/customer/AccountPage';
 
 // Both staff consoles share this shell (app.ticketly.com / app.<slug>.ticketly.com)
@@ -99,6 +100,7 @@ const customerRouter = createBrowserRouter([
       { path: '/checkout', element: <CheckoutPage /> },
       { path: '/confirmation', element: <ConfirmationPage /> },
       { path: '/account', element: <AccountPage /> },
+      { path: '/bookings/:id/manage', element: <ManageBookingPage /> },
       { path: '/legal/:slug', element: <LegalPage /> },
       { path: '/track/:token', element: <TrackingPage /> },
       { path: '/connecting/results', element: <ConnectingResultsPage /> },

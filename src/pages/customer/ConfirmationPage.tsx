@@ -5,6 +5,7 @@ import { ArrowRight, CheckCircle2, Copy, Mail, RotateCcw } from 'lucide-react';
 import { Button, Card, CardBody, CardHeader, ErrorState, Skeleton, useToast } from '@/components/ui';
 import { QrCode } from '@/components/common/QrCode';
 import { PrintTicketButton } from '@/components/customer/PrintTicketButton';
+import { rememberManageMobile } from '@/lib/manageMobile';
 import { bookingsApi } from '@/lib/api/bookings';
 import { resultsUrl } from '@/lib/search-filters';
 import { useAuth } from '@/stores/auth';
@@ -117,7 +118,10 @@ export function ConfirmationPage() {
 
       <div className="mt-6 flex flex-wrap gap-3">
         <Button variant="outline" leftIcon={<RotateCcw className="h-4 w-4" />} onClick={bookAnother}>Book another trip</Button>
-        <Button onClick={() => navigate('/account')}>My trips</Button>
+        <Button onClick={() => {
+          if (mobile) rememberManageMobile(b.bookingId!, mobile);
+          navigate(`/bookings/${b.bookingId}/manage`, { state: { mobile } });
+        }}>Manage booking</Button>
       </div>
     </div>
   );

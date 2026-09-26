@@ -49,6 +49,8 @@ export interface Booking {
   createdAt?: string;
   /** Only present on the cross-tenant PNR lookup (`by-pnr`) — the operator this booking belongs to. */
   tenantId?: string;
+  /** On the customer's own list (`mine`): the journey. */
+  routeName?: string; departsAt?: string; operatorName?: string; fromName?: string | null; toName?: string | null;
 }
 
 export interface Ticket {

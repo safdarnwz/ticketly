@@ -42,6 +42,17 @@ export interface StaffBookingFilters {
   status?: StaffBookingStatus; channel?: string; tripId?: string; agentId?: string; noShow?: boolean; branchId?: string;
 }
 
+/** One booking on the customer's Manage booking page. */
+export interface ManagedBooking {
+  id: string; tenantId: string; pnr: string; status: string; channel: string; seatCount: number;
+  totalMinor: number; paidMinor: number; currency: string; contactPhone: string | null; contactEmail: string | null;
+  timesRescheduled: number; createdAt: string; tripId: string; tripStatus: string; routeName: string;
+  departsAt: string; arrivesAt: string; fromSeq: number; toSeq: number; fromStopId: string; toStopId: string;
+  boardingPoint: string | null; droppingPoint: string | null; fromCityId: string | null; toCityId: string | null;
+  boardsAt: string | null; dropsAt: string | null; operatorName: string; operatorPhone: string | null; operatorEmail: string | null;
+  passengers: { seatNumber: string; fullName: string; age: number | null; gender: string | null; ticketId: string | null; ticketStatus: string | null }[];
+}
+
 export const bookingsApi = {
   /** The operator's bookings, newest first (default: booked today). */
   list: (f: StaffBookingFilters, cursor?: string, limit = 50) => {
@@ -100,6 +111,9 @@ export const bookingsApi = {
   // shape is { booking, seats }, NOT a bare Booking.
   getByPnr: (pnr: string, mobile: string) =>
     get<{ booking: Booking; seats: string[] }>(`/v1/bookings/by-pnr/${encodeURIComponent(pnr)}?mobile=${encodeURIComponent(mobile)}`),
+  /** "Manage booking": the journey, travellers with tickets and the operator — the customer signed in, or the booking mobile. */
+  manage: (bookingId: string, mobile?: string) =>
+    get<ManagedBooking>(`/v1/bookings/${bookingId}/manage${mobile ? `?mobile=${encodeURIComponent(mobile)}` : ''}`),
   /** The signed-in customer's own bookings. */
   mine: () => get<{ bookings: Booking[] }>('/v1/bookings/mine'),
 

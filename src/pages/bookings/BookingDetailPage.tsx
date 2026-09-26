@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowUpCircle, Mail, MailWarning, Send, ShieldCheck, Ticket, XCircle } from 'lucide-react';
 
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Input, Modal, PageLoader, statusTone, useToast } from '@/components/ui';
+import { CancelBookingModal } from '@/components/booking/CancelBookingModal';
 import { amendmentsApi } from '@/lib/api/amendments';
 import { BookingChangeModal, type ChangeKind } from './BookingChanges';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -227,7 +228,7 @@ export function BookingDetailPage() {
           onClose={() => setChanging(null)} onDone={() => { setChanging(null); refresh(); void qc.invalidateQueries({ queryKey: ['tickets', id] }); }} />
       )}
       {cancelOpen && id && (
-        <CancelModal bookingId={id} currency={booking.currency} seats={d?.seats ?? []} passengers={passengers} onClose={() => setCancelOpen(false)} onDone={() => { setCancelOpen(false); refresh(); }} />
+        <CancelBookingModal bookingId={id} currency={booking.currency} seats={d?.seats ?? []} passengers={passengers} onClose={() => setCancelOpen(false)} onDone={() => { setCancelOpen(false); refresh(); }} />
       )}
       {payOpen && id && d?.holdExpiresAt && (
         <PhonePayModal bookingId={id} totalMinor={booking.totalMinor} currency={booking.currency} holdExpiresAt={d.holdExpiresAt} onClose={() => setPayOpen(false)} onDone={() => { setPayOpen(false); refresh(); }} />
@@ -244,65 +245,6 @@ export function BookingDetailPage() {
         </div>
       </Modal>
     </>
-  );
-}
-
-function CancelModal({ bookingId, currency, seats, passengers, onClose, onDone }: {
-  bookingId: string; currency: string; seats: string[];
-  passengers: { seatNumber: string; fullName: string }[];
-  onClose: () => void; onDone: () => void;
-}) {
-  const toast = useToast();
-  const [picked, setPicked] = useState<string[]>(seats);
-  const [reason, setReason] = useState('');
-  const [touched, setTouched] = useState(false);
-  const inFlight = useRef(false);
-  const preview = useQuery({ queryKey: ['refund-preview', bookingId], queryFn: () => bookingsApi.refundPreview(bookingId) });
-  const all = picked.length === seats.length || seats.length === 0;
-  const reasonError = reason.trim().length < 3 ? 'Say why (at least 3 characters)' : '';
-  const seatError = picked.length === 0 ? 'Pick at least one seat' : '';
-
-  const cancel = useMutation({
-    mutationFn: () => (all ? bookingsApi.cancel(bookingId, reason.trim()) : bookingsApi.cancelSeats(bookingId, picked, reason.trim())),
-    onSuccess: (r) => { toast.success(`Cancelled · refund ${formatMoney(r.refundMinor, currency)} (${r.refundPct}%)`); onDone(); },
-    onError: (e) => toast.error(errText(e, 'Could not cancel')),
-    onSettled: () => { inFlight.current = false; },
-  });
-  const submit = () => {
-    setTouched(true);
-    if (reasonError || seatError || inFlight.current || preview.data?.cancellable === false) return;
-    inFlight.current = true;
-    cancel.mutate();
-  };
-
-  return (
-    <Modal open onClose={onClose} title="Cancel booking"
-      footer={<><Button variant="ghost" onClick={onClose} disabled={cancel.isPending}>Keep booking</Button><Button variant="danger" loading={cancel.isPending} disabled={cancel.isPending || preview.data?.cancellable === false} onClick={submit}>{all ? 'Cancel whole booking' : `Cancel ${picked.length} seat${picked.length === 1 ? '' : 's'}`}</Button></>}>
-      <div className="flex flex-col gap-4 text-sm">
-        {preview.isLoading ? <p className="text-text-muted">Working out the refund…</p> : preview.isError ? <ErrorState error={preview.error} onRetry={preview.refetch} /> : preview.data?.cancellable === false ? (
-          <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-danger">{preview.data.reason ?? 'This booking can no longer be cancelled.'}</p>
-        ) : preview.data ? (
-          <p className="rounded-md bg-surface-muted px-3 py-2">
-            Cancelling now refunds <b>{preview.data.refundPct}%</b>{all ? <> — <b>{formatMoney(preview.data.refundMinor, currency)}</b> for the whole booking</> : ' of each cancelled seat’s fare'}, to the original payment.
-          </p>
-        ) : null}
-        {seats.length > 1 && (
-          <fieldset>
-            <legend className="mb-2 font-medium text-text">Seats to cancel</legend>
-            <div className="flex flex-col gap-1">
-              {seats.map((s) => (
-                <label key={s} className="flex items-center gap-2">
-                  <input type="checkbox" checked={picked.includes(s)} onChange={(e) => setPicked((cur) => (e.target.checked ? [...cur, s] : cur.filter((x) => x !== s)))} />
-                  Seat {s} <span className="text-text-muted">{passengers.find((p) => p.seatNumber === s)?.fullName}</span>
-                </label>
-              ))}
-            </div>
-            {touched && seatError && <p role="alert" className="mt-1 text-xs text-danger">{seatError}</p>}
-          </fieldset>
-        )}
-        <Input label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Customer called to cancel" maxLength={500} error={touched ? reasonError : undefined} />
-      </div>
-    </Modal>
   );
 }
 

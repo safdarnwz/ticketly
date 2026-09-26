@@ -14,6 +14,8 @@ interface Props {
   bookingId: string; pnr: string; tripId: string; seats: string[]; passengers: { seatNumber: string; fullName: string }[]; onClose: () => void; onDone: () => void;
   /** A travel agent changing their own booking: its leg, read from the booking (agents have no trip chart). */
   agentLeg?: { fromSeq: number; toSeq: number };
+  /** The customer changing their own booking on the customer site: its leg and operator, and the booking mobile when not signed in. */
+  customer?: { leg: { fromSeq: number; toSeq: number }; tenantId: string; mobile?: string };
 }
 type Stop = { stopId: string; sequence: number; name: string | null; departsAt: string; arrivesAt: string; canBoard: boolean; canAlight: boolean };
 
@@ -23,24 +25,37 @@ type Stop = { stopId: string; sequence: number; name: string | null; departsAt: 
  * and seat map (their own seats show as taken there, and are excluded anyway).
  */
 function useLeg(p: Props) {
-  const staff = useQuery({ queryKey: ['trip-chart', p.tripId], queryFn: () => tripOpsApi.chart(p.tripId), enabled: !p.agentLeg });
-  const trip = useQuery({ queryKey: ['trip-public', p.tripId], queryFn: () => flowApi.trip(p.tripId), enabled: !!p.agentLeg });
-  const stops: Stop[] = (p.agentLeg ? trip.data?.stops : staff.data?.stops) ?? [];
-  const leg = p.agentLeg
-    ? (() => { const from = stops.find((s) => s.sequence === p.agentLeg!.fromSeq); const to = stops.find((s) => s.sequence === p.agentLeg!.toSeq); return from && to ? { from, to } : null; })()
+  // Agents and customers read the public trip and seat map; staff read the trip chart.
+  const publicLeg = p.agentLeg ?? p.customer?.leg;
+  const tenantId = p.customer?.tenantId;
+  const staff = useQuery({ queryKey: ['trip-chart', p.tripId], queryFn: () => tripOpsApi.chart(p.tripId), enabled: !publicLeg });
+  const trip = useQuery({ queryKey: ['trip-public', p.tripId], queryFn: () => flowApi.trip(p.tripId, tenantId), enabled: !!publicLeg });
+  const stops: Stop[] = (publicLeg ? trip.data?.stops : staff.data?.stops) ?? [];
+  const leg = publicLeg
+    ? (() => { const from = stops.find((s) => s.sequence === publicLeg.fromSeq); const to = stops.find((s) => s.sequence === publicLeg.toSeq); return from && to ? { from, to } : null; })()
     : legOf(staff.data, p.bookingId);
   const seatMap = useQuery({
     queryKey: ['seat-map', p.tripId, leg?.from.stopId, leg?.to.stopId],
-    queryFn: () => flowApi.availability(p.tripId, leg!.from.stopId, leg!.to.stopId),
-    enabled: !!p.agentLeg && !!leg,
+    queryFn: () => flowApi.availability(p.tripId, leg!.from.stopId, leg!.to.stopId, tenantId),
+    enabled: !!publicLeg && !!leg,
   });
-  const free = p.agentLeg
+  const free = publicLeg
     ? (seatMap.data?.seats ?? []).filter((s) => s.available).map((s) => s.seatNumber)
     : staff.data && leg ? freeSeats(staff.data, leg.from.sequence, leg.to.sequence, p.bookingId).map((s) => s.seatNumber) : [];
-  const q = p.agentLeg ? (trip.isError ? trip : seatMap) : staff;
-  return { stops, leg, free, isLoading: p.agentLeg ? trip.isLoading || seatMap.isLoading : staff.isLoading, isError: q.isError, error: q.error, refetch: q.refetch };
+  const q = publicLeg ? (trip.isError ? trip : seatMap) : staff;
+  return { stops, leg, free, isLoading: publicLeg ? trip.isLoading || seatMap.isLoading : staff.isLoading, isError: q.isError, error: q.error, refetch: q.refetch };
 }
-const apiFor = (p: Props) => (p.agentLeg ? agentPortalApi : amendmentsApi);
+/** Who makes the change: the agent portal, the customer (with the booking mobile), or staff. */
+function apiFor(p: Props) {
+  if (p.agentLeg) return agentPortalApi;
+  if (!p.customer) return amendmentsApi;
+  const m = p.customer.mobile;
+  return {
+    changeSeats: (id: string, seats: string[], key: string) => amendmentsApi.changeSeats(id, seats, key, m),
+    changePoints: (id: string, body: { fromStopId?: string; toStopId?: string }, key: string) => amendmentsApi.changePoints(id, body, key, m),
+    correctName: (id: string, seat: string, name: string, key: string) => amendmentsApi.correctName(id, seat, name, key, m),
+  };
+}
 const errText = (e: unknown) => (e instanceof Error ? e.message : 'Failed');
 
 function useTripChart(tripId: string | null) {
@@ -61,7 +76,7 @@ function freeSeats(chart: TripChart, fromSeq: number, toSeq: number, exceptBooki
 function SeatPicker({ seats, picked, max, onChange }: { seats: string[]; picked: string[]; max: number; onChange: (v: string[]) => void }) {
   return (
     <div className="flex max-h-48 flex-wrap gap-1 overflow-y-auto">
-      {seats.map((n) => {
+      {[...seats].sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).map((n) => {
         const on = picked.includes(n);
         return <button key={n} type="button" aria-pressed={on} disabled={!on && picked.length >= max}
           onClick={() => onChange(on ? picked.filter((x) => x !== n) : [...picked, n])}
@@ -72,7 +87,7 @@ function SeatPicker({ seats, picked, max, onChange }: { seats: string[]; picked:
 }
 
 export function BookingChangeModal({ kind, ...p }: Props & { kind: ChangeKind }) {
-  return kind === 'seats' ? <SeatsChange {...p} /> : kind === 'points' ? <PointsChange {...p} /> : kind === 'name' ? <NameChange {...p} /> : kind === 'reschedule' ? <Reschedule {...p} /> : <HoldChange {...p} />;
+  return kind === 'seats' ? <SeatsChange {...p} /> : kind === 'points' ? <PointsChange {...p} /> : kind === 'name' ? <NameChange {...p} /> : kind === 'reschedule' ? (p.customer ? <CustomerReschedule {...p} /> : <Reschedule {...p} />) : <HoldChange {...p} />;
 }
 
 function SeatsChange(p: Props) {
@@ -183,7 +198,7 @@ function Reschedule({ bookingId, tripId, seats, onClose, onDone }: Props) {
     mutationFn: () => amendmentsApi.reschedule(bookingId, { newTripId: newTrip, newFromStopId: leg!.from.stopId, newToStopId: leg!.to.stopId, newSeatNumbers: picked }, key),
     onSuccess: (r) => {
       if (r.status === 'rescheduled') { toast.success(r.refundMinor > 0 ? `Moved — ${formatMoney(r.refundMinor)} goes back to the customer` : 'Moved to the new trip'); onDone(); }
-      else setDue({ intentId: r.payment.intentId, amount: r.amountDueMinor, payload: r.payment.clientPayload });
+      else if (r.status === 'payment_required') setDue({ intentId: r.payment.intentId, amount: r.amountDueMinor, payload: r.payment.clientPayload });
     },
     onError: (x) => toast.error(errText(x)),
   });
@@ -217,6 +232,104 @@ function Reschedule({ bookingId, tripId, seats, onClose, onDone }: Props) {
               <p>Pick {seats.length} seat{seats.length === 1 ? '' : 's'} ({picked.length}/{seats.length})</p>
               <SeatPicker seats={options} picked={picked} max={seats.length} onChange={setPicked} />
             </>
+          ))}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+/**
+ * The customer moving their own booking to another day: the operator's buses
+ * that day through the same boarding and drop points, seats free on that
+ * stretch, the exact price of the change before confirming, then payment when
+ * money is due (the booking moves only once it is paid).
+ */
+function CustomerReschedule({ bookingId, seats, customer, onClose, onDone }: Props) {
+  const toast = useToast();
+  const m = customer?.mobile;
+  const tenantId = customer?.tenantId;
+  const [key] = useState(() => idempotencyKey('resched'));
+  const [date, setDate] = useState('');
+  const [tripId, setTripId] = useState('');
+  const [picked, setPicked] = useState<string[]>([]);
+  const [due, setDue] = useState<{ intentId: string; amount: number; payload: unknown } | null>(null);
+  const options = useQuery({ queryKey: ['resched-options', bookingId, date], queryFn: () => amendmentsApi.rescheduleOptions(bookingId, date, m), enabled: !!date });
+  const need = options.data?.seatsNeeded ?? seats.length;
+  const seatMap = useQuery({
+    queryKey: ['seat-map', tripId, options.data?.fromStopId, options.data?.toStopId],
+    queryFn: () => flowApi.availability(tripId, options.data!.fromStopId, options.data!.toStopId, tenantId),
+    enabled: !!tripId && !!options.data,
+  });
+  const free = (seatMap.data?.seats ?? []).filter((x) => x.available).map((x) => x.seatNumber);
+  const target = tripId && options.data && picked.length === need
+    ? { newTripId: tripId, newFromStopId: options.data.fromStopId, newToStopId: options.data.toStopId, newSeatNumbers: picked }
+    : null;
+  const quote = useQuery({ queryKey: ['resched-quote', bookingId, target], queryFn: () => amendmentsApi.rescheduleQuote(bookingId, target!, m), enabled: !!target, retry: false });
+  const testMode = useQuery({ queryKey: ['payment-test-methods'], queryFn: paymentsApi.testMethods, staleTime: 300_000 });
+  const go = useMutation({
+    mutationFn: () => amendmentsApi.reschedule(bookingId, target!, key, m),
+    onSuccess: (r) => {
+      if (r.status === 'rescheduled') { toast.success(r.refundMinor > 0 ? `Moved — ${formatMoney(r.refundMinor)} will be refunded to you` : 'Moved to the new bus — your ticket was re-issued'); onDone(); }
+      else if (r.status === 'payment_required') setDue({ intentId: r.payment.intentId, amount: r.amountDueMinor, payload: r.payment.clientPayload });
+    },
+    onError: (x) => toast.error(errText(x)),
+  });
+  const pay = useMutation({
+    mutationFn: async () => {
+      if (testMode.data?.testMode) return amendmentsApi.payChangeTest(due!.intentId, `pay-${due!.intentId}`);
+      await openRazorpayCheckout(due!.payload as never);
+      return { status: 'captured' };
+    },
+    onSuccess: () => { toast.success('Paid — your booking is on the new bus and the ticket was re-issued'); onDone(); },
+    onError: (x) => toast.error(errText(x)),
+  });
+  const q = quote.data;
+  return (
+    <Modal open onClose={onClose} size="lg" title="Change travel date"
+      footer={due
+        ? <><Button variant="ghost" onClick={onClose} disabled={pay.isPending}>Not now</Button><Button loading={pay.isPending} disabled={pay.isPending} onClick={() => pay.mutate()}>Pay {formatMoney(due.amount)}</Button></>
+        : <><Button variant="ghost" onClick={onClose} disabled={go.isPending}>Cancel</Button><Button loading={go.isPending} disabled={!target || !q || go.isPending} onClick={() => go.mutate()}>{q && q.amountDueMinor > 0 ? `Continue to pay ${formatMoney(q.amountDueMinor)}` : 'Move my booking'}</Button></>}>
+      {due ? (
+        <div className="text-sm">
+          <p>Pay <b>{formatMoney(due.amount)}</b> (fare difference and change fee). Your booking moves to the new bus only once it is paid — until then your current ticket stays valid.</p>
+          {testMode.data?.testMode && <p className="mt-1 text-xs text-text-muted">Test mode: paid through the sandbox gateway.</p>}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3 text-sm">
+          <p className="text-text-muted">Same boarding and drop points, {need} seat{need === 1 ? '' : 's'}. A change fee applies; a costlier bus is paid for, a cheaper one refunded.</p>
+          <Input label="New travel date" type="date" min={todayLocal()} value={date} onChange={(x) => { setDate(x.target.value); setTripId(''); setPicked([]); }} />
+          {date && (options.isLoading ? <PageLoader /> : options.isError ? <ErrorState error={options.error} onRetry={options.refetch} /> : options.data!.trips.length === 0 ? (
+            <p className="text-text-muted">No bus of this operator through your points that day. Try another date.</p>
+          ) : (
+            <div className="flex flex-col gap-2" role="radiogroup" aria-label="Bus">
+              {options.data!.trips.map((t) => {
+                const full = t.freeSeats < need;
+                return (
+                  <button key={t.tripId} type="button" role="radio" aria-checked={tripId === t.tripId} disabled={full}
+                    onClick={() => { setTripId(t.tripId); setPicked([]); }}
+                    className={cn('flex items-center justify-between rounded-md border px-3 py-2 text-left disabled:opacity-50', tripId === t.tripId ? 'border-primary bg-surface-muted' : 'border-border')}>
+                    <span><span className="font-medium">{formatDateTime(t.boardsAt)}</span> <span className="text-text-muted">→ {formatDateTime(t.dropsAt)} · {t.routeName}</span></span>
+                    <span className={cn('text-xs', full ? 'text-danger' : 'text-text-muted')}>{full ? 'not enough seats' : `${t.freeSeats} free`}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+          {tripId && (seatMap.isLoading ? <PageLoader /> : seatMap.isError ? <ErrorState error={seatMap.error} onRetry={seatMap.refetch} /> : (
+            <>
+              <p>Pick {need} seat{need === 1 ? '' : 's'} ({picked.length}/{need})</p>
+              <SeatPicker seats={free} picked={picked} max={need} onChange={setPicked} />
+            </>
+          ))}
+          {target && (quote.isLoading ? <PageLoader /> : quote.isError ? <p className="text-danger">{errText(quote.error)}</p> : q && (
+            <div className="rounded-md border border-border p-3">
+              <div className="flex justify-between"><span className="text-text-muted">Change fee</span><span>{formatMoney(q.feeMinor)}</span></div>
+              <div className="flex justify-between"><span className="text-text-muted">Fare difference</span><span>{formatMoney(q.fareDiffMinor)}</span></div>
+              <div className="mt-1 flex justify-between border-t border-border pt-1 font-semibold">
+                {q.amountDueMinor > 0 ? <><span>You pay</span><span>{formatMoney(q.amountDueMinor)}</span></> : <><span>Refund to you</span><span>{formatMoney(q.refundMinor)}</span></>}
+              </div>
+            </div>
           ))}
         </div>
       )}
