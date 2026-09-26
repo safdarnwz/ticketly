@@ -341,6 +341,45 @@ export class GdsRepository {
     );
     return r[0] ? { tenantId: r[0].tenant_id, closed: r[0].closed ?? [] } : null;
   }
+  /**
+   * One trip of this operator as partners see it: whether partner sales are
+   * closed on the trip or its whole service, and the seats partners hold / sold.
+   */
+  async partnerSyncFacts(tripId: string): Promise<{
+    closedOnTrip: boolean;
+    closedOnService: boolean;
+    partnerSold: number;
+    partnerHolding: number;
+  } | null> {
+    const r = await this.run(
+      'gds.partnerSyncFacts',
+      (q) =>
+        q<{ closed_on_trip: boolean; closed_on_service: boolean; sold: string; holding: string }>(
+          `SELECT 'ota' = ANY(t.closed_channels) AS closed_on_trip,
+                  coalesce('ota' = ANY(s.closed_channels), false) AS closed_on_service,
+                  (SELECT count(*) FROM booking_seats bs JOIN bookings b ON b.id = bs.booking_id
+                    WHERE b.trip_id = t.id AND b.gds_partner_id IS NOT NULL
+                      AND b.status IN ('confirmed', 'completed')) AS sold,
+                  (SELECT count(*) FROM booking_seats bs JOIN bookings b ON b.id = bs.booking_id
+                    WHERE b.trip_id = t.id AND b.gds_partner_id IS NOT NULL
+                      AND b.status = 'held' AND b.hold_expires_at > now()) AS holding
+             FROM trips t LEFT JOIN services s ON s.id = t.service_id
+            WHERE t.tenant_id = $1 AND t.id = $2`,
+          [requireTenantId(), tripId],
+        ),
+      false,
+    );
+    const row = r[0];
+    return row
+      ? {
+          closedOnTrip: row.closed_on_trip,
+          closedOnService: row.closed_on_service,
+          partnerSold: Number(row.sold),
+          partnerHolding: Number(row.holding),
+        }
+      : null;
+  }
+
   async tripsClosedForOta(tripIds: string[]): Promise<Set<string>> {
     if (!tripIds.length) return new Set();
     const r = await this.run('gds.closedForOta', (q) =>

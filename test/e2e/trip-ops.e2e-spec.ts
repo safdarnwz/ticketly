@@ -211,6 +211,33 @@ describe('trip operations (e2e)', () => {
     expect((await chart(f.tripId)).body.trip.closedOnTrip).toEqual([]);
   });
 
+  it('partner sync: what OTAs see now, and what stops them', async () => {
+    const f = app.fixtures;
+    const sync = () => app.get(`/trips/${f.tripId}/partner-sync`, op);
+    const open = await sync();
+    expect(open.status, JSON.stringify(open.body)).toBe(200);
+    expect(open.body.seats.total).toBeGreaterThan(0);
+    expect(open.body.seats.freeNow).toBeGreaterThan(0);
+    expect(Array.isArray(open.body.partners)).toBe(true);
+    const set = (closed: string[]) => app.put(`/trips/${f.tripId}/closed-channels`, { closed }, op);
+    try {
+      expect((await set(['ota'])).status).toBe(200);
+      const shut = (await sync()).body;
+      expect(shut.selling).toBe(false);
+      expect(shut.seats.freeForPartners).toBe(0);
+      expect(shut.issues.map((i: { code: string }) => i.code)).toContain('closed_on_trip');
+    } finally {
+      await set([]);
+    }
+    expect((await sync()).body.issues.map((i: { code: string }) => i.code)).not.toContain(
+      'closed_on_trip',
+    );
+    expect(
+      (await app.get('/trips/00000000-0000-4000-8000-000000000000/partner-sync', op)).status,
+    ).toBe(404);
+    expect((await app.get(`/trips/${f.tripId}/partner-sync`)).status).toBe(403);
+  });
+
   it('a no-show is marked only after the bus was due to leave', async () => {
     const f = app.fixtures;
     const seats = (await chart(f.tripId)).body.seats as {

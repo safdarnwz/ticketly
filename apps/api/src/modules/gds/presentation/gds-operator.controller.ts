@@ -65,4 +65,14 @@ export class GdsOperatorController {
     await this.trips.setClosedChannels(tripId as TripId, dto.closed);
     return { ok: true, closed: [...new Set(dto.closed)] };
   }
+
+  @Get('trips/:tripId/partner-sync')
+  @RequirePermission(Permission.INVENTORY_MANAGE)
+  @ApiOperation({
+    summary:
+      'Is this trip reaching the OTAs? Seats partners see now, partner sold / holding, and what blocks them',
+  })
+  partnerSync(@UuidParam('tripId') tripId: string) {
+    return this.gds.partnerSync(tripId);
+  }
 }

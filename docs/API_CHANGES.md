@@ -444,3 +444,8 @@ an unknown id is now 404 (was 200).
   another operator's or unknown service 404). A service's own policy wins over its route's, which wins over
   the operator-wide one; quotes and search prices use it. `GET /pricing/policies` rows add `serviceId`.
   Migration 0101.
+- **OTA sync check:** new `GET /trips/:tripId/partner-sync` (`inventory:manage`): whether partners are
+  selling this trip, the seats they see now (the same live seat map every channel reads), seats sold / being
+  paid for by partners, each partner's agreement, and what blocks them (`closed_on_trip`,
+  `closed_on_service`, `no_partner`, `sold_out`). Fixes use the existing `PUT /trips/:tripId/closed-channels`
+  and `PUT /gds-partners/:partnerId`.

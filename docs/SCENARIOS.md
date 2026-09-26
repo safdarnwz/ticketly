@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 561 |
-| DONE | 414 |
+| TODO | 559 |
+| DONE | 416 |
 | DUP | 9 |
 
 
@@ -771,8 +771,8 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 727 | Increase frequency of service | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
 | 728 | Decrease frequency of service | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
 | 729 | Apply temporary route diversion | DONE | DONE | incidents type=diversion · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
-| 730 | Check whether inventory is correctly synced with OTAs | DONE | TODO | verified manually: existing module/API |
-| 731 | Manually fix inventory sync issues | DONE | TODO | verified manually: existing module/API |
+| 730 | Check whether inventory is correctly synced with OTAs | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Sales channels → OTA partners: what they see now (seats, sold, paying), partners receiving |
+| 731 | Manually fix inventory sync issues | DONE | DONE | verified manually: existing module/API · UI: Trip chart → OTA partners card: issues with one-click fix (Reopen for partners; links to Distribution / the service) |
 | 732 | Export historical occupancy data | GAP | — | verified manually: not built yet |
 | 733 | Automatically notify passengers when schedule changes | GAP | — | verified manually: not built yet |
 | 734 | Upload schedules in bulk using Excel | GAP | — | verified manually: not built yet |

@@ -20,7 +20,7 @@ import { agentCommissionMinor, checkFunds, spendableMinor } from '../../agents';
 import { BookingService, BookingRepository } from '../../booking';
 import { PaymentService } from '../../payment';
 import { PricingService } from '../../pricing';
-import { InventoryRepository } from '../../scheduling';
+import { InventoryRepository, TripRepository } from '../../scheduling';
 import { SearchService } from '../../search';
 import { generateKey } from '../domain/gds-keys';
 import { WebhookDeliveryService, WebhookRepository } from '../../webhooks';
@@ -62,6 +62,7 @@ export class GdsService {
     private readonly bookings: BookingRepository,
     private readonly payments: PaymentService,
     private readonly inventory: InventoryRepository,
+    private readonly trips: TripRepository,
     private readonly uow: UnitOfWork,
     private readonly webhooks: WebhookRepository,
     private readonly webhookDelivery: WebhookDeliveryService,
@@ -457,6 +458,69 @@ export class GdsService {
 
   partnersForOperator() {
     return this.gds.agreementsOfTenant();
+  }
+
+  /**
+   * Is this trip's inventory reaching the OTAs as it should? Partners read the
+   * same live seat map as every other channel, so the seats they see ARE the
+   * seats free now — unless partner sales are closed on the trip or its
+   * service, or no partner has an active agreement. Lists what is wrong, each
+   * with the fix the operator can make (reopen the channel, resume a partner).
+   */
+  async partnerSync(tripId: string) {
+    const trip = await this.trips.getById(tripId as TripId);
+    const facts = await this.gds.partnerSyncFacts(tripId);
+    if (!facts) throw new NotFoundError('Trip', tripId);
+    const seats = await this.inventory.seatAvailability(trip.id, 0, trip.stopCount - 1);
+    const freeForPartners = seats.filter((x) => x.available).length;
+    const agreements = (await this.gds.agreementsOfTenant()) as {
+      partnerId: string;
+      name: string;
+      status: string | null;
+      commissionPct: string | null;
+    }[];
+    const receiving = agreements.filter((a) => a.status === 'active');
+    const departed = trip.departsAt.getTime() <= Date.now();
+    const issues: { code: string; message: string }[] = [];
+    if (facts.closedOnService)
+      issues.push({
+        code: 'closed_on_service',
+        message: 'Partner sales are stopped for the whole service — reopen them on the service',
+      });
+    if (facts.closedOnTrip)
+      issues.push({
+        code: 'closed_on_trip',
+        message: 'Partner sales are stopped on this trip — reopen the OTA channel',
+      });
+    if (receiving.length === 0)
+      issues.push({
+        code: 'no_partner',
+        message: 'No partner receives your seats — start distributing to one',
+      });
+    if (!departed && freeForPartners === 0)
+      issues.push({ code: 'sold_out', message: 'No seat is free for the full journey' });
+    const selling =
+      !departed && !facts.closedOnTrip && !facts.closedOnService && receiving.length > 0;
+    return {
+      tripId,
+      selling,
+      departed,
+      seats: {
+        total: seats.length,
+        freeForPartners: selling ? freeForPartners : 0,
+        freeNow: freeForPartners,
+        partnerSold: facts.partnerSold,
+        partnerHolding: facts.partnerHolding,
+      },
+      partners: agreements.map((a) => ({
+        partnerId: a.partnerId,
+        name: a.name,
+        receiving: a.status === 'active',
+        paused: a.status === 'paused',
+        commissionPct: a.commissionPct == null ? null : Number(a.commissionPct),
+      })),
+      issues,
+    };
   }
   async setAgreement(partnerId: string, status: AgreementStatus, commissionPct: number) {
     const p = await this.gds.getPartner(partnerId);
