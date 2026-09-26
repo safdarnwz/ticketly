@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 747 |
-| DONE | 228 |
+| TODO | 669 |
+| DONE | 306 |
 | DUP | 9 |
 
 
@@ -170,12 +170,12 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 133 | Select bus type (Seater, Sleeper, Semi-Sleeper, Multi-Axle) | DONE | TODO | verified manually: existing module/API |
 | 134 | Enter total seat capacity | DONE | TODO | verified manually: existing module/API |
 | 135 | Design seat layout visually | DONE | TODO | verified manually: existing module/API |
-| 136 | Mark window seats | DONE | TODO | POST /master-data/seat-layouts/:id/seats/auto-positions / seats/mark (position) |
-| 137 | Mark aisle seats | DONE | TODO | POST /master-data/seat-layouts/:id/seats/auto-positions / seats/mark (position) |
-| 138 | Mark lower berths | DONE | TODO | verified manually: existing module/API |
-| 139 | Mark upper berths | DONE | TODO | verified manually: existing module/API |
-| 140 | Mark ladies seats | DONE | TODO | verified manually: existing module/API |
-| 141 | Mark disabled-friendly seats | DONE | TODO | seats/mark {accessible}; trip_seats.accessible; kept for 'disabled' passengers |
+| 136 | Mark window seats | DONE | DONE | POST /master-data/seat-layouts/:id/seats/auto-positions / seats/mark (position) · UI: Fleet → Seat Layouts: editor marks window/aisle, ladies, disability-friendly, berths per deck; Auto window/aisle |
+| 137 | Mark aisle seats | DONE | DONE | POST /master-data/seat-layouts/:id/seats/auto-positions / seats/mark (position) · UI: Fleet → Seat Layouts: editor marks window/aisle, ladies, disability-friendly, berths per deck; Auto window/aisle |
+| 138 | Mark lower berths | DONE | DONE | verified manually: existing module/API · UI: Fleet → Seat Layouts: editor marks window/aisle, ladies, disability-friendly, berths per deck; Auto window/aisle |
+| 139 | Mark upper berths | DONE | DONE | verified manually: existing module/API · UI: Fleet → Seat Layouts: editor marks window/aisle, ladies, disability-friendly, berths per deck; Auto window/aisle |
+| 140 | Mark ladies seats | DONE | DONE | verified manually: existing module/API · UI: Fleet → Seat Layouts: editor marks window/aisle, ladies, disability-friendly, berths per deck; Auto window/aisle |
+| 141 | Mark disabled-friendly seats | DONE | DONE | seats/mark {accessible}; trip_seats.accessible; kept for 'disabled' passengers · UI: Fleet → Seat Layouts: editor marks window/aisle, ladies, disability-friendly, berths per deck; Auto window/aisle |
 | 142 | Set bus amenities list | DONE | TODO | verified manually: existing module/API |
 | 143 | Enable AC amenity | DONE | TODO | verified manually: existing module/API |
 | 144 | Enable WiFi amenity | DONE | TODO | verified manually: existing module/API |
@@ -289,7 +289,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 252 | Set standard luggage allowance | GAP | — | verified manually: not built yet |
 | 253 | Configure extra luggage charge per kg or piece | GAP | — | verified manually: not built yet |
 | 254 | View all live running services | DONE | TODO | verified manually: existing module/API |
-| 255 | View currently delayed services | DONE | TODO | verified manually: existing module/API |
+| 255 | View currently delayed services | DONE | DONE | verified manually: existing module/API · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
 | 256 | View today’s cancelled services | DONE | TODO | verified manually: existing module/API |
 | 257 | Manually mark service as departed | DONE | TODO | verified manually: existing module/API |
 | 258 | Manually mark service as arrived | DONE | TODO | verified manually: existing module/API |
@@ -298,7 +298,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 261 | Temporarily block specific seats | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Block / open seats |
 | 262 | Release previously blocked seats | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Block / open seats |
 | 263 | Change allocated bus of a service last minute | DONE | TODO | verified manually: existing module/API |
-| 264 | Change allocated crew last minute | DONE | TODO | verified manually: existing module/API |
+| 264 | Change allocated crew last minute | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 265 | Add internal remark on service | DONE | DONE | POST/GET /scheduling/trips/:id/remarks · UI: Trips & Charts › chart: Staff remarks |
 | 266 | Clone an existing service to new date | DONE | DONE | POST /scheduling/services/:id/clone · UI: Schedule → Manage service |
 | 267 | Bulk update fares using Excel | DONE | DONE | GET rules.csv + POST /pricing/fare-plans/:id/rules/import / adjust · UI: Pricing → Fare plan: sheet download/upload, change all by % |
@@ -308,11 +308,11 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 271 | Set blackout dates for route | DONE | DONE | POST /scheduling/routes/:routeId/blackouts (materialisation skips) · UI: Schedule → Route blackouts |
 | 272 | Configure seasonal schedule patterns | DONE | DONE | POST /scheduling/services/:id/clone {season:true} · UI: Schedule → Manage service |
 | 273 | Create festival special services in bulk | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
-| 274 | Set temporary route diversion | DONE | TODO | incident type 'diversion' → trip.diverted SMS to every passenger |
+| 274 | Set temporary route diversion | DONE | DONE | incident type 'diversion' → trip.diverted SMS to every passenger · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
 | 275 | Trigger passenger notification on schedule change | DONE | DONE | POST /scheduling/trips/:id/retime → trip.retimed SMS to every passenger · UI: Trips & Charts › chart: Change departure time |
-| 276 | View current inventory utilization percentage | DONE | TODO | verified manually: existing module/API |
-| 277 | View occupancy forecast for next 7 days | DONE | TODO | verified manually: existing module/API |
-| 278 | View occupancy forecast for next 15 days | DONE | TODO | GET /reports/occupancy-forecast?days=15 |
+| 276 | View current inventory utilization percentage | DONE | DONE | verified manually: existing module/API · UI: Reports → Dispatch |
+| 277 | View occupancy forecast for next 7 days | DONE | DONE | verified manually: existing module/API · UI: Reports → Forecast (weak trips: keep / plan to cancel) |
+| 278 | View occupancy forecast for next 15 days | DONE | DONE | GET /reports/occupancy-forecast?days=15 · UI: Reports → Forecast (weak trips: keep / plan to cancel) |
 | 279 | Accept AI suggestion for adding extra trip | DONE | DONE | verified manually: existing module/API · UI: Schedule → Busy trips suggestions |
 | 280 | Reject AI suggestion for cancelling service | DONE | TODO | GET /reports/cancel-suggestions; POST /trips/:tripId/cancel-suggestion/decision |
 | 281 | Set minimum fare floor value | DONE | DONE | route floor (engine, after yield) · UI: Pricing → Route limits & peak times |
@@ -334,7 +334,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 297 | Upload and manage fitness certificate | DONE | TODO | verified manually: existing module/API |
 | 298 | Set document expiry reminder days | GAP | — | verified manually: not built yet |
 | 299 | View document expiry dashboard | DONE | TODO | verified manually: existing module/API |
-| 300 | Upload bus exterior and interior photos | DONE | TODO | verified manually: existing module/API |
+| 300 | Upload bus exterior and interior photos | DONE | DONE | verified manually: existing module/API · UI: Fleet → bus page → Photos (max 10, no video) |
 | 301 | Set bus public display name | GAP | — | verified manually: not built yet |
 | 302 | View agent performance ranking by bookings | GAP | — | verified manually: not built yet |
 | 303 | View agent performance ranking by revenue | GAP | — | verified manually: not built yet |
@@ -366,9 +366,9 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 329 | Raise formal dispute on OTA settlement | GAP | — | verified manually: not built yet |
 | 330 | Generate data for GST returns | GAP | — | verified manually: not built yet |
 | 331 | Generate data for TDS returns | GAP | — | verified manually: not built yet |
-| 332 | View monthly Profit and Loss statement | DONE | TODO | verified manually: existing module/API |
+| 332 | View monthly Profit and Loss statement | DONE | DONE | verified manually: existing module/API · UI: Reports → Profit & Loss (route / bus / trip) |
 | 333 | View route-wise profitability ranking | DONE | DONE | verified manually: existing module/API · UI: Reports › Route Performance (last 30 days, fixed occupancy) |
-| 334 | View bus-wise profitability ranking | DONE | TODO | verified manually: existing module/API |
+| 334 | View bus-wise profitability ranking | DONE | DONE | verified manually: existing module/API · UI: Reports → Profit & Loss (route / bus / trip) |
 | 335 | Export all financial reports | GAP | — | verified manually: not built yet |
 | 336 | Configure list of expense categories | GAP | — | verified manually: not built yet |
 | 337 | Add fuel expense entry | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Expenses & P&L |
@@ -427,7 +427,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 390 | Temporarily block access of a staff member | DONE | DONE | verified manually: existing module/API · UI: Staff modal (access ends / disable) |
 | 391 | Activate special promotional offer for branch | GAP | — | verified manually: not built yet |
 | 392 | Raise request for extra service on festival | GAP | — | verified manually: not built yet |
-| 393 | Send delay notification to all passengers | DONE | TODO | verified manually: existing module/API |
+| 393 | Send delay notification to all passengers | DONE | DONE | verified manually: existing module/API · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
 | 394 | Suggest alternate service for delayed bus | GAP | — | verified manually: not built yet |
 | 395 | Re-allocate passengers when bus breaks down | DONE | TODO | verified manually: existing module/API |
 | 396 | Handle large group booking request | GAP | — | verified manually: not built yet |
@@ -436,7 +436,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 399 | Raise branch wallet recharge request | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 400 | Raise formal complaint against agent | DONE | TODO | verified manually: existing module/API |
 | 401 | Register passenger complaint in system | DONE | DONE | support tickets: staff raise by PNR / reply / priority / assign / resolve; customers own tickets only; author from account · UI: Support: queue views (active/mine/unassigned/…), search, ticket thread with reply, resolve/reopen/close, priority, assign; raise for a caller by PNR |
-| 402 | Enter lost and found item details | DONE | TODO | POST /lost-found (+claim with PNR check, 30-day disposal) |
+| 402 | Enter lost and found item details | DONE | DONE | POST /lost-found (+claim with PNR check, 30-day disposal) · UI: Operations → Lost & found |
 | 403 | Manage stock of ticket rolls | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 404 | Manage stock of printer paper | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 405 | Report printer or hardware problem | DONE | TODO | verified manually: existing module/API |
@@ -463,7 +463,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 426 | Escalate high value cancellation to operator admin | GAP | — | verified manually: not built yet |
 | 427 | View live GPS location of branch services | DONE | TODO | verified manually: existing module/API |
 | 428 | Mark service as departed from this branch | DONE | TODO | verified manually: existing module/API |
-| 429 | Enter detailed delay reason | DONE | TODO | verified manually: existing module/API |
+| 429 | Enter detailed delay reason | DONE | DONE | verified manually: existing module/API · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
 | 430 | View complete no-show passenger list | DONE | TODO | verified manually: existing module/API |
 | 431 | Contact no-show passenger | DONE | TODO | verified manually: existing module/API |
 | 432 | Release no-show seat to waitlist | GAP | — | verified manually: not built yet |
@@ -487,8 +487,8 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 450 | Force synchronize offline data | GAP | — | verified manually: not built yet |
 | 451 | View list of sync conflicts | GAP | — | verified manually: not built yet |
 | 452 | Resolve sync conflict with manager decision | GAP | — | verified manually: not built yet |
-| 453 | View previous shift handover notes | DONE | TODO | GET /shift-notes |
-| 454 | Write handover notes for next shift manager | DONE | TODO | POST /shift-notes |
+| 453 | View previous shift handover notes | DONE | DONE | GET /shift-notes · UI: Operations → Shift notes |
+| 454 | Write handover notes for next shift manager | DONE | DONE | POST /shift-notes · UI: Operations → Shift notes |
 | 455 | Lock all counters at end of day | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 456 | Unlock counters at start of next day | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 457 | View branch collection against monthly target | GAP | — | verified manually: not built yet |
@@ -496,8 +496,8 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 459 | Approve agent request for higher credit | GAP | — | verified manually: not built yet |
 | 460 | View list of blacklisted passengers | DONE | DONE | customer_blocks per operator (account + mobile), GET /customers?filter=blocked, hold → 403 · UI: Customers: Blocked tab, block with reason / unblock in the profile |
 | 461 | Add passenger to branch watch list | GAP | — | verified manually: not built yet |
-| 462 | Handle medical emergency at branch | DONE | TODO | incidents type=medical (critical alert) |
-| 463 | Arrange emergency support | DONE | TODO | incident.critical → emergency contacts |
+| 462 | Handle medical emergency at branch | DONE | DONE | incidents type=medical (critical alert) · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
+| 463 | Arrange emergency support | DONE | DONE | incident.critical → emergency contacts · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
 | 464 | Communicate with dispatch manager on issues | PROCESS | — | operational practice, not software |
 | 465 | View crew currently allocated to services | DONE | TODO | verified manually: existing module/API |
 | 466 | Request change of crew | DONE | TODO | verified manually: existing module/API |
@@ -599,20 +599,20 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 555 | Filter services by delayed status | GAP | — | verified manually: not built yet |
 | 556 | Filter services by cancelled status | DONE | TODO | verified manually: existing module/API |
 | 557 | View current bus allocation | DONE | TODO | verified manually: existing module/API |
-| 558 | View current driver allocation | DONE | TODO | verified manually: existing module/API |
-| 559 | View current conductor allocation | DONE | TODO | verified manually: existing module/API |
+| 558 | View current driver allocation | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
+| 559 | View current conductor allocation | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 560 | Assign bus to a service | DONE | DONE | verified manually: existing module/API · UI: Trips & Charts › chart › Assign / change bus |
-| 561 | Assign driver to a service | DONE | TODO | verified manually: existing module/API |
-| 562 | Assign conductor to a service | DONE | TODO | verified manually: existing module/API |
-| 563 | Change already assigned crew | DONE | TODO | verified manually: existing module/API |
+| 561 | Assign driver to a service | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
+| 562 | Assign conductor to a service | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
+| 563 | Change already assigned crew | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 564 | View live GPS location of all buses | DONE | TODO | verified manually: existing module/API |
 | 565 | Receive automatic delay alert | DONE | TODO | verified manually: existing module/API |
-| 566 | Enter reason for delay | DONE | TODO | verified manually: existing module/API |
-| 567 | Select delay category (traffic, breakdown, weather, other) | DONE | TODO | incidents type=delay + delayCategory |
-| 568 | Send delay SMS to all passengers | DONE | TODO | verified manually: existing module/API |
+| 566 | Enter reason for delay | DONE | DONE | verified manually: existing module/API · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
+| 567 | Select delay category (traffic, breakdown, weather, other) | DONE | DONE | incidents type=delay + delayCategory · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
+| 568 | Send delay SMS to all passengers | DONE | DONE | verified manually: existing module/API · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
 | 569 | Send delay WhatsApp to all passengers | DONE | TODO | verified manually: existing module/API |
-| 570 | Identify services with very low occupancy | DONE | TODO | verified manually: existing module/API |
-| 571 | Take decision to cancel low occupancy service | DONE | TODO | verified manually: existing module/API |
+| 570 | Identify services with very low occupancy | DONE | DONE | verified manually: existing module/API · UI: Reports → Forecast (weak trips: keep / plan to cancel) |
+| 571 | Take decision to cancel low occupancy service | DONE | DONE | verified manually: existing module/API · UI: Reports → Forecast (weak trips: keep / plan to cancel) |
 | 572 | Cancel service in system | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Cancel trip (reason) |
 | 573 | Automatically notify all booked passengers | DONE | TODO | verified manually: existing module/API |
 | 574 | Offer alternate service to cancelled passengers | GAP | — | verified manually: not built yet |
@@ -620,7 +620,7 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 576 | Create new extra trip service | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
 | 577 | Set departure time for extra trip | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
 | 578 | Release inventory for extra trip | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
-| 579 | Handle bus breakdown report | DONE | TODO | incidents type=breakdown |
+| 579 | Handle bus breakdown report | DONE | DONE | incidents type=breakdown · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
 | 580 | Arrange replacement bus | DONE | TODO | verified manually: existing module/API |
 | 581 | Re-allocate all passengers to replacement bus | DONE | TODO | verified manually: existing module/API |
 | 582 | Generate final boarding chart | DONE | TODO | verified manually: existing module/API |
@@ -629,39 +629,39 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 585 | Mark passengers as no-show | DONE | TODO | verified manually: existing module/API |
 | 586 | Enable way-side booking for service | CONFLICT | — | way-side / conductor cash — earlier decision |
 | 587 | Disable way-side booking for service | CONFLICT | — | way-side / conductor cash — earlier decision |
-| 588 | Enter route diversion details | DONE | TODO | incidents type=diversion (diversionVia) |
-| 589 | Notify passengers about route diversion | DONE | TODO | trip.diverted event |
-| 590 | Prepare crew duty roster for next day | DONE | TODO | verified manually: existing module/API |
-| 591 | Mark attendance of driver | DONE | TODO | verified manually: existing module/API |
-| 592 | Mark attendance of conductor | DONE | TODO | verified manually: existing module/API |
-| 593 | Approve overtime for crew | DONE | TODO | verified manually: existing module/API |
-| 594 | Approve double duty for crew | DONE | TODO | verified manually: existing module/API |
+| 588 | Enter route diversion details | DONE | DONE | incidents type=diversion (diversionVia) · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
+| 589 | Notify passengers about route diversion | DONE | DONE | trip.diverted event · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
+| 590 | Prepare crew duty roster for next day | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
+| 591 | Mark attendance of driver | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
+| 592 | Mark attendance of conductor | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
+| 593 | Approve overtime for crew | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
+| 594 | Approve double duty for crew | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 595 | Report fuel related issue | DONE | TODO | verified manually: existing module/API |
-| 596 | Report maintenance related issue | DONE | TODO | verified manually: existing module/API |
-| 597 | View on-time performance percentage | DONE | TODO | GET /reports/dispatch onTimePct (actual_departed_at) |
-| 598 | View average delay duration | DONE | TODO | GET /reports/dispatch avgDepartureDelayMin |
-| 599 | Generate daily dispatch summary report | DONE | TODO | GET /reports/dispatch |
-| 600 | Generate report of all delayed services | DONE | TODO | GET /reports/dispatch delayed[] |
+| 596 | Report maintenance related issue | DONE | DONE | verified manually: existing module/API · UI: Fleet → bus page → Maintenance |
+| 597 | View on-time performance percentage | DONE | DONE | GET /reports/dispatch onTimePct (actual_departed_at) · UI: Reports → Dispatch |
+| 598 | View average delay duration | DONE | DONE | GET /reports/dispatch avgDepartureDelayMin · UI: Reports → Dispatch |
+| 599 | Generate daily dispatch summary report | DONE | DONE | GET /reports/dispatch · UI: Reports → Dispatch |
+| 600 | Generate report of all delayed services | DONE | DONE | GET /reports/dispatch delayed[] · UI: Reports → Dispatch |
 | 601 | Generate report of all cancelled services | DONE | TODO | verified manually: existing module/API |
-| 602 | View performance report of each crew member | DONE | TODO | GET /reports/dispatch crew[] |
-| 603 | View utilization report of each bus | DONE | TODO | GET /reports/dispatch buses[] |
-| 604 | Receive emergency alert from bus | DONE | TODO | incident.critical → emergency contacts (SMS+email) |
-| 605 | Notify emergency support team | DONE | TODO | incident.critical consumer |
+| 602 | View performance report of each crew member | DONE | DONE | GET /reports/dispatch crew[] · UI: Reports → Dispatch |
+| 603 | View utilization report of each bus | DONE | DONE | GET /reports/dispatch buses[] · UI: Reports → Dispatch |
+| 604 | Receive emergency alert from bus | DONE | DONE | incident.critical → emergency contacts (SMS+email) · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
+| 605 | Notify emergency support team | DONE | DONE | incident.critical consumer · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
 | 606 | Register passenger complaint related to service | DONE | DONE | support tickets: staff raise by PNR / reply / priority / assign / resolve; customers own tickets only; author from account · UI: Support: queue views (active/mine/unassigned/…), search, ticket thread with reply, resolve/reopen/close, priority, assign; raise for a caller by PNR |
-| 607 | Enter details of lost luggage | DONE | TODO | POST /lost-found |
+| 607 | Enter details of lost luggage | DONE | DONE | POST /lost-found · UI: Operations → Lost & found |
 | 608 | Finalize next day bus and crew allocation | DONE | TODO | verified manually: existing module/API |
 | 609 | Block inventory at last minute | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Block / open seats |
 | 610 | Release inventory at last minute | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Block / open seats |
 | 611 | Adjust OTA inventory percentage at last minute | DONE | DONE | PUT /trips/:tripId/closed-channels (ota off/on per trip) · UI: Trip chart → Sales channels |
-| 612 | Add internal dispatch notes | DONE | TODO | verified manually: existing module/API |
-| 613 | Write shift handover notes for next dispatcher | DONE | TODO | POST/GET /shift-notes scope=dispatch |
+| 612 | Add internal dispatch notes | DONE | DONE | verified manually: existing module/API · UI: Operations → Shift notes |
+| 613 | Write shift handover notes for next dispatcher | DONE | DONE | POST/GET /shift-notes scope=dispatch · UI: Operations → Shift notes |
 | 614 | Perform dispatch updates in offline mode | GAP | — | verified manually: not built yet |
 | 615 | Sync offline dispatch updates | GAP | — | verified manually: not built yet |
 | 616 | Resolve data conflicts after sync | GAP | — | verified manually: not built yet |
 | 617 | Switch to manual tracking when GPS fails | GAP | — | verified manually: not built yet |
 | 618 | Generate monthly dispatch efficiency report | GAP | — | verified manually: not built yet |
-| 619 | View crew rest period compliance | DONE | TODO | verified manually: existing module/API |
-| 620 | View crew duty hours compliance | DONE | TODO | verified manually: existing module/API |
+| 619 | View crew rest period compliance | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
+| 620 | View crew duty hours compliance | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 621 | Logout from dispatch system | DONE | TODO | verified manually: existing module/API |
 | 622 | Login with own credentials | DONE | TODO | verified manually: existing module/API |
 | 623 | View list of assigned services for the day | DONE | TODO | verified manually: existing module/API |
@@ -758,10 +758,10 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 714 | Update complete fare matrix | DONE | DONE | verified manually: existing module/API · UI: Pricing → Fare plan: sheet download/upload, change all by % |
 | 715 | Perform bulk fare update for multiple services | DONE | DONE | POST /pricing/fare-plans/:id/rules/adjust (all fares of a route's plan by %) · UI: Pricing → Fare plan: sheet download/upload, change all by % |
 | 716 | Set different fare for different seat types | DONE | DONE | verified manually: existing module/API · UI: Pricing → Fare plans (seat-type fares, seat overrides) |
-| 717 | View current inventory utilization report | DONE | TODO | verified manually: existing module/API |
-| 718 | Identify services running with low occupancy | DONE | TODO | verified manually: existing module/API |
+| 717 | View current inventory utilization report | DONE | DONE | verified manually: existing module/API · UI: Reports → Dispatch |
+| 718 | Identify services running with low occupancy | DONE | DONE | verified manually: existing module/API · UI: Reports → Forecast (weak trips: keep / plan to cancel) |
 | 719 | Add extra seats or service on high demand | DONE | DONE | verified manually: existing module/API · UI: Schedule → Busy trips suggestions |
-| 720 | View occupancy forecast for coming days | DONE | TODO | verified manually: existing module/API |
+| 720 | View occupancy forecast for coming days | DONE | DONE | verified manually: existing module/API · UI: Reports → Forecast (weak trips: keep / plan to cancel) |
 | 721 | Detect schedule timing clash | GAP | — | verified manually: not built yet |
 | 722 | Resolve schedule clash | GAP | — | verified manually: not built yet |
 | 723 | Allocate specific bus to service | DONE | TODO | verified manually: existing module/API |
@@ -770,7 +770,7 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 726 | Define blackout dates when service will not run | DONE | DONE | POST /scheduling/routes/:id/blackouts (same as #271) · UI: Schedule → Route blackouts |
 | 727 | Increase frequency of service | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
 | 728 | Decrease frequency of service | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
-| 729 | Apply temporary route diversion | DONE | TODO | incidents type=diversion |
+| 729 | Apply temporary route diversion | DONE | DONE | incidents type=diversion · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
 | 730 | Check whether inventory is correctly synced with OTAs | DONE | TODO | verified manually: existing module/API |
 | 731 | Manually fix inventory sync issues | DONE | TODO | verified manually: existing module/API |
 | 732 | Export historical occupancy data | GAP | — | verified manually: not built yet |
@@ -1187,8 +1187,8 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 | 1262 | Conductor not allocated to service | OPEN | — |  |
 | 1263 | Driver not allocated to service | OPEN | — |  |
 | 1264 | Same crew allocated to two services | OPEN | — |  |
-| 1265 | Crew exceeds maximum allowed duty hours | DONE | TODO | fleet/domain/duty-roster.ts + /fleet/crew/* |
-| 1266 | Mandatory rest period not provided to crew | DONE | TODO | fleet/domain/duty-roster.ts + /fleet/crew/* |
+| 1265 | Crew exceeds maximum allowed duty hours | DONE | DONE | fleet/domain/duty-roster.ts + /fleet/crew/* · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
+| 1266 | Mandatory rest period not provided to crew | DONE | DONE | fleet/domain/duty-roster.ts + /fleet/crew/* · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 1267 | Bus does not have enough fuel for trip | OPEN | — |  |
 | 1268 | GPS device stops working | OPEN | — |  |
 | 1269 | Panic button pressed by mistake | OPEN | — |  |
@@ -1284,9 +1284,9 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 | 1344 | Refund liability does not match actual refunds | OPEN | — |  |
 | 1345 | Month-end closing attempted with pending items | OPEN | — |  |
 | 1346 | Trial balance does not match | OPEN | — |  |
-| 1347 | Profit and Loss has incorrect expense allocation | DONE | TODO | modules/trip-expenses |
-| 1348 | Route profitability calculation with shared costs | DONE | TODO | modules/trip-expenses |
-| 1349 | Bus profitability with maintenance cost allocation | DONE | TODO | modules/trip-expenses |
+| 1347 | Profit and Loss has incorrect expense allocation | DONE | DONE | modules/trip-expenses · UI: Reports → Profit & Loss (route / bus / trip) |
+| 1348 | Route profitability calculation with shared costs | DONE | DONE | modules/trip-expenses · UI: Reports → Profit & Loss (route / bus / trip) |
+| 1349 | Bus profitability with maintenance cost allocation | DONE | DONE | modules/trip-expenses · UI: Reports → Profit & Loss (route / bus / trip) |
 | 1350 | High value refund processed without approval | OPEN | — |  |
 | 1351 | Bulk refund job fails partially | OPEN | — |  |
 | 1352 | Chargeback received after settlement is done | OPEN | — |  |
@@ -1317,10 +1317,10 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 | 1402 | Crew reports late for duty | OPEN | — |  |
 | 1403 | Crew does not report for duty | OPEN | — |  |
 | 1404 | Crew is changed in the middle of route | OPEN | — |  |
-| 1405 | Crew exceeds legal duty hours | DONE | TODO | fleet/domain/duty-roster.ts + /fleet/crew/* |
-| 1406 | Continuous driving limit is breached | DONE | TODO | fleet/domain/duty-roster.ts + /fleet/crew/* |
-| 1407 | Mandatory rest period is not given | DONE | TODO | fleet/domain/duty-roster.ts + /fleet/crew/* |
-| 1408 | Approval for double duty is missing | DONE | TODO | fleet/domain/duty-roster.ts + /fleet/crew/* |
+| 1405 | Crew exceeds legal duty hours | DONE | DONE | fleet/domain/duty-roster.ts + /fleet/crew/* · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
+| 1406 | Continuous driving limit is breached | DONE | DONE | fleet/domain/duty-roster.ts + /fleet/crew/* · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
+| 1407 | Mandatory rest period is not given | DONE | DONE | fleet/domain/duty-roster.ts + /fleet/crew/* · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
+| 1408 | Approval for double duty is missing | DONE | DONE | fleet/domain/duty-roster.ts + /fleet/crew/* · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 1409 | Bus breaks down with passengers on board | OPEN | — |  |
 | 1410 | Replacement bus has different seat layout | DUP | DUP | same as #1250 |
 | 1411 | Automatic re-seating of passengers fails | OPEN | — |  |
@@ -1514,7 +1514,7 @@ CONFLICT 13, DONE 53, DUP 3, OPEN 431
 | 1592 | View breakdown frequency by bus | OPEN | — |  |
 | 1593 | View breakdown frequency by route | OPEN | — |  |
 | 1594 | Configure crew allocation preference rules | OPEN | — |  |
-| 1595 | Set maximum continuous duty hours | DONE | TODO | fleet/domain/duty-roster.ts + /fleet/crew/* |
+| 1595 | Set maximum continuous duty hours | DONE | DONE | fleet/domain/duty-roster.ts + /fleet/crew/* · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 1596 | Set mandatory rest hours between duties | OPEN | — |  |
 | 1597 | View crew utilization report | OPEN | — |  |
 | 1598 | View crew overtime report | OPEN | — |  |
@@ -1597,7 +1597,7 @@ CONFLICT 13, DONE 53, DUP 3, OPEN 431
 | 1675 | View contribution margin by route | OPEN | — |  |
 | 1676 | View contribution margin by service | OPEN | — |  |
 | 1677 | View contribution margin by bus | OPEN | — |  |
-| 1678 | Rank all services by economic profit | DONE | TODO | modules/trip-expenses |
+| 1678 | Rank all services by economic profit | DONE | DONE | modules/trip-expenses · UI: Reports → Profit & Loss (route / bus / trip) |
 | 1679 | Identify chronic loss-making services | OPEN | — |  |
 | 1680 | Simulate impact of dropping a service | OPEN | — |  |
 | 1681 | Recommend optimal service frequency | OPEN | — |  |
@@ -1683,7 +1683,7 @@ CONFLICT 13, DONE 53, DUP 3, OPEN 431
 | 1761 | View weekly staff roster | OPEN | — |  |
 | 1762 | Request additional staff for peak | OPEN | — |  |
 | 1763 | Approve staff leave | OPEN | — |  |
-| 1764 | Manually mark attendance | DONE | TODO | fleet/domain/duty-roster.ts + /fleet/crew/* |
+| 1764 | Manually mark attendance | DONE | DONE | fleet/domain/duty-roster.ts + /fleet/crew/* · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 1765 | View punctuality report | OPEN | — |  |
 | 1766 | Conduct pre-shift briefing | OPEN | — |  |
 | 1767 | Record shift handover issues | OPEN | — |  |
@@ -1828,7 +1828,7 @@ CONFLICT 13, DONE 53, DUP 3, OPEN 431
 | 1906 | Record traffic condition on route | OPEN | — |  |
 | 1907 | Share traffic update with relevant services | OPEN | — |  |
 | 1908 | View crew current duty status | OPEN | — |  |
-| 1909 | Calculate remaining allowable duty hours | DONE | TODO | fleet/domain/duty-roster.ts + /fleet/crew/* |
+| 1909 | Calculate remaining allowable duty hours | DONE | DONE | fleet/domain/duty-roster.ts + /fleet/crew/* · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 1910 | Alert when crew nearing legal limit | OPEN | — |  |
 | 1911 | Plan mid-route crew change | OPEN | — |  |
 | 1912 | Coordinate crew change location and time | OPEN | — |  |
@@ -1865,8 +1865,8 @@ CONFLICT 13, DONE 53, DUP 3, OPEN 431
 | 1943 | Arrange emergency crew | OPEN | — |  |
 | 1944 | Consider crew route preferences | OPEN | — |  |
 | 1945 | Balance difficult and easy duties | OPEN | — |  |
-| 1946 | Monitor fatigue indicators | DONE | TODO | fleet/domain/duty-roster.ts + /fleet/crew/* |
-| 1947 | Enforce rest periods strictly | DONE | TODO | fleet/domain/duty-roster.ts + /fleet/crew/* |
+| 1946 | Monitor fatigue indicators | DONE | DONE | fleet/domain/duty-roster.ts + /fleet/crew/* · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
+| 1947 | Enforce rest periods strictly | DONE | DONE | fleet/domain/duty-roster.ts + /fleet/crew/* · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 1948 | Record rest compliance | OPEN | — |  |
 | 1949 | Ensure fair night duty distribution | OPEN | — |  |
 | 1950 | Rotate night duties | OPEN | — |  |
@@ -1916,7 +1916,7 @@ CONFLICT 13, DONE 53, DUP 3, OPEN 431
 | 1994 | Evaluate OTA quality (cancellations, no-shows) | DONE | TODO | modules/gds |
 | 1995 | Reduce allocation to low-quality OTAs | OPEN | — |  |
 | 1996 | Calculate true net revenue after all costs | OPEN | — |  |
-| 1997 | Rank services by true economic profit | DONE | TODO | modules/trip-expenses |
+| 1997 | Rank services by true economic profit | DONE | DONE | modules/trip-expenses · UI: Reports → Profit & Loss (route / bus / trip) |
 | 1998 | Recommend dropping chronic loss makers | OPEN | — |  |
 | 1999 | Simulate network impact of dropping service | OPEN | — |  |
 | 2000 | Recommend best time for new service | OPEN | — |  |
@@ -3983,12 +3983,12 @@ DONE 12, OPEN 88
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
-| 6501 | Crew not reporting for duty | DONE | TODO | fleet/domain/duty-roster.ts + /fleet/crew/* |
+| 6501 | Crew not reporting for duty | DONE | DONE | fleet/domain/duty-roster.ts + /fleet/crew/* · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 6502 | Crew reporting late | OPEN | — |  |
 | 6503 | Crew reporting unfit | OPEN | — |  |
-| 6504 | Crew duty hours exceeded | DONE | TODO | fleet/domain/duty-roster.ts + /fleet/crew/* |
-| 6505 | Crew rest period insufficient | DONE | TODO | fleet/domain/duty-roster.ts + /fleet/crew/* |
-| 6506 | Crew double duty approval missing | DONE | TODO | fleet/domain/duty-roster.ts + /fleet/crew/* |
+| 6504 | Crew duty hours exceeded | DONE | DONE | fleet/domain/duty-roster.ts + /fleet/crew/* · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
+| 6505 | Crew rest period insufficient | DONE | DONE | fleet/domain/duty-roster.ts + /fleet/crew/* · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
+| 6506 | Crew double duty approval missing | DONE | DONE | fleet/domain/duty-roster.ts + /fleet/crew/* · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 6507 | Crew change mid route planned | OPEN | — |  |
 | 6508 | Crew change mid route unplanned | OPEN | — |  |
 | 6509 | Crew performance below standard | OPEN | — |  |

@@ -363,3 +363,26 @@ an unknown id is now 404 (was 200).
   Saving route rules or a trip fare change checks the route / trip is this operator's (404; an unknown id
   was a 409 and another operator's could be linked); a trip fare change is refused once the trip left or
   was cancelled (422); both refresh cached search prices.
+- **Maintenance log:** `POST /fleet/vehicles/:id/maintenance` records work already done — `performedOn`
+  in the future is 422, `nextDueOn` must be after `performedOn`, description at least 3 characters, cost up
+  to ₹1 crore (400). An unknown or another operator's bus is 404 (was a 409); the history read is 404 too.
+- **Crew:** new `PATCH /fleet/crew/:id` (name, mobile, licence, employee code, `status`
+  active / on_leave / inactive; null clears a detail). Leave or inactive is refused while the person holds
+  upcoming duties (422). A driver must have a licence number and expiry, on create and edit. One mobile per
+  person in the team (409, also against older `+91…` rows); duplicate employee code 409 with a message.
+  `GET /fleet/crew` takes `status`, and each row carries `phone`, `employeeCode`, `upcomingDuties`.
+- **Duties:** `POST /fleet/crew/duties` refuses a duty that already ended (400), an unknown / another
+  operator's crew or trip (404), a cancelled trip, crew on leave / inactive, and a driver whose licence
+  expires before the duty ends (422). `POST /fleet/crew/duties/:id/cancel` is 404 for an unknown duty,
+  a no-op when already cancelled, and 422 once attendance is marked or the duty has ended.
+  `GET /fleet/crew/duties` rows add `crewRole`, `tripLabel`, `attendance`, `overrideReason`.
+  `GET /fleet/crew/:id/allowance` is 404 for an unknown crew member.
+- **Lost & found:** `POST /lost-found` needs an `idempotency-key` (a double click logs one item); an
+  unknown or another operator's trip is 404 (was a 409, and the global key accepted anyone's trip). The
+  list adds `trip_label`; the seat is stored in capitals.
+- **Shift notes:** `POST /shift-notes` needs an `idempotency-key`. A `branch` note must name a branch
+  (422), a `dispatch` note must not (422); an unknown / another operator's branch is 404, a closed one 422.
+- **Incidents:** the list adds `trip_label`.
+- **Dispatch report:** `GET /reports/dispatch` covers at most 366 days (422).
+- **Cancel suggestions:** `POST /trips/:tripId/cancel-suggestion/decision` is refused (422) for a trip that
+  already left or was cancelled.
