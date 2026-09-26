@@ -24,6 +24,7 @@ import { PasswordHasher } from '@security';
 import { BookingService, BookingRepository, type HoldRequest } from '../../../booking';
 import { PaymentService } from '../../../payment';
 import { SeatQuotaService } from '../../../quotas';
+import { BranchRepository } from '../../../branches';
 import { User, RoleRepository, UserRepository } from '../../../iam';
 import {
   agentCommissionMinor,
@@ -112,11 +113,24 @@ export class AgentService {
     logger: Logger,
     private readonly policies: PlatformPoliciesService,
     private readonly planQuotas: PlanQuotaService,
+    private readonly branches: BranchRepository,
   ) {
     this.log = logger.forContext('AgentService');
   }
 
   /* ───────────────────────── operator: onboarding ───────────────────────── */
+
+  /** An agent sits under one of THIS operator's active branches, or none. */
+  private async assertBranch(branchId: string | undefined): Promise<void> {
+    if (!branchId) return;
+    const branch = await this.branches.find(branchId as never);
+    if (!branch) throw new NotFoundError('Branch', branchId);
+    if (branch.status !== 'active')
+      throw new DomainError(
+        ErrorCode.COMMON_VALIDATION,
+        'That branch is closed — pick an active one',
+      );
+  }
 
   async create(
     input: CreateAgentRequest,
@@ -133,6 +147,7 @@ export class AgentService {
       input.creditLimitMinor,
     );
     if (!credit.ok) throw new DomainError(ErrorCode.COMMON_VALIDATION, credit.error);
+    await this.assertBranch(input.branchId);
     const creditLimitMinor = credit.creditLimitMinor;
     const termsError = validateTerms({ billingMode: input.billingMode, creditLimitMinor });
     if (termsError) throw new DomainError(ErrorCode.COMMON_VALIDATION, termsError);
@@ -219,6 +234,7 @@ export class AgentService {
   }
 
   async update(id: AgentId, input: Parameters<AgentRepository['update']>[1]): Promise<void> {
+    await this.assertBranch(input.branchId ?? undefined);
     await this.uow.run({ name: 'agent.update', tenantId: requireTenantId() }, async () => {
       const agent = await this.agents.lockForUpdate(id);
       if (!agent) throw new NotFoundError('Agent', id);

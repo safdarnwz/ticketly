@@ -7,6 +7,7 @@ import { MessagingModule } from '@messaging';
 
 import { AmendmentsModule } from '../amendments/amendments.module';
 import { BookingModule } from '../booking/booking.module';
+import { BranchesModule } from '../branches/branches.module';
 import { IamModule } from '../iam/iam.module';
 import { PaymentModule } from '../payment/payment.module';
 import { QuotasModule } from '../quotas/quotas.module';
@@ -26,6 +27,7 @@ import { PlatformSettingsModule } from '../platform-settings/platform-settings.m
     BookingModule,
     PaymentModule,
     IamModule,
+    BranchesModule,
     RefundModule,
     QuotasModule,
     AmendmentsModule,
