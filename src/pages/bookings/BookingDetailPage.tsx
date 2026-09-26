@@ -5,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowUpCircle, Mail, MailWarning, Send, ShieldCheck, Ticket, XCircle } from 'lucide-react';
 
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Input, Modal, PageLoader, statusTone, useToast } from '@/components/ui';
+import { amendmentsApi } from '@/lib/api/amendments';
+import { BookingChangeModal, type ChangeKind } from './BookingChanges';
 import { PageHeader } from '@/components/common/PageHeader';
 import { PrintTicketButton } from '@/components/customer/PrintTicketButton';
 import { bookingsApi } from '@/lib/api/bookings';
@@ -33,6 +35,7 @@ export function BookingDetailPage() {
   const [toSeat, setToSeat] = useState('');
   const [cancelOpen, setCancelOpen] = useState(false);
   const [resendOpen, setResendOpen] = useState(false);
+  const [changing, setChanging] = useState<ChangeKind | null>(null);
   const upgradeInFlight = useRef(false);
 
   const q = useQuery({ queryKey: ['booking', pnr], queryFn: () => bookingsApi.byPnrStaff(pnr), retry: (n, e) => !(e instanceof ApiError && e.status < 500) && n < 2 });
@@ -85,6 +88,16 @@ export function BookingDetailPage() {
         action={
           <div className="flex gap-2">
             {confirmed && <Button variant="outline" leftIcon={<Send className="h-4 w-4" />} onClick={() => setResendOpen(true)}>Resend e-ticket</Button>}
+            {d && booking.status === 'confirmed' && new Date(d.departsAt).getTime() > Date.now() && (
+              <select aria-label="Change booking" value="" onChange={(e) => setChanging(e.target.value as ChangeKind)} className="h-10 rounded-md border border-border bg-surface px-2 text-sm">
+                <option value="">Change…</option>
+                <option value="seats">Seats (same bus)</option>
+                <option value="points">Boarding / drop point</option>
+                <option value="name">Name spelling</option>
+                <option value="reschedule">Date / bus</option>
+              </select>
+            )}
+            {d && booking.status === 'held' && d.channel === 'phone' && <Button variant="outline" onClick={() => setChanging('hold')}>Release time…</Button>}
             {cancellable && <Button variant="danger" leftIcon={<XCircle className="h-4 w-4" />} onClick={() => setCancelOpen(true)}>Cancel…</Button>}
           </div>
         }
@@ -161,6 +174,7 @@ export function BookingDetailPage() {
                     <div className="flex gap-2">
                       {t.ticketId && booking.status === 'confirmed' && <Button variant="ghost" size="sm" leftIcon={<ArrowUpCircle className="h-4 w-4" />} onClick={() => { setUpgrading({ ticketId: t.ticketId!, seat: t.seat }); setToSeat(''); }}>Upgrade</Button>}
                       <VerifyButton token={t.boardingToken} />
+                      {t.ticketId && d && new Date(d.departsAt).getTime() <= Date.now() && booking.status === 'confirmed' && <NoShowButton ticketId={t.ticketId} onDone={() => void qc.invalidateQueries({ queryKey: ['tickets', id] })} />}
                     </div>
                   </div>
                 ))}
@@ -204,6 +218,10 @@ export function BookingDetailPage() {
         </Card>
       </div>
 
+      {changing && id && d && (
+        <BookingChangeModal kind={changing} bookingId={id} pnr={booking.pnr} tripId={d.tripId} seats={d.seats} passengers={passengers}
+          onClose={() => setChanging(null)} onDone={() => { setChanging(null); refresh(); void qc.invalidateQueries({ queryKey: ['tickets', id] }); }} />
+      )}
       {cancelOpen && id && (
         <CancelModal bookingId={id} currency={booking.currency} seats={d?.seats ?? []} passengers={passengers} onClose={() => setCancelOpen(false)} onDone={() => { setCancelOpen(false); refresh(); }} />
       )}
@@ -323,4 +341,15 @@ function VerifyButton({ token }: { token: string }) {
     onError: (e) => toast.error(errText(e, 'Verification failed')),
   });
   return <Button variant="ghost" size="sm" onClick={() => verify.mutate()} loading={verify.isPending} leftIcon={<ShieldCheck className="h-4 w-4" />}>Verify</Button>;
+}
+
+/** After departure: record that a passenger never turned up (for reports, not a refund decision). */
+function NoShowButton({ ticketId, onDone }: { ticketId: string; onDone: () => void }) {
+  const toast = useToast();
+  const m = useMutation({
+    mutationFn: () => amendmentsApi.noShow(ticketId),
+    onSuccess: () => { toast.success('Marked as no-show'); onDone(); },
+    onError: (e) => toast.error(errText(e, 'Could not mark')),
+  });
+  return <Button variant="ghost" size="sm" loading={m.isPending} disabled={m.isPending} onClick={() => m.mutate()}>No-show</Button>;
 }
