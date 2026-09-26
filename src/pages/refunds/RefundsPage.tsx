@@ -41,6 +41,9 @@ export function RefundsPage() {
   const [pnr, setPnr] = useState('');
   const [paying, setPaying] = useState<RefundQueueRow | null>(null);
   const [creating, setCreating] = useState(false);
+  /** Failed gateway refunds picked for one "retry them all" run. */
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [bulk, setBulk] = useState<{ done: number; total: number; settled: number; refused: number; errors: string[] } | null>(null);
   const filter = pnr.trim().toUpperCase();
 
   const queue = useInfiniteQuery({
@@ -60,7 +63,35 @@ export function RefundsPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
   });
 
+  const retryable = rows.filter((r) => r.status === 'failed' && r.destination === 'source');
+  const togglePick = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  /** One at a time, through the same retry as the row button; each result is counted, nothing is retried twice. */
+  const retrySelected = async () => {
+    const ids = retryable.filter((r) => picked.has(r.id)).map((r) => r.id);
+    const state = { done: 0, total: ids.length, settled: 0, refused: 0, errors: [] as string[] };
+    setBulk({ ...state });
+    for (const id of ids) {
+      try {
+        const r = await refundsApi.retry(id);
+        if (r.status === 'settled') state.settled += 1;
+        else if (r.status === 'failed') state.refused += 1;
+      } catch (e) {
+        state.errors.push(`${rows.find((x) => x.id === id)?.pnr ?? id}: ${e instanceof Error ? e.message : 'failed'}`);
+      }
+      state.done += 1;
+      setBulk({ ...state, errors: [...state.errors] });
+    }
+    setPicked(new Set());
+    refresh();
+    toast.success(`${state.done} retried — ${state.settled} refunded${state.refused ? `, ${state.refused} refused again` : ''}${state.errors.length ? `, ${state.errors.length} errors` : ''}`);
+  };
+  const bulkRunning = !!bulk && bulk.done < bulk.total;
+
   const columns: Column<RefundQueueRow>[] = [
+    ...(tab === 'action' && retryable.length > 0 ? [{
+      key: 'pick', header: '', render: (r: RefundQueueRow) => r.status === 'failed' && r.destination === 'source'
+        ? <input type="checkbox" aria-label={`Select ${r.pnr}`} checked={picked.has(r.id)} disabled={bulkRunning} onChange={() => togglePick(r.id)} onClick={(e) => e.stopPropagation()} /> : null,
+    }] : []),
     { key: 'pnr', header: 'Booking', render: (r) => <div><Link to={`/bookings/${r.pnr}`} className="font-mono font-semibold text-primary hover:underline" onClick={(e) => e.stopPropagation()}>{r.pnr}</Link>{r.contactPhone && <div className="text-xs text-text-muted">{r.contactPhone}</div>}</div> },
     { key: 'amount', header: 'Amount', render: (r) => <span className="font-semibold">{formatMoney(r.amountMinor, r.currency)}</span> },
     {
@@ -115,6 +146,16 @@ export function RefundsPage() {
         </CardBody>
       </Card>
 
+      {tab === 'action' && retryable.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md border border-border bg-surface px-3 py-2 text-sm">
+          <label className="flex items-center gap-2"><input type="checkbox" aria-label="Select all failed refunds" disabled={bulkRunning}
+            checked={retryable.every((r) => picked.has(r.id))} onChange={(e) => setPicked(e.target.checked ? new Set(retryable.map((r) => r.id)) : new Set())} />
+            {picked.size ? `${picked.size} selected` : `Select all ${retryable.length} failed gateway refunds`}</label>
+          <Button size="sm" leftIcon={<RotateCcw className="h-4 w-4" />} disabled={!picked.size || bulkRunning} loading={bulkRunning} onClick={() => void retrySelected()}>Retry selected</Button>
+          {bulk && <span className="text-text-muted">{bulk.done}/{bulk.total} done · {bulk.settled} refunded{bulk.refused ? ` · ${bulk.refused} refused again (pay by transfer)` : ''}</span>}
+          {bulk?.errors.length ? <span role="alert" className="w-full text-xs text-danger">{bulk.errors.join(' · ')}</span> : null}
+        </div>
+      )}
       {queue.isLoading ? <PageLoader /> : queue.isError ? <ErrorState error={queue.error} onRetry={queue.refetch} /> : rows.length === 0 ? (
         <EmptyState title={tab === 'action' ? 'Nothing needs you' : 'No refunds here'} description={tab === 'action' ? 'Failed refunds and bank transfers to send show up here.' : filter ? `No refunds for PNR ${filter}.` : 'Refunds appear as bookings are cancelled.'} icon={<RotateCcw className="h-10 w-10" />} />
       ) : (
