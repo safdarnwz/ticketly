@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3112 |
-| TODO | 842 |
-| DONE | 124 |
+| TODO | 834 |
+| DONE | 132 |
 | DUP | 9 |
 
 
@@ -276,8 +276,8 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 239 | Set waitlist entry expiry hours | GAP | — | verified manually: not built yet |
 | 240 | Enable way-side booking on service | CONFLICT | — | earlier product decision |
 | 241 | Disable way-side booking on service | CONFLICT | — | earlier product decision |
-| 242 | Set maximum advance booking days allowed | DONE | TODO | PUT /concessions/booking-window {maxAdvanceDays} |
-| 243 | Set minimum hours before departure for booking | DONE | TODO | PUT /concessions/booking-window {minMinutesBeforeDeparture} |
+| 242 | Set maximum advance booking days allowed | DONE | DONE | PUT /concessions/booking-window {maxAdvanceDays} · UI: Pricing → Concessions & booking rules |
+| 243 | Set minimum hours before departure for booking | DONE | DONE | PUT /concessions/booking-window {minMinutesBeforeDeparture} · UI: Pricing → Concessions & booking rules |
 | 244 | Configure cancellation charge slabs by time | DONE | TODO | verified manually: existing module/API |
 | 245 | Set free cancellation window in hours | GAP | — | verified manually: not built yet |
 | 246 | Configure rules for partial cancellation | DONE | TODO | verified manually: existing module/API |
@@ -323,12 +323,12 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 286 | Set additional charges for specific pickup points | GAP | — | verified manually: not built yet |
 | 287 | Set additional charges for specific drop points | GAP | — | verified manually: not built yet |
 | 288 | Configure complete ladies special service rules | DONE | TODO | verified manually: existing module/API |
-| 289 | Configure senior citizen concession percentage | DONE | TODO | verified manually: existing module/API |
-| 290 | Configure student concession percentage | DONE | TODO | verified manually: existing module/API |
-| 291 | Configure defense personnel concession | DONE | TODO | verified manually: existing module/API |
-| 292 | Set child fare rules by age | DONE | TODO | verified manually: existing module/API |
-| 293 | Set infant policy (free or charged) | DONE | TODO | verified manually: existing module/API |
-| 294 | Configure disability-friendly seat rules | DONE | TODO | PUT /concessions/accessible-seats (release hours), enforced on hold |
+| 289 | Configure senior citizen concession percentage | DONE | DONE | verified manually: existing module/API · UI: Pricing → Concessions & booking rules |
+| 290 | Configure student concession percentage | DONE | DONE | verified manually: existing module/API · UI: Pricing → Concessions & booking rules |
+| 291 | Configure defense personnel concession | DONE | DONE | verified manually: existing module/API · UI: Pricing → Concessions & booking rules |
+| 292 | Set child fare rules by age | DONE | DONE | verified manually: existing module/API · UI: Pricing → Concessions & booking rules |
+| 293 | Set infant policy (free or charged) | DONE | DONE | verified manually: existing module/API · UI: Pricing → Concessions & booking rules |
+| 294 | Configure disability-friendly seat rules | DONE | DONE | PUT /concessions/accessible-seats (release hours), enforced on hold · UI: Pricing → Concessions & booking rules |
 | 295 | Upload and manage bus permit documents | DONE | DONE | verified manually: existing module/API · UI: Fleet › vehicle page › documents upload/replace + submit for verification |
 | 296 | Upload and manage insurance documents | DONE | DONE | verified manually: existing module/API · UI: Fleet › vehicle page › documents upload/replace + submit for verification |
 | 297 | Upload and manage fitness certificate | DONE | TODO | verified manually: existing module/API |
