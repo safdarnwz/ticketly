@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { CheckCircle2, PhoneCall, Smartphone } from 'lucide-react';
 
 import { Button, Card, CardBody, CardHeader, Input, useToast } from '@/components/ui';
@@ -10,7 +10,7 @@ import { bookingsApi } from '@/lib/api/bookings';
 import { ApiError } from '@/lib/api/client';
 import { paymentsApi } from '@/lib/api/payments';
 import type { SearchResult } from '@/lib/api/types';
-import { normalizeMobile, validatePassengers, type PassengerForm } from '@/lib/checkout';
+import { CATEGORY_LABEL, normalizeMobile, validatePassengers, type Category, type PassengerForm } from '@/lib/checkout';
 import { formatDateTime, formatMoney, fromAppDateTimeInput, toAppDateTimeInput } from '@/lib/utils';
 
 /** Phone-booking release window (the server enforces the same). */
@@ -64,10 +64,23 @@ export function StaffTripPage() {
   const passengers: PassengerForm[] = sel.seats.map((s) => forms[s.seatNumber] ?? { seatNumber: s.seatNumber, fullName: '', age: '', gender: '', category: 'adult', idProof: '' });
   const patch = (seat: string, p: Partial<PassengerForm>) =>
     setForms((f) => ({ ...f, [seat]: { ...(f[seat] ?? { seatNumber: seat, fullName: '', age: '', gender: '', category: 'adult', idProof: '' }), ...p } }));
-  const errors = useMemo(
-    () => validatePassengers(passengers, { concessions: [], ladiesSeats: sel.seats.filter((s) => s.ladiesOnly).map((s) => s.seatNumber) }),
-    [passengers, sel.seats],
+  const rules = useQuery({ queryKey: ['concessions', trip?.tripId, trip?.departsAt.slice(0, 10)], queryFn: () => flowApi.concessions(trip!.departsAt.slice(0, 10)), enabled: Boolean(trip) });
+  const concessions = useMemo(() => rules.data?.concessions ?? [], [rules.data]);
+  const ladiesSeats = sel.seats.filter((s) => s.ladiesOnly).map((s) => s.seatNumber);
+  /** Staff may seat a man on a ladies seat (e.g. a family travelling together) — with a written reason, logged. */
+  const [ladiesReason, setLadiesReason] = useState('');
+  const rawErrors = useMemo(
+    () => validatePassengers(passengers, { concessions, policy: rules.data?.policy, ladiesSeats }),
+    [passengers, concessions, rules.data?.policy, ladiesSeats.join(',')], // eslint-disable-line react-hooks/exhaustive-deps
   );
+  const ladiesClash = passengers.some((p) => ladiesSeats.includes(p.seatNumber) && p.gender && p.gender !== 'female');
+  const overrideOk = ladiesReason.trim().length >= 5;
+  const errors = useMemo(() => {
+    if (!ladiesClash || !overrideOk) return rawErrors;
+    const e = { ...rawErrors };
+    passengers.forEach((p, i) => { if (ladiesSeats.includes(p.seatNumber) && e[`${i}.gender`]?.includes('women only')) delete e[`${i}.gender`]; });
+    return e;
+  }, [rawErrors, ladiesClash, overrideOk, passengers, ladiesSeats.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
   const mobile = normalizeMobile(phone);
   const priceOf = (t: string) => trip?.fares?.find((f) => f.seatType === t)?.priceMinor;
   const estimate = sel.seats.reduce((a, s) => a + (priceOf(s.seatType) ?? 0), 0);
@@ -88,7 +101,8 @@ export function StaffTripPage() {
       const hold = await bookingsApi.hold({
         quoteId: q.quoteId,
         seatNumbers: sel.seats.map((s) => s.seatNumber),
-        passengers: passengers.map((p) => ({ seatNumber: p.seatNumber, fullName: p.fullName.trim(), age: Number(p.age), gender: p.gender || undefined })),
+        passengers: passengers.map((p) => ({ seatNumber: p.seatNumber, fullName: p.fullName.trim(), age: Number(p.age), gender: p.gender || undefined, category: p.category === 'adult' ? undefined : p.category, idProof: p.idProof.trim() || undefined })),
+        ladiesSeatOverrideReason: ladiesClash ? ladiesReason.trim() : undefined,
         contactPhone: mobile!,
         contactEmail: email.trim() || undefined,
         channel: 'backoffice',
@@ -111,7 +125,8 @@ export function StaffTripPage() {
       return bookingsApi.phoneBook({
         quoteId: q.quoteId,
         seatNumbers: sel.seats.map((s) => s.seatNumber),
-        passengers: passengers.map((p) => ({ seatNumber: p.seatNumber, fullName: p.fullName.trim(), age: Number(p.age), gender: p.gender || undefined })),
+        passengers: passengers.map((p) => ({ seatNumber: p.seatNumber, fullName: p.fullName.trim(), age: Number(p.age), gender: p.gender || undefined, category: p.category === 'adult' ? undefined : p.category, idProof: p.idProof.trim() || undefined })),
+        ladiesSeatOverrideReason: ladiesClash ? ladiesReason.trim() : undefined,
         contactPhone: mobile!,
         contactEmail: email.trim() || undefined,
         releaseAt: new Date(releaseMs).toISOString(),
@@ -181,9 +196,29 @@ export function StaffTripPage() {
                     </select>
                     {showErrors && errors[`${i}.gender`] && <p className="mt-1 text-xs text-danger">{errors[`${i}.gender`]}</p>}
                   </div>
+                  {concessions.length > 0 && (
+                    <div className="sm:col-span-3">
+                      <label className="mb-1.5 block text-sm font-medium text-text" htmlFor={`cat-${i}`}>Concession</label>
+                      <select id={`cat-${i}`} value={p.category} onChange={(e) => patch(p.seatNumber, { category: e.target.value as Category })} className="h-input w-full rounded-input border border-border bg-surface px-input-x text-sm focus-ring">
+                        <option value="adult">None (adult)</option>
+                        {concessions.map((c) => <option key={c.category} value={c.category}>{CATEGORY_LABEL[c.category] ?? c.category} — {c.discountPct}% off</option>)}
+                      </select>
+                      {showErrors && errors[`${i}.category`] && <p className="mt-1 text-xs text-danger">{errors[`${i}.category`]}</p>}
+                    </div>
+                  )}
+                  {concessions.find((c) => c.category === p.category)?.requiresIdProof && (
+                    <div className="sm:col-span-3"><Input label="ID number (checked at boarding)" value={p.idProof} onChange={(e) => patch(p.seatNumber, { idProof: e.target.value.slice(0, 40) })} error={showErrors ? errors[`${i}.idProof`] : undefined} /></div>
+                  )}
                 </div>
               ))}
               {showErrors && errors.form && <p className="text-sm text-danger">{errors.form}</p>}
+              {ladiesClash && (
+                <div className="rounded-md border border-warning/50 bg-warning/5 p-3 text-sm">
+                  <div className="font-medium text-text">A male passenger is on a ladies seat</div>
+                  <p className="text-xs text-text-muted">Allowed at the counter only with a reason (e.g. husband travelling with his wife). It is recorded.</p>
+                  <Input label="Reason" value={ladiesReason} maxLength={300} onChange={(e) => setLadiesReason(e.target.value)} error={showErrors && !overrideOk ? 'Give a reason (at least 5 characters) — or pick another seat' : undefined} />
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Input label="Customer mobile" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} error={showErrors && !mobile ? 'Enter a 10-digit mobile' : undefined} />
                 <Input label="Customer email (optional)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />

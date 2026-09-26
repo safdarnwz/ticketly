@@ -14,6 +14,8 @@ export interface HoldInput {
   }[];
   contactEmail?: string;
   contactPhone?: string;
+  /** Staff only: a man on a ladies seat, with the reason (logged). */
+  ladiesSeatOverrideReason?: string;
   /** 'backoffice' for staff counter sales (needs booking:create); storefront omits it. */
   channel?: 'direct_web' | 'direct_app' | 'backoffice';
 }
