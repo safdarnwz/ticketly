@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Bus, Users, LayoutGrid, Sparkles, Upload } from 'lucide-react';
+import { Plus, Bus, Users, LayoutGrid, Sparkles, Upload, CalendarClock } from 'lucide-react';
 
 import { Button, Card, CardBody, Badge, statusTone, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -9,11 +9,12 @@ import { masterDataApi, type VehicleType, type Amenity, type SeatLayoutRow } fro
 import { fleetApi, type Vehicle } from '@/lib/api/fleet';
 import { SeatLayoutsTab } from './SeatLayoutsTab';
 import { CrewTab } from './CrewTab';
+import { RenewalsTab } from './RenewalsTab';
 import { isRegistration, normReg } from '@/lib/vehicle';
 import { cn } from '@/lib/utils';
 import { parseCsv } from '@/lib/csv';
 
-type Tab = 'vehicles' | 'layouts' | 'setup' | 'crew';
+type Tab = 'vehicles' | 'layouts' | 'setup' | 'crew' | 'renewals';
 
 export function FleetPage() {
   const [tab, setTab] = useState<Tab>('vehicles');
@@ -22,6 +23,7 @@ export function FleetPage() {
     { key: 'layouts', label: 'Seat Layouts', icon: LayoutGrid },
     { key: 'setup', label: 'Vehicle Types & Amenities', icon: Sparkles },
     { key: 'crew', label: 'Crew & Duties', icon: Users },
+    { key: 'renewals', label: 'Renewals', icon: CalendarClock },
   ];
 
   return (
@@ -39,6 +41,7 @@ export function FleetPage() {
       {tab === 'layouts' && <SeatLayoutsTab />}
       {tab === 'setup' && <SetupTab />}
       {tab === 'crew' && <CrewTab />}
+      {tab === 'renewals' && <RenewalsTab />}
     </>
   );
 }

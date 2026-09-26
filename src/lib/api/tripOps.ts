@@ -31,6 +31,8 @@ export const tripOpsExtraApi = {
   uploadReceipt: (tripId: string, file: File) =>
     post<{ fileId: string; fileName: string }>(`/v1/trips/${tripId}/expenses/receipt?fileName=${encodeURIComponent(file.name)}`, file, { headers: { 'Content-Type': 'application/octet-stream' } }),
   openReceipt: (fileId: string) => download(`/v1/files/${fileId}`, 'receipt'),
+  /** Take someone off the waitlist (staff read the number from the entry). */
+  leaveWaitlist: (tripId: string, id: string, contactPhone: string) => post<{ ok: boolean }>(`/v1/trips/${tripId}/waitlist/${id}/leave`, { contactPhone }),
   addExpense: (tripId: string, body: { category: ExpenseCategory; amountMinor: number; note?: string; receiptFileId?: string }, key: string) =>
     post<{ id: string }>(`/v1/trips/${tripId}/expenses`, body, withIdempotency(key)),
   voidExpense: (tripId: string, expenseId: string, reason: string, key: string) =>

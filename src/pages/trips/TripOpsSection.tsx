@@ -132,7 +132,14 @@ function Quotas({ chart, locked, onChanged }: { chart: TripChart; locked: boolea
 }
 
 function Waitlist({ tripId }: { tripId: string }) {
+  const qc = useQueryClient();
+  const toast = useToast();
   const q = useQuery({ queryKey: ['trip-waitlist', tripId], queryFn: () => tripOpsExtraApi.waitlist(tripId) });
+  const remove = useMutation({
+    mutationFn: (w: { id: string; contactPhone: string }) => tripOpsExtraApi.leaveWaitlist(tripId, w.id, w.contactPhone),
+    onSuccess: () => { toast.success('Removed from the waitlist'); void qc.invalidateQueries({ queryKey: ['trip-waitlist', tripId] }); },
+    onError: (x) => toast.error(errText(x)),
+  });
   if (q.isLoading) return <PageLoader />;
   if (q.isError) return <ErrorState error={q.error} onRetry={q.refetch} />;
   const items = q.data?.items ?? [];
@@ -142,7 +149,9 @@ function Waitlist({ tripId }: { tripId: string }) {
       {items.map((w) => (
         <li key={w.id} className="flex items-center justify-between gap-2 px-3 py-2">
           <span><span className="font-mono">{w.contactPhone}</span> · {w.seatCount} seat{w.seatCount === 1 ? '' : 's'} · {w.fromStop} → {w.toStop}</span>
-          <span className="flex items-center gap-2 text-xs text-text-muted"><Badge tone={w.status === 'waiting' ? 'warning' : 'neutral'}>{w.status}</Badge>{w.notifiedAt ? `told ${formatDateTime(w.notifiedAt)}` : `since ${formatDateTime(w.createdAt)}`}</span>
+          <span className="flex items-center gap-2 text-xs text-text-muted"><Badge tone={w.status === 'waiting' ? 'warning' : 'neutral'}>{w.status}</Badge>{w.notifiedAt ? `told ${formatDateTime(w.notifiedAt)}` : `since ${formatDateTime(w.createdAt)}`}
+            {w.status === 'waiting' && <Button size="sm" variant="ghost" loading={remove.isPending && remove.variables?.id === w.id} disabled={remove.isPending}
+              onClick={() => { if (window.confirm(`Remove ${w.contactPhone} from the waitlist?`)) remove.mutate({ id: w.id, contactPhone: w.contactPhone }); }}>Remove</Button>}</span>
         </li>
       ))}
     </ul>

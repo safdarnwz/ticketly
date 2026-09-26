@@ -9,6 +9,11 @@ export interface CrewAllowance { remainingDrivingMinutes: number; nextAvailableA
 export interface ComplianceRow { id: string; crewName: string; role: string; tripId: string | null; startsAt: string; endsAt: string; drivingMinutes: number; attendance: string; overrideReason: string | null; overrideConflicts: unknown[] | null; approvedBy: string | null }
 export interface MaintenanceEntry { kind: string; description: string; odometerKm: number | null; costMinor: number; performedOn: string; nextDueOn: string | null }
 export interface VehicleMedia { id: string; kind: string; caption: string | null; url: string | null }
+export interface Renewals {
+  days: number;
+  documents: { vehicleId: string; registrationNo: string; docType: string; documentNo: string | null; expiresOn: string; daysLeft: number }[];
+  licences: { crewId: string; fullName: string; licenceNo: string | null; expiresOn: string | null; daysLeft: number | null }[];
+}
 export const MAINTENANCE_KINDS = ['service', 'repair', 'inspection'] as const;
 export interface Duty { id: string; crewId: string; crewName: string; crewRole: string; tripId: string | null; tripLabel: string | null; startsAt: string; endsAt: string; drivingMinutes: number; attendance: 'pending' | 'present' | 'late' | 'absent'; overrideReason: string | null }
 
@@ -58,6 +63,7 @@ export const fleetApi = {
     post<{ imported: number; failed: { row: number; error: string }[] }>('/v1/fleet/vehicles/bulk-import', { rows }),
   addMaintenance: (vehicleId: string, input: { kind: string; description: string; odometerKm?: number; costMinor?: number; performedOn: string; nextDueOn?: string }) =>
     post<{ ok: boolean }>(`/v1/fleet/vehicles/${vehicleId}/maintenance`, input),
+  renewals: (days: number) => get<Renewals>(`/v1/fleet/expiring?days=${days}`),
   listMaintenance: (vehicleId: string) => get<{ items: MaintenanceEntry[] }>(`/v1/fleet/vehicles/${vehicleId}/maintenance`),
   listMedia: (vehicleId: string) => get<{ items: VehicleMedia[] }>(`/v1/fleet/vehicles/${vehicleId}/media`),
   addPhoto: (vehicleId: string, file: File, caption?: string) =>
