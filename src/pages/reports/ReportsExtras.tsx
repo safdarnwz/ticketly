@@ -5,7 +5,7 @@ import { Download } from 'lucide-react';
 
 import { Badge, Button, Card, CardBody, EmptyState, ErrorState, Input, Modal, PageLoader, Select, Table, type Column, useToast } from '@/components/ui';
 import { reportsApi, type ForecastRow, type PnlRow } from '@/lib/api/reports';
-import { cn, dayDiff, formatDateLabel, formatDateTime, formatMoney, minutesToHm } from '@/lib/utils';
+import { cn, dayDiff, downloadCsv, formatDateLabel, formatDateTime, formatMoney, minutesToHm } from '@/lib/utils';
 
 const errText = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
 const money = (m: number | null | undefined) => (m == null ? '—' : formatMoney(Number(m), 'INR'));
@@ -68,7 +68,6 @@ export function DispatchTab({ from, to }: { from: string; to: string }) {
   const idle = buses.filter((b) => b.trips === 0);
   /** One sheet (opens in Excel): the summary, then late departures, buses and crew. */
   const exportCsv = () => {
-    const cell = (v: unknown) => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
     const rows: unknown[][] = [
       [`Dispatch report ${from} to ${to}`], [],
       ['Trips run', 'Cancelled', 'On time %', 'Average late start (min)'],
@@ -78,10 +77,7 @@ export function DispatchTab({ from, to }: { from: string; to: string }) {
       ['Buses'], ['Bus', 'Trips', 'Scheduled hours'], ...buses.map((b) => [b.bus, b.trips, b.scheduledHours ?? 0]), [],
       ['Crew'], ['Name', 'Role', 'Duties', 'Late', 'Absent', 'Driving (min)'], ...crew.map((c) => [c.name, c.role, c.duties, c.late, c.absent, c.drivingMinutes]),
     ];
-    const blob = new Blob(['\ufeff' + rows.map((r) => r.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = `dispatch-${from}-to-${to}.csv`; a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    downloadCsv(`dispatch-${from}-to-${to}.csv`, rows);
   };
   return (
     <div className="flex flex-col gap-6">

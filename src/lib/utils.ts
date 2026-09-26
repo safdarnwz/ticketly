@@ -120,3 +120,12 @@ export function minutesToHm(min: number): string {
 export function idempotencyKey(prefix = 'web'): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
+
+/** Save rows as a CSV file that opens in Excel (UTF-8 with BOM, quoted where needed). */
+export function downloadCsv(filename: string, rows: unknown[][]): void {
+  const cell = (v: unknown) => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const blob = new Blob(['﻿' + rows.map((r) => r.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}

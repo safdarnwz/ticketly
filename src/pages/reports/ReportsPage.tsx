@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
-import { TrendingUp, Download, BarChart3, XCircle, Clock, IndianRupee, Timer, LineChart } from 'lucide-react';
+import { TrendingUp, Download, BarChart3, XCircle, Clock, IndianRupee, Timer, LineChart, BookOpen } from 'lucide-react';
 
 import { Button, Card, CardBody, Input, Table, type Column, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
+import { authApi } from '@/lib/api/auth';
 import { reportsApi } from '@/lib/api/reports';
 import { DispatchTab, ForecastTab, PnlTab } from './ReportsExtras';
+import { LedgerTab } from './LedgerTab';
 import { addDaysIso, cn, dayDiff, formatDateLabel, formatMoney, todayLocal } from '@/lib/utils';
 
-type Tab = 'revenue' | 'occupancy' | 'routes' | 'cancellations' | 'peak-hours' | 'pnl' | 'dispatch' | 'forecast';
+type Tab = 'revenue' | 'occupancy' | 'routes' | 'cancellations' | 'peak-hours' | 'pnl' | 'dispatch' | 'forecast' | 'ledger';
 
 /** The operator's own calendar days, not UTC. */
 function lastDays(n: number) {
@@ -25,6 +27,10 @@ const day = (d: string) => formatDateLabel(d, { weekday: 'short', day: '2-digit'
 
 export function ReportsPage() {
   const [tab, setTab] = useState<Tab>('revenue');
+  // The ledger is for whoever handles settlements; the API refuses everyone else anyway.
+  const me = useQuery({ queryKey: ['auth-me'], queryFn: authApi.me, staleTime: 60_000 });
+  const held = new Set(me.data?.permissions ?? []);
+  const canLedger = held.has('*') || held.has('settlement:manage');
   const [{ from, to }, setRange] = useState(lastDays(30));
   const rangeError = !from || !to ? 'Pick both dates' : from > to ? "'From' is after 'To'" : dayDiff(`${from}T00:00:00Z`, `${to}T00:00:00Z`) > 366 ? 'Pick at most a year' : undefined;
 
@@ -54,6 +60,7 @@ export function ReportsPage() {
           { key: 'pnl', label: 'Profit & Loss', icon: IndianRupee },
           { key: 'dispatch', label: 'Dispatch', icon: Timer },
           { key: 'forecast', label: 'Forecast', icon: LineChart },
+          ...(canLedger ? [{ key: 'ledger', label: 'Ledger', icon: BookOpen }] as const : []),
         ] as const).map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setTab(key)}
             className={cn('flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium', tab === key ? 'border-primary text-text' : 'border-transparent text-text-muted hover:text-text')}>
@@ -72,6 +79,7 @@ export function ReportsPage() {
           {tab === 'pnl' && <PnlTab from={from} to={to} />}
           {tab === 'dispatch' && <DispatchTab from={from} to={to} />}
           {tab === 'forecast' && <ForecastTab />}
+          {tab === 'ledger' && canLedger && <LedgerTab from={from} to={to} />}
         </>
       )}
     </>

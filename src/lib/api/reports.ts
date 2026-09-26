@@ -33,3 +33,18 @@ export const reportsApi = {
   cancelSuggestions: (days: number, maxPct: number) => get<{ maxPct: number; items: ForecastRow[] }>(`/v1/reports/cancel-suggestions?days=${days}&maxPct=${maxPct}`),
   decideSuggestion: (tripId: string, decision: 'accepted' | 'rejected', reason: string) => post<{ tripId: string; decision: string }>(`/v1/trips/${tripId}/cancel-suggestion/decision`, { decision, reason }),
 };
+
+export const LEDGER_ENTRY_TYPES = ['booking.captured', 'booking.captured_offline', 'booking.partner_commission', 'refund.paid', 'refund.offline', 'refund.partner_commission', 'settlement.paid'] as const;
+export interface LedgerEntry { id: string; type: string; currency: string; sourceType: string; sourceId: string; createdAt: string; pnr: string | null; postings: { account: string; amountMinor: number; ref: string | null }[] }
+export interface LedgerQuery { from: string; to: string; type?: string; pnr?: string; before?: string }
+
+export const ledgerApi = {
+  journal: (q: LedgerQuery) => {
+    const p = new URLSearchParams({ from: q.from, to: q.to, limit: '50' });
+    if (q.type) p.set('type', q.type);
+    if (q.pnr) p.set('pnr', q.pnr);
+    if (q.before) p.set('before', q.before);
+    return get<{ items: LedgerEntry[]; nextBefore: string | null }>(`/v1/payments/ledger/entries?${p}`);
+  },
+  trialBalance: () => get<{ accounts: { account: string; balance: number }[]; total: number; balanced: boolean }>('/v1/payments/ledger/trial-balance'),
+};
