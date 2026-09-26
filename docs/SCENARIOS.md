@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3123 |
-| TODO | 892 |
-| DONE | 63 |
+| TODO | 888 |
+| DONE | 67 |
 | DUP | 9 |
 
 
@@ -44,7 +44,7 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 7 | Set operator email and phone | DONE | TODO | verified manually: existing module/API |
 | 8 | Set GST number for operator | DONE | TODO | verified manually: existing module/API |
 | 9 | Set PAN number for operator | DONE | TODO | verified manually: existing module/API |
-| 10 | Enter bank account details for settlements | DONE | TODO | verified manually: existing module/API |
+| 10 | Enter bank account details for settlements | DONE | DONE | verified manually: existing module/API · UI: Settings › Bank Details: checked fields, re-enter number, change under review, withdraw |
 | 11 | Enable or disable global payment gateways | DONE | TODO | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test |
 | 12 | Configure Razorpay credentials | DONE | TODO | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test |
 | 13 | Configure PayU credentials | DONE | TODO | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test |
@@ -68,8 +68,8 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 31 | Lock operator account on suspicious activity | DONE | TODO | verified manually: existing module/API |
 | 32 | Unlock operator account | DONE | TODO | verified manually: existing module/API |
 | 33 | Define global GST tax slabs | DONE | TODO | PUT /admin/policies/gst-slabs |
-| 34 | Create cancellation policy templates | DONE | TODO | verified manually: existing module/API |
-| 35 | Create refund policy templates | DONE | TODO | verified manually: existing module/API |
+| 34 | Create cancellation policy templates | DONE | DONE | verified manually: existing module/API · UI: Settings › Cancellation Policy: tiers with checks, preview, reset to default |
+| 35 | Create refund policy templates | DONE | DONE | verified manually: existing module/API · UI: Settings › Cancellation Policy: tiers with checks, preview, reset to default |
 | 36 | Enable dynamic pricing engine globally | DONE | TODO | verified manually: existing module/API |
 | 37 | Enable redBus integration | DONE | TODO | verified manually: existing module/API |
 | 38 | Enable AbhiBus integration | DONE | TODO | verified manually: existing module/API |
@@ -367,7 +367,7 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 330 | Generate data for GST returns | GAP | — | verified manually: not built yet |
 | 331 | Generate data for TDS returns | GAP | — | verified manually: not built yet |
 | 332 | View monthly Profit and Loss statement | DONE | TODO | verified manually: existing module/API |
-| 333 | View route-wise profitability ranking | DONE | TODO | verified manually: existing module/API |
+| 333 | View route-wise profitability ranking | DONE | DONE | verified manually: existing module/API · UI: Reports › Route Performance (last 30 days, fixed occupancy) |
 | 334 | View bus-wise profitability ranking | DONE | TODO | verified manually: existing module/API |
 | 335 | Export all financial reports | GAP | — | verified manually: not built yet |
 | 336 | Configure list of expense categories | GAP | — | verified manually: not built yet |
