@@ -122,7 +122,7 @@ export class LedgerRepository {
     const more = rows.length > q.limit;
     const items = more ? rows.slice(0, q.limit) : rows;
     for (const e of items) for (const p of e.postings) p.amountMinor = Number(p.amountMinor);
-    return { items, nextBefore: more ? items[items.length - 1]!.id : null };
+    return { items, nextBefore: more ? items[items.length - 1].id : null };
   }
 }
 
