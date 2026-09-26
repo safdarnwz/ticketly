@@ -13,7 +13,20 @@ export interface LoginWindow { days: number[]; startMinute: number; endMinute: n
 export interface PermissionGroup { group: string; items: { code: string; label: string; grantable: boolean }[] }
 export interface RoleTemplate { id: string; code: string; name: string; description: string; permissions: string[] }
 export interface StaffAccess { accessExpiresAt?: string | null; loginWindow?: LoginWindow | null; managerId?: string | null }
-export interface StaffPerformance { userId: string; fullName: string; branchName: string | null; bookings: number; seats: number; revenueMinor: number; cancelled: number; cancellationRatePct: number }
+export interface StaffPerformance { userId: string; fullName: string; branchName: string | null; bookings: number; seats: number; revenueMinor: number; cancelled: number; cancellationRatePct: number; targetBookings: number | null; targetRevenueMinor: number | null }
+export interface StaffTarget { dailyBookings: number; dailyRevenueMinor: number | null; updatedAt: string }
+export type WarningReason = 'low_sales' | 'high_cancellations' | 'conduct' | 'attendance' | 'other';
+export const WARNING_REASONS: { value: WarningReason; label: string }[] = [
+  { value: 'low_sales', label: 'Low sales' },
+  { value: 'high_cancellations', label: 'Too many cancellations' },
+  { value: 'conduct', label: 'Conduct' },
+  { value: 'attendance', label: 'Attendance' },
+  { value: 'other', label: 'Other' },
+];
+export const reasonLabel = (r: string) => WARNING_REASONS.find((x) => x.value === r)?.label ?? r;
+export interface StaffWarning { id: string; reason: WarningReason; note: string; issuedByName: string | null; issuedAt: string; acknowledgedAt: string | null }
+export type StaffRecord = Staff & { activity: StaffActivity[]; warnings: StaffWarning[]; target: StaffTarget | null };
+export interface StaffImportResult { imported: number; failed: { row: number; error: string }[]; created: { row: number; fullName: string; email: string; password: string }[] }
 
 export const staffApi = {
   list: (f: { q?: string; status?: string; branchId?: string; roleId?: string; page: number }) => {
@@ -21,7 +34,14 @@ export const staffApi = {
     for (const k of ['q', 'status', 'branchId', 'roleId'] as const) if (f[k]) q.set(k, f[k]!);
     return get<{ items: Staff[]; page: number; hasMore: boolean }>(`/v1/users?${q}`);
   },
-  get: (id: string) => get<Staff & { activity: StaffActivity[] }>(`/v1/users/${id}`),
+  get: (id: string) => get<StaffRecord>(`/v1/users/${id}`),
+  me: () => get<StaffRecord>('/v1/users/me'),
+  acknowledgeWarning: (warningId: string) => post<{ ok: boolean }>(`/v1/users/me/warnings/${warningId}/acknowledge`, {}),
+  setTarget: (id: string, target: { dailyBookings: number; dailyRevenueMinor: number | null }) => put<{ ok: boolean }>(`/v1/users/${id}/target`, target),
+  clearTarget: (id: string) => del<{ ok: boolean }>(`/v1/users/${id}/target`),
+  warn: (id: string, reason: WarningReason, note: string) => post<{ id: string }>(`/v1/users/${id}/warnings`, { reason, note }),
+  importTemplate: () => download('/v1/users/import-template.csv', 'staff-upload-template.csv'),
+  bulkImport: (rows: Record<string, string>[]) => post<StaffImportResult>('/v1/users/bulk-import', { rows }),
   roles: () => get<{ items: Role[] }>('/v1/roles'),
   invite: (body: { fullName: string; email: string; phone?: string; password: string; roles: string[] }) => post<{ id: string }>('/v1/users', body),
   update: (id: string, changes: { fullName?: string; phone?: string; status?: 'active' | 'disabled' }) => patch<{ ok: boolean }>(`/v1/users/${id}`, changes),

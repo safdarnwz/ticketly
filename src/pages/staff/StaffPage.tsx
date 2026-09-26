@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, KeyRound, LogOut, Plus, ShieldCheck, Search, Trophy, UserCog, UserPlus, X } from 'lucide-react';
+import { Download, KeyRound, Upload, LogOut, Plus, ShieldCheck, Search, Trophy, UserCog, UserPlus, X } from 'lucide-react';
 
 import { Badge, Button, Card, CardBody, EmptyState, ErrorState, Input, Modal, PageLoader, Select, Table, useToast, type Column } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ApiError } from '@/lib/api/client';
 import { branchesApi } from '@/lib/api/branches';
 import { RolesTab } from './RolesTab';
+import { TargetProgress, TargetSection, UploadStaffModal, WarningsSection } from './StaffTeamTools';
 import { staffApi, type Staff, type StaffPerformance } from '@/lib/api/staff';
 import { useAuth } from '@/stores/auth';
 import { addDaysIso, cn, formatDateTime, formatMoney, todayLocal } from '@/lib/utils';
@@ -44,6 +45,7 @@ function Directory() {
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const roles = useQuery({ queryKey: ['roles'], queryFn: staffApi.roles });
   const branches = useQuery({ queryKey: ['branches'], queryFn: branchesApi.list });
@@ -75,6 +77,7 @@ function Directory() {
           <div className="w-44"><Select label="Role" value={roleId} onChange={(e) => { setRoleId(e.target.value); reset(); }} options={[{ label: 'Any role', value: '' }, ...(roles.data?.items ?? []).map((r) => ({ label: r.name, value: r.id }))]} /></div>
           <div className="ml-auto flex gap-2">
             <Button variant="outline" leftIcon={<Download className="h-4 w-4" />} loading={exp.isPending} onClick={() => exp.mutate()}>Export CSV</Button>
+            <Button variant="outline" leftIcon={<Upload className="h-4 w-4" />} onClick={() => setUploading(true)}>Upload staff</Button>
             <Button leftIcon={<UserPlus className="h-4 w-4" />} onClick={() => setInviting(true)}>Add staff</Button>
           </div>
         </CardBody>
@@ -94,6 +97,7 @@ function Directory() {
       )}
 
       {open && <StaffModal id={open} onClose={() => setOpen(null)} />}
+      {uploading && <UploadStaffModal onClose={() => setUploading(false)} />}
       {inviting && <InviteModal onClose={() => setInviting(false)} onDone={(id) => { setInviting(false); setOpen(id); }} />}
     </>
   );
@@ -175,6 +179,8 @@ function StaffModal({ id, onClose }: { id: string; onClose: () => void }) {
 
           <AccessSection staff={d} self={self} onSaved={refresh} />
           {!self && d.status === 'active' && <PasswordSection id={d.id} />}
+          <TargetSection key={d.target?.updatedAt ?? 'none'} id={d.id} target={d.target} disabled={d.status !== 'active'} onSaved={refresh} />
+          <WarningsSection id={d.id} warnings={d.warnings} canIssue={!self && d.status === 'active'} why={self ? 'You cannot warn yourself' : d.status !== 'active' ? 'Enable the account first' : undefined} onSaved={refresh} />
 
           <div>
             <div className="mb-1.5 font-semibold text-text">Recent activity</div>
@@ -340,11 +346,13 @@ function Performance() {
     { key: 'bookings', header: 'Bookings', render: (r) => r.bookings },
     { key: 'seats', header: 'Seats', render: (r) => r.seats },
     { key: 'revenue', header: 'Revenue', render: (r) => formatMoney(r.revenueMinor, 'INR') },
+    { key: 'target', header: 'Bookings vs target', render: (r) => <TargetProgress done={r.bookings} target={r.targetBookings} /> },
     { key: 'cancel', header: 'Cancelled', render: (r) => <span className={cn(r.cancellationRatePct > 20 && 'text-danger')}>{r.cancelled} ({r.cancellationRatePct}%)</span> },
     {
       key: 'flag', header: '', render: (r) => r.bookings === 0 ? <span className="text-xs text-text-muted">No counter sales</span>
         : r === selling[0] ? <Badge tone="success">Top seller</Badge>
-          : selling.length > 2 && r.revenueMinor < avg / 2 ? <Badge tone="warning">Below half the average</Badge> : null,
+          : selling.length > 2 && r.revenueMinor < avg / 2 ? <Badge tone="warning">Below half the average</Badge>
+            : r.targetBookings && r.bookings < r.targetBookings ? <Badge tone="warning">Behind target</Badge> : null,
     },
   ];
   return (

@@ -16,7 +16,7 @@ export function Topbar() {
         {user?.tenantId ? 'Operator console' : 'Platform console'}
       </div>
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2.5">
+        <button type="button" disabled={!user?.tenantId} onClick={() => navigate('/me')} title={user?.tenantId ? 'My account' : undefined} className="flex items-center gap-2.5 rounded-md px-1 hover:bg-surface-muted">
           <div className="flex h-9 w-9 items-center justify-center rounded-pill bg-surface-muted text-text-muted">
             <User className="h-4 w-4" />
           </div>
@@ -24,7 +24,7 @@ export function Topbar() {
             <div className="text-sm font-medium leading-tight text-text">{user?.fullName ?? 'User'}</div>
             <div className="text-xs capitalize text-text-muted">{role ?? 'member'}</div>
           </div>
-        </div>
+        </button>
         <Button
           variant="outline"
           size="sm"

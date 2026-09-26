@@ -11,6 +11,7 @@ import { SeatLayoutsTab } from './SeatLayoutsTab';
 import { isRegistration, normReg } from '@/lib/vehicle';
 import { normalizeMobile } from '@/lib/checkout';
 import { cn } from '@/lib/utils';
+import { parseCsv } from '@/lib/csv';
 
 type Tab = 'vehicles' | 'layouts' | 'setup' | 'crew';
 
@@ -94,20 +95,7 @@ function VehiclesTab() {
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
   });
   const bulkImport = useMutation({
-    mutationFn: () => {
-      const lines = importText.trim().split('\n').filter(Boolean);
-      const [header, ...rows] = lines;
-      const cols = header.split(',').map((c) => c.trim());
-      const parsed = rows.map((line) => {
-        const vals = line.split(',').map((v) => v.trim());
-        const obj: Record<string, string> = {};
-        cols.forEach((c, i) => { obj[c] = vals[i] ?? ''; });
-        // Blank cells are "not given", not empty text.
-        for (const k of Object.keys(obj)) if (obj[k] === '') delete obj[k];
-        return obj as never;
-      });
-      return fleetApi.bulkImportVehicles(parsed);
-    },
+    mutationFn: () => fleetApi.bulkImportVehicles(parseCsv(importText) as never),
     onSuccess: (res) => { setImportResult(res); void qc.invalidateQueries({ queryKey: ['vehicles'] }); },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Import failed'),
   });

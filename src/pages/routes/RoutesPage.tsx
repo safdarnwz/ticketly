@@ -5,6 +5,7 @@ import { Plus, MapPin, Route as RouteIcon, Trash2, CheckCircle2, Archive, Copy, 
 import { Button, Card, CardBody, Badge, statusTone, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { masterDataApi, type RouteRow, type City, type Stop } from '@/lib/api/masterData';
+import { parseCsv } from '@/lib/csv';
 
 interface StopDraft { stopId: string; stopName: string; sequence: number; distanceFromOriginM: number; departOffsetMin: number }
 
@@ -293,18 +294,7 @@ function StopsTab() {
     onSuccess: () => { toast.success('Stop deactivated — hidden from customer search'); void qc.invalidateQueries({ queryKey: ['all-stops'] }); },
   });
   const bulkImport = useMutation({
-    mutationFn: () => {
-      const lines = importText.trim().split('\n').filter(Boolean);
-      const [header, ...rows] = lines;
-      const cols = header.split(',').map((c) => c.trim());
-      const parsed = rows.map((line) => {
-        const vals = line.split(',').map((v) => v.trim());
-        const obj: Record<string, string> = {};
-        cols.forEach((c, i) => { obj[c] = vals[i] ?? ''; });
-        return obj as never;
-      });
-      return masterDataApi.bulkImportStops(parsed);
-    },
+    mutationFn: () => masterDataApi.bulkImportStops(parseCsv(importText) as never),
     onSuccess: (res) => { setImportResult(res); void qc.invalidateQueries({ queryKey: ['all-stops'] }); },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Import failed'),
   });

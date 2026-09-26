@@ -24,6 +24,10 @@ export const authApi = {
 
   refresh: (refreshToken: string) => post<AuthTokens>('/v1/auth/refresh', { refreshToken }),
   logout: (refreshToken: string) => post<void>('/v1/auth/logout', { refreshToken }),
+  /** Every session of mine ends, this one included. */
+  logoutAll: () => post<void>('/v1/auth/logout-all', {}),
+  /** Change my own password; my other sessions end, this one stays. */
+  changePassword: (currentPassword: string, newPassword: string) => post<void>('/v1/auth/password', { currentPassword, newPassword }),
 
   /** Step 1 of forgot-password: send a code to email/mobile. */
   requestPasswordResetOtp: (identity: string) =>
