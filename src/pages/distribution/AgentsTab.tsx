@@ -6,6 +6,7 @@ import { Badge, Button, Card, CardBody, EmptyState, ErrorState, Input, Modal, Pa
 import { ApiError } from '@/lib/api/client';
 import { agentsApi, type Agent, type AgentLedgerEntry, type AgentStatus, type BillingMode, type Slab } from '@/lib/api/agents';
 import { branchesApi } from '@/lib/api/branches';
+import { AgentComplaints } from './AgentComplaints';
 import { addDaysIso, cn, formatDateTime, formatMoney, idempotencyKey, todayLocal } from '@/lib/utils';
 
 const STATUS_TONE: Record<AgentStatus, 'success' | 'warning' | 'danger' | 'neutral'> = { active: 'success', pending: 'warning', suspended: 'danger', rejected: 'neutral' };
@@ -119,7 +120,7 @@ function AgentModal({ id, onClose }: { id: string; onClose: () => void }) {
   const qc = useQueryClient();
   const toast = useToast();
   const a = useQuery({ queryKey: ['agent', id], queryFn: () => agentsApi.get(id) });
-  const [tab, setTab] = useState<'money' | 'terms' | 'statement'>('money');
+  const [tab, setTab] = useState<'money' | 'terms' | 'statement' | 'complaints'>('money');
   const refresh = () => { void qc.invalidateQueries({ queryKey: ['agent', id] }); void qc.invalidateQueries({ queryKey: ['agents'] }); void qc.invalidateQueries({ queryKey: ['agent-ledger', id] }); };
   const [reason, setReason] = useState('');
   const [acting, setActing] = useState<'suspended' | 'rejected' | null>(null);
@@ -153,11 +154,11 @@ function AgentModal({ id, onClose }: { id: string; onClose: () => void }) {
             </div>
           )}
           <div className="flex gap-2 border-b border-border">
-            {([['money', 'Money'], ['terms', 'Terms & commission'], ['statement', 'Statement']] as const).map(([k, l]) => (
+            {([['money', 'Money'], ['terms', 'Terms & commission'], ['statement', 'Statement'], ['complaints', 'Complaints']] as const).map(([k, l]) => (
               <button key={k} onClick={() => setTab(k)} className={cn('border-b-2 px-3 py-1.5', tab === k ? 'border-primary text-text' : 'border-transparent text-text-muted')}>{l}</button>
             ))}
           </div>
-          {tab === 'money' ? <MoneyTab agent={d} onDone={refresh} /> : tab === 'terms' ? <TermsTab agent={d} onDone={refresh} /> : <StatementTab id={d.id} />}
+          {tab === 'money' ? <MoneyTab agent={d} onDone={refresh} /> : tab === 'terms' ? <TermsTab agent={d} onDone={refresh} /> : tab === 'complaints' ? <AgentComplaints agentId={d.id} /> : <StatementTab id={d.id} />}
         </div>
       )}
     </Modal>

@@ -44,4 +44,17 @@ export const agentsApi = {
   setDefaultSlabs: (slabs: Slab[]) => put<{ ok: boolean }>('/v1/agents/commission-slabs', { slabs }),
   slabs: (id: string) => get<{ agentSlabs: Slab[]; operatorDefaultSlabs: Slab[]; currentRate: { pct: number; source: string; monthSalesMinor: number } }>(`/v1/agents/${id}/commission-slabs`),
   setSlabs: (id: string, slabs: Slab[]) => put<{ ok: boolean }>(`/v1/agents/${id}/commission-slabs`, { slabs }),
+  complaints: (id: string) => get<{ items: AgentComplaint[] }>(`/v1/agents/${id}/complaints`),
+  /** `key` is made once per form, so a double-clicked submit records one complaint. */
+  raiseComplaint: (id: string, body: { category: ComplaintCategory; description: string; pnr?: string }, key: string) =>
+    post<{ id: string }>(`/v1/agents/${id}/complaints`, body, withIdempotency(key)),
+  decideComplaint: (id: string, complaintId: string, outcome: 'upheld' | 'dismissed', resolution: string, key: string) =>
+    post<{ status: string }>(`/v1/agents/${id}/complaints/${complaintId}/decision`, { outcome, resolution }, withIdempotency(key)),
 };
+
+export type ComplaintCategory = 'overcharging' | 'wrong_booking' | 'misbehaviour' | 'fraud' | 'other';
+export interface AgentComplaint {
+  id: string; agentId: string; category: ComplaintCategory; description: string; bookingId: string | null; pnr: string | null;
+  status: 'open' | 'upheld' | 'dismissed'; resolution: string | null; raisedByName: string | null; resolvedByName: string | null;
+  createdAt: string; resolvedAt: string | null;
+}
