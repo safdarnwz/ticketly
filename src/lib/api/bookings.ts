@@ -39,7 +39,7 @@ export type StaffBookingStatus = 'live' | 'confirmed' | 'cancelled' | 'expired' 
 export interface StaffBookingFilters {
   pnr?: string; mobile?: string; ticket?: string;
   from?: string; to?: string; dateBasis?: 'booked' | 'journey';
-  status?: StaffBookingStatus; channel?: string; tripId?: string; agentId?: string; noShow?: boolean;
+  status?: StaffBookingStatus; channel?: string; tripId?: string; agentId?: string; noShow?: boolean; branchId?: string;
 }
 
 export const bookingsApi = {

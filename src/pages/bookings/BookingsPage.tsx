@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { bookingsApi, type StaffBookingFilters, type StaffBookingRow, type StaffBookingStatus } from '@/lib/api/bookings';
 import { classifyQuery } from '@/lib/booking-query';
 import { agentsApi } from '@/lib/api/agents';
+import { branchesApi } from '@/lib/api/branches';
 import { addDaysIso, cn, dayDiff, formatMoney, formatTime, todayLocal } from '@/lib/utils';
 
 const MAX_DAYS = 92;
@@ -68,6 +69,8 @@ export function BookingsPage() {
   const tripLabel = params.get('route') ?? '';
   const agentId = params.get('agent') ?? '';
   const noShow = params.get('noShow') === '1';
+  const branchId = params.get('branch') ?? '';
+  const branches = useQuery({ queryKey: ['branches'], queryFn: branchesApi.list, staleTime: 60_000 });
   const agents = useQuery({ queryKey: ['agents', 'all'], queryFn: () => agentsApi.list(), enabled: channel === 'agent' || !!agentId, staleTime: 60_000 });
   const [draft, setDraft] = useState(q);
   const [draftError, setDraftError] = useState('');
@@ -84,7 +87,7 @@ export function BookingsPage() {
 
   const filters: StaffBookingFilters = byId
     ? { [byId.kind]: byId.value, status: status || undefined }
-    : { from, to, dateBasis: basis, status: status || undefined, channel: channel || undefined, tripId: tripId || undefined, agentId: agentId || undefined, noShow: noShow || undefined };
+    : { from, to, dateBasis: basis, status: status || undefined, channel: channel || undefined, tripId: tripId || undefined, agentId: agentId || undefined, noShow: noShow || undefined, branchId: branchId || undefined };
 
   const list = useInfiniteQuery({
     queryKey: ['staff-bookings', filters],
@@ -142,7 +145,7 @@ export function BookingsPage() {
     { key: 'status', header: 'Status', render: (b) => <div className="flex flex-col items-start gap-1"><Badge tone={b.liveHold ? 'warning' : statusTone(b.status)}>{b.liveHold ? 'paying now' : b.status === 'completed' ? 'travelled' : b.status}</Badge>{b.noShowSeats?.length ? <Badge tone="danger">no-show: {b.noShowSeats.join(', ')}</Badge> : null}</div> },
   ];
 
-  const anyFilter = q || status || channel || tripId || agentId || noShow || basis !== 'booked' || from !== today || to !== today;
+  const anyFilter = q || status || channel || tripId || agentId || noShow || branchId || basis !== 'booked' || from !== today || to !== today;
 
   return (
     <>
@@ -172,6 +175,10 @@ export function BookingsPage() {
               <Input label="From" type="date" value={from} onChange={(e) => set({ from: e.target.value || undefined })} error={rangeError && from > to ? rangeError : undefined} />
               <Input label="To" type="date" value={to} onChange={(e) => set({ to: e.target.value || undefined })} error={rangeError && !(from > to) ? rangeError : undefined} />
               <Select label="Channel" value={channel} onChange={(e) => set({ channel: e.target.value || undefined, agent: e.target.value === 'agent' ? agentId || undefined : undefined })} options={CHANNELS} />
+              {(branches.data?.items.length ?? 0) > 0 && (
+                <Select label="Branch" value={branchId} onChange={(e) => set({ branch: e.target.value || undefined })}
+                  options={[{ value: '', label: 'All branches' }, ...(branches.data?.items ?? []).map((b) => ({ value: b.id, label: `${b.name}${b.code ? ` (${b.code})` : ''}` }))]} />
+              )}
               {channel === 'agent' && (
                 <Select label="Agent" value={agentId} onChange={(e) => set({ agent: e.target.value || undefined })}
                   options={[{ value: '', label: agents.isLoading ? 'Loading…' : 'All agents' }, ...(agents.data?.items ?? []).map((a) => ({ value: a.id, label: `${a.name}${a.status !== 'active' ? ` (${a.status})` : ''}` }))]} />
