@@ -397,3 +397,6 @@ an unknown id is now 404 (was 200).
 - **Roles:** `POST /users/:id/roles` (by role code) now runs the same checks as
   `PUT /users/:id/roles/:roleId` — staff only, grantable roles only.
 - **Expense receipts:** `POST /trips/:tripId/expenses/receipt` is 404 for another operator's trip.
+- **Departure:** `POST /crew/trips/:id/status {status:'departed'}` is refused (422) more than 2 hours
+  before the bus's departure time — marking next week's bus departed by mistake stopped its sales and told
+  its passengers it had left.

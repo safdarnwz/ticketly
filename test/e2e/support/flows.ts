@@ -1,3 +1,5 @@
+import { UnitOfWork } from '@database';
+import { createContext, runAsTenant, runWithContext, type TenantId } from '@kernel';
 import { expect } from 'vitest';
 
 import type { TestApp } from './bootstrap';
@@ -52,4 +54,23 @@ export async function confirmedBooking(
   );
   expect(pay.status, JSON.stringify(pay.body)).toBe(200);
   return { bookingId, pnr };
+}
+
+/**
+ * Bring a test trip's departure to 30 minutes from now (arrival moves with it), so
+ * it may be marked departed — a bus can only be marked departed near its time.
+ */
+export async function departingSoon(app: TestApp, tripId: string): Promise<void> {
+  await runWithContext(createContext({ actorType: 'system' }), () =>
+    runAsTenant(app.fixtures.tenantId as TenantId, () =>
+      app.nest.get(UnitOfWork).run({ name: 'e2e.departingSoon' }, async (s) => {
+        await s.client.query(
+          `UPDATE trips SET arrives_at = arrives_at - (departs_at - (now() + interval '30 minutes')),
+                            departs_at = now() + interval '30 minutes'
+            WHERE id = $1`,
+          [tripId],
+        );
+      }),
+    ),
+  );
 }

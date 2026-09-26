@@ -19,6 +19,9 @@ import { TripRepository } from '../../../scheduling';
  *  - **trip start/stop** — the driver flips the trip's operational status,
  *    which feeds live tracking.
  */
+/** How early before its scheduled time a bus may be marked departed. */
+const DEPART_EARLIEST_MS = 2 * 3_600_000;
+
 @Injectable()
 export class CrewAppService {
   constructor(
@@ -84,6 +87,12 @@ export class CrewAppService {
       if (status === 'closed' && current.status !== 'departed')
         throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
           message: 'Mark the bus departed before closing the trip',
+        });
+      // A bus leaves around its time: marking next week's bus departed by
+      // mistake would stop its sales and tell its passengers it has gone.
+      if (status === 'departed' && current.departsAt.getTime() - Date.now() > DEPART_EARLIEST_MS)
+        throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
+          message: 'A bus can be marked departed from 2 hours before its departure time',
         });
       await this.trips.setStatus(tripId, status);
       if (status === 'departed')

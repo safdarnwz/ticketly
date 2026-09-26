@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { bootstrapTestApp, type TestApp } from './support/bootstrap';
-import { confirmedBooking, type TripLeg } from './support/flows';
+import { confirmedBooking, departingSoon, type TripLeg } from './support/flows';
 
 /**
  * Reviews: only the traveller's own account, only after the bus has left —
@@ -87,6 +87,7 @@ describe('reviews (e2e)', () => {
     expect(early.status).toBe(422);
     expect(early.body.detail).toMatch(/once the bus has left/);
 
+    await departingSoon(app, leg.tripId);
     expect(
       (await app.post(`/crew/trips/${leg.tripId}/status`, { status: 'departed' }, op)).status,
     ).toBe(201);

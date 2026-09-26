@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 660 |
-| DONE | 315 |
+| TODO | 624 |
+| DONE | 351 |
 | DUP | 9 |
 
 
@@ -167,30 +167,30 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 130 | Deactivate branch temporarily | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
 | 131 | Reactivate branch | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
 | 132 | Add new bus with registration number | DONE | DONE | verified manually: existing module/API · UI: Fleet › Add vehicle (reg validated) + vehicle page |
-| 133 | Select bus type (Seater, Sleeper, Semi-Sleeper, Multi-Axle) | DONE | TODO | verified manually: existing module/API |
-| 134 | Enter total seat capacity | DONE | TODO | verified manually: existing module/API |
-| 135 | Design seat layout visually | DONE | TODO | verified manually: existing module/API |
+| 133 | Select bus type (Seater, Sleeper, Semi-Sleeper, Multi-Axle) | DONE | DONE | verified manually: existing module/API · UI: Fleet → Seat Layouts editor + Vehicle Types & Amenities |
+| 134 | Enter total seat capacity | DONE | DONE | verified manually: existing module/API · UI: Fleet → Seat Layouts editor + Vehicle Types & Amenities |
+| 135 | Design seat layout visually | DONE | DONE | verified manually: existing module/API · UI: Fleet → Seat Layouts editor + Vehicle Types & Amenities |
 | 136 | Mark window seats | DONE | DONE | POST /master-data/seat-layouts/:id/seats/auto-positions / seats/mark (position) · UI: Fleet → Seat Layouts: editor marks window/aisle, ladies, disability-friendly, berths per deck; Auto window/aisle |
 | 137 | Mark aisle seats | DONE | DONE | POST /master-data/seat-layouts/:id/seats/auto-positions / seats/mark (position) · UI: Fleet → Seat Layouts: editor marks window/aisle, ladies, disability-friendly, berths per deck; Auto window/aisle |
 | 138 | Mark lower berths | DONE | DONE | verified manually: existing module/API · UI: Fleet → Seat Layouts: editor marks window/aisle, ladies, disability-friendly, berths per deck; Auto window/aisle |
 | 139 | Mark upper berths | DONE | DONE | verified manually: existing module/API · UI: Fleet → Seat Layouts: editor marks window/aisle, ladies, disability-friendly, berths per deck; Auto window/aisle |
 | 140 | Mark ladies seats | DONE | DONE | verified manually: existing module/API · UI: Fleet → Seat Layouts: editor marks window/aisle, ladies, disability-friendly, berths per deck; Auto window/aisle |
 | 141 | Mark disabled-friendly seats | DONE | DONE | seats/mark {accessible}; trip_seats.accessible; kept for 'disabled' passengers · UI: Fleet → Seat Layouts: editor marks window/aisle, ladies, disability-friendly, berths per deck; Auto window/aisle |
-| 142 | Set bus amenities list | DONE | TODO | verified manually: existing module/API |
-| 143 | Enable AC amenity | DONE | TODO | verified manually: existing module/API |
-| 144 | Enable WiFi amenity | DONE | TODO | verified manually: existing module/API |
-| 145 | Enable charging point amenity | DONE | TODO | verified manually: existing module/API |
-| 146 | Enable blanket and water amenity | DONE | TODO | verified manually: existing module/API |
-| 147 | Enable toilet amenity | DONE | TODO | verified manually: existing module/API |
+| 142 | Set bus amenities list | DONE | DONE | verified manually: existing module/API · UI: Fleet → Seat Layouts editor + Vehicle Types & Amenities |
+| 143 | Enable AC amenity | DONE | DONE | verified manually: existing module/API · UI: Fleet → Seat Layouts editor + Vehicle Types & Amenities |
+| 144 | Enable WiFi amenity | DONE | DONE | verified manually: existing module/API · UI: Fleet → Seat Layouts editor + Vehicle Types & Amenities |
+| 145 | Enable charging point amenity | DONE | DONE | verified manually: existing module/API · UI: Fleet → Seat Layouts editor + Vehicle Types & Amenities |
+| 146 | Enable blanket and water amenity | DONE | DONE | verified manually: existing module/API · UI: Fleet → Seat Layouts editor + Vehicle Types & Amenities |
+| 147 | Enable toilet amenity | DONE | DONE | verified manually: existing module/API · UI: Fleet → Seat Layouts editor + Vehicle Types & Amenities |
 | 148 | Create new route with origin and destination | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops › New route (stops, km, timing validated) + publish |
-| 149 | Add intermediate stage 1 | DONE | TODO | verified manually: existing module/API |
-| 150 | Add intermediate stage 2 | DONE | TODO | verified manually: existing module/API |
-| 151 | Add multiple intermediate stages | DONE | TODO | verified manually: existing module/API |
-| 152 | Set distance between stages | DONE | TODO | verified manually: existing module/API |
-| 153 | Set running duration between stages | DONE | TODO | verified manually: existing module/API |
-| 154 | Map primary pickup points | DONE | TODO | verified manually: existing module/API |
-| 155 | Map secondary pickup points | DONE | TODO | verified manually: existing module/API |
-| 156 | Map drop points | DONE | TODO | verified manually: existing module/API |
+| 149 | Add intermediate stage 1 | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops → stops with km, running time, boarding/dropping points |
+| 150 | Add intermediate stage 2 | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops → stops with km, running time, boarding/dropping points |
+| 151 | Add multiple intermediate stages | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops → stops with km, running time, boarding/dropping points |
+| 152 | Set distance between stages | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops → stops with km, running time, boarding/dropping points |
+| 153 | Set running duration between stages | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops → stops with km, running time, boarding/dropping points |
+| 154 | Map primary pickup points | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops → stops with km, running time, boarding/dropping points |
+| 155 | Map secondary pickup points | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops → stops with km, running time, boarding/dropping points |
+| 156 | Map drop points | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops → stops with km, running time, boarding/dropping points |
 | 157 | Create complete stage-to-stage fare matrix | DONE | DONE | verified manually: existing module/API · UI: Pricing → Fare plans (seat-type fares, seat overrides) |
 | 158 | Set base fare for main route | DONE | DONE | verified manually: existing module/API · UI: Pricing → Fare plans (seat-type fares, seat overrides) |
 | 159 | Set peak hour fare multiplier | DONE | DONE | PUT /pricing/routes/:id/rules peakWindows · UI: Pricing → Route limits & peak times |
@@ -209,7 +209,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 172 | Set branch-wise inventory allocation percentage | DONE | DONE | POST /trips/:tripId/quotas/percentage (branch/agent) · UI: Trip chart → Agent & branch seats |
 | 173 | Set ladies quota percentage or seats | DONE | DONE | sales-rules categoryQuotas.female/senior (seats or pct, releaseHours), enforced on hold · UI: Schedule → Manage service |
 | 174 | Set senior citizen quota | DONE | DONE | sales-rules categoryQuotas.female/senior (seats or pct, releaseHours), enforced on hold · UI: Schedule → Manage service |
-| 175 | Enable dynamic pricing on selected routes | DONE | TODO | verified manually: existing module/API |
+| 175 | Enable dynamic pricing on selected routes | DONE | DONE | verified manually: existing module/API · UI: Pricing → dynamic yield (occupancy / advance steps) |
 | 176 | Create percentage based coupon | DONE | DONE | POST /pricing/coupons: percent 1–100, flat ≥ ₹1, end after start and in the future, code A-Z0-9-_; DB checks (0087); 404 on another operator's coupon · UI: Pricing › Coupons: percent 1–100 or flat ₹ (paise), cap, min fare, valid till, total and per-customer uses, first-booking; switch off/on; stats; applied at checkout |
 | 177 | Create flat amount coupon | DONE | DONE | POST /pricing/coupons: percent 1–100, flat ≥ ₹1, end after start and in the future, code A-Z0-9-_; DB checks (0087); 404 on another operator's coupon · UI: Pricing › Coupons: percent 1–100 or flat ₹ (paise), cap, min fare, valid till, total and per-customer uses, first-booking; switch off/on; stats; applied at checkout |
 | 178 | Set coupon validity dates | DONE | DONE | POST /pricing/coupons: percent 1–100, flat ≥ ₹1, end after start and in the future, code A-Z0-9-_; DB checks (0087); 404 on another operator's coupon · UI: Pricing › Coupons: percent 1–100 or flat ₹ (paise), cap, min fare, valid till, total and per-customer uses, first-booking; switch off/on; stats; applied at checkout |
@@ -255,16 +255,16 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 218 | Create temporary contractor staff with expiry | DONE | DONE | PUT /users/:id/access {accessExpiresAt} · UI: Staff modal (roles until, access & hours, reports to, new password) |
 | 219 | System auto-deactivates expired staff | DONE | DONE | auth guard refuses expired access on next request · UI: Staff modal (roles until, access & hours, reports to, new password) |
 | 220 | View main operator dashboard | DONE | DONE | GET /reports/summary (today in operator tz, live holds) + GET /scheduling/trips?date= + GET /bookings/search · UI: operator Dashboard (KPIs, today's departures, latest bookings) |
-| 221 | View today’s total bookings | DONE | TODO | verified manually: existing module/API |
-| 222 | View today’s total revenue | DONE | TODO | verified manually: existing module/API |
-| 223 | View today’s average occupancy | DONE | TODO | verified manually: existing module/API |
+| 221 | View today’s total bookings | DONE | DONE | verified manually: existing module/API · UI: Dashboard (today's bookings, sales, occupancy, bookings by hour, best/least filled routes) |
+| 222 | View today’s total revenue | DONE | DONE | verified manually: existing module/API · UI: Dashboard (today's bookings, sales, occupancy, bookings by hour, best/least filled routes) |
+| 223 | View today’s average occupancy | DONE | DONE | verified manually: existing module/API · UI: Dashboard (today's bookings, sales, occupancy, bookings by hour, best/least filled routes) |
 | 224 | Compare today vs yesterday metrics | GAP | — | verified manually: not built yet |
-| 225 | View hourly booking trend graph | DONE | TODO | verified manually: existing module/API |
-| 226 | View top 5 performing routes | DONE | TODO | verified manually: existing module/API |
-| 227 | View bottom 5 performing routes | DONE | TODO | verified manually: existing module/API |
+| 225 | View hourly booking trend graph | DONE | DONE | verified manually: existing module/API · UI: Dashboard (today's bookings, sales, occupancy, bookings by hour, best/least filled routes) |
+| 226 | View top 5 performing routes | DONE | DONE | verified manually: existing module/API · UI: Dashboard (today's bookings, sales, occupancy, bookings by hour, best/least filled routes) |
+| 227 | View bottom 5 performing routes | DONE | DONE | verified manually: existing module/API · UI: Dashboard (today's bookings, sales, occupancy, bookings by hour, best/least filled routes) |
 | 228 | View OTA vs Direct booking percentage | GAP | — | verified manually: not built yet |
 | 229 | View cash vs digital collection split | CONFLICT | — | earlier product decision |
-| 230 | Configure occupancy-based dynamic pricing rule | DONE | TODO | verified manually: existing module/API |
+| 230 | Configure occupancy-based dynamic pricing rule | DONE | DONE | verified manually: existing module/API · UI: Pricing → dynamic yield (occupancy / advance steps) |
 | 231 | Configure time-based pricing rule | DONE | DONE | peak windows by departure time · UI: Pricing → Route limits & peak times |
 | 232 | Configure demand surge pricing rule | GAP | — | verified manually: not built yet |
 | 233 | Block complete inventory for charter | DONE | DONE | verified manually: existing module/API · UI: Trips & Charts › chart: Block / open seats |
@@ -278,7 +278,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 241 | Disable way-side booking on service | CONFLICT | — | earlier product decision |
 | 242 | Set maximum advance booking days allowed | DONE | DONE | PUT /concessions/booking-window {maxAdvanceDays} · UI: Pricing → Concessions & booking rules |
 | 243 | Set minimum hours before departure for booking | DONE | DONE | PUT /concessions/booking-window {minMinutesBeforeDeparture} · UI: Pricing → Concessions & booking rules |
-| 244 | Configure cancellation charge slabs by time | DONE | TODO | verified manually: existing module/API |
+| 244 | Configure cancellation charge slabs by time | DONE | DONE | verified manually: existing module/API · UI: Settings → Refund policy (time slabs) |
 | 245 | Set free cancellation window in hours | GAP | — | verified manually: not built yet |
 | 246 | Configure rules for partial cancellation | DONE | TODO | verified manually: existing module/API |
 | 247 | Set no-show marking policy | DONE | TODO | verified manually: existing module/API |
@@ -288,16 +288,16 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 251 | Configure corporate booking credit terms | GAP | — | verified manually: not built yet |
 | 252 | Set standard luggage allowance | GAP | — | verified manually: not built yet |
 | 253 | Configure extra luggage charge per kg or piece | GAP | — | verified manually: not built yet |
-| 254 | View all live running services | DONE | TODO | verified manually: existing module/API |
+| 254 | View all live running services | DONE | DONE | verified manually: existing module/API · UI: Trips (On the road / Cancelled filter) → chart: Mark departed / arrived, Change bus |
 | 255 | View currently delayed services | DONE | DONE | verified manually: existing module/API · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
-| 256 | View today’s cancelled services | DONE | TODO | verified manually: existing module/API |
-| 257 | Manually mark service as departed | DONE | TODO | verified manually: existing module/API |
-| 258 | Manually mark service as arrived | DONE | TODO | verified manually: existing module/API |
+| 256 | View today’s cancelled services | DONE | DONE | verified manually: existing module/API · UI: Trips (On the road / Cancelled filter) → chart: Mark departed / arrived, Change bus |
+| 257 | Manually mark service as departed | DONE | DONE | verified manually: existing module/API · UI: Trips (On the road / Cancelled filter) → chart: Mark departed / arrived, Change bus |
+| 258 | Manually mark service as arrived | DONE | DONE | verified manually: existing module/API · UI: Trips (On the road / Cancelled filter) → chart: Mark departed / arrived, Change bus |
 | 259 | Force release all temporary holds on service | DONE | DONE | POST /scheduling/trips/:id/release-holds · UI: Trips & Charts › chart: Release holds |
 | 260 | View live seat map of any service | DONE | DONE | verified manually: existing module/API · UI: Trip chart (live seat map) |
 | 261 | Temporarily block specific seats | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Block / open seats |
 | 262 | Release previously blocked seats | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Block / open seats |
-| 263 | Change allocated bus of a service last minute | DONE | TODO | verified manually: existing module/API |
+| 263 | Change allocated bus of a service last minute | DONE | DONE | verified manually: existing module/API · UI: Trips (On the road / Cancelled filter) → chart: Mark departed / arrived, Change bus |
 | 264 | Change allocated crew last minute | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 265 | Add internal remark on service | DONE | DONE | POST/GET /scheduling/trips/:id/remarks · UI: Trips & Charts › chart: Staff remarks |
 | 266 | Clone an existing service to new date | DONE | DONE | POST /scheduling/services/:id/clone · UI: Schedule → Manage service |
@@ -314,12 +314,12 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 277 | View occupancy forecast for next 7 days | DONE | DONE | verified manually: existing module/API · UI: Reports → Forecast (weak trips: keep / plan to cancel) |
 | 278 | View occupancy forecast for next 15 days | DONE | DONE | GET /reports/occupancy-forecast?days=15 · UI: Reports → Forecast (weak trips: keep / plan to cancel) |
 | 279 | Accept AI suggestion for adding extra trip | DONE | DONE | verified manually: existing module/API · UI: Schedule → Busy trips suggestions |
-| 280 | Reject AI suggestion for cancelling service | DONE | TODO | GET /reports/cancel-suggestions; POST /trips/:tripId/cancel-suggestion/decision |
+| 280 | Reject AI suggestion for cancelling service | DONE | DONE | GET /reports/cancel-suggestions; POST /trips/:tripId/cancel-suggestion/decision · UI: Reports → Forecast: Keep running / Plan to cancel |
 | 281 | Set minimum fare floor value | DONE | DONE | route floor (engine, after yield) · UI: Pricing → Route limits & peak times |
 | 282 | Set maximum fare ceiling value | DONE | DONE | route ceiling (engine, after yield) · UI: Pricing → Route limits & peak times |
 | 283 | Configure round-trip discount percentage | GAP | — | verified manually: not built yet |
-| 284 | Manage master list of boarding points | DONE | TODO | verified manually: existing module/API |
-| 285 | Manage master list of drop points | DONE | TODO | verified manually: existing module/API |
+| 284 | Manage master list of boarding points | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops → stops with km, running time, boarding/dropping points |
+| 285 | Manage master list of drop points | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops → stops with km, running time, boarding/dropping points |
 | 286 | Set additional charges for specific pickup points | GAP | — | verified manually: not built yet |
 | 287 | Set additional charges for specific drop points | GAP | — | verified manually: not built yet |
 | 288 | Configure complete ladies special service rules | DONE | TODO | verified manually: existing module/API |
@@ -429,7 +429,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 392 | Raise request for extra service on festival | GAP | — | verified manually: not built yet |
 | 393 | Send delay notification to all passengers | DONE | DONE | verified manually: existing module/API · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
 | 394 | Suggest alternate service for delayed bus | GAP | — | verified manually: not built yet |
-| 395 | Re-allocate passengers when bus breaks down | DONE | TODO | verified manually: existing module/API |
+| 395 | Re-allocate passengers when bus breaks down | DONE | DONE | verified manually: existing module/API · UI: Trips (On the road / Cancelled filter) → chart: Mark departed / arrived, Change bus |
 | 396 | Handle large group booking request | GAP | — | verified manually: not built yet |
 | 397 | Process corporate company booking | GAP | — | verified manually: not built yet |
 | 398 | Check current branch wallet balance | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
@@ -462,7 +462,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 425 | View list of pending refunds for branch | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
 | 426 | Escalate high value cancellation to operator admin | GAP | — | verified manually: not built yet |
 | 427 | View live GPS location of branch services | DONE | TODO | verified manually: existing module/API |
-| 428 | Mark service as departed from this branch | DONE | TODO | verified manually: existing module/API |
+| 428 | Mark service as departed from this branch | DONE | DONE | verified manually: existing module/API · UI: Trips (On the road / Cancelled filter) → chart: Mark departed / arrived, Change bus |
 | 429 | Enter detailed delay reason | DONE | DONE | verified manually: existing module/API · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
 | 430 | View complete no-show passenger list | DONE | TODO | verified manually: existing module/API |
 | 431 | Contact no-show passenger | DONE | TODO | verified manually: existing module/API |

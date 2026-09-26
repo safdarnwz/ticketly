@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { bootstrapTestApp, type TestApp } from './support/bootstrap';
-import { confirmedBooking } from './support/flows';
+import { confirmedBooking, departingSoon } from './support/flows';
 
 /**
  * A bus's operations: the reservation chart, stopping and resuming sales,
@@ -104,6 +104,8 @@ describe('trip operations (e2e)', () => {
     const id = spare!.id;
 
     const crew = (status: string) => app.post(`/crew/trips/${id}/status`, { status }, op);
+    expect((await crew('departed')).status).toBe(422); // days before its time
+    await departingSoon(app, id);
     expect((await crew('closed')).status).toBe(422); // not departed yet
     expect((await crew('departed')).status).toBe(201);
     expect((await chart(id)).body.trip.hasRun).toBe(true);
