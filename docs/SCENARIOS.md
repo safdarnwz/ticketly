@@ -14,8 +14,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Backend status | Count |
 |---|---|
 | OPEN | 2711 |
-| DONE | 966 |
-| GAP | 299 |
+| DONE | 972 |
+| GAP | 293 |
 | CONFLICT | 76 |
 | INFRA | 20 |
 | DUP | 9 |
@@ -23,9 +23,9 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 | Frontend status | Count |
 |---|---|
-| — | 3112 |
-| TODO | 834 |
-| DONE | 132 |
+| — | 3106 |
+| TODO | 799 |
+| DONE | 173 |
 | DUP | 9 |
 
 
@@ -196,19 +196,19 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 159 | Set peak hour fare multiplier | DONE | TODO | PUT /pricing/routes/:id/rules peakWindows |
 | 160 | Set off-peak fare multiplier | DONE | TODO | PUT /pricing/routes/:id/rules peakWindows (−%) |
 | 161 | Apply festive season fare hike percentage | DONE | TODO | verified manually: existing module/API |
-| 162 | Create daily service for specific date | DONE | TODO | verified manually: existing module/API |
-| 163 | Set service departure time | DONE | TODO | verified manually: existing module/API |
-| 164 | Set service arrival time | DONE | TODO | verified manually: existing module/API |
-| 165 | Set weekly recurring schedule (Mon-Sun) | DONE | TODO | verified manually: existing module/API |
-| 166 | Create special extra trip service | DONE | TODO | verified manually: existing module/API |
-| 167 | Temporarily cancel a service | DONE | TODO | verified manually: existing module/API |
-| 168 | Set cancellation reason | DONE | TODO | verified manually: existing module/API |
-| 169 | Permanently delete a service | DONE | TODO | DELETE /scheduling/services/:id (only without history) |
-| 170 | Set OTA inventory release percentage per service | DONE | TODO | PUT /scheduling/services/:id/sales-rules {otaReleasePct}; platform default PUT /admin/policies/ota-release; enforced on hold |
+| 162 | Create daily service for specific date | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
+| 163 | Set service departure time | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
+| 164 | Set service arrival time | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
+| 165 | Set weekly recurring schedule (Mon-Sun) | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
+| 166 | Create special extra trip service | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
+| 167 | Temporarily cancel a service | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Cancel trip (reason) |
+| 168 | Set cancellation reason | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Cancel trip (reason) |
+| 169 | Permanently delete a service | DONE | DONE | DELETE /scheduling/services/:id (only without history) · UI: Schedule → Manage service |
+| 170 | Set OTA inventory release percentage per service | DONE | DONE | PUT /scheduling/services/:id/sales-rules {otaReleasePct}; platform default PUT /admin/policies/ota-release; enforced on hold · UI: Schedule → Manage service |
 | 171 | Set agent-wise inventory quota | DONE | TODO | verified manually: existing module/API |
 | 172 | Set branch-wise inventory allocation percentage | DONE | TODO | POST /trips/:tripId/quotas/percentage (branch/agent) |
-| 173 | Set ladies quota percentage or seats | DONE | TODO | sales-rules categoryQuotas.female/senior (seats or pct, releaseHours), enforced on hold |
-| 174 | Set senior citizen quota | DONE | TODO | sales-rules categoryQuotas.female/senior (seats or pct, releaseHours), enforced on hold |
+| 173 | Set ladies quota percentage or seats | DONE | DONE | sales-rules categoryQuotas.female/senior (seats or pct, releaseHours), enforced on hold · UI: Schedule → Manage service |
+| 174 | Set senior citizen quota | DONE | DONE | sales-rules categoryQuotas.female/senior (seats or pct, releaseHours), enforced on hold · UI: Schedule → Manage service |
 | 175 | Enable dynamic pricing on selected routes | DONE | TODO | verified manually: existing module/API |
 | 176 | Create percentage based coupon | DONE | DONE | POST /pricing/coupons: percent 1–100, flat ≥ ₹1, end after start and in the future, code A-Z0-9-_; DB checks (0087); 404 on another operator's coupon · UI: Pricing › Coupons: percent 1–100 or flat ₹ (paise), cap, min fare, valid till, total and per-customer uses, first-booking; switch off/on; stats; applied at checkout |
 | 177 | Create flat amount coupon | DONE | DONE | POST /pricing/coupons: percent 1–100, flat ≥ ₹1, end after start and in the future, code A-Z0-9-_; DB checks (0087); 404 on another operator's coupon · UI: Pricing › Coupons: percent 1–100 or flat ₹ (paise), cap, min fare, valid till, total and per-customer uses, first-booking; switch off/on; stats; applied at checkout |
@@ -300,20 +300,20 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 263 | Change allocated bus of a service last minute | DONE | TODO | verified manually: existing module/API |
 | 264 | Change allocated crew last minute | DONE | TODO | verified manually: existing module/API |
 | 265 | Add internal remark on service | DONE | DONE | POST/GET /scheduling/trips/:id/remarks · UI: Trips & Charts › chart: Staff remarks |
-| 266 | Clone an existing service to new date | DONE | TODO | POST /scheduling/services/:id/clone |
+| 266 | Clone an existing service to new date | DONE | DONE | POST /scheduling/services/:id/clone · UI: Schedule → Manage service |
 | 267 | Bulk update fares using Excel | DONE | TODO | GET rules.csv + POST /pricing/fare-plans/:id/rules/import / adjust |
 | 268 | Bulk create schedules using Excel | GAP | — | verified manually: not built yet |
-| 269 | View complete schedule version history | DONE | TODO | GET /scheduling/services/:id/versions |
-| 270 | Rollback schedule to previous version | DONE | TODO | POST /scheduling/services/:id/versions/:n/restore |
-| 271 | Set blackout dates for route | DONE | TODO | POST /scheduling/routes/:routeId/blackouts (materialisation skips) |
-| 272 | Configure seasonal schedule patterns | DONE | TODO | POST /scheduling/services/:id/clone {season:true} |
-| 273 | Create festival special services in bulk | DONE | TODO | verified manually: existing module/API |
+| 269 | View complete schedule version history | DONE | DONE | GET /scheduling/services/:id/versions · UI: Schedule → Manage service |
+| 270 | Rollback schedule to previous version | DONE | DONE | POST /scheduling/services/:id/versions/:n/restore · UI: Schedule → Manage service |
+| 271 | Set blackout dates for route | DONE | DONE | POST /scheduling/routes/:routeId/blackouts (materialisation skips) · UI: Schedule → Route blackouts |
+| 272 | Configure seasonal schedule patterns | DONE | DONE | POST /scheduling/services/:id/clone {season:true} · UI: Schedule → Manage service |
+| 273 | Create festival special services in bulk | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
 | 274 | Set temporary route diversion | DONE | TODO | incident type 'diversion' → trip.diverted SMS to every passenger |
 | 275 | Trigger passenger notification on schedule change | DONE | DONE | POST /scheduling/trips/:id/retime → trip.retimed SMS to every passenger · UI: Trips & Charts › chart: Change departure time |
 | 276 | View current inventory utilization percentage | DONE | TODO | verified manually: existing module/API |
 | 277 | View occupancy forecast for next 7 days | DONE | TODO | verified manually: existing module/API |
 | 278 | View occupancy forecast for next 15 days | DONE | TODO | GET /reports/occupancy-forecast?days=15 |
-| 279 | Accept AI suggestion for adding extra trip | DONE | TODO | verified manually: existing module/API |
+| 279 | Accept AI suggestion for adding extra trip | DONE | DONE | verified manually: existing module/API · UI: Schedule → Busy trips suggestions |
 | 280 | Reject AI suggestion for cancelling service | DONE | TODO | GET /reports/cancel-suggestions; POST /trips/:tripId/cancel-suggestion/decision |
 | 281 | Set minimum fare floor value | DONE | TODO | route floor (engine, after yield) |
 | 282 | Set maximum fare ceiling value | DONE | TODO | route ceiling (engine, after yield) |
@@ -538,7 +538,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 ## #501–#1000
 
-CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
+CONFLICT 11, DONE 257, DUP 2, GAP 66, INFRA 3, PROCESS 2
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -613,13 +613,13 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 | 569 | Send delay WhatsApp to all passengers | DONE | TODO | verified manually: existing module/API |
 | 570 | Identify services with very low occupancy | DONE | TODO | verified manually: existing module/API |
 | 571 | Take decision to cancel low occupancy service | DONE | TODO | verified manually: existing module/API |
-| 572 | Cancel service in system | DONE | TODO | verified manually: existing module/API |
+| 572 | Cancel service in system | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Cancel trip (reason) |
 | 573 | Automatically notify all booked passengers | DONE | TODO | verified manually: existing module/API |
 | 574 | Offer alternate service to cancelled passengers | GAP | — | verified manually: not built yet |
 | 575 | Shift passengers to alternate service | GAP | — | verified manually: not built yet |
-| 576 | Create new extra trip service | DONE | TODO | verified manually: existing module/API |
-| 577 | Set departure time for extra trip | DONE | TODO | verified manually: existing module/API |
-| 578 | Release inventory for extra trip | DONE | TODO | verified manually: existing module/API |
+| 576 | Create new extra trip service | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
+| 577 | Set departure time for extra trip | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
+| 578 | Release inventory for extra trip | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
 | 579 | Handle bus breakdown report | DONE | TODO | incidents type=breakdown |
 | 580 | Arrange replacement bus | DONE | TODO | verified manually: existing module/API |
 | 581 | Re-allocate all passengers to replacement bus | DONE | TODO | verified manually: existing module/API |
@@ -728,27 +728,27 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 | 684 | Enter running time for each stage | DONE | TODO | verified manually: existing module/API |
 | 685 | Map all pickup points for the route | DONE | TODO | verified manually: existing module/API |
 | 686 | Map all drop points for the route | DONE | TODO | verified manually: existing module/API |
-| 687 | Create new service schedule | DONE | TODO | verified manually: existing module/API |
-| 688 | Set service name or number | DONE | TODO | verified manually: existing module/API |
-| 689 | Set departure time | DONE | TODO | verified manually: existing module/API |
-| 690 | Set arrival time | DONE | TODO | verified manually: existing module/API |
-| 691 | Configure daily recurrence | DONE | TODO | verified manually: existing module/API |
-| 692 | Configure weekly recurrence pattern | DONE | TODO | verified manually: existing module/API |
-| 693 | Create one-time special service | DONE | TODO | verified manually: existing module/API |
-| 694 | Edit existing service timing | DONE | TODO | verified manually: existing module/API |
-| 695 | Temporarily suspend a service | DONE | TODO | verified manually: existing module/API |
+| 687 | Create new service schedule | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
+| 688 | Set service name or number | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
+| 689 | Set departure time | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
+| 690 | Set arrival time | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
+| 691 | Configure daily recurrence | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
+| 692 | Configure weekly recurrence pattern | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
+| 693 | Create one-time special service | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
+| 694 | Edit existing service timing | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
+| 695 | Temporarily suspend a service | DONE | DONE | verified manually: existing module/API · UI: Schedule → Pause |
 | 696 | Permanently cancel a service | DONE | TODO | verified manually: existing module/API |
-| 697 | Stop further inventory release for cancelled service | DONE | TODO | verified manually: existing module/API |
+| 697 | Stop further inventory release for cancelled service | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
 | 698 | Link correct seat layout to service | DONE | TODO | verified manually: existing module/API |
 | 699 | Block inventory for scheduled maintenance | DONE | TODO | inventory blocks / quotas |
 | 700 | Block inventory for charter booking | DONE | TODO | inventory blocks / quotas |
 | 701 | Release inventory after maintenance | DONE | TODO | inventory blocks / quotas |
 | 702 | Release inventory after charter | DONE | TODO | inventory blocks / quotas |
-| 703 | Define ladies quota in seats or percentage | GAP | — | verified manually: not built yet |
-| 704 | Define senior citizen quota | GAP | — | verified manually: not built yet |
+| 703 | Define ladies quota in seats or percentage | DONE | DONE | PUT /scheduling/services/:id/sales-rules (same as #173/#174/#170) · UI: Schedule → Manage service |
+| 704 | Define senior citizen quota | DONE | DONE | PUT /scheduling/services/:id/sales-rules (same as #173/#174/#170) · UI: Schedule → Manage service |
 | 705 | Define inventory quota for each agent | DONE | TODO | verified manually: existing module/API |
 | 706 | Define inventory allocation for each branch | DONE | TODO | verified manually: existing module/API |
-| 707 | Set percentage of inventory to release to OTAs | GAP | — | verified manually: not built yet |
+| 707 | Set percentage of inventory to release to OTAs | DONE | DONE | PUT /scheduling/services/:id/sales-rules (same as #173/#174/#170) · UI: Schedule → Manage service |
 | 708 | Pull back inventory from OTA at last moment | GAP | — | verified manually: not built yet |
 | 709 | Apply dynamic pricing rule on selected service | DONE | TODO | verified manually: existing module/API |
 | 710 | Define peak time fare | DONE | TODO | verified manually: existing module/API |
@@ -760,16 +760,16 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 | 716 | Set different fare for different seat types | DONE | TODO | verified manually: existing module/API |
 | 717 | View current inventory utilization report | DONE | TODO | verified manually: existing module/API |
 | 718 | Identify services running with low occupancy | DONE | TODO | verified manually: existing module/API |
-| 719 | Add extra seats or service on high demand | DONE | TODO | verified manually: existing module/API |
+| 719 | Add extra seats or service on high demand | DONE | DONE | verified manually: existing module/API · UI: Schedule → Busy trips suggestions |
 | 720 | View occupancy forecast for coming days | DONE | TODO | verified manually: existing module/API |
 | 721 | Detect schedule timing clash | GAP | — | verified manually: not built yet |
 | 722 | Resolve schedule clash | GAP | — | verified manually: not built yet |
 | 723 | Allocate specific bus to service | DONE | TODO | verified manually: existing module/API |
 | 724 | Configure merge of two buses into one service | GAP | — | verified manually: not built yet |
 | 725 | Set up multi-hop connecting service | DONE | TODO | verified manually: existing module/API |
-| 726 | Define blackout dates when service will not run | GAP | — | verified manually: not built yet |
-| 727 | Increase frequency of service | DONE | TODO | verified manually: existing module/API |
-| 728 | Decrease frequency of service | DONE | TODO | verified manually: existing module/API |
+| 726 | Define blackout dates when service will not run | DONE | DONE | POST /scheduling/routes/:id/blackouts (same as #271) · UI: Schedule → Route blackouts |
+| 727 | Increase frequency of service | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
+| 728 | Decrease frequency of service | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
 | 729 | Apply temporary route diversion | DONE | TODO | incidents type=diversion |
 | 730 | Check whether inventory is correctly synced with OTAs | DONE | TODO | verified manually: existing module/API |
 | 731 | Manually fix inventory sync issues | DONE | TODO | verified manually: existing module/API |
@@ -777,8 +777,8 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 | 733 | Automatically notify passengers when schedule changes | GAP | — | verified manually: not built yet |
 | 734 | Upload schedules in bulk using Excel | GAP | — | verified manually: not built yet |
 | 735 | Download Excel template for schedule upload | GAP | — | verified manually: not built yet |
-| 736 | View complete history of schedule changes | GAP | — | verified manually: not built yet |
-| 737 | Rollback schedule to an earlier version | GAP | — | verified manually: not built yet |
+| 736 | View complete history of schedule changes | DONE | DONE | GET versions / POST restore (same as #269/#270) · UI: Schedule → Manage service |
+| 737 | Rollback schedule to an earlier version | DONE | DONE | GET versions / POST restore (same as #269/#270) · UI: Schedule → Manage service |
 | 738 | Generate monthly inventory efficiency report | GAP | — | verified manually: not built yet |
 | 739 | View seat-wise sales report | GAP | — | verified manually: not built yet |
 | 740 | View stage-wise passenger movement report | GAP | — | verified manually: not built yet |
@@ -794,7 +794,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 ## #501–#1000
 
-CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
+CONFLICT 11, DONE 257, DUP 2, GAP 66, INFRA 3, PROCESS 2
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
