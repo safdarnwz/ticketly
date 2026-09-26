@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { localDateQuery } from '@http';
+import { localDateQuery, queryFlag } from '@http';
 
 const uuid = z.string().uuid();
 
@@ -130,8 +130,12 @@ export const StaffBookingSearchQuerySchema = z
     to: localDateQuery.optional(),
     dateBasis: z.enum(['booked', 'journey']).default('booked'),
     status: z.enum(['live', 'confirmed', 'cancelled', 'expired', 'completed']).optional(),
-    channel: z.enum(['direct_web', 'direct_app', 'ota', 'backoffice']).optional(),
+    channel: z.enum(['direct_web', 'direct_app', 'ota', 'backoffice', 'phone', 'agent']).optional(),
     tripId: z.string().uuid().optional(),
+    /** Sold by this travel agent. */
+    agentId: z.string().uuid().optional(),
+    /** Only bookings with a passenger marked no-show. */
+    noShow: queryFlag.optional(),
     cursor: z.string().max(200).optional(),
     limit: z.coerce.number().int().min(1).max(200).default(50),
   })

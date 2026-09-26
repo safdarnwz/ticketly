@@ -118,6 +118,25 @@ describe('operator bookings (e2e)', () => {
       expect(confirmed.body.items.some((b: { pnr: string }) => b.pnr === family.pnr)).toBe(true);
     });
 
+    it('filters by channel, agent and no-shows', async () => {
+      const wide = 'dateBasis=journey&from=2026-01-01&to=2026-03-31&limit=200';
+      const byAgent = await app.get(
+        `/bookings/search?${wide}&agentId=01a0dddd-0000-7000-8000-000000000000`,
+        op,
+      );
+      expect(byAgent.status).toBe(200);
+      expect(byAgent.body.items).toEqual([]);
+      const phone = await app.get(`/bookings/search?${wide}&channel=phone`, op);
+      expect(phone.status).toBe(200);
+      expect(phone.body.items.every((b: { channel: string }) => b.channel === 'phone')).toBe(true);
+      const noShows = await app.get(`/bookings/search?${wide}&noShow=1`, op);
+      expect(noShows.status).toBe(200);
+      expect(
+        noShows.body.items.every((b: { noShowSeats: string[] }) => b.noShowSeats.length > 0),
+      ).toBe(true);
+      expect((await app.get('/bookings/search?channel=pigeon', op)).status).toBe(400);
+    });
+
     it('defaults to today and rejects bad input', async () => {
       const today = await app.get('/bookings/search', op);
       expect(today.status).toBe(200);

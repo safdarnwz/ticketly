@@ -400,3 +400,5 @@ an unknown id is now 404 (was 200).
 - **Departure:** `POST /crew/trips/:id/status {status:'departed'}` is refused (422) more than 2 hours
   before the bus's departure time — marking next week's bus departed by mistake stopped its sales and told
   its passengers it had left.
+- **Staff booking search:** `GET /bookings/search` takes `channel=phone|agent`, `agentId` and `noShow=1`;
+  each row adds `agentName` and `noShowSeats`.

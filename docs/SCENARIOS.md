@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 624 |
-| DONE | 351 |
+| TODO | 618 |
+| DONE | 357 |
 | DUP | 9 |
 
 
@@ -396,7 +396,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 359 | Hold seats temporarily for walk-in passenger | DONE | DONE | verified manually: existing module/API · UI: Search & Book → hold then pay |
 | 360 | Convert held seats to confirmed booking | DONE | DONE | verified manually: existing module/API · UI: Search & Book → hold then pay |
 | 361 | Confirm booking received on phone | DONE | DONE | verified manually: existing module/API · UI: Search & Book → Phone booking (hold until a release time) → booking page: Take UPI payment |
-| 362 | Verify booking done by agent | DONE | TODO | verified manually: existing module/API |
+| 362 | Verify booking done by agent | DONE | DONE | verified manually: existing module/API · UI: Bookings → channel Travel agent + agent filter; booking shows the agent |
 | 363 | Approve agent booking | GAP | — | verified manually: not built yet |
 | 364 | Generate boarding chart in PDF | GAP | — | verified manually: not built yet |
 | 365 | Print boarding chart | DONE | DONE | GET /bookings/trips/:tripId/chart (passenger list by boarding point) — printed from the web chart · UI: Trips & Charts › chart: Print chart + passenger list |
@@ -453,9 +453,9 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 416 | Search booking using mobile number | DONE | DONE | GET /bookings/search?mobile= (last-10-digit match) · UI: operator Bookings list + detail (find by PNR/mobile/ticket, filters, CSV) |
 | 417 | Search booking using ticket number | DONE | DONE | GET /bookings/search?ticket= · UI: operator Bookings list + detail (find by PNR/mobile/ticket, filters, CSV) |
 | 418 | View complete passenger travel history | DONE | TODO | verified manually: existing module/API |
-| 419 | Manually apply senior citizen discount | DONE | TODO | verified manually: existing module/API |
-| 420 | Manually apply student discount | DONE | TODO | verified manually: existing module/API |
-| 421 | Override ladies seat restriction with proper reason | DONE | TODO | POST /bookings/hold ladiesSeatOverrideReason (staff only, event booking.ladies_seat_override) |
+| 419 | Manually apply senior citizen discount | DONE | DONE | verified manually: existing module/API · UI: Search & Book (counter): concession per passenger with ID; ladies seat for a man only with a written reason |
+| 420 | Manually apply student discount | DONE | DONE | verified manually: existing module/API · UI: Search & Book (counter): concession per passenger with ID; ladies seat for a man only with a written reason |
+| 421 | Override ladies seat restriction with proper reason | DONE | DONE | POST /bookings/hold ladiesSeatOverrideReason (staff only, event booking.ladies_seat_override) · UI: Search & Book (counter): concession per passenger with ID; ladies seat for a man only with a written reason |
 | 422 | Show cancellation charges to passenger before confirming | DONE | DONE | verified manually: existing module/API · UI: Booking → Cancel… (refund shown first) |
 | 423 | Process refund back to original payment method | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
 | 424 | Process refund in cash | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
@@ -464,8 +464,8 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 427 | View live GPS location of branch services | DONE | TODO | verified manually: existing module/API |
 | 428 | Mark service as departed from this branch | DONE | DONE | verified manually: existing module/API · UI: Trips (On the road / Cancelled filter) → chart: Mark departed / arrived, Change bus |
 | 429 | Enter detailed delay reason | DONE | DONE | verified manually: existing module/API · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
-| 430 | View complete no-show passenger list | DONE | TODO | verified manually: existing module/API |
-| 431 | Contact no-show passenger | DONE | TODO | verified manually: existing module/API |
+| 430 | View complete no-show passenger list | DONE | DONE | verified manually: existing module/API · UI: Bookings → No-shows only (seats shown), tap the mobile to call |
+| 431 | Contact no-show passenger | DONE | DONE | verified manually: existing module/API · UI: Bookings → No-shows only (seats shown), tap the mobile to call |
 | 432 | Release no-show seat to waitlist | GAP | — | verified manually: not built yet |
 | 433 | View current waitlist for services | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Waitlist |
 | 434 | Confirm passenger from waitlist | GAP | — | verified manually: not built yet |

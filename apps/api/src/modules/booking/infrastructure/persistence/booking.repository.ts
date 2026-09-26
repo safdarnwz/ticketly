@@ -59,6 +59,8 @@ export interface StaffBookingRow {
   toName: string | null;
   leadPassenger: string | null;
   seats: string[];
+  agentName: string | null;
+  noShowSeats: string[];
 }
 
 export interface BookingRow {
@@ -243,6 +245,7 @@ export class BookingRepository {
     status?: 'live' | 'confirmed' | 'cancelled' | 'expired' | 'completed';
     channel?: string;
     tripId?: string;
+    noShow?: boolean;
     before?: { createdAt: string; id: string };
     limit?: number;
   }): Promise<StaffBookingRow[]> {
@@ -267,8 +270,11 @@ export class BookingRepository {
               t.departs_at AS "departsAt", r.name AS "routeName",
               fs.name AS "fromName", ts.name AS "toName",
               (SELECT p.full_name FROM passengers p WHERE p.booking_id = b.id ORDER BY p.seat_number LIMIT 1) AS "leadPassenger",
-              (SELECT array_agg(bs.seat_number ORDER BY bs.seat_number) FROM booking_seats bs WHERE bs.booking_id = b.id) AS seats
+              (SELECT array_agg(bs.seat_number ORDER BY bs.seat_number) FROM booking_seats bs WHERE bs.booking_id = b.id) AS seats,
+              ag.name AS "agentName",
+              (SELECT array_agg(tk.seat_number ORDER BY tk.seat_number) FROM tickets tk WHERE tk.booking_id = b.id AND tk.status = 'no_show') AS "noShowSeats"
          FROM bookings b
+         LEFT JOIN agents ag ON ag.id = b.agent_id AND ag.tenant_id = b.tenant_id
          JOIN tenants te ON te.id = b.tenant_id
          JOIN trips t ON t.id = b.trip_id
          JOIN routes r ON r.id = t.route_id
@@ -284,6 +290,7 @@ export class BookingRepository {
           AND ($8::boolean OR ${status})
           AND ($9::text IS NULL OR b.channel = $9)
           AND ($10::uuid IS NULL OR b.trip_id = $10)
+          AND (NOT $14::boolean OR EXISTS (SELECT 1 FROM tickets tk WHERE tk.booking_id = b.id AND tk.status = 'no_show'))
           AND ($11::timestamptz IS NULL OR (b.created_at, b.id) < ($11::timestamptz, $12::uuid))
         ORDER BY b.created_at DESC, b.id DESC
         LIMIT $13`,
@@ -301,6 +308,7 @@ export class BookingRepository {
         q.before?.createdAt ?? null,
         q.before?.id ?? null,
         Math.min(q.limit ?? 50, 201),
+        q.noShow ?? false,
       ],
       { name: 'booking.search' },
     );
@@ -310,6 +318,7 @@ export class BookingRepository {
       totalMinor: Number(r.totalMinor),
       paidMinor: Number(r.paidMinor),
       seats: (r.seats as string[] | null) ?? [],
+      noShowSeats: (r.noShowSeats as string[] | null) ?? [],
     }));
   }
 
