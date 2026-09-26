@@ -9,7 +9,8 @@ export interface NotificationTemplate {
 }
 
 export const notificationsApi = {
-  listTemplates: () => get<{ items: NotificationTemplate[] }>('/v1/notifications/templates'),
+  /** Templates, and the catalogue of events with the placeholders each fills in. */
+  listTemplates: () => get<{ items: NotificationTemplate[]; catalogue: Record<string, { label: string; placeholders: string[] }> }>('/v1/notifications/templates'),
   upsertTemplate: (input: { eventType: string; channel: NotificationTemplate['channel']; subject?: string; body: string }) =>
     post<{ ok: boolean }>('/v1/notifications/templates', input),
 };

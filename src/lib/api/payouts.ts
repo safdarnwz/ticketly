@@ -1,4 +1,4 @@
-import { get, patch, post } from './client';
+import { del, get, patch, post } from './client';
 
 export interface BankDetails {
   onFile: boolean;
@@ -38,6 +38,8 @@ export const bankDetailsApi = {
   get: () => get<BankDetails>('/v1/operator/bank-details'),
   set: (input: { accountHolder: string; accountNumber: string; ifsc: string; bankName?: string }) =>
     patch<{ ok: boolean }>('/v1/operator/bank-details', input),
+  /** Take back the change waiting for platform approval. */
+  withdraw: () => del<{ ok: boolean }>('/v1/operator/bank-details/pending'),
 };
 
 export const payoutsApi = {
