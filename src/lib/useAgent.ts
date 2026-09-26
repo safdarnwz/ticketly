@@ -13,3 +13,10 @@ export function useIsAgent(): { isAgent: boolean; loading: boolean } {
   const roles = me.data?.roles ?? [];
   return { isAgent: roles.includes('agent') && roles.length === 1, loading: me.isLoading };
 }
+
+/** A conductor / driver login: the operator's 'crew' role only — they use the crew app. */
+export function useIsCrew(): { isCrew: boolean; loading: boolean } {
+  const me = useQuery({ queryKey: ['auth-me'], queryFn: authApi.me, enabled: !isSuperAdmin, staleTime: 60_000 });
+  const roles = me.data?.roles ?? [];
+  return { isCrew: roles.length === 1 && roles[0] === 'crew', loading: me.isLoading };
+}

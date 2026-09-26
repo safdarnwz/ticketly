@@ -2,7 +2,7 @@ import { del, get, post, put, patch } from './client';
 
 export interface Vehicle { id: string; registrationNo: string; vehicleTypeId: string; seatLayoutId?: string | null; status: string; verificationStatus?: string; verificationReason?: string | null; manufactureYear?: number | null; chassisNo?: string | null; engineNo?: string | null; fuelType?: string | null; registeredOwner?: string | null; make?: string; model?: string; photoUrl?: string | null; serviceNote?: string | null; permitType?: 'aitp' | 'stage_carriage' | 'state_tourist_permit' | 'contract_carriage' | null }
 export type CrewStatus = 'active' | 'on_leave' | 'inactive';
-export interface Crew { id: string; role: string; fullName: string; status: CrewStatus; licenceNo: string | null; licenceExpiresOn: string | null; phone: string | null; employeeCode: string | null; upcomingDuties: number }
+export interface Crew { id: string; role: string; fullName: string; status: CrewStatus; licenceNo: string | null; licenceExpiresOn: string | null; phone: string | null; employeeCode: string | null; upcomingDuties: number; hasLogin?: boolean }
 export type CrewPatch = Partial<{ fullName: string; phone: string | null; licenceNo: string | null; licenceExpiresOn: string | null; employeeCode: string | null; status: CrewStatus }>;
 export interface CrewRules { minRestMinutes: number; maxDailyDrivingMinutes: number; maxDutyMinutes: number; maxContinuousDrivingMinutes?: number }
 export interface CrewAllowance { remainingDrivingMinutes: number; nextAvailableAt: string | null; rules: CrewRules }
@@ -75,6 +75,8 @@ export const fleetApi = {
     return get<{ items: Crew[] }>(`/v1/fleet/crew${qs ? `?${qs}` : ''}`);
   },
   updateCrew: (id: string, changes: CrewPatch) => patch<Crew>(`/v1/fleet/crew/${id}`, changes),
+  /** Crew-app login: their mobile + this password; again = reset (signs them out). */
+  setCrewLogin: (id: string, password: string) => put<{ userId: string; created: boolean }>(`/v1/fleet/crew/${id}/login`, { password }),
   allowance: (id: string) => get<CrewAllowance>(`/v1/fleet/crew/${id}/allowance`),
   crewRules: () => get<CrewRules>('/v1/fleet/crew-rules'),
   setCrewRules: (rules: CrewRules) => put<{ ok: boolean }>('/v1/fleet/crew-rules', rules),

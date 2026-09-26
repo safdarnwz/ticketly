@@ -47,6 +47,7 @@ function CrewList() {
   const [role, setRole] = useState('');
   const [status, setStatus] = useState('');
   const [editing, setEditing] = useState<Crew | 'new' | null>(null);
+  const [loginFor, setLoginFor] = useState<Crew | null>(null);
   const crew = useQuery({ queryKey: ['crew', role, status], queryFn: () => fleetApi.listCrew({ role, status }) });
   const today = todayLocal();
   const soon = addDaysIso(today, 30);
@@ -60,7 +61,13 @@ function CrewList() {
     ) : <span className="text-text-muted">{r.role === 'driver' ? <span className="text-danger">missing</span> : '—'}</span> },
     { key: 'duties', header: 'Upcoming duties', render: (r) => r.upcomingDuties },
     { key: 'status', header: 'Status', render: (r) => <Badge tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status] ?? r.status}</Badge> },
-    { key: 'act', header: '', render: (r) => <Button size="sm" variant="ghost" leftIcon={<Pencil className="h-3.5 w-3.5" />} onClick={() => setEditing(r)}>Edit</Button> },
+    { key: 'app', header: 'Crew app', render: (r) => r.hasLogin ? <Badge tone="success">has login</Badge> : <span className="text-xs text-text-muted">no login</span> },
+    { key: 'act', header: '', render: (r) => (
+      <div className="flex justify-end gap-1">
+        <Button size="sm" variant="ghost" disabled={!r.phone || r.status !== 'active'} title={!r.phone ? 'Add a mobile number first' : r.status !== 'active' ? 'Only active crew use the app' : undefined} onClick={() => setLoginFor(r)}>{r.hasLogin ? 'Reset app password' : 'Give app login'}</Button>
+        <Button size="sm" variant="ghost" leftIcon={<Pencil className="h-3.5 w-3.5" />} onClick={() => setEditing(r)}>Edit</Button>
+      </div>
+    ) },
   ];
   return (
     <>
@@ -75,7 +82,31 @@ function CrewList() {
         crew.data?.items.length ? <Table columns={columns} rows={crew.data.items} />
           : <EmptyState title={role || status ? 'Nobody matches these filters' : 'No crew yet'} icon={<Users className="h-10 w-10" />} />}
       {editing && <CrewModal crew={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
+      {loginFor && <CrewLoginModal crew={loginFor} onClose={() => setLoginFor(null)} />}
     </>
+  );
+}
+
+/** Give a crew member a crew-app login (their mobile + a password), or reset it (signs them out). */
+function CrewLoginModal({ crew, onClose }: { crew: Crew; onClose: () => void }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [pw, setPw] = useState('');
+  const [tried, setTried] = useState(false);
+  const bad = pw.length < 8 ? 'At least 8 characters' : undefined;
+  const save = useMutation({
+    mutationFn: () => fleetApi.setCrewLogin(crew.id, pw),
+    onSuccess: (r) => { toast.success(r.created ? `${crew.fullName} can sign in to the crew app with ${crew.phone}` : 'Password reset — they must sign in again'); void qc.invalidateQueries({ queryKey: ['crew'] }); onClose(); },
+    onError: (e) => toast.error(errText(e, 'Could not save')),
+  });
+  return (
+    <Modal open onClose={onClose} title={crew.hasLogin ? 'Reset crew-app password' : 'Give a crew-app login'}
+      footer={<><Button variant="ghost" onClick={onClose} disabled={save.isPending}>Cancel</Button><Button loading={save.isPending} disabled={save.isPending} onClick={() => { setTried(true); if (!bad) save.mutate(); }}>Save</Button></>}>
+      <div className="flex flex-col gap-3 text-sm">
+        <p className="text-text-muted">{crew.fullName} signs in with mobile <b className="text-text">{crew.phone}</b> and this password. The app shows only their own duties and trips.</p>
+        <Input label="Password" type="password" value={pw} onChange={(e) => setPw(e.target.value)} error={tried ? bad : undefined} />
+      </div>
+    </Modal>
   );
 }
 

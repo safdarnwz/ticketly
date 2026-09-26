@@ -4,7 +4,7 @@ import { ArrowUpRight, BarChart3, CheckCircle2, IndianRupee, RotateCcw, Search, 
 import type { ReactNode } from 'react';
 
 import { Badge, Card, CardBody, CardHeader, ErrorState, PageLoader, Skeleton, Table, statusTone, type Column } from '@/components/ui';
-import { useIsAgent } from '@/lib/useAgent';
+import { useIsAgent, useIsCrew } from '@/lib/useAgent';
 import { useAuth } from '@/stores/auth';
 import { reportsApi } from '@/lib/api/reports';
 import { schedulingApi, type TripRow } from '@/lib/api/scheduling';
@@ -60,8 +60,9 @@ function Occupancy({ t }: { t: TripRow }) {
 /** Staff land on the operator dashboard; a travel agent's login lands on their own portal. */
 export function DashboardPage() {
   const { isAgent, loading } = useIsAgent();
+  const { isCrew } = useIsCrew();
   if (loading) return <PageLoader />;
-  return isAgent ? <Navigate to="/agent" replace /> : <StaffDashboard />;
+  return isAgent ? <Navigate to="/agent" replace /> : isCrew ? <Navigate to="/crew" replace /> : <StaffDashboard />;
 }
 
 function StaffDashboard() {

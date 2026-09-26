@@ -56,6 +56,8 @@ import { AgentBookingsPage } from '@/pages/agent/AgentBookingsPage';
 import { AgentBookingPage } from '@/pages/agent/AgentBookingPage';
 import { AgentStatementPage } from '@/pages/agent/AgentStatementPage';
 import { AgentHelpPage } from '@/pages/agent/AgentHelpPage';
+import { CrewHomePage } from '@/pages/crew/CrewHomePage';
+import { CrewTripPage } from '@/pages/crew/CrewTripPage';
 import { CustomersPage } from '@/pages/crm/CustomersPage';
 import { ReportsPage } from '@/pages/reports/ReportsPage';
 import { AnnouncementsPage } from '@/pages/announcements/AnnouncementsPage';
@@ -146,6 +148,8 @@ const tenantAdminRouter = createBrowserRouter([
           { path: '/agent/bookings/:id', element: <AgentBookingPage /> },
           { path: '/agent/statement', element: <AgentStatementPage /> },
           { path: '/agent/help', element: <AgentHelpPage /> },
+          { path: '/crew', element: <CrewHomePage /> },
+          { path: '/crew/trips/:tripId', element: <CrewTripPage /> },
           { path: '/legal/:slug', element: <LegalPage /> },
           { path: '/customers', element: <CustomersPage /> },
           { path: '/reports', element: <ReportsPage /> },

@@ -62,14 +62,22 @@ const agentNav = [
   { to: '/agent/help', label: 'Help & support', icon: LifeBuoy },
 ];
 
+/** A conductor / driver: the crew app. */
+const crewNav = [
+  { to: '/crew', label: 'My duties', icon: ClipboardList },
+  { to: '/me', label: 'My account', icon: UserCog },
+];
+
 export function Sidebar() {
   // Staff only see the menus their roles open (any one of `needs`); the API refuses the rest anyway.
   const me = useQuery({ queryKey: ['auth-me'], queryFn: authApi.me, enabled: !isSuperAdmin, staleTime: 60_000 });
   const held = new Set(me.data?.permissions ?? []);
   const agent = (me.data?.roles ?? []).length === 1 && me.data?.roles.includes('agent') === true;
+  const crew = (me.data?.roles ?? []).length === 1 && me.data?.roles[0] === 'crew';
   const nav = isSuperAdmin
     ? superAdminNav
     : agent ? agentNav
+    : crew ? crewNav
     : tenantAdminNav.filter((n) => n.needs.length === 0 || held.has('*') || n.needs.some((p) => held.has(p)));
 
   return (
@@ -112,7 +120,7 @@ export function Sidebar() {
         ))}
       </nav>
       <div className="border-t border-border p-4 text-[11px] leading-relaxed text-text-muted">
-        {isSuperAdmin ? 'Ticketly Platform Admin' : agent ? 'Ticketly Agent Portal' : 'Ticketly Console'} · v1.0
+        {isSuperAdmin ? 'Ticketly Platform Admin' : agent ? 'Ticketly Agent Portal' : crew ? 'Ticketly Crew App' : 'Ticketly Console'} · v1.0
       </div>
     </aside>
   );

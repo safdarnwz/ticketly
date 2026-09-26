@@ -33,6 +33,7 @@ function userFromToken(token: string, fallbackIdentifier?: string): AuthUser {
 export function homeForRoles(roles: string[], surface?: string): string {
   if (roles.includes('super_admin') || roles.includes('platform_admin')) return '/admin/tenants';
   if (roles.includes('agent')) return '/agent';
+  if (roles.length === 1 && roles[0] === 'crew') return '/crew';
   // On an operator's console every signed-in user is staff (custom role names included).
   if (surface === 'tenantAdmin') return '/dashboard';
   if (roles.includes('operator_admin') || roles.includes('operator_staff')
