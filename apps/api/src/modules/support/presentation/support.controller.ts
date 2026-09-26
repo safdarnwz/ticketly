@@ -2,16 +2,25 @@ import { Body, Controller, Get, Patch, Post, Query, HttpCode } from '@nestjs/com
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, RequirePermission, UuidParam, zodBody, zodQuery } from '@http';
+import {
+  ApiStandardErrors,
+  Idempotent,
+  RequirePermission,
+  UuidParam,
+  zodBody,
+  zodQuery,
+} from '@http';
 import { type BookingId, type SupportTicketId } from '@kernel';
 
 import { SupportService } from '../application/services/support.service';
 import {
+  EscalateTicketSchema,
   ListSupportTicketsQuerySchema,
   OpenSupportTicketSchema,
   SupportReplySchema,
   SupportTransitionSchema,
   UpdateTicketSchema,
+  type EscalateTicketDto,
   type ListSupportTicketsQueryDto,
   type UpdateTicketDto,
   type OpenSupportTicketDto,
@@ -86,5 +95,20 @@ export class SupportController {
     @Body(zodBody(SupportTransitionSchema)) dto: SupportTransitionDto,
   ) {
     return this.support.transition(id as SupportTicketId, dto.status);
+  }
+
+  @Post(':id/escalate')
+  @HttpCode(200)
+  @Idempotent()
+  @RequirePermission(Permission.BOOKING_READ)
+  @ApiOperation({
+    summary:
+      "Staff: escalate to the platform's support team with what is wrong (internal — the customer never sees it)",
+  })
+  async escalate(
+    @UuidParam('id') id: string,
+    @Body(zodBody(EscalateTicketSchema)) dto: EscalateTicketDto,
+  ) {
+    return this.support.escalate(id as SupportTicketId, dto.reason);
   }
 }

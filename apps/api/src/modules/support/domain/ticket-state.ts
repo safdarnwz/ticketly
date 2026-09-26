@@ -62,3 +62,14 @@ export function statusAfterMessage(
   if (authorKind === 'agent') return current === 'open' ? 'pending' : current; // agent picks up an open ticket → pending
   return current; // system note doesn't move it
 }
+
+/**
+ * Escalation to the platform's support team, alongside the ticket's own status:
+ * open (waiting on the platform) → answered (the platform replied) → closed.
+ * A new note from the operator reopens it.
+ */
+export const ESCALATION_STATUSES = ['open', 'answered', 'closed'] as const;
+export type EscalationStatus = (typeof ESCALATION_STATUSES)[number];
+
+/** Notes between the operator and the platform — never shown to the customer. */
+export const INTERNAL_AUTHOR_KINDS = ['escalation', 'platform'] as const;

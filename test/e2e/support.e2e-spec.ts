@@ -139,4 +139,95 @@ describe('support tickets (e2e)', () => {
       .tickets as { id: string }[];
     expect(byPnr.some((x) => x.id === id)).toBe(true);
   });
+
+  it('staff escalate to the platform; the notes stay internal; the platform answers and closes', async () => {
+    const t = await open({ pnr: booking.pnr, subject: 'Payment taken, no ticket' }, op);
+    const id = t.body.ticketId as string;
+    const escalate = (body: object, key: string, opts: object = op) =>
+      app.post(`/support/tickets/${id}/escalate`, body, {
+        ...opts,
+        idempotencyKey: `e2e-esc-${key}-${id}`,
+      });
+    const why = { reason: 'Gateway shows captured, booking still held — please check' };
+
+    expect((await escalate({ reason: 'help' }, 'short')).status).toBe(400);
+    expect((await escalate(why, 'cust', customer)).status).toBe(403);
+    expect((await escalate(why, 'other', { headers: otherOperator })).status).toBe(404);
+    expect(
+      (
+        await app.post('/support/tickets/00000000-0000-4000-8000-000000000000/escalate', why, {
+          ...op,
+          idempotencyKey: `e2e-esc-unknown-${id}`,
+        })
+      ).status,
+    ).toBe(404);
+    const first = await escalate(why, 'one');
+    expect(first.status, JSON.stringify(first.body)).toBe(200);
+    expect(first.body.escalationStatus).toBe('open');
+    await escalate(why, 'one'); // a double click posts the note once
+
+    const staffView = await get(id, op);
+    expect(staffView.body.ticket.escalationStatus).toBe('open');
+    const notes = (staffView.body.messages as { authorKind: string }[]).filter(
+      (m) => m.authorKind === 'escalation',
+    );
+    expect(notes).toHaveLength(1);
+    // The customer sees neither the note nor that it was escalated.
+    const custView = await get(id);
+    expect(
+      (custView.body.messages as { authorKind: string }[]).map((m) => m.authorKind),
+    ).not.toContain('escalation');
+    expect(custView.body.ticket.escalationStatus).toBeNull();
+    const escalatedOnly = (await app.get('/support/tickets?escalated=1', op)).body.tickets as {
+      id: string;
+    }[];
+    expect(escalatedOnly.some((x) => x.id === id)).toBe(true);
+
+    // The platform desk: operators cannot reach it; the platform sees and answers.
+    const admin = { as: 'platformAdmin' as const };
+    expect((await app.get('/admin/support/escalations', op)).status).toBe(403);
+    const desk = await app.get('/admin/support/escalations', admin);
+    expect(desk.status, JSON.stringify(desk.body)).toBe(200);
+    expect(desk.body.items.find((x: { id: string }) => x.id === id)).toMatchObject({
+      escalationStatus: 'open',
+      operatorName: expect.any(String),
+    });
+    const thread = await app.get(`/admin/support/escalations/${id}`, admin);
+    expect(thread.body.messages.length).toBeGreaterThanOrEqual(2);
+    expect(
+      (await app.get('/admin/support/escalations/00000000-0000-4000-8000-000000000000', admin))
+        .status,
+    ).toBe(404);
+    const answer = (body: string) =>
+      app.post(`/admin/support/escalations/${id}/messages`, { body }, admin);
+    expect((await answer('')).status).toBe(400);
+    expect((await answer('Payment re-linked; ticket issued')).body.escalationStatus).toBe(
+      'answered',
+    );
+    const afterAnswer = await get(id, op);
+    expect(afterAnswer.body.ticket.escalationStatus).toBe('answered');
+    expect(
+      (afterAnswer.body.messages as { authorKind: string }[]).some(
+        (m) => m.authorKind === 'platform',
+      ),
+    ).toBe(true);
+    expect(
+      ((await get(id)).body.messages as { authorKind: string }[]).map((m) => m.authorKind),
+    ).not.toContain('platform');
+
+    const close = () => app.post(`/admin/support/escalations/${id}/close`, {}, admin);
+    expect((await close()).status).toBe(200);
+    expect((await close()).status).toBe(200);
+    expect((await answer('One more thing')).status).toBe(422);
+    // It comes back: the operator escalates again.
+    expect((await escalate({ reason: 'Happened again on the next booking' }, 'two')).body).toEqual({
+      escalationStatus: 'open',
+    });
+
+    // A closed ticket cannot be escalated.
+    expect((await app.post(`/support/tickets/${id}/status`, { status: 'closed' }, op)).status).toBe(
+      200,
+    );
+    expect((await escalate(why, 'closed')).status).toBe(422);
+  });
 });

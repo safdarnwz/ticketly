@@ -420,3 +420,10 @@ an unknown id is now 404 (was 200).
   is 400.
 - **Attendance sheet:** `GET /fleet/crew/duties` takes `date=YYYY-MM-DD` — every duty starting that day of
   the operator's (finished ones too) with its attendance; without it, the upcoming roster as before.
+- **Escalate to platform support:** new `POST /support/tickets/:id/escalate {reason}` (staff, idempotent):
+  hands a ticket the operator cannot solve to the platform's support team (422 on a closed ticket, 403 for
+  a customer). The note (`authorKind: 'escalation'`) and the platform's answers (`'platform'`) are internal —
+  customers never see them. Tickets carry `escalationStatus` (`open` → `answered` → `closed`) and
+  `escalatedAt`; `GET /support/tickets?escalated=1` lists the ones with the platform. Category `technical`
+  added. Platform desk (platform admins): `GET /admin/support/escalations[?status]`, `GET …/:id`,
+  `POST …/:id/messages {body}` (422 once closed), `POST …/:id/close`. Migration 0098.

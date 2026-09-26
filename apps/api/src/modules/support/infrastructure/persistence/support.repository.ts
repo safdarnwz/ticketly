@@ -1,9 +1,15 @@
 import { Injectable } from '@nestjs/common';
 
-import { currentTransaction, DatabaseService } from '@database';
+import { currentTransaction, DatabaseService, UnitOfWork } from '@database';
 import { newId, requireTenantId, type BookingId, type SupportTicketId, type UserId } from '@kernel';
 
-import type { TicketStatus } from '../../domain/ticket-state';
+import {
+  INTERNAL_AUTHOR_KINDS,
+  type EscalationStatus,
+  type TicketStatus,
+} from '../../domain/ticket-state';
+
+const INTERNAL = `(${INTERNAL_AUTHOR_KINDS.map((k) => `'${k}'`).join(',')})`;
 
 export interface TicketRow {
   id: SupportTicketId;
@@ -14,6 +20,7 @@ export interface TicketRow {
   customerId: string | null;
   bookingId: string | null;
   assignedTo: string | null;
+  escalationStatus: EscalationStatus | null;
 }
 
 export interface TicketListRow {
@@ -29,6 +36,8 @@ export interface TicketListRow {
   assignedTo: string | null;
   assignedName: string | null;
   messages: number;
+  escalationStatus: EscalationStatus | null;
+  escalatedAt: string | null;
   lastAuthor: string | null;
   lastMessageAt: string | null;
   createdAt: string;
@@ -37,7 +46,10 @@ export interface TicketListRow {
 
 @Injectable()
 export class SupportRepository {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly uow: UnitOfWork,
+  ) {}
 
   async createTicket(input: {
     subject: string;
@@ -67,7 +79,7 @@ export class SupportRepository {
   async findTicket(ticketId: SupportTicketId): Promise<TicketRow | null> {
     const scope = currentTransaction();
     const sql = `SELECT id, status, subject, category, priority, customer_id AS "customerId", booking_id AS "bookingId",
-                        assigned_to AS "assignedTo"
+                        assigned_to AS "assignedTo", escalation_status AS "escalationStatus"
                    FROM support_tickets WHERE tenant_id = $1 AND id = $2${scope ? ' FOR UPDATE' : ''}`;
     if (scope)
       return (
@@ -114,12 +126,15 @@ export class SupportRepository {
     else await this.db.execute_(sql, params, { name: 'support.updateStatus', primary: true });
   }
 
-  async listMessages(ticketId: SupportTicketId): Promise<unknown[]> {
+  /** The thread; notes between the operator and the platform only for staff. */
+  async listMessages(ticketId: SupportTicketId, internal: boolean): Promise<unknown[]> {
     return this.db.query(
       `SELECT m.id, m.author_kind AS "authorKind", m.author_id AS "authorId", u.full_name AS "authorName",
               m.body, m.created_at AS "createdAt"
          FROM support_messages m LEFT JOIN users u ON u.id = m.author_id
-        WHERE m.tenant_id = $1 AND m.ticket_id = $2 ORDER BY m.created_at`,
+        WHERE m.tenant_id = $1 AND m.ticket_id = $2
+          ${internal ? '' : `AND m.author_kind NOT IN ${INTERNAL}`}
+        ORDER BY m.created_at`,
       [requireTenantId(), ticketId],
       { name: 'support.listMessages' },
     );
@@ -137,8 +152,12 @@ export class SupportRepository {
     /** A staff user id, or 'none' for unassigned. */
     assignedTo?: string;
     q?: string;
+    /** Only tickets escalated to the platform (not closed there). */
+    escalated?: boolean;
     limit: number;
   }): Promise<TicketListRow[]> {
+    // Customers never see the operator ↔ platform notes, not even their count.
+    const visible = filter.customerId ? `AND m.author_kind NOT IN ${INTERNAL}` : '';
     const conds = ['t.tenant_id = $1'];
     const params: unknown[] = [requireTenantId()];
     const add = (sql: string, v: unknown) => {
@@ -152,6 +171,7 @@ export class SupportRepository {
     if (filter.category) add('t.category = ?', filter.category);
     if (filter.assignedTo === 'none') conds.push('t.assigned_to IS NULL');
     else if (filter.assignedTo) add('t.assigned_to = ?', filter.assignedTo);
+    if (filter.escalated) conds.push(`t.escalation_status IN ('open','answered')`);
     if (filter.q) {
       params.push(filter.q);
       const n = params.length;
@@ -162,7 +182,9 @@ export class SupportRepository {
       `SELECT t.id, t.subject, t.category, t.priority, t.status, b.pnr, t.booking_id AS "bookingId",
               cu.full_name AS "customerName", b.contact_phone AS "customerPhone",
               t.assigned_to AS "assignedTo", au.full_name AS "assignedName",
-              (SELECT count(*)::int FROM support_messages m WHERE m.ticket_id = t.id) AS messages,
+              (SELECT count(*)::int FROM support_messages m WHERE m.ticket_id = t.id ${visible}) AS messages,
+              ${filter.customerId ? 'NULL' : 't.escalation_status'} AS "escalationStatus",
+              ${filter.customerId ? 'NULL' : 't.escalated_at'} AS "escalatedAt",
               lm.author_kind AS "lastAuthor", lm.created_at AS "lastMessageAt",
               t.created_at AS "createdAt", t.updated_at AS "updatedAt"
          FROM support_tickets t
@@ -170,7 +192,7 @@ export class SupportRepository {
          LEFT JOIN users cu ON cu.id = t.customer_id
          LEFT JOIN users au ON au.id = t.assigned_to
          LEFT JOIN LATERAL (SELECT author_kind, created_at FROM support_messages m
-                             WHERE m.ticket_id = t.id ORDER BY created_at DESC LIMIT 1) lm ON true
+                             WHERE m.ticket_id = t.id ${visible} ORDER BY created_at DESC LIMIT 1) lm ON true
         WHERE ${conds.join(' AND ')}
         ORDER BY (t.status IN ('open','pending')) DESC, (t.status = 'open') DESC,
                  array_position(ARRAY['urgent','high','normal','low'], t.priority),
@@ -183,19 +205,21 @@ export class SupportRepository {
   }
 
   /** One ticket's header for its page: booking, customer, assignee. */
-  async ticketView(ticketId: SupportTicketId): Promise<TicketListRow | null> {
+  async ticketView(ticketId: SupportTicketId, internal: boolean): Promise<TicketListRow | null> {
     const rows = await this.db.query<TicketListRow>(
       `SELECT t.id, t.subject, t.category, t.priority, t.status, b.pnr, t.booking_id AS "bookingId",
               cu.full_name AS "customerName", b.contact_phone AS "customerPhone",
               t.assigned_to AS "assignedTo", au.full_name AS "assignedName",
               0 AS messages, NULL AS "lastAuthor", NULL AS "lastMessageAt",
+              CASE WHEN $3 THEN t.escalation_status END AS "escalationStatus",
+              CASE WHEN $3 THEN t.escalated_at END AS "escalatedAt",
               t.created_at AS "createdAt", t.updated_at AS "updatedAt"
          FROM support_tickets t
          LEFT JOIN bookings b ON b.id = t.booking_id
          LEFT JOIN users cu ON cu.id = t.customer_id
          LEFT JOIN users au ON au.id = t.assigned_to
         WHERE t.tenant_id = $1 AND t.id = $2`,
-      [requireTenantId(), ticketId],
+      [requireTenantId(), ticketId, internal],
       { name: 'support.ticketView' },
     );
     return rows[0] ?? null;
@@ -244,4 +268,141 @@ export class SupportRepository {
       { name: 'support.booking', primary: true },
     );
   }
+
+  /** Escalate (or re-escalate) to the platform: waiting on the platform again. */
+  async escalate(ticketId: SupportTicketId, by: UserId | null): Promise<void> {
+    const scope = currentTransaction();
+    if (!scope) throw new Error('escalate must run inside a transaction');
+    await scope.client.query(
+      `UPDATE support_tickets
+          SET escalated_at = CASE WHEN escalation_status IN ('open','answered') THEN escalated_at ELSE now() END,
+              escalated_by = CASE WHEN escalation_status IN ('open','answered') THEN escalated_by ELSE $3 END,
+              escalation_status = 'open', escalation_closed_at = NULL, updated_at = now()
+        WHERE tenant_id = $1 AND id = $2`,
+      [requireTenantId(), ticketId, by],
+    );
+  }
+
+  // ── Platform side: every operator's escalations (RLS bypassed, platform admins only) ──
+
+  /** Escalations across operators, those waiting on the platform first. */
+  async listEscalations(filter: {
+    status?: EscalationStatus | 'active';
+    limit: number;
+  }): Promise<EscalationRow[]> {
+    return this.uow.run(
+      { name: 'support.listEscalations', readOnly: true, bypassRls: true },
+      async (s) =>
+        (
+          await s.client.query<EscalationRow>(
+            `SELECT t.id, t.tenant_id AS "tenantId", tn.display_name AS "operatorName", t.subject, t.category,
+                    t.priority, t.status, t.escalation_status AS "escalationStatus",
+                    t.escalated_at AS "escalatedAt", eu.full_name AS "escalatedByName",
+                    b.pnr, lm.author_kind AS "lastAuthor", lm.created_at AS "lastMessageAt"
+               FROM support_tickets t
+               JOIN tenants tn ON tn.id = t.tenant_id
+               LEFT JOIN users eu ON eu.id = t.escalated_by
+               LEFT JOIN bookings b ON b.id = t.booking_id
+               LEFT JOIN LATERAL (SELECT author_kind, created_at FROM support_messages m
+                                   WHERE m.ticket_id = t.id AND m.author_kind IN ${INTERNAL}
+                                   ORDER BY created_at DESC LIMIT 1) lm ON true
+              WHERE t.escalation_status IS NOT NULL
+                AND CASE WHEN $1::text IS NULL OR $1 = 'active' THEN t.escalation_status IN ('open','answered')
+                         ELSE t.escalation_status = $1 END
+              ORDER BY (t.escalation_status = 'open') DESC,
+                       array_position(ARRAY['urgent','high','normal','low'], t.priority),
+                       t.escalated_at ASC
+              LIMIT $2`,
+            [filter.status ?? null, filter.limit],
+          )
+        ).rows,
+    );
+  }
+
+  /** One escalated ticket with its whole thread (the platform needs the context). */
+  async escalation(
+    ticketId: string,
+  ): Promise<{ ticket: EscalationRow; messages: unknown[] } | null> {
+    return this.uow.run(
+      { name: 'support.escalation', readOnly: true, bypassRls: true },
+      async (s) => {
+        const t = await s.client.query<EscalationRow>(
+          `SELECT t.id, t.tenant_id AS "tenantId", tn.display_name AS "operatorName", t.subject, t.category,
+                  t.priority, t.status, t.escalation_status AS "escalationStatus",
+                  t.escalated_at AS "escalatedAt", eu.full_name AS "escalatedByName", b.pnr,
+                  NULL AS "lastAuthor", NULL AS "lastMessageAt"
+             FROM support_tickets t
+             JOIN tenants tn ON tn.id = t.tenant_id
+             LEFT JOIN users eu ON eu.id = t.escalated_by
+             LEFT JOIN bookings b ON b.id = t.booking_id
+            WHERE t.id = $1 AND t.escalation_status IS NOT NULL`,
+          [ticketId],
+        );
+        if (!t.rows[0]) return null;
+        const m = await s.client.query(
+          `SELECT m.id, m.author_kind AS "authorKind", u.full_name AS "authorName", m.body,
+                  m.created_at AS "createdAt"
+             FROM support_messages m LEFT JOIN users u ON u.id = m.author_id
+            WHERE m.ticket_id = $1 ORDER BY m.created_at`,
+          [ticketId],
+        );
+        return { ticket: t.rows[0], messages: m.rows };
+      },
+    );
+  }
+
+  /**
+   * The platform answers (or closes) an escalation. Locked so a reply never
+   * lands on an escalation closed a moment earlier. Returns the status before
+   * the change, or null when the ticket is not escalated.
+   */
+  async platformAct(
+    ticketId: string,
+    act: { reply: { authorId: string | null; body: string } } | { close: true },
+  ): Promise<EscalationStatus | null> {
+    return this.uow.run({ name: 'support.platformAct', bypassRls: true }, async (s) => {
+      const t = await s.client.query<{ tenant_id: string; escalation_status: EscalationStatus }>(
+        `SELECT tenant_id, escalation_status FROM support_tickets
+          WHERE id = $1 AND escalation_status IS NOT NULL FOR UPDATE`,
+        [ticketId],
+      );
+      const row = t.rows[0];
+      if (!row) return null;
+      if ('reply' in act) {
+        if (row.escalation_status === 'closed') return row.escalation_status;
+        await s.client.query(
+          `INSERT INTO support_messages (id, tenant_id, ticket_id, author_kind, author_id, body)
+           VALUES ($1, $2, $3, 'platform', $4, $5)`,
+          [newId(), row.tenant_id, ticketId, act.reply.authorId, act.reply.body],
+        );
+        await s.client.query(
+          `UPDATE support_tickets SET escalation_status = 'answered', updated_at = now() WHERE id = $1`,
+          [ticketId],
+        );
+      } else if (row.escalation_status !== 'closed') {
+        await s.client.query(
+          `UPDATE support_tickets SET escalation_status = 'closed', escalation_closed_at = now(),
+                  updated_at = now() WHERE id = $1`,
+          [ticketId],
+        );
+      }
+      return row.escalation_status;
+    });
+  }
+}
+
+export interface EscalationRow {
+  id: string;
+  tenantId: string;
+  operatorName: string;
+  subject: string;
+  category: string;
+  priority: string;
+  status: TicketStatus;
+  escalationStatus: EscalationStatus;
+  escalatedAt: string;
+  escalatedByName: string | null;
+  pnr: string | null;
+  lastAuthor: string | null;
+  lastMessageAt: string | null;
 }

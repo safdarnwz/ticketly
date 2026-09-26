@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@database';
 
 import { SupportController } from './presentation/support.controller';
+import { SupportEscalationController } from './presentation/support-escalation.controller';
 import { SupportRepository } from './infrastructure/persistence/support.repository';
 import { SupportService } from './application/services/support.service';
 
@@ -13,7 +14,7 @@ import { SupportService } from './application/services/support.service';
  */
 @Module({
   imports: [DatabaseModule],
-  controllers: [SupportController],
+  controllers: [SupportController, SupportEscalationController],
   providers: [SupportRepository, SupportService],
   exports: [SupportService],
 })

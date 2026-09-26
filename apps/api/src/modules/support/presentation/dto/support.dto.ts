@@ -1,7 +1,9 @@
 import { z } from 'zod';
-import { TICKET_STATUSES } from '../../domain/ticket-state';
 
-export const TICKET_CATEGORIES = ['refund', 'booking', 'payment', 'general'] as const;
+import { queryFlag } from '@http';
+import { ESCALATION_STATUSES, TICKET_STATUSES } from '../../domain/ticket-state';
+
+export const TICKET_CATEGORIES = ['refund', 'booking', 'payment', 'technical', 'general'] as const;
 export const TICKET_PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
 
 export const OpenSupportTicketSchema = z.object({
@@ -45,6 +47,20 @@ export const ListSupportTicketsQuerySchema = z.object({
   assigned: z.enum(['me', 'none']).optional(),
   /** Subject words or a PNR. */
   q: z.string().trim().max(80).optional(),
+  /** Staff: only tickets escalated to the platform and not closed there. */
+  escalated: queryFlag.optional(),
   limit: z.coerce.number().int().min(1).max(200).default(100),
 });
 export type ListSupportTicketsQueryDto = z.infer<typeof ListSupportTicketsQuerySchema>;
+
+/** Staff → platform: what is wrong and what was tried. */
+export const EscalateTicketSchema = z.object({
+  reason: z.string().trim().min(10, 'Say what is wrong and what you tried').max(2000),
+});
+export type EscalateTicketDto = z.infer<typeof EscalateTicketSchema>;
+
+export const ListEscalationsQuerySchema = z.object({
+  status: z.enum([...ESCALATION_STATUSES, 'active']).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(100),
+});
+export type ListEscalationsQueryDto = z.infer<typeof ListEscalationsQuerySchema>;

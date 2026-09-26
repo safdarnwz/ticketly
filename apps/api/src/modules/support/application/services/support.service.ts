@@ -19,6 +19,7 @@ import {
   assertTicketTransition,
   isTicketClosed,
   statusAfterMessage,
+  type EscalationStatus,
   type TicketStatus,
 } from '../../domain/ticket-state';
 import { SupportRepository } from '../../infrastructure/persistence/support.repository';
@@ -149,9 +150,10 @@ export class SupportService {
 
   async get(ticketId: SupportTicketId): Promise<unknown> {
     await this.visible(ticketId, isStaff());
+    const staff = isStaff();
     const [ticket, messages] = await Promise.all([
-      this.repo.ticketView(ticketId),
-      this.repo.listMessages(ticketId),
+      this.repo.ticketView(ticketId, staff),
+      this.repo.listMessages(ticketId, staff),
     ]);
     return { ticket, messages };
   }
@@ -162,6 +164,7 @@ export class SupportService {
     category?: string;
     assigned?: 'me' | 'none';
     q?: string;
+    escalated?: boolean;
     limit: number;
   }): Promise<unknown[]> {
     const staff = isStaff();
@@ -171,7 +174,74 @@ export class SupportService {
       // A customer sees only their own tickets, whatever they ask for.
       customerId: staff ? undefined : ((me ?? '00000000-0000-0000-0000-000000000000') as UserId),
       assignedTo: filter.assigned === 'none' ? 'none' : filter.assigned === 'me' ? me : undefined,
+      escalated: staff ? filter.escalated : undefined,
     });
+  }
+
+  /**
+   * Staff hand a ticket they cannot solve to the platform's support team, with
+   * what they tried. A later note re-opens an answered or closed escalation.
+   * The note is internal: the customer never sees it.
+   */
+  async escalate(
+    ticketId: SupportTicketId,
+    reason: string,
+  ): Promise<{ escalationStatus: EscalationStatus }> {
+    if (!isStaff())
+      throw new AppError(ErrorCode.COMMON_FORBIDDEN, 403, {
+        message: "Only the operator's staff can escalate a ticket",
+      });
+    return this.uow.run({ name: 'support.escalate', tenantId: requireTenantId() }, async () => {
+      const ticket = await this.visible(ticketId, true);
+      if (isTicketClosed(ticket.status))
+        throw new AppError(ErrorCode.SUPPORT_TICKET_CLOSED, 422, {
+          message: 'This ticket is closed — open a new one to escalate',
+        });
+      const me = getUserId() ?? null;
+      await this.repo.addMessage({
+        ticketId,
+        authorKind: 'escalation',
+        authorId: me,
+        body: reason,
+      });
+      await this.repo.escalate(ticketId, me);
+      return { escalationStatus: 'open' as const };
+    });
+  }
+
+  // ── Platform support team ──
+
+  listEscalations(filter: { status?: EscalationStatus | 'active'; limit: number }) {
+    return this.repo.listEscalations(filter);
+  }
+
+  async escalation(ticketId: string) {
+    const found = await this.repo.escalation(ticketId);
+    if (!found) throw new NotFoundError('Escalation', ticketId);
+    return found;
+  }
+
+  /** The platform answers the operator; an escalation closed by the platform takes no more replies. */
+  async answerEscalation(
+    ticketId: string,
+    body: string,
+  ): Promise<{ escalationStatus: 'answered' }> {
+    const before = await this.repo.platformAct(ticketId, {
+      reply: { authorId: getUserId() ?? null, body },
+    });
+    if (!before) throw new NotFoundError('Escalation', ticketId);
+    if (before === 'closed')
+      throw new AppError(ErrorCode.SUPPORT_TICKET_CLOSED, 422, {
+        message: 'This escalation is closed — the operator can escalate again if it comes back',
+      });
+    return { escalationStatus: 'answered' };
+  }
+
+  /** The platform is done with it (closing twice is a no-op). */
+  async closeEscalation(ticketId: string): Promise<{ escalationStatus: 'closed' }> {
+    if (!(await this.repo.platformAct(ticketId, { close: true })))
+      throw new NotFoundError('Escalation', ticketId);
+    return { escalationStatus: 'closed' };
   }
 
   /** The ticket, if this caller may see it (404 otherwise — never a hint it exists). */

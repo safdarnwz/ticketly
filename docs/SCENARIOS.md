@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 573 |
-| DONE | 402 |
+| TODO | 572 |
+| DONE | 403 |
 | DUP | 9 |
 
 
@@ -509,7 +509,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 472 | Manage passenger queue during peak hours | PROCESS | — | operational practice, not software |
 | 473 | Open additional temporary counter | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 474 | Close under-utilized counter | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
-| 475 | Escalate unresolved technical issue to support | DONE | TODO | verified manually: existing module/API |
+| 475 | Escalate unresolved technical issue to support | DONE | DONE | verified manually: existing module/API · UI: Support → ticket → Escalate to Ticketly (internal note; 'With Ticketly' view); super admin → Support escalations (answer / close) |
 | 476 | View system notifications | DONE | DONE | verified manually: existing module/API · UI: Platform announcements banner in the console |
 | 477 | Clear system notifications | GAP | — | verified manually: not built yet |
 | 478 | Change own login password | DONE | DONE | POST /auth/password (current required; other sessions end) · UI: My account (/me) |
