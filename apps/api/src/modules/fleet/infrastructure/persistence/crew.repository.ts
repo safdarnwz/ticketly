@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { RECOMMENDED_REST_RULES, type RestRules } from '../../domain/duty-roster';
 
+import { AppConfig } from '@config';
 import { DatabaseService, registerConstraintMessages } from '@database';
 import {
   newId,
@@ -39,7 +40,10 @@ const CREW_COLUMNS = `c.id, c.role, c.full_name, c.status, c.licence_no, c.licen
 
 @Injectable()
 export class CrewRepository {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly config: AppConfig,
+  ) {}
 
   async create(input: {
     role: CrewRole;
@@ -324,7 +328,15 @@ export class CrewRepository {
   }
 
   /** Every upcoming assigned duty across all crew — for the roster view. */
-  async listUpcomingDuties(limit = 200): Promise<
+  /**
+   * The roster: every assigned duty that has not ended yet — or, given `date`,
+   * every duty starting on that day of the operator's (ended ones too), which is
+   * the day's attendance sheet.
+   */
+  async listDuties(
+    date?: LocalDate,
+    limit = 300,
+  ): Promise<
     {
       id: string;
       crewId: string;
@@ -347,10 +359,12 @@ export class CrewRepository {
          FROM crew_duties d JOIN crew c ON c.id = d.crew_id
          LEFT JOIN trips t ON t.id = d.trip_id AND t.tenant_id = d.tenant_id
          LEFT JOIN services s ON s.id = t.service_id
-        WHERE d.tenant_id = $1 AND d.status = 'assigned' AND d.ends_at > now()
+        WHERE d.tenant_id = $1 AND d.status = 'assigned'
+          AND CASE WHEN $3::date IS NULL THEN d.ends_at > now()
+                   ELSE (d.starts_at AT TIME ZONE $4)::date = $3::date END
         ORDER BY d.starts_at LIMIT $2`,
-      [requireTenantId(), limit],
-      { name: 'crew.listUpcomingDuties' },
+      [requireTenantId(), limit, date ?? null, this.config.domain.timezone],
+      { name: 'crew.listDuties' },
     );
   }
 }

@@ -35,6 +35,7 @@ import {
   CreateCrewSchema,
   CreateVehicleSchema,
   ExpiringQuerySchema,
+  ListDutiesQuerySchema,
   CrewRulesSchema,
   ListCrewQuerySchema,
   ListVehiclesQuerySchema,
@@ -52,6 +53,7 @@ import {
   type CreateCrewDto,
   type CreateVehicleDto,
   type ExpiringQueryDto,
+  type ListDutiesQueryDto,
   type ListCrewQueryDto,
   type ListVehiclesQueryDto,
   type MaintenanceLogDto,
@@ -465,9 +467,12 @@ export class FleetController {
 
   @Get('crew/duties')
   @RequirePermission(Permission.CREW_MANAGE)
-  @ApiOperation({ summary: 'Every upcoming assigned duty, across all crew (roster view)' })
-  async listDuties() {
-    return { duties: await this.crew.listUpcomingDuties() };
+  @ApiOperation({
+    summary:
+      'Roster: every upcoming assigned duty, or with ?date=YYYY-MM-DD every duty of that day (attendance sheet)',
+  })
+  async listDuties(@Query(zodQuery(ListDutiesQuerySchema)) q: ListDutiesQueryDto) {
+    return { duties: await this.crew.listDuties(q.date ? localDate(q.date) : undefined) };
   }
 
   @Post('crew/duties/:id/cancel')

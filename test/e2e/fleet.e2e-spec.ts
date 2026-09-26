@@ -137,6 +137,20 @@ describe('fleet (e2e)', () => {
     const me = crew.body.items.find((c: { id: string }) => c.id === crewId);
     expect(me).toMatchObject({ licenceNo: 'RJ1420190001234', upcomingDuties: 1, phone });
 
+    // The day's attendance sheet (operator's day) lists it; another day or a bad date does not.
+    const istDay = new Date(Date.parse(at(24)) + 5.5 * 3_600_000).toISOString().slice(0, 10);
+    const sheet = await app.get(`/fleet/crew/duties?date=${istDay}`, { as: 'operator' });
+    expect(sheet.status).toBe(200);
+    expect(sheet.body.duties.find((d: { id: string }) => d.id === assigned.body.id)).toMatchObject({
+      crewId,
+      attendance: 'pending',
+    });
+    const empty = await app.get('/fleet/crew/duties?date=1990-01-01', { as: 'operator' });
+    expect(empty.body.duties).toEqual([]);
+    expect((await app.get('/fleet/crew/duties?date=26-09-2026', { as: 'operator' })).status).toBe(
+      400,
+    );
+
     const leave = await app.patch(
       `/fleet/crew/${crewId}`,
       { status: 'on_leave' },

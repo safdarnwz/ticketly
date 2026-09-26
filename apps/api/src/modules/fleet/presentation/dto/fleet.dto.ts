@@ -197,6 +197,10 @@ export const VehiclePhotoNoteSchema = z.object({
 });
 export type VehiclePhotoNoteDto = z.infer<typeof VehiclePhotoNoteSchema>;
 
+/** The roster: upcoming duties, or one day's duties (its attendance sheet). */
+export const ListDutiesQuerySchema = z.object({ date: localDate.optional() });
+export type ListDutiesQueryDto = z.infer<typeof ListDutiesQuerySchema>;
+
 /** How far ahead to look for renewals. */
 export const ExpiringQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(365).default(30),

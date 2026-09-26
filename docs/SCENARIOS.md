@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 574 |
-| DONE | 401 |
+| TODO | 573 |
+| DONE | 402 |
 | DUP | 9 |
 
 
@@ -473,7 +473,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 436 | View all group bookings | GAP | — | verified manually: not built yet |
 | 437 | Modify existing group booking | GAP | — | verified manually: not built yet |
 | 438 | Split one group booking into multiple | GAP | — | verified manually: not built yet |
-| 439 | View staff attendance for the day | DONE | TODO | verified manually: existing module/API |
+| 439 | View staff attendance for the day | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties → Duty roster → Today's attendance / pick a day (present/late/absent/not marked) |
 | 440 | Approve overtime request of staff | GAP | — | verified manually: not built yet |
 | 441 | View branch expense entries | GAP | — | verified manually: not built yet |
 | 442 | Add new petty cash expense | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |

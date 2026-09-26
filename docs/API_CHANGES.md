@@ -418,3 +418,5 @@ an unknown id is now 404 (was 200).
   (`settlement:manage`): every ledger entry of the operator's days with its postings, newest first, with
   the booking's PNR; paged by `before` = the last entry id (`nextBefore`). At most a year; unknown `type`
   is 400.
+- **Attendance sheet:** `GET /fleet/crew/duties` takes `date=YYYY-MM-DD` — every duty starting that day of
+  the operator's (finished ones too) with its attendance; without it, the upcoming roster as before.
