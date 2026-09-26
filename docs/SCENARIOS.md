@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 501 |
-| DONE | 474 |
+| DONE | 499 |
+| TODO | 476 |
 | DUP | 9 |
 
 
@@ -625,7 +625,7 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 581 | Re-allocate all passengers to replacement bus | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Change bus (re-seats on a different layout) + earlier changes |
 | 582 | Generate final boarding chart | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Print chart |
 | 583 | Share boarding chart with conductor | DUP | DUP | same as #366 |
-| 584 | Receive live boarding updates from conductor | DONE | TODO | verified manually: existing module/API |
+| 584 | Receive live boarding updates from conductor | DONE | DONE | verified manually: existing module/API · UI: Trips & Charts → chart: Boarded count / boarded seats from the crew app |
 | 585 | Mark passengers as no-show | DONE | DONE | verified manually: existing module/API · UI: Booking page → Mark no-show after departure |
 | 586 | Enable way-side booking for service | CONFLICT | — | way-side / conductor cash — earlier decision |
 | 587 | Disable way-side booking for service | CONFLICT | — | way-side / conductor cash — earlier decision |
@@ -663,16 +663,16 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 619 | View crew rest period compliance | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 620 | View crew duty hours compliance | DONE | DONE | verified manually: existing module/API · UI: Fleet → Crew & Duties (crew, roster, attendance, rest rules, compliance) |
 | 621 | Logout from dispatch system | DONE | DONE | verified manually: existing module/API · UI: Console sign-in / sign-out (every module) |
-| 622 | Login with own credentials | DONE | TODO | verified manually: existing module/API |
-| 623 | View list of assigned services for the day | DONE | TODO | verified manually: existing module/API |
-| 624 | Select current service | DONE | TODO | verified manually: existing module/API |
-| 625 | View complete service details | DONE | TODO | verified manually: existing module/API |
-| 626 | Download latest boarding chart | DONE | TODO | verified manually: existing module/API |
-| 627 | View passenger names and seat numbers | DONE | TODO | verified manually: existing module/API |
-| 628 | View passenger boarding points | DONE | TODO | verified manually: existing module/API |
+| 622 | Login with own credentials | DONE | DONE | crew app: GET /crew/me, /crew/trips/:id/* (own duties only), PUT /fleet/crew/:id/login · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
+| 623 | View list of assigned services for the day | DONE | DONE | crew app: GET /crew/me, /crew/trips/:id/* (own duties only), PUT /fleet/crew/:id/login · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
+| 624 | Select current service | DONE | DONE | crew app: GET /crew/me, /crew/trips/:id/* (own duties only), PUT /fleet/crew/:id/login · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
+| 625 | View complete service details | DONE | DONE | crew app: GET /crew/me, /crew/trips/:id/* (own duties only), PUT /fleet/crew/:id/login · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
+| 626 | Download latest boarding chart | DONE | DONE | crew app: GET /crew/me, /crew/trips/:id/* (own duties only), PUT /fleet/crew/:id/login · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
+| 627 | View passenger names and seat numbers | DONE | DONE | crew app: GET /crew/me, /crew/trips/:id/* (own duties only), PUT /fleet/crew/:id/login · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
+| 628 | View passenger boarding points | DONE | DONE | crew app: GET /crew/me, /crew/trips/:id/* (own duties only), PUT /fleet/crew/:id/login · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
 | 629 | Reach boarding point and call passengers | PROCESS | — | on-ground practice, not software |
-| 630 | Verify passenger ticket or PNR | DONE | TODO | verified manually: existing module/API |
-| 631 | Mark passenger as successfully boarded | DONE | TODO | verified manually: existing module/API |
+| 630 | Verify passenger ticket or PNR | DONE | DONE | crew app: GET /crew/me, /crew/trips/:id/* (own duties only), PUT /fleet/crew/:id/login · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
+| 631 | Mark passenger as successfully boarded | DONE | DONE | crew app: GET /crew/me, /crew/trips/:id/* (own duties only), PUT /fleet/crew/:id/login · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
 | 632 | Guide passenger to correct seat | PROCESS | — | on-ground practice, not software |
 | 633 | Prevent male passenger from sitting on ladies seat | DONE | DONE | verified manually: existing module/API · UI: checkout: ladies seat + gender validation |
 | 634 | Issue ticket to passenger without prior booking | CONFLICT | — | way-side / conductor cash — earlier decision |
@@ -688,33 +688,33 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 644 | Record luggage pieces | GAP | — | verified manually: not built yet |
 | 645 | Collect extra luggage charges | GAP | — | verified manually: not built yet |
 | 646 | Note down passenger complaint | DONE | DONE | support tickets: staff raise by PNR / reply / priority / assign / resolve; customers own tickets only; author from account · UI: Support: queue views (active/mine/unassigned/…), search, ticket thread with reply, resolve/reopen/close, priority, assign; raise for a caller by PNR |
-| 647 | Raise medical emergency alert | DONE | TODO | POST /crew/trips/:id/sos kind=medical |
-| 648 | Raise security or police alert | DONE | TODO | POST /crew/trips/:id/sos kind=security |
-| 649 | Inform dispatch about bus breakdown | DONE | TODO | incidents type=breakdown |
-| 650 | Enter reason for traffic delay | DONE | TODO | incidents type=delay (category) |
+| 647 | Raise medical emergency alert | DONE | DONE | POST /crew/trips/:id/sos kind=medical · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
+| 648 | Raise security or police alert | DONE | DONE | POST /crew/trips/:id/sos kind=security · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
+| 649 | Inform dispatch about bus breakdown | DONE | DONE | incidents type=breakdown · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
+| 650 | Enter reason for traffic delay | DONE | DONE | incidents type=delay (category) · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
 | 651 | Update estimated time for next stop | GAP | — | verified manually: not built yet |
 | 652 | Inform passenger about boarding point change | GAP | — | verified manually: not built yet |
-| 653 | Continuously update live occupancy | DONE | TODO | verified manually: existing module/API |
+| 653 | Continuously update live occupancy | DONE | DONE | crew app: GET /crew/me, /crew/trips/:id/* (own duties only), PUT /fleet/crew/:id/login · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
 | 654 | Submit final occupancy count at trip end | GAP | — | verified manually: not built yet |
 | 655 | Enter total cash collected | CONFLICT | — | way-side / conductor cash — earlier decision |
 | 656 | Enter total digital payments collected | CONFLICT | — | way-side / conductor cash — earlier decision |
 | 657 | Generate collection summary | CONFLICT | — | way-side / conductor cash — earlier decision |
 | 658 | Hand over cash to authorized person | CONFLICT | — | way-side / conductor cash — earlier decision |
-| 659 | Record lost and found item | DONE | TODO | POST /lost-found |
-| 660 | Collect passenger feedback | DONE | TODO | verified manually: existing module/API |
-| 661 | Check details of next assigned duty | DONE | TODO | verified manually: existing module/API |
-| 662 | Mark own attendance | DONE | TODO | verified manually: existing module/API |
+| 659 | Record lost and found item | DONE | DONE | POST /lost-found · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
+| 660 | Collect passenger feedback | DONE | DONE | crew app: GET /crew/me, /crew/trips/:id/* (own duties only), PUT /fleet/crew/:id/login · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
+| 661 | Check details of next assigned duty | DONE | DONE | crew app: GET /crew/me, /crew/trips/:id/* (own duties only), PUT /fleet/crew/:id/login · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
+| 662 | Mark own attendance | DONE | DONE | crew app: GET /crew/me, /crew/trips/:id/* (own duties only), PUT /fleet/crew/:id/login · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
 | 663 | Enter fuel filled quantity | GAP | — | verified manually: not built yet |
 | 664 | Enter current mileage | GAP | — | verified manually: not built yet |
-| 665 | Report cleaning issue in bus | DONE | TODO | verified manually: existing module/API |
-| 666 | Report maintenance issue in bus | DONE | TODO | verified manually: existing module/API |
-| 667 | Keep GPS tracking active throughout trip | DONE | TODO | verified manually: existing module/API |
-| 668 | Press panic button in real emergency | DONE | TODO | POST /crew/trips/:id/sos (one tap) |
+| 665 | Report cleaning issue in bus | DONE | DONE | crew app: GET /crew/me, /crew/trips/:id/* (own duties only), PUT /fleet/crew/:id/login · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
+| 666 | Report maintenance issue in bus | DONE | DONE | crew app: GET /crew/me, /crew/trips/:id/* (own duties only), PUT /fleet/crew/:id/login · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
+| 667 | Keep GPS tracking active throughout trip | DONE | DONE | crew app: GET /crew/me, /crew/trips/:id/* (own duties only), PUT /fleet/crew/:id/login · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
+| 668 | Press panic button in real emergency | DONE | DONE | POST /crew/trips/:id/sos (one tap) · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
 | 669 | Move from offline mode to online mode | GAP | — | verified manually: not built yet |
 | 670 | Send manual report when automatic sync fails | GAP | — | verified manually: not built yet |
-| 671 | Handle two services on same day (double duty) | DONE | TODO | verified manually: existing module/API |
+| 671 | Handle two services on same day (double duty) | DONE | DONE | crew app: GET /crew/me, /crew/trips/:id/* (own duties only), PUT /fleet/crew/:id/login · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
 | 672 | Complete special checklist for night service | GAP | — | verified manually: not built yet |
-| 673 | Strictly follow ladies special service rules | DONE | TODO | verified manually: existing module/API |
+| 673 | Strictly follow ladies special service rules | DONE | DONE | crew app: GET /crew/me, /crew/trips/:id/* (own duties only), PUT /fleet/crew/:id/login · UI: Crew app (/crew): duties, trip manifest by boarding point, board / code check-in, report, lost item, GPS, Emergency; Fleet → Crew: Give app login |
 | 674 | Submit final trip report | GAP | — | verified manually: not built yet |
 | 675 | End duty for the day | GAP | — | verified manually: not built yet |
 | 676 | Login to inventory and schedule module | DONE | DONE | verified manually: existing module/API · UI: Console sign-in / sign-out (every module) |

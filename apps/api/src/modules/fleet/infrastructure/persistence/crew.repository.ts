@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { RECOMMENDED_REST_RULES, type RestRules } from '../../domain/duty-roster';
 
 import { AppConfig } from '@config';
-import { DatabaseService, registerConstraintMessages } from '@database';
+import { currentTransaction, DatabaseService, registerConstraintMessages } from '@database';
 import {
   newId,
   NotFoundError,
@@ -29,6 +29,8 @@ export interface Crew {
   employeeCode: string | null;
   /** Upcoming duties still assigned. */
   upcomingDuties: number;
+  /** Has a crew-app login (their mobile + a password the operator set). */
+  hasLogin: boolean;
 }
 
 registerConstraintMessages({
@@ -36,7 +38,8 @@ registerConstraintMessages({
 });
 
 const CREW_COLUMNS = `c.id, c.role, c.full_name, c.status, c.licence_no, c.licence_expires_on, c.phone, c.employee_code,
-  (SELECT count(*) FROM crew_duties d WHERE d.crew_id = c.id AND d.status = 'assigned' AND d.ends_at > now()) AS upcoming_duties`;
+  (SELECT count(*) FROM crew_duties d WHERE d.crew_id = c.id AND d.status = 'assigned' AND d.ends_at > now()) AS upcoming_duties,
+  (c.user_id IS NOT NULL) AS has_login`;
 
 @Injectable()
 export class CrewRepository {
@@ -81,6 +84,91 @@ export class CrewRepository {
     );
     if (!row) throw new NotFoundError('Crew', id);
     return mapCrew(row);
+  }
+
+  /** The crew member a crew-app login belongs to (null for anyone else). */
+  async findByUserId(userId: string): Promise<Crew | null> {
+    const row = await this.db.queryOne<CrewRow>(
+      `SELECT ${CREW_COLUMNS}
+         FROM crew c WHERE c.tenant_id = $1 AND c.user_id = $2 AND c.deleted_at IS NULL`,
+      [requireTenantId(), userId],
+      { name: 'crew.findByUserId' },
+    );
+    return row ? mapCrew(row) : null;
+  }
+
+  async loginUserId(id: CrewId): Promise<string | null> {
+    const row = await this.db.queryOne<{ user_id: string | null }>(
+      `SELECT user_id FROM crew WHERE tenant_id = $1 AND id = $2`,
+      [requireTenantId(), id],
+      { name: 'crew.loginUserId', primary: true },
+    );
+    return row?.user_id ?? null;
+  }
+
+  /** Inside the caller's transaction: the login user is created in the same one. */
+  async linkLogin(id: CrewId, userId: string): Promise<void> {
+    const scope = currentTransaction();
+    if (!scope) throw new Error('linkLogin must run inside a transaction');
+    await scope.client.query(
+      `UPDATE crew SET user_id = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2`,
+      [requireTenantId(), id, userId],
+    );
+  }
+
+  /**
+   * One crew member's assigned duties in a window, with the trip each is for —
+   * what the crew app shows as "my day" (two in a day is a double duty).
+   */
+  myDuties(
+    crewId: CrewId,
+    from: Date,
+    to: Date,
+  ): Promise<
+    {
+      id: string;
+      tripId: string | null;
+      startsAt: Date;
+      endsAt: Date;
+      attendance: string;
+      routeName: string | null;
+      serviceCode: string | null;
+      departsAt: Date | null;
+      arrivesAt: Date | null;
+      tripStatus: string | null;
+      bus: string | null;
+      seatsSold: number;
+      seatsTotal: number | null;
+    }[]
+  > {
+    return this.db.query(
+      `SELECT d.id, d.trip_id AS "tripId", d.starts_at AS "startsAt", d.ends_at AS "endsAt", d.attendance,
+              r.name AS "routeName", s.code AS "serviceCode", t.departs_at AS "departsAt",
+              t.arrives_at AS "arrivesAt", t.status::text AS "tripStatus", v.registration_no AS bus,
+              coalesce((SELECT count(*)::int FROM booking_seats bs JOIN bookings b ON b.id = bs.booking_id
+                         WHERE bs.trip_id = t.id AND b.status IN ('confirmed','completed')), 0) AS "seatsSold",
+              t.total_seats AS "seatsTotal"
+         FROM crew_duties d
+         LEFT JOIN trips t ON t.id = d.trip_id AND t.tenant_id = d.tenant_id
+         LEFT JOIN routes r ON r.id = t.route_id
+         LEFT JOIN services s ON s.id = t.service_id
+         LEFT JOIN vehicles v ON v.id = t.vehicle_id
+        WHERE d.tenant_id = $1 AND d.crew_id = $2 AND d.status = 'assigned'
+          AND d.ends_at > $3 AND d.starts_at < $4
+        ORDER BY d.starts_at`,
+      [requireTenantId(), crewId, from, to],
+      { name: 'crew.myDuties' },
+    );
+  }
+
+  /** Is this crew member on an assigned duty for this trip? */
+  async isOnTrip(crewId: CrewId, tripId: string): Promise<boolean> {
+    const row = await this.db.queryOne(
+      `SELECT 1 FROM crew_duties WHERE tenant_id = $1 AND crew_id = $2 AND trip_id = $3 AND status = 'assigned'`,
+      [requireTenantId(), crewId, tripId],
+      { name: 'crew.isOnTrip' },
+    );
+    return !!row;
   }
 
   async list(filter: { role?: CrewRole; status?: string } = {}): Promise<Crew[]> {
@@ -379,6 +467,7 @@ interface CrewRow {
   phone: string | null;
   employee_code: string | null;
   upcoming_duties: number;
+  has_login: boolean;
 }
 interface DutyRow {
   id: string;
@@ -398,5 +487,6 @@ function mapCrew(r: CrewRow): Crew {
     phone: r.phone,
     employeeCode: r.employee_code,
     upcomingDuties: Number(r.upcoming_duties),
+    hasLogin: r.has_login,
   };
 }

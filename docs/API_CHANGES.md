@@ -453,3 +453,16 @@ an unknown id is now 404 (was 200).
   rows add `commissionMinor` (earned less any taken back), and with `from/to` return the same rows for bookings
   made on those operator days (was a different shape); `GET /agent-portal/bookings/:id` adds `journey
   {routeName, departsAt, arrivesAt, boardingStop, droppingStop, commissionMinor}`.
+- **Crew app login:** new `PUT /fleet/crew/:id/login {password}` (`crew:manage`) gives a conductor / driver
+  a login on their mobile (a `crew` role with only `crew:app`), or resets the password and signs them out
+  everywhere; `{created}` says which. No mobile 422, not active 422. `GET /fleet/crew` rows add `hasLogin`.
+  Migration 0102 (`crew.user_id`, permission `crew:app`).
+- **Crew app:** new `GET /crew/me` (the crew member, their duties from 12 hours ago to 30 days ahead with the
+  trip) and `POST /crew/me/duties/:dutyId/attendance` (opens 6 hours before the duty). Every
+  `/crew/trips/:tripId/*` call from a crew login is limited to trips they are on duty for (404 otherwise);
+  staff with `trip:operate` keep access to all. New `POST /crew/trips/:tripId/tickets/:ticketId/board`
+  (board from the list; boarding twice is `already_boarded`), `POST /crew/trips/:tripId/incidents` (delay,
+  breakdown, cleaning, maintenance, complaint…; not SOS), `POST /crew/trips/:tripId/lost-found` and
+  `POST /crew/trips/:tripId/ping`. The manifest rows add `contactPhone`, `boardingPoint`, `droppingPoint`,
+  `boardsAt`, `ticketId`, `ladiesSeat`, in boarding order. `POST /crew/trips/:tripId/sos` keeps its URL.
+  `POST /incidents` takes `type: 'cleaning' | 'maintenance'`.

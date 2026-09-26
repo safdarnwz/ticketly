@@ -24,6 +24,10 @@ export const INCIDENT_TYPES = [
   'diversion',
   'delay',
   'complaint',
+  /** A dirty or unhygienic bus — cleaned at the next depot. */
+  'cleaning',
+  /** A fault to fix (AC, lights, a seat, a door) that does not stop the bus. */
+  'maintenance',
   'other',
 ] as const;
 export type IncidentType = (typeof INCIDENT_TYPES)[number];

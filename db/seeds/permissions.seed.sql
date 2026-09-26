@@ -13,6 +13,7 @@ INSERT INTO permissions (code, resource, action, description) VALUES
   ('vehicle:manage',    'vehicle',    'manage',    'Manage vehicles'),
   ('vehicle:read',      'vehicle',    'read',      'View vehicles'),
   ('crew:manage',       'crew',       'manage',    'Manage crew + duty roster'),
+  ('crew:app',          'crew',       'app',       'Crew app: own duties and the trips on them only'),
   ('agent:read',        'agent',      'read',      'View agents + their account ledger'),
   ('agent:manage',      'agent',      'manage',    'Register/approve agents, record deposits/payments, set credit limits'),
   ('agent:portal',      'agent',      'portal',    'Agent self-service portal: own account + own bookings only'),

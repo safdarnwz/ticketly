@@ -60,6 +60,7 @@ export const PERMISSION_CATALOGUE: readonly {
       { code: Permission.AGENT_READ, label: 'See travel agents' },
       { code: Permission.AGENT_MANAGE, label: 'Add agents, credit and commission' },
       { code: Permission.AGENT_PORTAL, label: 'Agent portal (for agent logins only)' },
+      { code: Permission.CREW_APP, label: 'Crew app (for conductor / driver logins only)' },
     ],
   },
   {

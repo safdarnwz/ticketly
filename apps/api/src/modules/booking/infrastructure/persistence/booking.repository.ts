@@ -668,15 +668,43 @@ export class BookingRepository {
   manifest(tripId: TripId): Promise<unknown[]> {
     return this.db.query(
       `SELECT p.seat_number AS "seatNumber", p.full_name AS "fullName", p.age, p.gender,
-              b.pnr, b.from_stop_id AS "fromStopId", b.to_stop_id AS "toStopId",
-              t.status AS "ticketStatus"
+              b.pnr, b.contact_phone AS "contactPhone", b.from_stop_id AS "fromStopId", b.to_stop_id AS "toStopId",
+              fs.name AS "boardingPoint", ts.name AS "droppingPoint", b.from_seq AS "fromSeq",
+              fts.departs_at AS "boardsAt", t.id AS "ticketId", t.status AS "ticketStatus",
+              coalesce(st.ladies_only, false) AS "ladiesSeat"
          FROM passengers p
          JOIN bookings b ON b.id = p.booking_id AND b.status = 'confirmed'
          LEFT JOIN tickets t ON t.booking_id = b.id AND t.seat_number = p.seat_number
+         LEFT JOIN stops fs ON fs.id = b.from_stop_id
+         LEFT JOIN stops ts ON ts.id = b.to_stop_id
+         LEFT JOIN trip_stops fts ON fts.trip_id = b.trip_id AND fts.sequence = b.from_seq
+         LEFT JOIN trip_seats st ON st.trip_id = b.trip_id AND st.seat_number = p.seat_number
         WHERE p.tenant_id = $1 AND b.trip_id = $2
-        ORDER BY p.seat_number`,
+        ORDER BY b.from_seq, p.seat_number`,
       [requireTenantId(), tripId],
       { name: 'booking.manifest' },
+    );
+  }
+
+  /** A ticket by id (the crew app boards from the manifest after checking the PNR), row-locked. */
+  lockTicketById(ticketId: string): Promise<{
+    id: string;
+    tripId: string;
+    seatNumber: string;
+    status: string;
+    bookingStatus: string;
+    passengerName: string | null;
+  } | null> {
+    return this.db.queryOne(
+      `SELECT tk.id, tk.trip_id AS "tripId", tk.seat_number AS "seatNumber", tk.status,
+              b.status AS "bookingStatus", p.full_name AS "passengerName"
+         FROM tickets tk
+         JOIN bookings b ON b.id = tk.booking_id
+         LEFT JOIN passengers p ON p.booking_id = b.id AND p.seat_number = tk.seat_number
+        WHERE tk.tenant_id = $1 AND tk.id = $2
+        FOR UPDATE OF tk`,
+      [requireTenantId(), ticketId],
+      { name: 'booking.lockTicketById', primary: true },
     );
   }
 

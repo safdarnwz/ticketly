@@ -23,7 +23,6 @@ import {
   ListLostItemsQuerySchema,
   LostItemSchema,
   ReportIncidentSchema,
-  SosSchema,
   type ClaimLostItemDto,
   type HandoverNoteDto,
   type HandoverNotesQueryDto,
@@ -32,7 +31,6 @@ import {
   type ListLostItemsQueryDto,
   type LostItemDto,
   type ReportIncidentDto,
-  type SosDto,
 } from './dto/incident.dto';
 
 /** Dispatch / branch console: incidents, lost & found, shift handover, dispatch report. */
@@ -72,24 +70,6 @@ export class IncidentController {
     @Body(zodBody(IncidentTransitionSchema)) dto: IncidentTransitionDto,
   ) {
     return this.svc.transition(id, dto.status, dto.note);
-  }
-
-  @Post('crew/trips/:tripId/sos')
-  @HttpCode(201)
-  @Idempotent()
-  @RequirePermission(Permission.TRIP_OPERATE)
-  @ApiOperation({
-    summary:
-      'Panic button from the crew app — one tap, location optional, alerts the emergency team at once',
-  })
-  sos(@UuidParam('tripId') tripId: string, @Body(zodBody(SosSchema)) dto: SosDto) {
-    return this.svc.report({
-      tripId,
-      type: dto.kind,
-      lat: dto.lat,
-      lng: dto.lng,
-      description: dto.description,
-    });
   }
 
   @Post('lost-found')

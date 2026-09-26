@@ -27,6 +27,8 @@ export const Permission = {
   VEHICLE_READ: 'vehicle:read',
   VEHICLE_MANAGE: 'vehicle:manage',
   CREW_MANAGE: 'crew:manage',
+  /** Held ONLY by crew logins: the crew app (own duties, own trips). */
+  CREW_APP: 'crew:app',
 
   // B2B agent network (GDS distribution)
   AGENT_READ: 'agent:read',

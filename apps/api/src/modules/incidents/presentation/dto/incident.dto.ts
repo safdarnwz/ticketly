@@ -19,14 +19,6 @@ export const ReportIncidentSchema = z.object({
 });
 export type ReportIncidentDto = z.infer<typeof ReportIncidentSchema>;
 
-export const SosSchema = z.object({
-  kind: z.enum(['sos', 'medical', 'security', 'accident']).default('sos'),
-  lat: z.number().optional(),
-  lng: z.number().optional(),
-  description: z.string().trim().max(500).optional(),
-});
-export type SosDto = z.infer<typeof SosSchema>;
-
 export const IncidentTransitionSchema = z.object({
   status: z.enum(['acknowledged', 'resolved', 'closed']),
   note: z.string().trim().max(2000).optional(),
