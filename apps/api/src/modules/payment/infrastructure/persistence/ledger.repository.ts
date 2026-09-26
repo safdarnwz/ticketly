@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
+import { AppConfig } from '@config';
 import { currentTransaction, DatabaseService } from '@database';
-import { Money, newId, requireTenantId, type CurrencyCode } from '@kernel';
+import { Money, newId, requireTenantId, type CurrencyCode, type LocalDate } from '@kernel';
 
 import { LedgerTransaction } from '../../domain/ledger';
 
@@ -13,7 +14,10 @@ import { LedgerTransaction } from '../../domain/ledger';
  */
 @Injectable()
 export class LedgerRepository {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly config: AppConfig,
+  ) {}
 
   async post(tx: LedgerTransaction): Promise<void> {
     const scope = currentTransaction();
@@ -72,4 +76,63 @@ export class LedgerRepository {
       { name: 'ledger.trialBalance' },
     );
   }
+
+  /**
+   * The journal: every entry with its postings, newest first, for the operator's
+   * own calendar days `from`..`to`. Booking entries carry the booking's PNR so a
+   * finance clerk can trace a figure back to the ticket. Paged by entry id
+   * (time-ordered uuid v7): pass the last id seen as `before`.
+   */
+  async journal(q: {
+    from: LocalDate;
+    to: LocalDate;
+    type?: string;
+    pnr?: string;
+    before?: string;
+    limit: number;
+  }): Promise<{ items: JournalEntry[]; nextBefore: string | null }> {
+    const rows = await this.db.query<JournalEntry>(
+      `SELECT le.id, le.entry_type AS "type", le.currency, le.source_type AS "sourceType",
+              le.source_id AS "sourceId", le.created_at AS "createdAt", b.pnr,
+              coalesce((SELECT json_agg(json_build_object('account', lp.account,
+                         'amountMinor', lp.amount_minor, 'ref', lp.ref) ORDER BY lp.amount_minor DESC)
+                          FROM ledger_postings lp WHERE lp.entry_id = le.id), '[]'::json) AS postings
+         FROM ledger_entries le
+         LEFT JOIN bookings b ON le.source_type = 'booking' AND b.tenant_id = le.tenant_id
+                             AND b.id::text = le.source_id
+        WHERE le.tenant_id = $1
+          AND (le.created_at AT TIME ZONE $2)::date BETWEEN $3 AND $4
+          AND ($5::text IS NULL OR le.entry_type = $5)
+          AND ($6::text IS NULL OR upper(b.pnr) = upper($6))
+          AND ($7::uuid IS NULL OR le.id < $7)
+        ORDER BY le.id DESC
+        LIMIT $8`,
+      [
+        requireTenantId(),
+        this.config.domain.timezone,
+        q.from,
+        q.to,
+        q.type ?? null,
+        q.pnr ?? null,
+        q.before ?? null,
+        q.limit + 1,
+      ],
+      { name: 'ledger.journal' },
+    );
+    const more = rows.length > q.limit;
+    const items = more ? rows.slice(0, q.limit) : rows;
+    for (const e of items) for (const p of e.postings) p.amountMinor = Number(p.amountMinor);
+    return { items, nextBefore: more ? items[items.length - 1]!.id : null };
+  }
+}
+
+export interface JournalEntry {
+  id: string;
+  type: string;
+  currency: string;
+  sourceType: string;
+  sourceId: string;
+  createdAt: Date;
+  pnr: string | null;
+  postings: { account: string; amountMinor: number; ref: string | null }[];
 }

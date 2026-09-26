@@ -414,3 +414,7 @@ an unknown id is now 404 (was 200).
   of such a refund now credits the seller's account instead of refusing ("no captured gateway payment").
 - **Bookings by branch:** `GET /bookings/search` takes `branchId` — bookings made by that branch's counter
   staff or by travel agents attached to the branch (an unknown branch gives an empty list; a bad id is 400).
+- **Financial audit trail:** new `GET /payments/ledger/entries?from&to[&type&pnr&before&limit]`
+  (`settlement:manage`): every ledger entry of the operator's days with its postings, newest first, with
+  the booking's PNR; paged by `before` = the last entry id (`nextBefore`). At most a year; unknown `type`
+  is 400.

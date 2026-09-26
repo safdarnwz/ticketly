@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Post, Req, HttpCode } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, Query, Req, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import type { FastifyRequest } from 'fastify';
 
@@ -13,6 +13,7 @@ import {
   RequirePlatformAdmin,
   UuidParam,
   zodBody,
+  zodQuery,
 } from '@http';
 import { localDate, runAsTenant, type BookingId, type TenantId } from '@kernel';
 
@@ -21,6 +22,7 @@ import {
   CreateIntentSchema,
   FinaliseSettlementSchema,
   GenerateSettlementSchema,
+  LedgerJournalQuerySchema,
   SelfUpgradeSeatSchema,
   SetCommissionSchema,
   TestInstrumentSchema,
@@ -30,6 +32,7 @@ import {
   type CreateIntentDto,
   type FinaliseSettlementDto,
   type GenerateSettlementDto,
+  type LedgerJournalQueryDto,
   type SelfUpgradeSeatDto,
   type SetCommissionDto,
   type TestInstrumentDto,
@@ -223,6 +226,17 @@ export class PaymentController {
     const accounts = await this.ledger.trialBalance();
     const total = accounts.reduce((s, a) => s + Number(a.balance), 0);
     return { accounts, total, balanced: total === 0 };
+  }
+
+  @Get('ledger/entries')
+  @ApiBearerAuth('bearer')
+  @RequirePermission(Permission.SETTLEMENT_MANAGE)
+  @ApiOperation({
+    summary:
+      'Audit trail: every ledger entry with its postings, newest first (by day, type or PNR)',
+  })
+  async journal(@Query(zodQuery(LedgerJournalQuerySchema)) q: LedgerJournalQueryDto) {
+    return this.ledger.journal({ ...q, from: localDate(q.from), to: localDate(q.to) });
   }
 
   // Payouts are the platform's to make (the payout scheduler runs them weekly);

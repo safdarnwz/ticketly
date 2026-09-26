@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { daysBetween, type LocalDate } from '@kernel';
+
 const uuid = z.string().uuid();
 const localDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
@@ -94,3 +96,30 @@ export type GenerateSettlementDto = z.infer<typeof GenerateSettlementSchema>;
 
 export const FinaliseSettlementSchema = z.object({ tenantId: z.string().uuid() });
 export type FinaliseSettlementDto = z.infer<typeof FinaliseSettlementSchema>;
+
+export const LEDGER_ENTRY_TYPES = [
+  'booking.captured',
+  'booking.captured_offline',
+  'booking.partner_commission',
+  'refund.paid',
+  'refund.offline',
+  'refund.partner_commission',
+  'settlement.paid',
+] as const;
+
+/** The journal: the operator's own days, at most a year at a time. */
+export const LedgerJournalQuerySchema = z
+  .object({
+    from: localDate,
+    to: localDate,
+    type: z.enum(LEDGER_ENTRY_TYPES).optional(),
+    pnr: z.string().trim().min(4).max(20).optional(),
+    before: z.string().uuid().optional(),
+    limit: z.coerce.number().int().min(1).max(200).default(50),
+  })
+  .refine((d) => d.from <= d.to, { message: "'From' is after 'To'", path: ['to'] })
+  .refine((d) => daysBetween(d.from as LocalDate, d.to as LocalDate) <= 366, {
+    message: 'Pick at most a year',
+    path: ['to'],
+  });
+export type LedgerJournalQueryDto = z.infer<typeof LedgerJournalQuerySchema>;

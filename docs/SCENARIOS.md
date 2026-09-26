@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 575 |
-| DONE | 400 |
+| TODO | 574 |
+| DONE | 401 |
 | DUP | 9 |
 
 
@@ -382,7 +382,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 345 | View current refund liability amount | GAP | — | verified manually: not built yet |
 | 346 | Process bulk refunds | DONE | DONE | verified manually: existing module/API · UI: Refunds → Needs action: select failed refunds → Retry selected |
 | 347 | Approve high-value refund requests | GAP | — | verified manually: not built yet |
-| 348 | View complete audit trail of financial entries | DONE | TODO | verified manually: existing module/API |
+| 348 | View complete audit trail of financial entries | DONE | DONE | verified manually: existing module/API · UI: Reports → Ledger (journal with postings, PNR/type filter, trial balance, CSV) |
 | 349 | Download final month-end closing pack | GAP | — | verified manually: not built yet |
 | 350 | Perform final operator health check | GAP | — | verified manually: not built yet |
 | 351 | Login to assigned branch dashboard | GAP | — | verified manually: not built yet |
