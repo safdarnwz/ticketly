@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3117 |
-| TODO | 879 |
-| DONE | 82 |
+| TODO | 863 |
+| DONE | 98 |
 | DUP | 9 |
 
 
@@ -228,32 +228,32 @@ CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
 | 191 | Create new staff user | DONE | DONE | verified manually: existing module/API · UI: Staff page |
 | 192 | Assign staff name, mobile, email | DONE | DONE | verified manually: existing module/API · UI: Staff page |
 | 193 | Assign staff to one or more branches | DONE | DONE | PUT /users/:id/branch (one home branch per person; active branches of this operator only) · UI: Staff page |
-| 194 | Create custom role named Branch Manager | DONE | TODO | verified manually: existing module/API |
-| 195 | Create custom role named Dispatch Manager | DONE | TODO | verified manually: existing module/API |
-| 196 | Create custom role named Finance Executive | DONE | TODO | verified manually: existing module/API |
-| 197 | Create custom role named Inventory Manager | DONE | TODO | verified manually: existing module/API |
-| 198 | Create custom role named Conductor Supervisor | DONE | TODO | verified manually: existing module/API |
-| 199 | Assign full permissions to a role | DONE | TODO | verified manually: existing module/API |
-| 200 | Assign limited permissions to a role | DONE | TODO | verified manually: existing module/API |
-| 201 | Edit permissions of existing role | DONE | TODO | verified manually: existing module/API |
-| 202 | Duplicate role and modify | DONE | TODO | POST /iam/roles/:id/duplicate |
-| 203 | Delete unused custom role | DONE | TODO | DELETE /iam/roles/:id (not built-in, not assigned) |
+| 194 | Create custom role named Branch Manager | DONE | DONE | verified manually: existing module/API · UI: Staff → Roles & permissions |
+| 195 | Create custom role named Dispatch Manager | DONE | DONE | verified manually: existing module/API · UI: Staff → Roles & permissions |
+| 196 | Create custom role named Finance Executive | DONE | DONE | verified manually: existing module/API · UI: Staff → Roles & permissions |
+| 197 | Create custom role named Inventory Manager | DONE | DONE | verified manually: existing module/API · UI: Staff → Roles & permissions |
+| 198 | Create custom role named Conductor Supervisor | DONE | DONE | verified manually: existing module/API · UI: Staff → Roles & permissions |
+| 199 | Assign full permissions to a role | DONE | DONE | verified manually: existing module/API · UI: Staff → Roles & permissions |
+| 200 | Assign limited permissions to a role | DONE | DONE | verified manually: existing module/API · UI: Staff → Roles & permissions |
+| 201 | Edit permissions of existing role | DONE | DONE | verified manually: existing module/API · UI: Staff → Roles & permissions |
+| 202 | Duplicate role and modify | DONE | DONE | POST /iam/roles/:id/duplicate · UI: Staff → Roles & permissions |
+| 203 | Delete unused custom role | DONE | DONE | DELETE /iam/roles/:id (not built-in, not assigned) · UI: Staff → Roles & permissions |
 | 204 | View complete permission matrix | DONE | TODO | verified manually: existing module/API |
 | 205 | Set branch-level permission override | GAP | — | verified manually: not built yet |
-| 206 | Give temporary permission with end date | DONE | TODO | PUT /users/:id/roles/:roleId {expiresAt} |
+| 206 | Give temporary permission with end date | DONE | DONE | PUT /users/:id/roles/:roleId {expiresAt} · UI: Staff modal (roles until, access & hours, reports to, new password) |
 | 207 | View staff activity logs | DONE | DONE | verified manually: existing module/API · UI: Staff page |
 | 208 | Force logout a staff session | DONE | DONE | POST /users/:id/force-logout (tokens_valid_after) · UI: Staff page |
-| 209 | Reset staff password | DONE | TODO | verified manually: existing module/API |
+| 209 | Reset staff password | DONE | DONE | PUT /users/:id/password (unlocks, signs out; not yourself) · UI: Staff modal (roles until, access & hours, reports to, new password) |
 | 210 | Deactivate staff account | DONE | DONE | verified manually: existing module/API · UI: Staff page |
 | 211 | Reactivate staff account | DONE | DONE | verified manually: existing module/API · UI: Staff page |
 | 212 | Bulk upload staff using Excel template | GAP | — | verified manually: not built yet |
 | 213 | Download staff upload template | GAP | — | verified manually: not built yet |
 | 214 | Export complete staff directory | DONE | DONE | GET /users/export.csv · UI: Staff page |
-| 215 | Set allowed login time window for staff | DONE | TODO | PUT /users/:id/access {loginWindow} (overnight-safe) |
+| 215 | Set allowed login time window for staff | DONE | DONE | PUT /users/:id/access {loginWindow} (overnight-safe) · UI: Staff modal (roles until, access & hours, reports to, new password) |
 | 216 | View staff last login date and time | DONE | DONE | verified manually: existing module/API · UI: Staff page |
-| 217 | Set reporting manager for staff | DONE | TODO | PUT /users/:id/access {managerId} (no loops) |
-| 218 | Create temporary contractor staff with expiry | DONE | TODO | PUT /users/:id/access {accessExpiresAt} |
-| 219 | System auto-deactivates expired staff | DONE | TODO | auth guard refuses expired access on next request |
+| 217 | Set reporting manager for staff | DONE | DONE | PUT /users/:id/access {managerId} (no loops) · UI: Staff modal (roles until, access & hours, reports to, new password) |
+| 218 | Create temporary contractor staff with expiry | DONE | DONE | PUT /users/:id/access {accessExpiresAt} · UI: Staff modal (roles until, access & hours, reports to, new password) |
+| 219 | System auto-deactivates expired staff | DONE | DONE | auth guard refuses expired access on next request · UI: Staff modal (roles until, access & hours, reports to, new password) |
 | 220 | View main operator dashboard | DONE | DONE | GET /reports/summary (today in operator tz, live holds) + GET /scheduling/trips?date= + GET /bookings/search · UI: operator Dashboard (KPIs, today's departures, latest bookings) |
 | 221 | View today’s total bookings | DONE | TODO | verified manually: existing module/API |
 | 222 | View today’s total revenue | DONE | TODO | verified manually: existing module/API |
