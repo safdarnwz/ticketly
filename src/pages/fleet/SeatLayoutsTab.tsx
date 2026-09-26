@@ -4,7 +4,7 @@ import { LayoutGrid, Copy, Trash2, Wand2, Info, Code2, History, Eye, RotateCcw, 
 
 import { Button, Card, CardBody, Badge, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
 import { masterDataApi, type SeatLayoutRow, type SeatLayoutVersion } from '@/lib/api/masterData';
-import { cn } from '@/lib/utils';
+import { cn, formatDateTime } from '@/lib/utils';
 
 type SeatType = '' | 'seater' | 'sleeper' | 'semi_sleeper' | 'crew';
 type Position = '' | 'front' | 'aisle' | 'window';
@@ -412,7 +412,7 @@ export function SeatLayoutsTab() {
                   <div className="flex items-center gap-2 text-sm font-medium text-text">
                     v{v.versionNumber} {i === 0 && <Badge tone="success">Current</Badge>}
                   </div>
-                  <div className="text-xs text-text-muted">{v.changeNote ?? 'Edited'} — {new Date(v.createdAt).toLocaleString()}</div>
+                  <div className="text-xs text-text-muted">{v.changeNote ?? 'Edited'} — {formatDateTime(v.createdAt)}</div>
                   <div className="text-xs text-text-muted">{v.summary.totalSeats} seats ({v.summary.seater} seater, {v.summary.sleeper} sleeper, {v.summary.semiSleeper} semi{v.summary.crewSeats ? `, ${v.summary.crewSeats} crew` : ''})</div>
                 </div>
                 {i !== 0 && <Button size="sm" variant="outline" leftIcon={<RotateCcw className="h-4 w-4" />} loading={restore.isPending} onClick={() => restore.mutate(v.versionNumber)}>Restore</Button>}

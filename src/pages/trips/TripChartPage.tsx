@@ -10,7 +10,7 @@ import { ApiError } from '@/lib/api/client';
 import { tripOpsApi, type ChartOccupant, type ChartSeat, type TripChart } from '@/lib/api/scheduling';
 import { TRIP_STATUS_LABEL } from '@/lib/trip-status';
 import { fleetApi, type Vehicle } from '@/lib/api/fleet';
-import { SEAT_TYPE_LABEL, cn, formatDateLabel, formatTime } from '@/lib/utils';
+import { cn, formatDateLabel, formatDateTime, formatTime, fromAppDateTimeInput, SEAT_TYPE_LABEL, toAppDateTimeInput } from '@/lib/utils';
 
 const CELL_REM = 4.2;
 const errText = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
@@ -346,12 +346,10 @@ function CancelTripModal({ tripId, bookings, onClose, onDone }: { tripId: string
 function RetimeModal({ trip, onClose, onDone }: { trip: TripChart['trip']; onClose: () => void; onDone: () => void }) {
   const toast = useToast();
   const current = new Date(trip.departsAt);
-  // datetime-local wants local wall time: show it in IST.
-  const ist = (d: Date) => new Date(d.getTime() + 330 * 60_000).toISOString().slice(0, 16);
-  const [value, setValue] = useState(ist(current));
+  const [value, setValue] = useState(toAppDateTimeInput(current.getTime()));
   const [reason, setReason] = useState('');
   const [touched, setTouched] = useState(false);
-  const target = value ? new Date(`${value}:00+05:30`) : null;
+  const target = value ? new Date(fromAppDateTimeInput(value)) : null;
   const shift = target ? Math.round((target.getTime() - current.getTime()) / 60_000) : 0;
   const timeError = !target || Number.isNaN(target.getTime()) ? 'Pick the new time'
     : target.getTime() <= Date.now() ? 'The new time must be in the future'
@@ -404,7 +402,30 @@ function ChangeBusModal({ trip, vehicles, onClose, onDone }: { trip: TripChart['
           options={[{ value: '', label: options.length ? 'Choose…' : 'No other active bus' }, ...options.map((v) => ({ value: v.id, label: `${v.registrationNo}${v.make ? ` · ${v.make} ${v.model ?? ''}` : ''}` }))]} />
         <Input label="Reason" value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} error={touched ? reasonError : undefined} placeholder="e.g. Regular bus in for servicing" />
         <p className="text-text-muted">Only a platform-verified, active bus with a seat layout can run{notReady ? ` (${notReady} not ready yet)` : ''}. If its layout differs, passengers move to the same seat type.</p>
+        <BusHistory tripId={trip.id} />
       </div>
     </Modal>
+  );
+}
+
+/** Every bus change on this trip: from → to, why, who, and how many passengers were re-seated. */
+function BusHistory({ tripId }: { tripId: string }) {
+  const q = useQuery({ queryKey: ['bus-history', tripId], queryFn: () => tripOpsApi.busHistory(tripId) });
+  if (q.isLoading) return null;
+  if (q.isError) return <p className="text-xs text-danger">{errText(q.error, 'Could not load the bus history')}</p>;
+  const items = q.data?.items ?? [];
+  if (!items.length) return <p className="text-xs text-text-muted">This trip has kept its first bus.</p>;
+  return (
+    <div>
+      <div className="mb-1 font-semibold text-text">Earlier changes</div>
+      <ul className="max-h-40 divide-y divide-border overflow-y-auto rounded-md border border-border text-xs">
+        {items.map((h) => (
+          <li key={h.id} className="px-3 py-1.5">
+            <div className="text-text">{h.fromBus ?? 'No bus'} → {h.toBus}{h.seatMoves?.length ? ` · ${h.seatMoves.length} re-seated` : ''}</div>
+            <div className="text-text-muted">{h.reason} · {formatDateTime(h.createdAt)}{h.changedBy ? ` · ${h.changedBy}` : ''}</div>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

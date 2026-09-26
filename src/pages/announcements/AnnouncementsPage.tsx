@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Megaphone, Trash2 } from 'lucide-react';
+import { formatDateTime, fromAppDateTimeInput } from '@/lib/utils';
 
 import { Button, Card, CardBody, Badge, Modal, Input, Select, PageLoader, EmptyState, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -17,7 +18,7 @@ export function AnnouncementsPage() {
   const list = useQuery({ queryKey: ['announcements'], queryFn: announcementsApi.listAll });
 
   const create = useMutation({
-    mutationFn: () => announcementsApi.create({ ...form, endsAt: form.endsAt || undefined }),
+    mutationFn: () => announcementsApi.create({ ...form, endsAt: form.endsAt ? new Date(fromAppDateTimeInput(form.endsAt)).toISOString() : undefined }),
     onSuccess: () => { toast.success('Announcement published'); setAdding(false); setForm({ title: '', body: '', severity: 'info', audience: 'operators', endsAt: '' }); void qc.invalidateQueries({ queryKey: ['announcements'] }); },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
   });
@@ -47,7 +48,7 @@ export function AnnouncementsPage() {
                   </div>
                   <div className="mt-1 font-medium text-text">{a.title}</div>
                   <div className="text-sm text-text-muted">{a.body}</div>
-                  <div className="mt-1 text-xs text-text-muted">From {new Date(a.startsAt).toLocaleString()}{a.endsAt ? ` to ${new Date(a.endsAt).toLocaleString()}` : ' — no end date'}</div>
+                  <div className="mt-1 text-xs text-text-muted">From {formatDateTime(a.startsAt)}{a.endsAt ? ` to ${formatDateTime(a.endsAt)}` : ' — no end date'}</div>
                 </div>
                 <Button size="sm" variant="ghost" className="text-danger" leftIcon={<Trash2 className="h-4 w-4" />} onClick={() => remove.mutate(a.id)}>Remove</Button>
               </CardBody>

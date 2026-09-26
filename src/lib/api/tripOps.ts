@@ -1,4 +1,4 @@
-import { get, post, put, withIdempotency } from './client';
+import { download, get, post, put, withIdempotency } from './client';
 
 export interface Quota { id: string; seatNumber: string; holderType: 'agent' | 'branch'; holderId: string; holderName: string | null; releaseAt: string; releasedAt: string | null; releaseReason: string | null; consumedAt: string | null }
 export interface WaitlistEntry { id: string; seatCount: number; contactPhone: string; status: string; notifiedAt: string | null; createdAt: string; fromStop: string; toStop: string }
@@ -27,7 +27,11 @@ export const tripOpsExtraApi = {
   setClosedChannels: (tripId: string, closed: Channel[]) => put<{ ok: boolean; closed: Channel[] }>(`/v1/trips/${tripId}/closed-channels`, { closed }),
   waitlist: (tripId: string) => get<{ items: WaitlistEntry[] }>(`/v1/trips/${tripId}/waitlist`),
   expenses: (tripId: string, includeVoided = true) => get<{ items: Expense[] }>(`/v1/trips/${tripId}/expenses${includeVoided ? '?includeVoided=1' : ''}`),
-  addExpense: (tripId: string, body: { category: ExpenseCategory; amountMinor: number; note?: string }, key: string) =>
+  /** Upload a receipt (raw bytes) first; pass the fileId with the expense. */
+  uploadReceipt: (tripId: string, file: File) =>
+    post<{ fileId: string; fileName: string }>(`/v1/trips/${tripId}/expenses/receipt?fileName=${encodeURIComponent(file.name)}`, file, { headers: { 'Content-Type': 'application/octet-stream' } }),
+  openReceipt: (fileId: string) => download(`/v1/files/${fileId}`, 'receipt'),
+  addExpense: (tripId: string, body: { category: ExpenseCategory; amountMinor: number; note?: string; receiptFileId?: string }, key: string) =>
     post<{ id: string }>(`/v1/trips/${tripId}/expenses`, body, withIdempotency(key)),
   voidExpense: (tripId: string, expenseId: string, reason: string, key: string) =>
     post<{ ok: boolean }>(`/v1/trips/${tripId}/expenses/${expenseId}/void`, { reason }, withIdempotency(key)),

@@ -5,7 +5,7 @@ import { Button, ErrorState, Input, Modal, PageLoader, Select, useToast } from '
 import { amendmentsApi } from '@/lib/api/amendments';
 import { openRazorpayCheckout, paymentsApi } from '@/lib/api/payments';
 import { schedulingApi, tripOpsApi, type TripChart } from '@/lib/api/scheduling';
-import { cn, formatDateTime, formatMoney, idempotencyKey, todayLocal } from '@/lib/utils';
+import { cn, formatDateTime, formatMoney, fromAppDateTimeInput, idempotencyKey, todayLocal } from '@/lib/utils';
 
 export type ChangeKind = 'seats' | 'points' | 'name' | 'reschedule' | 'hold';
 interface Props { bookingId: string; pnr: string; tripId: string; seats: string[]; passengers: { seatNumber: string; fullName: string }[]; onClose: () => void; onDone: () => void }
@@ -194,10 +194,10 @@ function HoldChange({ bookingId, onClose, onDone }: Props) {
   const toast = useToast();
   const [key] = useState(() => idempotencyKey('hold'));
   const [at, setAt] = useState('');
-  const e = at && new Date(at).getTime() <= Date.now() ? 'Pick a time in the future' : undefined;
+  const e = at && fromAppDateTimeInput(at) <= Date.now() ? 'Pick a time in the future' : undefined;
   const qc = useQueryClient();
   const go = useMutation({
-    mutationFn: () => amendmentsApi.extendHold(bookingId, new Date(at).toISOString(), key),
+    mutationFn: () => amendmentsApi.extendHold(bookingId, new Date(fromAppDateTimeInput(at)).toISOString(), key),
     onSuccess: (r) => { toast.success(`Seats kept until ${formatDateTime(r.holdExpiresAt)}`); void qc.invalidateQueries({ queryKey: ['booking'] }); onDone(); },
     onError: (x) => toast.error(errText(x)),
   });

@@ -5,7 +5,7 @@ import { Copy, Handshake, KeyRound, Plus, Trash2 } from 'lucide-react';
 import { Badge, Button, EmptyState, ErrorState, Input, Modal, PageLoader, Table, useToast, type Column } from '@/components/ui';
 import { apiKeysApi, partnersApi, type ApiKey, type OtaPartner } from '@/lib/api/distribution';
 import { staffApi } from '@/lib/api/staff';
-import { cn, formatDateTime } from '@/lib/utils';
+import { cn, formatDateTime, fromAppDateTimeInput } from '@/lib/utils';
 
 /** OTAs on the platform: switch selling through each on or off and set the commission you give it. */
 export function PartnersTab() {
@@ -97,9 +97,9 @@ function NewKeyModal({ onClose, onDone }: { onClose: () => void; onDone: (r: { a
   if (name.trim().length < 2) e.name = 'At least 2 characters';
   if (scopes.size === 0) e.scopes = 'Pick what the key may do';
   if (ipList.some((ip) => !/^[\d.:a-fA-F]+(\/\d{1,3})?$/.test(ip))) e.ips = 'IP addresses or ranges like 203.0.113.0/24';
-  if (expires && new Date(expires).getTime() <= Date.now()) e.expires = 'Pick a future date';
+  if (expires && fromAppDateTimeInput(expires) <= Date.now()) e.expires = 'Pick a future date';
   const create = useMutation({
-    mutationFn: () => apiKeysApi.create({ name: name.trim(), scopes: [...scopes], ipAllowlist: ipList.length ? ipList : undefined, expiresAt: expires ? new Date(expires).toISOString() : undefined }),
+    mutationFn: () => apiKeysApi.create({ name: name.trim(), scopes: [...scopes], ipAllowlist: ipList.length ? ipList : undefined, expiresAt: expires ? new Date(fromAppDateTimeInput(expires)).toISOString() : undefined }),
     onSuccess: (r) => onDone({ apiKey: r.apiKey, name: name.trim() }),
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Failed'),
   });

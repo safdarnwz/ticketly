@@ -16,7 +16,7 @@ import { refundsApi } from '@/lib/api/ops';
 import { isEmail } from '@/lib/checkout';
 import { formatMoney, formatTime } from '@/lib/utils';
 
-const CHANNEL_LABEL: Record<string, string> = { direct_web: 'Website', direct_app: 'Mobile app', ota: 'OTA partner', backoffice: 'Counter' };
+const CHANNEL_LABEL: Record<string, string> = { direct_web: 'Website', direct_app: 'Mobile app', ota: 'OTA partner', backoffice: 'Counter', phone: 'Phone booking' };
 const dt = (iso: string) =>
   new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
 const errText = (e: unknown, fallback: string) => (e instanceof ApiError || e instanceof Error ? e.message : fallback);
@@ -35,6 +35,7 @@ export function BookingDetailPage() {
   const [toSeat, setToSeat] = useState('');
   const [cancelOpen, setCancelOpen] = useState(false);
   const [resendOpen, setResendOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
   const [changing, setChanging] = useState<ChangeKind | null>(null);
   const upgradeInFlight = useRef(false);
 
@@ -97,7 +98,8 @@ export function BookingDetailPage() {
                 <option value="reschedule">Date / bus</option>
               </select>
             )}
-            {d && booking.status === 'held' && d.channel === 'phone' && <Button variant="outline" onClick={() => setChanging('hold')}>Release time…</Button>}
+            {d && booking.status === 'held' && d.channel === 'phone' && d.liveHold && <Button onClick={() => setPayOpen(true)}>Take UPI payment</Button>}
+            {d && booking.status === 'held' && d.channel === 'phone' && d.liveHold && <Button variant="outline" onClick={() => setChanging('hold')}>Release time…</Button>}
             {cancellable && <Button variant="danger" leftIcon={<XCircle className="h-4 w-4" />} onClick={() => setCancelOpen(true)}>Cancel…</Button>}
           </div>
         }
@@ -224,6 +226,9 @@ export function BookingDetailPage() {
       )}
       {cancelOpen && id && (
         <CancelModal bookingId={id} currency={booking.currency} seats={d?.seats ?? []} passengers={passengers} onClose={() => setCancelOpen(false)} onDone={() => { setCancelOpen(false); refresh(); }} />
+      )}
+      {payOpen && id && d?.holdExpiresAt && (
+        <PhonePayModal bookingId={id} totalMinor={booking.totalMinor} currency={booking.currency} holdExpiresAt={d.holdExpiresAt} onClose={() => setPayOpen(false)} onDone={() => { setPayOpen(false); refresh(); }} />
       )}
       {resendOpen && id && (
         <ResendModal bookingId={id} defaultEmail={d?.contactEmail ?? ''} onClose={() => setResendOpen(false)} onDone={() => { setResendOpen(false); refresh(); }} />
@@ -352,4 +357,30 @@ function NoShowButton({ ticketId, onDone }: { ticketId: string; onDone: () => vo
     onError: (e) => toast.error(errText(e, 'Could not mark')),
   });
   return <Button variant="ghost" size="sm" loading={m.isPending} disabled={m.isPending} onClick={() => m.mutate()}>No-show</Button>;
+}
+
+/** A phone booking's caller pays by UPI before the release time; the booking is then confirmed and the e-ticket sent. */
+function PhonePayModal({ bookingId, totalMinor, currency, holdExpiresAt, onClose, onDone }: { bookingId: string; totalMinor: number; currency: string; holdExpiresAt: string; onClose: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const [vpa, setVpa] = useState('');
+  const [tried, setTried] = useState(false);
+  const ok = /^[\w.-]{2,}@[a-zA-Z]{2,}$/.test(vpa.trim());
+  const expired = Date.parse(holdExpiresAt) <= Date.now();
+  const pay = useMutation({
+    mutationFn: () => paymentsApi.chargeTest(bookingId, vpa.trim()),
+    onSuccess: () => { toast.success('Paid — booking confirmed, e-ticket sent'); onDone(); },
+    onError: (e) => toast.error(errText(e, 'Payment failed')),
+  });
+  return (
+    <Modal open onClose={onClose} title="Take UPI payment"
+      footer={<><Button variant="ghost" onClick={onClose} disabled={pay.isPending}>Close</Button>
+        <Button loading={pay.isPending} disabled={pay.isPending || expired} onClick={() => { setTried(true); if (ok) pay.mutate(); }}>Charge {formatMoney(totalMinor, currency)}</Button></>}>
+      <div className="flex flex-col gap-3 text-sm">
+        {expired ? <p role="alert" className="text-danger">The hold has expired — the seats were released. Book again.</p>
+          : <p className="text-text-muted">Seats are held until {dt(holdExpiresAt)}.</p>}
+        <Input label="Caller's UPI ID" value={vpa} placeholder="name@bank" onChange={(e) => setVpa(e.target.value)} error={tried && !ok ? 'Enter a UPI ID like name@bank' : undefined} disabled={pay.isPending || expired} />
+        {pay.isError && <p role="alert" className="text-xs text-danger">{errText(pay.error, 'Payment failed')} — the seats are still held; try again.</p>}
+      </div>
+    </Modal>
+  );
 }

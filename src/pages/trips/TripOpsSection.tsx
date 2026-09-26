@@ -149,6 +149,8 @@ function Waitlist({ tripId }: { tripId: string }) {
   );
 }
 
+const RECEIPT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+
 function Money({ tripId, cancelled }: { tripId: string; cancelled: boolean }) {
   const qc = useQueryClient();
   const toast = useToast();
@@ -157,14 +159,20 @@ function Money({ tripId, cancelled }: { tripId: string; cancelled: boolean }) {
   const [cat, setCat] = useState<ExpenseCategory>('diesel');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  const [receipt, setReceipt] = useState<File | null>(null);
+  const [fileKey, setFileKey] = useState(0);
   const [key, setKey] = useState(() => idempotencyKey('expense'));
   const [voiding, setVoiding] = useState<{ id: string; reason: string } | null>(null);
   const refresh = () => { void qc.invalidateQueries({ queryKey: ['trip-expenses', tripId] }); void qc.invalidateQueries({ queryKey: ['trip-pnl', tripId] }); };
   const amt = Number(amount);
   const amountErr = amount && !(amt > 0 && amt <= 500000 && /^\d+(\.\d{1,2})?$/.test(amount)) ? '₹0.01 to ₹5,00,000' : undefined;
+  const receiptErr = !receipt ? undefined : !RECEIPT_TYPES.includes(receipt.type) ? 'PDF, JPG, PNG or WEBP only' : receipt.size > 5 * 1024 * 1024 ? 'The file is over 5 MB' : undefined;
   const add = useMutation({
-    mutationFn: () => tripOpsExtraApi.addExpense(tripId, { category: cat, amountMinor: Math.round(amt * 100), note: note.trim() || undefined }, key),
-    onSuccess: () => { toast.success('Expense added'); setAmount(''); setNote(''); setKey(idempotencyKey('expense')); refresh(); },
+    mutationFn: async () => {
+      const receiptFileId = receipt ? (await tripOpsExtraApi.uploadReceipt(tripId, receipt)).fileId : undefined;
+      return tripOpsExtraApi.addExpense(tripId, { category: cat, amountMinor: Math.round(amt * 100), note: note.trim() || undefined, receiptFileId }, key);
+    },
+    onSuccess: () => { toast.success('Expense added'); setAmount(''); setNote(''); setReceipt(null); setFileKey((k) => k + 1); setKey(idempotencyKey('expense')); refresh(); },
     onError: (x) => toast.error(errText(x)),
   });
   const voidM = useMutation({
@@ -174,6 +182,7 @@ function Money({ tripId, cancelled }: { tripId: string; cancelled: boolean }) {
   });
   const cols: Column<Expense>[] = [
     { key: 'what', header: 'What', render: (x) => <span className={cn(x.voidedAt && 'text-text-muted line-through')}>{label(x.category)}{x.note ? ` · ${x.note}` : ''}</span> },
+    { key: 'receipt', header: 'Receipt', render: (x) => x.receiptFileId ? <Button size="sm" variant="ghost" onClick={() => void tripOpsExtraApi.openReceipt(x.receiptFileId!).catch((e) => toast.error(errText(e)))}>View</Button> : <span className="text-xs text-text-muted">—</span> },
     { key: 'amt', header: 'Amount', render: (x) => <span className={cn(x.voidedAt && 'text-text-muted line-through')}>{formatMoney(x.amountMinor)}</span> },
     { key: 'who', header: 'Added', render: (x) => <span className="text-xs text-text-muted">{formatDateTime(x.incurredAt)}{x.createdBy ? ` · ${x.createdBy}` : ''}{x.voidedAt ? ` · voided: ${x.voidReason}` : ''}</span> },
     { key: 'act', header: '', render: (x) => x.voidedAt ? null : voiding?.id === x.id ? (
@@ -198,7 +207,10 @@ function Money({ tripId, cancelled }: { tripId: string; cancelled: boolean }) {
           <div className="w-40"><Select label="Expense" value={cat} onChange={(x) => setCat(x.target.value as ExpenseCategory)} options={EXPENSE_CATEGORIES.map((c) => ({ label: label(c), value: c }))} /></div>
           <div className="w-36"><Input label="Amount (₹)" type="number" value={amount} error={amountErr} onChange={(x) => setAmount(x.target.value)} /></div>
           <div className="w-64"><Input label="Note (optional)" value={note} maxLength={300} onChange={(x) => setNote(x.target.value)} /></div>
-          <Button loading={add.isPending} disabled={!amount || !!amountErr || add.isPending} onClick={() => add.mutate()}>Add expense</Button>
+          <label className="flex flex-col gap-1.5"><span className="text-sm font-medium text-text">Receipt (optional)</span>
+            <input key={fileKey} type="file" aria-label="Receipt file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" className="text-xs" onChange={(x) => setReceipt(x.target.files?.[0] ?? null)} />
+            {receiptErr && <span role="alert" className="text-xs text-danger">{receiptErr}</span>}</label>
+          <Button loading={add.isPending} disabled={!amount || !!amountErr || !!receiptErr || add.isPending} onClick={() => add.mutate()}>Add expense</Button>
         </div>
       )}
       {exp.isLoading ? <PageLoader /> : exp.isError ? <ErrorState error={exp.error} onRetry={exp.refetch} /> : (exp.data?.items.length ?? 0) === 0 ? <p className="text-text-muted">No expenses on this trip yet.</p> : <Table columns={cols} rows={exp.data!.items} />}

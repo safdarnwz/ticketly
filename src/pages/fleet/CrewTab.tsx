@@ -7,7 +7,7 @@ import { ApiError } from '@/lib/api/client';
 import { fleetApi, type ComplianceRow, type Crew, type CrewPatch, type CrewRules, type CrewStatus, type Duty } from '@/lib/api/fleet';
 import { schedulingApi } from '@/lib/api/scheduling';
 import { normalizeMobile } from '@/lib/checkout';
-import { addDaysIso, cn, formatDateTime, minutesToHm, todayLocal } from '@/lib/utils';
+import { addDaysIso, cn, formatDateTime, fromAppDateTimeInput, minutesToHm, toAppDateTimeInput, todayLocal } from '@/lib/utils';
 
 const errText = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
 const ROLES = [{ label: 'Driver', value: 'driver' }, { label: 'Conductor', value: 'conductor' }, { label: 'Attendant', value: 'attendant' }];
@@ -207,10 +207,6 @@ function Roster() {
   );
 }
 
-const toLocalInput = (ms: number) => {
-  const d = new Date(ms - new Date().getTimezoneOffset() * 60_000);
-  return d.toISOString().slice(0, 16);
-};
 
 function AssignDutyModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const toast = useToast();
@@ -227,11 +223,11 @@ function AssignDutyModal({ onClose, onDone }: { onClose: () => void; onDone: () 
     if (!selectedTrip) return;
     const dep = new Date(selectedTrip.departsAt).getTime();
     const arr = new Date(selectedTrip.arrivesAt).getTime();
-    setF((x) => ({ ...x, startsAt: toLocalInput(dep - 30 * 60_000), endsAt: toLocalInput(arr), driving: x.driving || String(Math.round((arr - dep) / 60_000)) }));
+    setF((x) => ({ ...x, startsAt: toAppDateTimeInput(dep - 30 * 60_000), endsAt: toAppDateTimeInput(arr), driving: x.driving || String(Math.round((arr - dep) / 60_000)) }));
   }, [selectedTrip]);
   const member = crew.data?.items.find((c) => c.id === f.crewId);
-  const start = f.startsAt ? new Date(f.startsAt).getTime() : NaN;
-  const end = f.endsAt ? new Date(f.endsAt).getTime() : NaN;
+  const start = fromAppDateTimeInput(f.startsAt);
+  const end = fromAppDateTimeInput(f.endsAt);
   const driving = Number(f.driving);
   const errors: Record<string, string> = {};
   if (!f.crewId) errors.crewId = 'Pick who does this duty';

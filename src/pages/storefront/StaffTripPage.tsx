@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { CheckCircle2, Smartphone } from 'lucide-react';
+import { CheckCircle2, PhoneCall, Smartphone } from 'lucide-react';
 
 import { Button, Card, CardBody, CardHeader, Input, useToast } from '@/components/ui';
 import { SeatSelector, type SeatSelection } from '@/components/customer/SeatSelector';
@@ -11,7 +11,12 @@ import { ApiError } from '@/lib/api/client';
 import { paymentsApi } from '@/lib/api/payments';
 import type { SearchResult } from '@/lib/api/types';
 import { normalizeMobile, validatePassengers, type PassengerForm } from '@/lib/checkout';
-import { formatMoney } from '@/lib/utils';
+import { formatDateTime, formatMoney, fromAppDateTimeInput, toAppDateTimeInput } from '@/lib/utils';
+
+/** Phone-booking release window (the server enforces the same). */
+const RELEASE_MIN_MS = 5 * 60_000;
+const RELEASE_MAX_MS = 72 * 3_600_000;
+const RELEASE_BEFORE_DEPARTURE_MS = 60 * 60_000;
 
 /**
  * Counter sale by operator staff: seats, passengers, and the customer pays
@@ -33,7 +38,19 @@ export function StaffTripPage() {
   const [email, setEmail] = useState('');
   const [vpa, setVpa] = useState('');
   const [showErrors, setShowErrors] = useState(false);
-  const [confirmed, setConfirmed] = useState<{ pnr: string; bookingId: string } | null>(null);
+  const [confirmed, setConfirmed] = useState<{ pnr: string; bookingId: string; heldUntil?: string } | null>(null);
+  /** Pay now at the counter, or keep the seats for a caller who pays later. */
+  const [mode, setMode] = useState<'now' | 'later'>('now');
+  const departsMs = trip ? Date.parse(trip.departsAt) : 0;
+  const latestRelease = Math.min(Date.now() + RELEASE_MAX_MS, departsMs - RELEASE_BEFORE_DEPARTURE_MS);
+  const [releaseAt, setReleaseAt] = useState(() => toAppDateTimeInput(Math.min(Date.now() + 24 * 3_600_000, latestRelease)));
+  const releaseMs = fromAppDateTimeInput(releaseAt);
+  const releaseError = latestRelease < Date.now() + RELEASE_MIN_MS
+    ? 'This bus leaves too soon to hold seats — take payment now'
+    : !releaseAt || Number.isNaN(releaseMs) ? 'Pick until when to hold the seats'
+    : releaseMs < Date.now() + RELEASE_MIN_MS ? 'At least 5 minutes from now'
+    : releaseMs > Date.now() + RELEASE_MAX_MS ? 'At most 72 hours from now'
+    : releaseMs > departsMs - RELEASE_BEFORE_DEPARTURE_MS ? 'At least an hour before the bus leaves' : '';
   /** Seats held for this customer, waiting for their payment — a failed payment keeps them. */
   const [held, setHeld] = useState<{ bookingId: string; pnr: string; totalMinor: number; holdExpiresAt: string } | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -55,7 +72,7 @@ export function StaffTripPage() {
   const priceOf = (t: string) => trip?.fares?.find((f) => f.seatType === t)?.priceMinor;
   const estimate = sel.seats.reduce((a, s) => a + (priceOf(s.seatType) ?? 0), 0);
   const vpaOk = /^[\w.-]{2,}@[a-zA-Z]{2,}$/.test(vpa.trim());
-  const ready = sel.seats.length > 0 && Object.keys(errors).length === 0 && mobile && vpaOk;
+  const ready = sel.seats.length > 0 && Object.keys(errors).length === 0 && mobile && (mode === 'now' ? vpaOk : !releaseError);
   const secondsLeft = held ? Math.max(0, Math.round((Date.parse(held.holdExpiresAt) - now) / 1000)) : 0;
 
   /** Step 1: quote and hold the seats. */
@@ -81,6 +98,29 @@ export function StaffTripPage() {
     onSuccess: (h) => { setHeld(h); pay.mutate(h.bookingId); },
     onError: (e) => { inFlight.current = false; toast.error(e instanceof ApiError ? e.message : 'Could not hold the seats'); },
   });
+  /** Pay later: hold for the caller until the release time; they pay by UPI before it (Bookings → this PNR). */
+  const phoneHold = useMutation({
+    mutationFn: async () => {
+      const q = await flowApi.quote({
+        tripId: trip!.tripId,
+        fromStopId: sel.fromStop!.stopId,
+        toStopId: sel.toStop!.stopId,
+        seatType: sel.seatType,
+        seatNumbers: sel.seats.map((s) => s.seatNumber),
+      });
+      return bookingsApi.phoneBook({
+        quoteId: q.quoteId,
+        seatNumbers: sel.seats.map((s) => s.seatNumber),
+        passengers: passengers.map((p) => ({ seatNumber: p.seatNumber, fullName: p.fullName.trim(), age: Number(p.age), gender: p.gender || undefined })),
+        contactPhone: mobile!,
+        contactEmail: email.trim() || undefined,
+        releaseAt: new Date(releaseMs).toISOString(),
+      });
+    },
+    onSuccess: (h) => { setConfirmed({ pnr: h.pnr, bookingId: h.bookingId, heldUntil: h.holdExpiresAt }); toast.success('Seats held for the caller'); },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : 'Could not hold the seats'),
+    onSettled: () => { inFlight.current = false; },
+  });
   /** Step 2: the customer pays by UPI; a decline keeps the seats so they can try again. */
   const pay = useMutation({
     mutationFn: (bookingId: string) => paymentsApi.chargeTest(bookingId, vpa.trim()),
@@ -96,15 +136,17 @@ export function StaffTripPage() {
   useEffect(() => {
     if (held && secondsLeft === 0) { setHeld(null); pay.reset(); toast.error('The hold expired — the seats are free again. Select them once more.'); }
   }, [held, secondsLeft]); // eslint-disable-line react-hooks/exhaustive-deps
-  const busy = hold.isPending || pay.isPending || release.isPending;
+  const busy = hold.isPending || pay.isPending || release.isPending || phoneHold.isPending;
 
   if (!trip) return null;
   if (confirmed) {
     return (
       <div className="mx-auto flex max-w-lg flex-col items-center gap-4 px-4 py-16 text-center">
         <CheckCircle2 className="h-14 w-14 text-success" />
-        <h1 className="font-display text-2xl text-text">Booking confirmed</h1>
-        <p className="text-text-muted">PNR <b className="text-text">{confirmed.pnr}</b> — paid by UPI. The customer gets the e-ticket by SMS/email.</p>
+        <h1 className="font-display text-2xl text-text">{confirmed.heldUntil ? 'Seats held for the caller' : 'Booking confirmed'}</h1>
+        {confirmed.heldUntil
+          ? <p className="text-text-muted">PNR <b className="text-text">{confirmed.pnr}</b> — held until <b className="text-text">{formatDateTime(confirmed.heldUntil)}</b>. Take the UPI payment on the booking before then; unpaid seats are released automatically.</p>
+          : <p className="text-text-muted">PNR <b className="text-text">{confirmed.pnr}</b> — paid by UPI. The customer gets the e-ticket by SMS/email.</p>}
         <div className="flex gap-3">
           <Button variant="outline" onClick={() => navigate('/search')}>Book another</Button>
           <Button onClick={() => navigate(`/bookings/${confirmed.pnr}`)}>View booking</Button>
@@ -152,12 +194,24 @@ export function StaffTripPage() {
       </div>
 
       <Card className="h-fit lg:sticky lg:top-20">
-        <CardHeader title="Payment" subtitle="Customer pays by UPI" />
+        <CardHeader title="Payment" subtitle={mode === 'now' ? 'Customer pays by UPI' : 'Caller pays later, before the release time'} />
         <CardBody className="flex flex-col gap-3 text-sm">
+          {!held && (
+            <div role="radiogroup" aria-label="When does the customer pay" className="grid grid-cols-2 gap-1 rounded-md border border-border p-1">
+              {([['now', 'Pay now'], ['later', 'Phone booking']] as const).map(([k, label]) => (
+                <button key={k} role="radio" aria-checked={mode === k} disabled={busy} onClick={() => setMode(k)}
+                  className={mode === k ? 'rounded bg-primary px-2 py-1.5 text-sm font-medium text-white' : 'rounded px-2 py-1.5 text-sm text-text-muted hover:text-text'}>{label}</button>
+              ))}
+            </div>
+          )}
           <div className="flex justify-between"><span className="text-text-muted">Seats</span><span className="font-medium">{sel.seats.map((s) => s.seatNumber).join(', ') || '—'}</span></div>
           <div className="flex justify-between"><span className="text-text-muted">{held ? 'To pay' : 'Estimated fare'}</span><span className="font-semibold">{held ? formatMoney(held.totalMinor, trip.currency) : sel.seats.length ? formatMoney(estimate, trip.currency) : '—'}</span></div>
           {held && <div className="flex justify-between"><span className="text-text-muted">Held for</span><span className={secondsLeft < 60 ? 'font-semibold text-danger' : 'font-medium'}>{Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}</span></div>}
-          <Input label="Customer UPI ID" value={vpa} onChange={(e) => setVpa(e.target.value)} leftIcon={<Smartphone className="h-4 w-4" />} placeholder="name@bank" error={showErrors && !vpaOk ? 'Enter a UPI ID like name@bank' : undefined} disabled={pay.isPending} />
+          {mode === 'later' && !held ? (
+            <Input label="Hold seats until" type="datetime-local" value={releaseAt} min={toAppDateTimeInput(Date.now() + RELEASE_MIN_MS)} max={toAppDateTimeInput(Math.max(latestRelease, Date.now()))}
+              onChange={(e) => setReleaseAt(e.target.value)} error={showErrors || releaseError.startsWith('This bus') ? releaseError || undefined : undefined}
+              hint="Up to 72 hours, and at least an hour before the bus leaves" />
+          ) : <Input label="Customer UPI ID" value={vpa} onChange={(e) => setVpa(e.target.value)} leftIcon={<Smartphone className="h-4 w-4" />} placeholder="name@bank" error={showErrors && !vpaOk ? 'Enter a UPI ID like name@bank' : undefined} disabled={pay.isPending} />}
           {pay.isError && <p className="text-xs text-danger" role="alert">{pay.error instanceof ApiError ? pay.error.message : 'Payment failed'} — the seats are still held. Try again, or release them.</p>}
           {held ? (
             <>
@@ -166,6 +220,11 @@ export function StaffTripPage() {
               </Button>
               <Button fullWidth variant="ghost" loading={release.isPending} disabled={busy} onClick={() => release.mutate()}>Release seats</Button>
             </>
+          ) : mode === 'later' ? (
+            <Button fullWidth leftIcon={<PhoneCall className="h-4 w-4" />} loading={phoneHold.isPending} disabled={sel.seats.length === 0 || busy}
+              onClick={() => { setShowErrors(true); if (!ready || inFlight.current) return; inFlight.current = true; phoneHold.mutate(); }}>
+              Hold for caller
+            </Button>
           ) : (
             <Button
               fullWidth

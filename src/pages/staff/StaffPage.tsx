@@ -10,7 +10,7 @@ import { RolesTab } from './RolesTab';
 import { TargetProgress, TargetSection, UploadStaffModal, WarningsSection } from './StaffTeamTools';
 import { staffApi, type Staff, type StaffPerformance } from '@/lib/api/staff';
 import { useAuth } from '@/stores/auth';
-import { addDaysIso, cn, formatDateTime, formatMoney, todayLocal } from '@/lib/utils';
+import { addDaysIso, cn, formatDateTime, formatMoney, fromAppDateTimeInput, toAppDateTimeInput, todayLocal } from '@/lib/utils';
 
 type Tab = 'directory' | 'roles' | 'performance';
 
@@ -119,7 +119,7 @@ function StaffModal({ id, onClose }: { id: string; onClose: () => void }) {
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed'),
   });
   const branch = useMutation(act((b: string) => staffApi.setBranch(id, b || null), 'Branch updated'));
-  const grant = useMutation(act((v: { roleId: string; until: string }) => staffApi.grantRole(id, v.roleId, v.until ? new Date(v.until).toISOString() : null), 'Role given — it applies on their next click'));
+  const grant = useMutation(act((v: { roleId: string; until: string }) => staffApi.grantRole(id, v.roleId, v.until ? new Date(fromAppDateTimeInput(v.until)).toISOString() : null), 'Role given — it applies on their next click'));
   const revoke = useMutation(act((roleId: string) => staffApi.removeRole(id, roleId), 'Role removed — they sign in again'));
   const status = useMutation(act((v: 'active' | 'disabled') => staffApi.update(id, { status: v }), 'Status updated'));
   const logout = useMutation(act(() => staffApi.forceLogout(id), 'Signed out everywhere'));
@@ -127,7 +127,7 @@ function StaffModal({ id, onClose }: { id: string; onClose: () => void }) {
   const d = s.data;
   const self = d?.id === me;
   const addable = (roles.data?.items ?? []).filter((r) => !d?.roles.some((x) => x.id === r.id));
-  const untilPast = !!until && new Date(until).getTime() <= Date.now();
+  const untilPast = !!until && fromAppDateTimeInput(until) <= Date.now();
 
   return (
     <Modal open onClose={onClose} size="lg" title={d?.fullName ?? 'Staff member'}>
@@ -204,10 +204,9 @@ function StaffModal({ id, onClose }: { id: string; onClose: () => void }) {
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const toHm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 const fromHm = (v: string) => { const [h, m] = v.split(':').map(Number); return (h ?? 0) * 60 + (m ?? 0); };
-/** `datetime-local` value for now / for an ISO instant, in the browser's time. */
+/** `datetime-local` value for now / for an ISO instant, in the operator's time zone. */
 function nowLocalInput(iso?: string) {
-  const d = iso ? new Date(iso) : new Date();
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+  return toAppDateTimeInput(iso ? Date.parse(iso) : Date.now());
 }
 
 /** Contractor end date, allowed hours and reporting manager. Nobody limits their own access. */
@@ -222,12 +221,12 @@ function AccessSection({ staff, self, onSaved }: { staff: Staff; self: boolean; 
   const [managerId, setManagerId] = useState(staff.managerId ?? '');
   const people = useQuery({ queryKey: ['staff', 'managers'], queryFn: () => staffApi.list({ status: 'active', page: 1 }) });
   const errors: Record<string, string> = {};
-  if (until && new Date(until).getTime() <= Date.now()) errors.until = 'Pick a moment in the future — or disable the account';
+  if (until && fromAppDateTimeInput(until) <= Date.now()) errors.until = 'Pick a moment in the future — or disable the account';
   if (limited && days.length === 0) errors.days = 'Pick at least one day';
   if (limited && start === end) errors.time = 'Start and end cannot be the same';
   const save = useMutation({
     mutationFn: () => staffApi.setAccess(staff.id, {
-      accessExpiresAt: until ? new Date(until).toISOString() : null,
+      accessExpiresAt: until ? new Date(fromAppDateTimeInput(until)).toISOString() : null,
       loginWindow: limited ? { days: [...days].sort(), startMinute: fromHm(start), endMinute: fromHm(end) } : null,
       managerId: managerId || null,
     }),

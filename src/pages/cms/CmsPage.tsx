@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Megaphone, Plus } from 'lucide-react';
+import { fromAppDateTimeInput } from '@/lib/utils';
 
 import { Button, Card, CardBody, CardHeader, Input, EmptyState, PageLoader, ErrorState, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -18,7 +19,7 @@ export function CmsPage() {
   const create = useMutation({
     mutationFn: () => cmsApi.upsertOffer({
       code: offer.code, title: offer.title, couponCode: offer.couponCode || undefined,
-      validFrom: new Date(offer.validFrom).toISOString(), validTo: new Date(offer.validTo).toISOString(),
+      validFrom: new Date(fromAppDateTimeInput(offer.validFrom)).toISOString(), validTo: new Date(fromAppDateTimeInput(offer.validTo)).toISOString(),
     }),
     onSuccess: () => { toast.success('Offer saved'); setOpen(false); void qc.invalidateQueries({ queryKey: ['offers'] }); },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed to save offer'),

@@ -39,10 +39,23 @@ export function formatMoney(minor: number, currency = 'INR'): string {
   return `${neg ? '-' : ''}${sym}${group}${fracStr}`;
 }
 
+/** Date and time in the operator's time zone (see APP_TIMEZONE), like every other time on screen. */
 export function formatDateTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: APP_TIMEZONE });
+}
+
+/** India has one offset and no daylight saving. */
+const APP_OFFSET = '+05:30';
+const APP_OFFSET_MS = 5.5 * 3_600_000;
+/** An instant as a <input type="datetime-local"> value in APP_TIMEZONE (not the browser's zone). */
+export function toAppDateTimeInput(ms: number): string {
+  return new Date(ms + APP_OFFSET_MS).toISOString().slice(0, 16);
+}
+/** A <input type="datetime-local"> value, read in APP_TIMEZONE, as an instant (ms); NaN when empty. */
+export function fromAppDateTimeInput(value: string): number {
+  return value ? Date.parse(`${value}:00${APP_OFFSET}`) : NaN;
 }
 
 /**

@@ -9,7 +9,7 @@ import { tenantsApi, type Plan } from '@/lib/api/tenants';
 import { auditApi, type AuditEntry } from '@/lib/api/audit';
 import { promotionsApi } from '@/lib/api/promotions';
 import { payoutsApi, type PayoutInstruction, type BankChangeRequest } from '@/lib/api/payouts';
-import { formatMoney, cn } from '@/lib/utils';
+import { cn, formatDateTime, formatMoney } from '@/lib/utils';
 
 type Tab = 'analytics' | 'plans' | 'audit' | 'settings' | 'payouts';
 
@@ -145,7 +145,7 @@ function AuditTab() {
   const log = useQuery({ queryKey: ['audit-log', applied], queryFn: () => auditApi.list(applied) });
 
   const columns: Column<AuditEntry>[] = [
-    { key: 'when', header: 'When', render: (e) => new Date(e.occurredAt).toLocaleString() },
+    { key: 'when', header: 'When', render: (e) => formatDateTime(e.occurredAt) },
     { key: 'action', header: 'Action', render: (e) => <Badge>{e.action}</Badge> },
     { key: 'resource', header: 'Resource', render: (e) => <span className="text-text-muted">{e.resourceType}{e.resourceId ? ` · ${e.resourceId.slice(0, 8)}…` : ''}</span> },
     { key: 'actor', header: 'Actor', render: (e) => <span className="font-mono text-xs">{e.actorId ? `${e.actorId.slice(0, 8)}…` : e.actorType}</span> },
@@ -415,7 +415,7 @@ function PayoutsTab() {
   };
 
   const columns: Column<PayoutInstruction>[] = [
-    { key: 'when', header: 'Created', render: (p) => new Date(p.createdAt).toLocaleString() },
+    { key: 'when', header: 'Created', render: (p) => formatDateTime(p.createdAt) },
     { key: 'beneficiary', header: 'Beneficiary', render: (p) => <span className="font-medium text-text">{p.beneficiaryName}</span> },
     { key: 'account', header: 'Account', render: (p) => <span className="font-mono text-xs text-text-muted">••••{p.bankAccountNumber.slice(-4)} · {p.bankIfsc}</span> },
     { key: 'amount', header: 'Amount', render: (p) => formatMoney(p.amountMinor, p.currency) },
@@ -445,7 +445,7 @@ function PayoutsTab() {
                 <div>
                   <div className="text-sm font-medium text-text">{r.tenantName}</div>
                   <div className="text-xs text-text-muted">{r.accountHolder} · ••••{r.accountNumber.slice(-4)} · {r.ifsc}{r.bankName ? ` · ${r.bankName}` : ''}</div>
-                  <div className="text-[11px] text-text-muted">Submitted {new Date(r.createdAt).toLocaleString()}</div>
+                  <div className="text-[11px] text-text-muted">Submitted {formatDateTime(r.createdAt)}</div>
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" loading={approveChange.isPending} onClick={() => approveChange.mutate(r.id)}>Approve</Button>

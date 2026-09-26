@@ -55,6 +55,11 @@ export const bookingsApi = {
     post<{ bookingId: string; pnr: string; holdExpiresAt: string; totalMinor: number }>(
       '/v1/bookings/hold', input, withIdempotency(`hold-${input.quoteId}`),
     ),
+  /** Phone booking (staff): keep the seats for a caller until `releaseAt`; they pay later. */
+  phoneBook: (input: HoldInput & { releaseAt: string }) =>
+    post<{ bookingId: string; pnr: string; holdExpiresAt: string; totalMinor: number }>(
+      '/v1/bookings/phone', input, withIdempotency(`phone-${input.quoteId}`),
+    ),
   /** Free an unpaid hold now (the customer went back to change seats). The holder only: signed in, or the booking mobile. */
   releaseHold: (bookingId: string, mobile?: string) =>
     post<{ released: boolean }>(`/v1/bookings/${bookingId}/release-hold`, { mobile }),
