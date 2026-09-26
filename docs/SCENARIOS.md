@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 577 |
-| DONE | 398 |
+| TODO | 576 |
+| DONE | 399 |
 | DUP | 9 |
 
 
@@ -380,7 +380,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 343 | View projected cash flow | GAP | — | verified manually: not built yet |
 | 344 | Configure automatic reminders for pending dues | GAP | — | verified manually: not built yet |
 | 345 | View current refund liability amount | GAP | — | verified manually: not built yet |
-| 346 | Process bulk refunds | DONE | TODO | verified manually: existing module/API |
+| 346 | Process bulk refunds | DONE | DONE | verified manually: existing module/API · UI: Refunds → Needs action: select failed refunds → Retry selected |
 | 347 | Approve high-value refund requests | GAP | — | verified manually: not built yet |
 | 348 | View complete audit trail of financial entries | DONE | TODO | verified manually: existing module/API |
 | 349 | Download final month-end closing pack | GAP | — | verified manually: not built yet |

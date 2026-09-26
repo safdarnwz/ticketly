@@ -36,6 +36,8 @@ import { TripReminderScheduler } from './schedulers/trip-reminder.scheduler';
 import { ConnectionMonitorScheduler } from './schedulers/connection-monitor.scheduler';
 import { InventoryHorizonScheduler } from './schedulers/inventory-horizon.scheduler';
 import { SchedulingModule } from '@api/modules/scheduling/scheduling.module';
+import { AgentsModule } from '@api/modules/agents/agents.module';
+import { GdsModule } from '@api/modules/gds/gds.module';
 
 /**
  * Worker composition root.
@@ -77,6 +79,10 @@ import { SchedulingModule } from '@api/modules/scheduling/scheduling.module';
     DemandModule,
     PlatformSettingsModule,
     SchedulingModule,
+    // Refund creditors for agent and OTA/GDS sales register themselves at startup:
+    // without them the worker's automatic refund of such a cancellation failed.
+    AgentsModule,
+    GdsModule,
     // The tenancy module registers operator rate limits here; no HTTP layer in the worker.
     TenantRateLimitsModule,
   ],

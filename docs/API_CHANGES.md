@@ -408,3 +408,7 @@ an unknown id is now 404 (was 200).
   unique per operator ignoring case (409). Migration 0097.
 - **Fleet on the road:** new `GET /tracking/fleet` (staff): every bus of the operator that has left and not
   arrived, with its last GPS fix, speed, next stop and ETA.
+- **Agent / OTA refunds (fix):** the worker did not load the agents and GDS modules, so the automatic refund
+  after cancelling an agent- or partner-sold booking had no creditor and was marked failed ("no captured
+  payment to refund") — the agent was never credited. The worker now loads both. `POST /refunds/:id/retry`
+  of such a refund now credits the seller's account instead of refusing ("no captured gateway payment").

@@ -175,47 +175,14 @@ export class RefundService {
         // the seller's account by that channel's registered creditor.
         const creditor = this.creditors.for(intent?.gateway);
         if (creditor) {
-          const tenantId = requireTenantId();
-          const credited = await creditor.creditRefund({
-            bookingId: input.bookingId,
-            refundId,
-            refundMinor: input.amountMinor,
-            tenantId,
-          });
-          if (!credited) {
-            await this.refunds.transition(refundId, 'failed', {
-              failureReason: creditor.missingAccountReason,
-            });
-            return { kind: 'done', refundId, status: 'failed' };
-          }
-          if (creditor.collectedBy === 'operator') {
-            // The operator holds the cash: only the platform's commission share is reversed.
-            await this.postOfflineRefundLedger(input.bookingId, input.amountMinor, currency);
-          } else {
-            // The platform captured it from the partner: reverse the capture and
-            // give the partner's commission share back to the operator.
-            const rev = partnerCommissionReversalEntry({
-              currency,
-              bookingId: input.bookingId,
-              operatorId: tenantId,
-              clawbackMinor: credited.clawbackMinor,
-            });
-            if (rev) await this.ledger.post(rev);
-            await this.postRefundLedger(input.bookingId, input.amountMinor, currency);
-          }
-          await this.refunds.transition(refundId, 'settled', { reconciled: true });
-          await this.publishSettled(
+          const status = await this.creditSeller(
+            creditor,
             refundId,
             input.bookingId,
             input.amountMinor,
             currency,
-            creditor.destination,
           );
-          this.metrics.bookings.inc({
-            outcome: `refund_${creditor.destination}`,
-            channel: creditor.channel,
-          });
-          return { kind: 'done', refundId, status: 'settled' };
+          return { kind: 'done', refundId, status };
         }
 
         // Our own PSP: dispatched AFTER this transaction commits (phase 2).
@@ -369,24 +336,91 @@ export class RefundService {
   }
 
   /** Retry a FAILED source refund: new dispatch attempt (fresh PSP idempotency key), then send. */
-  async retry(refundId: string): Promise<{ status: RefundStatus }> {
-    await this.uow.run({ name: 'refund.retry', tenantId: requireTenantId() }, async () => {
-      const refund = await this.refunds.findForUpdate(refundId);
-      if (!refund)
-        throw new AppError(ErrorCode.REFUND_NOT_FOUND, 404, { message: 'Refund not found' });
-      assertRefundTransition(refund.status, 'processing'); // only failed → processing; a double click fails here
-      if (refund.destination !== 'source')
-        throw new AppError(ErrorCode.REFUND_NOT_ALLOWED, 422, {
-          message: 'Only a gateway (source) refund can be retried',
-        });
-      const intent = await this.refunds.capturedIntentForBooking(refund.bookingId);
-      if (!intent?.gatewayPaymentId || intent.gateway !== this.gateway.name) {
-        throw new AppError(ErrorCode.REFUND_NOT_ALLOWED, 422, {
-          message: 'No captured gateway payment to retry against',
-        });
-      }
-      await this.refunds.beginRetry(refundId);
+  /**
+   * B2B sale (operator agent / GDS partner): credit the refund to the seller's
+   * account through its registered creditor, post the ledger, settle. Must run
+   * inside the caller's transaction. Idempotent per refund id (the creditor is).
+   */
+  private async creditSeller(
+    creditor: NonNullable<ReturnType<RefundCreditorRegistry['for']>>,
+    refundId: string,
+    bookingId: BookingId,
+    amountMinor: number,
+    currency: CurrencyCode,
+  ): Promise<RefundStatus> {
+    const tenantId = requireTenantId();
+    const credited = await creditor.creditRefund({
+      bookingId,
+      refundId,
+      refundMinor: amountMinor,
+      tenantId,
     });
+    if (!credited) {
+      await this.refunds.transition(refundId, 'failed', {
+        failureReason: creditor.missingAccountReason,
+      });
+      return 'failed';
+    }
+    if (creditor.collectedBy === 'operator') {
+      // The operator holds the cash: only the platform's commission share is reversed.
+      await this.postOfflineRefundLedger(bookingId, amountMinor, currency);
+    } else {
+      // The platform captured it from the partner: reverse the capture and
+      // give the partner's commission share back to the operator.
+      const rev = partnerCommissionReversalEntry({
+        currency,
+        bookingId,
+        operatorId: tenantId,
+        clawbackMinor: credited.clawbackMinor,
+      });
+      if (rev) await this.ledger.post(rev);
+      await this.postRefundLedger(bookingId, amountMinor, currency);
+    }
+    await this.refunds.transition(refundId, 'settled', { reconciled: true });
+    await this.publishSettled(refundId, bookingId, amountMinor, currency, creditor.destination);
+    this.metrics.bookings.inc({
+      outcome: `refund_${creditor.destination}`,
+      channel: creditor.channel,
+    });
+    return 'settled';
+  }
+
+  async retry(refundId: string): Promise<{ status: RefundStatus }> {
+    const credited = await this.uow.run(
+      { name: 'refund.retry', tenantId: requireTenantId() },
+      async () => {
+        const refund = await this.refunds.findForUpdate(refundId);
+        if (!refund)
+          throw new AppError(ErrorCode.REFUND_NOT_FOUND, 404, { message: 'Refund not found' });
+        assertRefundTransition(refund.status, 'processing'); // only failed → processing; a double click fails here
+        if (refund.destination !== 'source')
+          throw new AppError(ErrorCode.REFUND_NOT_ALLOWED, 422, {
+            message: 'Only a gateway (source) refund can be retried',
+          });
+        const intent = await this.refunds.capturedIntentForBooking(refund.bookingId);
+        // An agent / partner sale: credit the seller's account again (it failed
+        // before, e.g. while that channel's creditor was not available).
+        const creditor = this.creditors.for(intent?.gateway);
+        if (creditor) {
+          await this.refunds.beginRetry(refundId);
+          return this.creditSeller(
+            creditor,
+            refundId,
+            refund.bookingId,
+            refund.amountMinor,
+            refund.currency as CurrencyCode,
+          );
+        }
+        if (!intent?.gatewayPaymentId || intent.gateway !== this.gateway.name) {
+          throw new AppError(ErrorCode.REFUND_NOT_ALLOWED, 422, {
+            message: 'No captured gateway payment to retry against',
+          });
+        }
+        await this.refunds.beginRetry(refundId);
+        return null;
+      },
+    );
+    if (credited) return { status: credited };
     const { status } = await this.dispatch(refundId);
     return { status };
   }
