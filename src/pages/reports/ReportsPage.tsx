@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
-import { TrendingUp, Download, BarChart3, XCircle, Clock } from 'lucide-react';
+import { TrendingUp, Download, BarChart3, XCircle, Clock, IndianRupee, Timer, LineChart } from 'lucide-react';
 
 import { Button, Card, CardBody, Input, Table, type Column, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { reportsApi } from '@/lib/api/reports';
+import { DispatchTab, ForecastTab, PnlTab } from './ReportsExtras';
 import { addDaysIso, cn, dayDiff, formatDateLabel, formatMoney, todayLocal } from '@/lib/utils';
 
-type Tab = 'revenue' | 'occupancy' | 'routes' | 'cancellations' | 'peak-hours';
+type Tab = 'revenue' | 'occupancy' | 'routes' | 'cancellations' | 'peak-hours' | 'pnl' | 'dispatch' | 'forecast';
 
 /** The operator's own calendar days, not UTC. */
 function lastDays(n: number) {
@@ -43,13 +44,16 @@ export function ReportsPage() {
         <span className="ml-auto text-xs text-text-muted">Figures refresh every few minutes</span>
       </div>
 
-      <div className="mb-6 flex gap-2 border-b border-border">
+      <div className="mb-6 flex flex-wrap gap-2 border-b border-border">
         {([
           { key: 'revenue', label: 'Revenue', icon: TrendingUp },
           { key: 'occupancy', label: 'Occupancy', icon: BarChart3 },
           { key: 'routes', label: 'Route Performance', icon: BarChart3 },
           { key: 'cancellations', label: 'Cancellations', icon: XCircle },
           { key: 'peak-hours', label: 'Peak Hours', icon: Clock },
+          { key: 'pnl', label: 'Profit & Loss', icon: IndianRupee },
+          { key: 'dispatch', label: 'Dispatch', icon: Timer },
+          { key: 'forecast', label: 'Forecast', icon: LineChart },
         ] as const).map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => setTab(key)}
             className={cn('flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium', tab === key ? 'border-primary text-text' : 'border-transparent text-text-muted hover:text-text')}>
@@ -58,13 +62,16 @@ export function ReportsPage() {
         ))}
       </div>
 
-      {rangeError && tab !== 'routes' ? <EmptyState title="Pick a valid period" description={rangeError} /> : (
+      {rangeError && tab !== 'routes' && tab !== 'forecast' ? <EmptyState title="Pick a valid period" description={rangeError} /> : (
         <>
           {tab === 'revenue' && <RevenueTab from={from} to={to} />}
           {tab === 'occupancy' && <OccupancyTab from={from} to={to} />}
           {tab === 'routes' && <RoutesTab />}
           {tab === 'cancellations' && <CancellationsTab from={from} to={to} />}
           {tab === 'peak-hours' && <PeakHoursTab from={from} to={to} />}
+          {tab === 'pnl' && <PnlTab from={from} to={to} />}
+          {tab === 'dispatch' && <DispatchTab from={from} to={to} />}
+          {tab === 'forecast' && <ForecastTab />}
         </>
       )}
     </>

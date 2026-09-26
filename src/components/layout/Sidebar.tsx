@@ -17,6 +17,7 @@ const tenantAdminNav: { to: string; label: string; icon: typeof Bus; needs: stri
   { to: '/trips', label: 'Trips & Charts', icon: Bus, needs: ['service:read', 'trip:manage', 'trip:operate'] },
   { to: '/routes', label: 'Routes & Stops', icon: RouteIcon, needs: ['route:read', 'stop:manage'] },
   { to: '/fleet', label: 'Fleet & Crew', icon: Truck, needs: ['vehicle:read', 'crew:manage'] },
+  { to: '/operations', label: 'Operations', icon: ShieldAlert, needs: ['trip:operate'] },
   { to: '/schedule', label: 'Schedule', icon: Calendar, needs: ['service:read'] },
   { to: '/pricing', label: 'Pricing', icon: IndianRupee, needs: ['fare:read'] },
   { to: '/distribution', label: 'Distribution', icon: Radio, needs: ['agent:read'] },

@@ -33,6 +33,7 @@ import { TripChartPage } from '@/pages/trips/TripChartPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { RoutesPage } from '@/pages/routes/RoutesPage';
 import { FleetPage } from '@/pages/fleet/FleetPage';
+import { OperationsPage } from '@/pages/operations/OperationsPage';
 import { SchedulePage } from '@/pages/schedule/SchedulePage';
 import { PricingPage } from '@/pages/pricing/PricingPage';
 import { DistributionPage } from '@/pages/distribution/DistributionTabs';
@@ -113,6 +114,7 @@ const tenantAdminRouter = createBrowserRouter([
           { path: '/trips/:id', element: <TripChartPage /> },
           { path: '/routes', element: <RoutesPage /> },
           { path: '/fleet', element: <FleetPage /> },
+          { path: '/operations', element: <OperationsPage /> },
           { path: '/fleet/vehicles/:id', element: <VehicleDetailPage /> },
           { path: '/schedule', element: <SchedulePage /> },
           { path: '/pricing', element: <PricingPage /> },
