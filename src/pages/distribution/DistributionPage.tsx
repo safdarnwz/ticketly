@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Webhook as WebhookIcon, Trash2, Copy, Radio, Send } from 'lucide-react';
 
 import { Button, Badge, statusTone, Table, type Column, Modal, Input, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
-import { PageHeader } from '@/components/common/PageHeader';
 import { ApiError } from '@/lib/api/client';
 import { distributionApi, type Webhook, type WebhookDelivery } from '@/lib/api/distribution';
 import { formatDateTime } from '@/lib/utils';
@@ -20,7 +19,7 @@ function urlProblem(raw: string): string | undefined {
   return undefined;
 }
 
-export function DistributionPage() {
+export function WebhooksTab() {
   const qc = useQueryClient();
   const toast = useToast();
   const [adding, setAdding] = useState(false);
@@ -94,8 +93,10 @@ export function DistributionPage() {
 
   return (
     <>
-      <PageHeader title="Distribution" subtitle="Push real-time updates to your partners (OTAs, your ERP) — signed, retried, no polling needed"
-        action={<Button leftIcon={<Plus className="h-4 w-4" />} onClick={open}>New webhook</Button>} />
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-sm text-text-muted">Push real-time updates to your partners (OTAs, your ERP) — signed, retried, no polling needed.</p>
+        <Button leftIcon={<Plus className="h-4 w-4" />} onClick={open}>New webhook</Button>
+      </div>
 
       {webhooks.isLoading ? <PageLoader /> : webhooks.isError ? <ErrorState error={webhooks.error} onRetry={webhooks.refetch} /> :
         (webhooks.data?.items.length ? <Table columns={columns} rows={webhooks.data.items} /> : <EmptyState title="No partner webhooks yet" description="Register one so a partner (redBus, Paytm, your ERP) is told about bookings as they happen." icon={<WebhookIcon className="h-10 w-10" />} />)}

@@ -35,7 +35,7 @@ import { RoutesPage } from '@/pages/routes/RoutesPage';
 import { FleetPage } from '@/pages/fleet/FleetPage';
 import { SchedulePage } from '@/pages/schedule/SchedulePage';
 import { PricingPage } from '@/pages/pricing/PricingPage';
-import { DistributionPage } from '@/pages/distribution/DistributionPage';
+import { DistributionPage } from '@/pages/distribution/DistributionTabs';
 import { BankDetailsPage } from '@/pages/settings/BankDetailsPage';
 import { RefundPolicyPage } from '@/pages/settings/RefundPolicyPage';
 import { TemplatesPage } from '@/pages/settings/TemplatesPage';
