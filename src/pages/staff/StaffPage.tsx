@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, LogOut, Plus, Search, Trophy, UserCog, UserPlus, X } from 'lucide-react';
+import { Download, KeyRound, LogOut, Plus, ShieldCheck, Search, Trophy, UserCog, UserPlus, X } from 'lucide-react';
 
 import { Badge, Button, Card, CardBody, EmptyState, ErrorState, Input, Modal, PageLoader, Select, Table, useToast, type Column } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ApiError } from '@/lib/api/client';
 import { branchesApi } from '@/lib/api/branches';
+import { RolesTab } from './RolesTab';
 import { staffApi, type Staff, type StaffPerformance } from '@/lib/api/staff';
 import { useAuth } from '@/stores/auth';
 import { addDaysIso, cn, formatDateTime, formatMoney, todayLocal } from '@/lib/utils';
 
-type Tab = 'directory' | 'performance';
+type Tab = 'directory' | 'roles' | 'performance';
 
 /**
  * The operator's staff: who they are, their roles and branch, what they did,
@@ -23,13 +24,13 @@ export function StaffPage() {
     <>
       <PageHeader title="Staff" subtitle="Your team — roles, branches, access and counter sales" />
       <div className="mb-4 flex gap-2 border-b border-border">
-        {([['directory', 'Directory', UserCog], ['performance', 'Performance', Trophy]] as const).map(([k, label, Icon]) => (
+        {([['directory', 'Directory', UserCog], ['roles', 'Roles & permissions', ShieldCheck], ['performance', 'Performance', Trophy]] as const).map(([k, label, Icon]) => (
           <button key={k} onClick={() => setTab(k)} className={cn('flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium', tab === k ? 'border-primary text-text' : 'border-transparent text-text-muted hover:text-text')}>
             <Icon className="h-4 w-4" /> {label}
           </button>
         ))}
       </div>
-      {tab === 'directory' ? <Directory /> : <Performance />}
+      {tab === 'directory' ? <Directory /> : tab === 'roles' ? <RolesTab /> : <Performance />}
     </>
   );
 }
@@ -103,17 +104,18 @@ function StaffModal({ id, onClose }: { id: string; onClose: () => void }) {
   const toast = useToast();
   const me = useAuth((s) => s.user?.id);
   const [addRole, setAddRole] = useState('');
+  const [until, setUntil] = useState('');
   const s = useQuery({ queryKey: ['staff-member', id], queryFn: () => staffApi.get(id) });
   const roles = useQuery({ queryKey: ['roles'], queryFn: staffApi.roles });
   const branches = useQuery({ queryKey: ['branches'], queryFn: branchesApi.list });
-  const refresh = () => { void qc.invalidateQueries({ queryKey: ['staff-member', id] }); void qc.invalidateQueries({ queryKey: ['staff'] }); };
+  const refresh = () => { void qc.invalidateQueries({ queryKey: ['staff-member', id] }); void qc.invalidateQueries({ queryKey: ['staff'] }); void qc.invalidateQueries({ queryKey: ['roles'] }); };
   const act = <T,>(fn: (v: T) => Promise<unknown>, ok: string) => ({
     mutationFn: fn,
     onSuccess: () => { toast.success(ok); refresh(); },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Failed'),
   });
   const branch = useMutation(act((b: string) => staffApi.setBranch(id, b || null), 'Branch updated'));
-  const grant = useMutation(act((code: string) => staffApi.addRole(id, code), 'Role added — they sign in again to get it'));
+  const grant = useMutation(act((v: { roleId: string; until: string }) => staffApi.grantRole(id, v.roleId, v.until ? new Date(v.until).toISOString() : null), 'Role given — it applies on their next click'));
   const revoke = useMutation(act((roleId: string) => staffApi.removeRole(id, roleId), 'Role removed — they sign in again'));
   const status = useMutation(act((v: 'active' | 'disabled') => staffApi.update(id, { status: v }), 'Status updated'));
   const logout = useMutation(act(() => staffApi.forceLogout(id), 'Signed out everywhere'));
@@ -121,6 +123,7 @@ function StaffModal({ id, onClose }: { id: string; onClose: () => void }) {
   const d = s.data;
   const self = d?.id === me;
   const addable = (roles.data?.items ?? []).filter((r) => !d?.roles.some((x) => x.id === r.id));
+  const untilPast = !!until && new Date(until).getTime() <= Date.now();
 
   return (
     <Modal open onClose={onClose} size="lg" title={d?.fullName ?? 'Staff member'}>
@@ -143,12 +146,14 @@ function StaffModal({ id, onClose }: { id: string; onClose: () => void }) {
                 </span>
               ))}
               {addable.length > 0 && (
-                <div className="flex items-end gap-1">
+                <div className="flex flex-wrap items-end gap-1">
                   <select aria-label="Add a role" value={addRole} onChange={(e) => setAddRole(e.target.value)} className="h-8 rounded-md border border-border bg-surface px-2 text-sm">
                     <option value="">Add a role…</option>
-                    {addable.map((r) => <option key={r.id} value={r.code}>{r.name}</option>)}
+                    {addable.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                   </select>
-                  <Button size="sm" variant="outline" leftIcon={<Plus className="h-3.5 w-3.5" />} disabled={!addRole || busy} onClick={() => { grant.mutate(addRole); setAddRole(''); }}>Add</Button>
+                  <input type="datetime-local" aria-label="Until (optional)" title="Leave empty for a permanent role" value={until} min={nowLocalInput()} onChange={(e) => setUntil(e.target.value)} className="h-8 rounded-md border border-border bg-surface px-2 text-sm" />
+                  <Button size="sm" variant="outline" leftIcon={<Plus className="h-3.5 w-3.5" />} disabled={!addRole || busy || untilPast} onClick={() => { grant.mutate({ roleId: addRole, until }); setAddRole(''); setUntil(''); }}>{until ? 'Add until then' : 'Add'}</Button>
+                  {untilPast && <span role="alert" className="text-xs text-danger">The end must be in the future</span>}
                 </div>
               )}
             </div>
@@ -168,6 +173,9 @@ function StaffModal({ id, onClose }: { id: string; onClose: () => void }) {
             </div>
           </div>
 
+          <AccessSection staff={d} self={self} onSaved={refresh} />
+          {!self && d.status === 'active' && <PasswordSection id={d.id} />}
+
           <div>
             <div className="mb-1.5 font-semibold text-text">Recent activity</div>
             {d.activity.length === 0 ? <p className="text-text-muted">Nothing recorded yet.</p> : (
@@ -184,6 +192,105 @@ function StaffModal({ id, onClose }: { id: string; onClose: () => void }) {
         </div>
       )}
     </Modal>
+  );
+}
+
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const toHm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+const fromHm = (v: string) => { const [h, m] = v.split(':').map(Number); return (h ?? 0) * 60 + (m ?? 0); };
+/** `datetime-local` value for now / for an ISO instant, in the browser's time. */
+function nowLocalInput(iso?: string) {
+  const d = iso ? new Date(iso) : new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+/** Contractor end date, allowed hours and reporting manager. Nobody limits their own access. */
+function AccessSection({ staff, self, onSaved }: { staff: Staff; self: boolean; onSaved: () => void }) {
+  const toast = useToast();
+  const w = staff.loginWindow;
+  const [until, setUntil] = useState(staff.accessExpiresAt ? nowLocalInput(staff.accessExpiresAt) : '');
+  const [limited, setLimited] = useState(!!w);
+  const [days, setDays] = useState<number[]>(w?.days ?? [1, 2, 3, 4, 5, 6]);
+  const [start, setStart] = useState(toHm(w?.startMinute ?? 480));
+  const [end, setEnd] = useState(toHm(w?.endMinute ?? 1200));
+  const [managerId, setManagerId] = useState(staff.managerId ?? '');
+  const people = useQuery({ queryKey: ['staff', 'managers'], queryFn: () => staffApi.list({ status: 'active', page: 1 }) });
+  const errors: Record<string, string> = {};
+  if (until && new Date(until).getTime() <= Date.now()) errors.until = 'Pick a moment in the future — or disable the account';
+  if (limited && days.length === 0) errors.days = 'Pick at least one day';
+  if (limited && start === end) errors.time = 'Start and end cannot be the same';
+  const save = useMutation({
+    mutationFn: () => staffApi.setAccess(staff.id, {
+      accessExpiresAt: until ? new Date(until).toISOString() : null,
+      loginWindow: limited ? { days: [...days].sort(), startMinute: fromHm(start), endMinute: fromHm(end) } : null,
+      managerId: managerId || null,
+    }),
+    onSuccess: () => { toast.success('Access saved — applies on their next click'); onSaved(); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  });
+  const bad = Object.keys(errors).length > 0;
+  const overnight = limited && fromHm(end) < fromHm(start);
+
+  return (
+    <fieldset className="flex flex-col gap-3 rounded-md border border-border p-3" disabled={save.isPending}>
+      <legend className="px-1 font-semibold text-text">Access &amp; hours</legend>
+      {self && <p className="text-xs text-text-muted">You cannot limit your own access — ask another admin. You can still pick who you report to.</p>}
+      <div className="grid grid-cols-2 gap-3">
+        <Input label="Access ends" type="datetime-local" value={until} disabled={self} min={nowLocalInput()} error={errors.until} hint="For contractors — empty means no end" onChange={(e) => setUntil(e.target.value)} />
+        <Select label="Reports to" value={managerId} onChange={(e) => setManagerId(e.target.value)}
+          options={[{ label: 'Nobody', value: '' }, ...(people.data?.items ?? []).filter((p) => p.id !== staff.id).map((p) => ({ label: p.fullName, value: p.id }))]} />
+      </div>
+      <label className="flex items-center gap-2"><input type="checkbox" checked={limited} disabled={self} onChange={(e) => setLimited(e.target.checked)} /> Only allow sign-in during set hours</label>
+      {limited && (
+        <div className="flex flex-col gap-2 pl-6">
+          <div className="flex flex-wrap gap-1" role="group" aria-label="Days">
+            {DAYS.map((label, i) => {
+              const day = i + 1; const on = days.includes(day);
+              return <button type="button" key={day} aria-pressed={on} onClick={() => setDays(on ? days.filter((x) => x !== day) : [...days, day])}
+                className={cn('rounded-md border px-2 py-1 text-xs', on ? 'border-primary bg-primary text-white' : 'border-border bg-surface text-text')}>{label}</button>;
+            })}
+          </div>
+          {errors.days && <span role="alert" className="text-xs text-danger">{errors.days}</span>}
+          <div className="flex items-end gap-2">
+            <Input label="From" type="time" value={start} onChange={(e) => setStart(e.target.value)} />
+            <Input label="To" type="time" value={end} error={errors.time} onChange={(e) => setEnd(e.target.value)} />
+          </div>
+          {overnight && <span className="text-xs text-text-muted">Overnight shift — ends the next morning.</span>}
+        </div>
+      )}
+      <div className="flex justify-end"><Button size="sm" loading={save.isPending} disabled={bad || save.isPending} onClick={() => save.mutate()}>Save access</Button></div>
+    </fieldset>
+  );
+}
+
+/** Set a new password for someone who is locked out; they are signed out everywhere. */
+function PasswordSection({ id }: { id: string }) {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [pw, setPw] = useState('');
+  const [again, setAgain] = useState('');
+  const [tried, setTried] = useState(false);
+  const errors: Record<string, string> = {};
+  if (pw.length < 8) errors.pw = 'At least 8 characters';
+  if (again !== pw) errors.again = 'The two passwords differ';
+  const reset = useMutation({
+    mutationFn: () => staffApi.resetPassword(id, pw),
+    onSuccess: () => { toast.success('New password set — they were signed out everywhere'); setOpen(false); setPw(''); setAgain(''); setTried(false); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  });
+  if (!open) return <div><Button size="sm" variant="ghost" leftIcon={<KeyRound className="h-3.5 w-3.5" />} onClick={() => setOpen(true)}>Set a new password</Button></div>;
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-border p-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Input label="New password" type="password" autoComplete="new-password" value={pw} error={tried ? errors.pw : undefined} onChange={(e) => setPw(e.target.value)} />
+        <Input label="Type it again" type="password" autoComplete="new-password" value={again} error={tried ? errors.again : undefined} onChange={(e) => setAgain(e.target.value)} />
+      </div>
+      <p className="text-xs text-text-muted">Share it with them privately. It also lifts a lock from wrong attempts.</p>
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="ghost" disabled={reset.isPending} onClick={() => { setOpen(false); setTried(false); }}>Cancel</Button>
+        <Button size="sm" loading={reset.isPending} disabled={reset.isPending} onClick={() => { setTried(true); if (Object.keys(errors).length === 0) reset.mutate(); }}>Set password</Button>
+      </div>
+    </div>
   );
 }
 
