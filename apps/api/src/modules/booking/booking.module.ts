@@ -16,6 +16,7 @@ import { BookingMonitoringController } from './presentation/booking-monitoring.c
 import { BookingMonitoringRepository } from './infrastructure/persistence/booking-monitoring.repository';
 import { BookingController } from './presentation/booking.controller';
 import { BookingRepository } from './infrastructure/persistence/booking.repository';
+import { BookingAccess } from './application/services/booking-access';
 import { BookingService } from './application/services/booking.service';
 import { TripOpsService } from './application/services/trip-ops.service';
 import { TripChartService } from './application/services/trip-chart.service';
@@ -53,10 +54,12 @@ import { OperatorPolicyRepository } from './infrastructure/persistence/operator-
     SeatLockRepository,
     SeatUpgradeRepository,
     BookingService,
+    BookingAccess,
     TripOpsService,
     ConcessionRepository,
   ],
   exports: [
+    BookingAccess,
     BookingRepository,
     JourneyConnectionRepository,
     SeatLockRepository,

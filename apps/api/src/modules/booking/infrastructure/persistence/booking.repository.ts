@@ -91,6 +91,58 @@ export interface BookingRow {
  * Booking persistence. Write methods assume an open transaction (they use the
  * unit-of-work client so the whole saga is atomic with the seat lock).
  */
+/** A row of the customer's "My trips". */
+export type CustomerBookingRow = BookingRow & {
+  routeName: string;
+  departsAt: Date;
+  operatorName: string;
+  fromName: string | null;
+  toName: string | null;
+};
+
+/** One booking on the customer's "Manage booking" page. */
+export interface CustomerBookingView {
+  id: string;
+  tenantId: string;
+  pnr: string;
+  status: string;
+  channel: string;
+  seatCount: number;
+  totalMinor: number;
+  paidMinor: number;
+  currency: string;
+  contactPhone: string | null;
+  contactEmail: string | null;
+  timesRescheduled: number;
+  createdAt: Date;
+  tripId: string;
+  tripStatus: string;
+  routeName: string;
+  departsAt: Date;
+  arrivesAt: Date;
+  fromSeq: number;
+  toSeq: number;
+  fromStopId: string;
+  toStopId: string;
+  boardingPoint: string | null;
+  droppingPoint: string | null;
+  fromCityId: string | null;
+  toCityId: string | null;
+  boardsAt: Date | null;
+  dropsAt: Date | null;
+  operatorName: string;
+  operatorPhone: string | null;
+  operatorEmail: string | null;
+  passengers: {
+    seatNumber: string;
+    fullName: string;
+    age: number | null;
+    gender: string | null;
+    ticketId: string | null;
+    ticketStatus: string | null;
+  }[];
+}
+
 @Injectable()
 export class BookingRepository {
   constructor(
@@ -440,17 +492,25 @@ export class BookingRepository {
   }
 
   /** A signed-in customer's own bookings, across every operator, newest first. */
-  async listForCustomer(customerId: string): Promise<BookingRow[]> {
-    return this.uow.run<BookingRow[]>(
+  /** The customer's bookings across every operator, newest first, with the journey to list them by. */
+  async listForCustomer(customerId: string): Promise<CustomerBookingRow[]> {
+    return this.uow.run<CustomerBookingRow[]>(
       { name: 'booking.listForCustomer', bypassRls: true, readOnly: true },
       async (scope) => {
-        const result = await scope.client.query<BookingRow>(
-          `SELECT id, pnr, trip_id AS "tripId", route_id AS "routeId", from_seq AS "fromSeq", to_seq AS "toSeq",
-                status, seat_count AS "seatCount", customer_id AS "customerId", currency, total_minor AS "totalMinor", paid_minor AS "paidMinor",
-                coupon_code AS "couponCode", hold_expires_at AS "holdExpiresAt", version, tenant_id AS "tenantId",
-                created_at AS "createdAt"
-           FROM bookings WHERE customer_id = $1 AND status <> 'held'
-          ORDER BY created_at DESC LIMIT 200`,
+        const result = await scope.client.query<CustomerBookingRow>(
+          `SELECT b.id, b.pnr, b.trip_id AS "tripId", b.route_id AS "routeId", b.from_seq AS "fromSeq", b.to_seq AS "toSeq",
+                b.status, b.seat_count AS "seatCount", b.customer_id AS "customerId", b.currency, b.total_minor AS "totalMinor", b.paid_minor AS "paidMinor",
+                b.coupon_code AS "couponCode", b.hold_expires_at AS "holdExpiresAt", b.version, b.tenant_id AS "tenantId",
+                b.created_at AS "createdAt", r.name AS "routeName", t.departs_at AS "departsAt",
+                tn.display_name AS "operatorName", fs.name AS "fromName", ts.name AS "toName"
+           FROM bookings b
+           JOIN trips t ON t.id = b.trip_id
+           JOIN routes r ON r.id = b.route_id
+           JOIN tenants tn ON tn.id = b.tenant_id
+           LEFT JOIN stops fs ON fs.id = b.from_stop_id
+           LEFT JOIN stops ts ON ts.id = b.to_stop_id
+          WHERE b.customer_id = $1 AND b.status <> 'held'
+          ORDER BY b.created_at DESC LIMIT 200`,
           [customerId],
         );
         return result.rows;
@@ -779,6 +839,57 @@ export class BookingRepository {
   }
 
   /** The REAL tickets table (post-confirm) — has actual DB ids, unlike loadSeats (booking_seats, hold-time only, no ticket id). Used wherever a caller needs to reference a SPECIFIC ticket, e.g. the seat-upgrade flow. */
+  /**
+   * A booking as its customer sees it on "Manage booking": the journey (with
+   * the stops and cities, so the page can offer other buses), each traveller
+   * with their ticket, and the operator to call. Null when not this operator's.
+   */
+  async customerView(bookingId: BookingId): Promise<CustomerBookingView | null> {
+    const b = await this.db.queryOne<Omit<CustomerBookingView, 'passengers'>>(
+      `SELECT b.id, b.tenant_id AS "tenantId", b.pnr, b.status, b.channel, b.seat_count AS "seatCount",
+              b.total_minor::bigint AS "totalMinor", b.paid_minor::bigint AS "paidMinor", b.currency,
+              b.contact_phone AS "contactPhone", b.contact_email AS "contactEmail",
+              b.times_rescheduled AS "timesRescheduled", b.created_at AS "createdAt",
+              b.trip_id AS "tripId", t.status AS "tripStatus", r.name AS "routeName",
+              t.departs_at AS "departsAt", t.arrives_at AS "arrivesAt",
+              b.from_seq AS "fromSeq", b.to_seq AS "toSeq",
+              b.from_stop_id AS "fromStopId", b.to_stop_id AS "toStopId",
+              fs.name AS "boardingPoint", ts.name AS "droppingPoint",
+              fs.city_id AS "fromCityId", ts.city_id AS "toCityId",
+              fts.departs_at AS "boardsAt", tts.arrives_at AS "dropsAt",
+              tn.display_name AS "operatorName", tn.contact_phone AS "operatorPhone",
+              tn.contact_email AS "operatorEmail"
+         FROM bookings b
+         JOIN trips t ON t.id = b.trip_id
+         JOIN routes r ON r.id = b.route_id
+         JOIN tenants tn ON tn.id = b.tenant_id
+         LEFT JOIN stops fs ON fs.id = b.from_stop_id
+         LEFT JOIN stops ts ON ts.id = b.to_stop_id
+         LEFT JOIN trip_stops fts ON fts.trip_id = b.trip_id AND fts.sequence = b.from_seq
+         LEFT JOIN trip_stops tts ON tts.trip_id = b.trip_id AND tts.sequence = b.to_seq
+        WHERE b.tenant_id = $1 AND b.id = $2`,
+      [requireTenantId(), bookingId],
+      { name: 'booking.customerView' },
+    );
+    if (!b) return null;
+    const passengers = await this.db.query<CustomerBookingView['passengers'][number]>(
+      `SELECT p.seat_number AS "seatNumber", p.full_name AS "fullName", p.age, p.gender,
+              tk.id AS "ticketId", tk.status AS "ticketStatus"
+         FROM passengers p
+         LEFT JOIN tickets tk ON tk.booking_id = p.booking_id AND tk.seat_number = p.seat_number
+        WHERE p.tenant_id = $1 AND p.booking_id = $2
+        ORDER BY length(p.seat_number), p.seat_number`,
+      [requireTenantId(), bookingId],
+      { name: 'booking.customerViewPassengers' },
+    );
+    return {
+      ...b,
+      totalMinor: Number(b.totalMinor),
+      paidMinor: Number(b.paidMinor),
+      passengers,
+    };
+  }
+
   async listTickets(bookingId: BookingId): Promise<{ id: string; seatNumber: string }[]> {
     return this.db.query(
       `SELECT id, seat_number AS "seatNumber" FROM tickets WHERE tenant_id = $1 AND booking_id = $2 ORDER BY seat_number`,

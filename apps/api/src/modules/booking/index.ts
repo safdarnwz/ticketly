@@ -4,6 +4,7 @@
  */
 export { ticketCode } from './domain/pnr';
 export * from './application/services/booking.service';
+export * from './application/services/booking-access';
 export * from './domain/booking-state';
 export * from './domain/refund-policy';
 export * from './infrastructure/persistence/booking.repository';

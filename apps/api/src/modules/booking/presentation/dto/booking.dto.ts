@@ -115,6 +115,9 @@ const mobileQuery = z
 /** Self-service lookups prove ownership with the mobile the booking was made with. */
 export const ContactMobileQuerySchema = z.object({ mobile: mobileQuery });
 export type ContactMobileQueryDto = z.infer<typeof ContactMobileQuerySchema>;
+/** Signed-in customers need no proof; a guest gives the booking mobile. */
+export const OptionalMobileQuerySchema = z.object({ mobile: z.string().trim().max(20).optional() });
+export type OptionalMobileQueryDto = z.infer<typeof OptionalMobileQuerySchema>;
 
 /**
  * The operator's bookings list. By PNR / mobile / ticket number it searches

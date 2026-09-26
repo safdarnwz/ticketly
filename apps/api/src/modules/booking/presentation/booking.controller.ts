@@ -16,8 +16,6 @@ import {
   BadRequestError,
   DEFAULT_TIMEZONE,
   ForbiddenError,
-  getContext,
-  hasPermission,
   daysBetween,
   decodeCursor,
   encodeCursor,
@@ -38,6 +36,7 @@ import { NotificationService } from '../../notification';
 import { BookingRepository } from '../infrastructure/persistence/booking.repository';
 import { allowedSalesChannel } from '../application/services/sales-channel';
 import { BookingService } from '../application/services/booking.service';
+import { BookingAccess } from '../application/services/booking-access';
 import { TripOpsService } from '../application/services/trip-ops.service';
 import { TripChartService } from '../application/services/trip-chart.service';
 import {
@@ -46,6 +45,7 @@ import {
   CancelTripSchema,
   ConfirmSchema,
   ContactMobileQuerySchema,
+  OptionalMobileQuerySchema,
   ExtendHoldSchema,
   HoldSchema,
   PhoneBookingSchema,
@@ -56,6 +56,7 @@ import {
   type CancelTripDto,
   type ConfirmDto,
   type ContactMobileQueryDto,
+  type OptionalMobileQueryDto,
   type ExtendHoldDto,
   type HoldDto,
   type PhoneBookingDto,
@@ -82,6 +83,7 @@ export class BookingController {
     private readonly tripOps: TripOpsService,
     private readonly notifications: NotificationService,
     private readonly tripChart: TripChartService,
+    private readonly access: BookingAccess,
   ) {}
 
   @Post('hold')
@@ -173,8 +175,12 @@ export class BookingController {
     @UuidParam('id') id: string,
     @Body(zodBody(CancelSeatsSchema)) dto: CancelSeatsDto,
   ) {
-    const run = (asStaff = false) =>
-      this.booking.cancelSeats(
+    return this.access.run(id, dto.mobile, Permission.BOOKING_CANCEL, (asStaff) => {
+      if (!asStaff && dto.refundDestination !== 'source')
+        throw new ForbiddenError({
+          message: 'The refund goes back to how you paid — ask the operator to send it elsewhere',
+        });
+      return this.booking.cancelSeats(
         id as BookingId,
         dto.seatNumbers,
         dto.reason,
@@ -182,24 +188,7 @@ export class BookingController {
         dto.altAccountDetails,
         asStaff,
       );
-    // Operator staff: the booking must be theirs (the service reads it in
-    // the caller's tenant, so another operator's id is simply not found).
-    if (getContext()?.tenantId && hasPermission(Permission.BOOKING_CANCEL)) return run(true);
-
-    // Anyone else proves the booking is theirs — it used to take any id.
-    const info = await this.bookings.accessInfo(id);
-    const digits = (v: string | null | undefined) => (v ?? '').replace(/\D/g, '').slice(-10);
-    const owner = Boolean(info?.customerId) && info?.customerId === getUserId();
-    const byPhone =
-      Boolean(dto.mobile) &&
-      digits(dto.mobile).length === 10 &&
-      digits(dto.mobile) === digits(info?.contactPhone);
-    if (!info || (!owner && !byPhone)) throw new NotFoundError('Booking', id);
-    if (dto.refundDestination !== 'source')
-      throw new ForbiddenError({
-        message: 'The refund goes back to how you paid — ask the operator to send it elsewhere',
-      });
-    return runAsTenant(info.tenantId as TenantId, () => run());
+    });
   }
 
   @Get('search')
@@ -296,6 +285,29 @@ export class BookingController {
     const userId = getUserId();
     if (!userId) throw new UnauthenticatedError();
     return { bookings: await this.bookings.listForCustomer(userId) };
+  }
+
+  /**
+   * "Manage booking": the journey, travellers and tickets, and the operator to
+   * call — for the signed-in customer who booked it or the booking mobile
+   * (operator staff read their own bookings too).
+   */
+  @Get(':id/manage')
+  @Public()
+  @RateLimit(60, 60_000, 'ip')
+  @ApiOperation({
+    summary:
+      "One booking for the customer's Manage booking page: journey, stops, travellers with tickets, operator contact",
+  })
+  async manage(
+    @UuidParam('id') id: string,
+    @Query(zodQuery(OptionalMobileQuerySchema)) q: OptionalMobileQueryDto,
+  ) {
+    return this.access.run(id, q.mobile, Permission.BOOKING_READ, async () => {
+      const view = await this.bookings.customerView(id as BookingId);
+      if (!view) throw new NotFoundError('Booking', id);
+      return view;
+    });
   }
 
   /** Free the seats of an unpaid hold now (customer changed their mind); idempotent. */

@@ -466,3 +466,17 @@ an unknown id is now 404 (was 200).
   `POST /crew/trips/:tripId/ping`. The manifest rows add `contactPhone`, `boardingPoint`, `droppingPoint`,
   `boardsAt`, `ticketId`, `ladiesSeat`, in boarding order. `POST /crew/trips/:tripId/sos` keeps its URL.
   `POST /incidents` takes `type: 'cleaning' | 'maintenance'`.
+- **Customer Manage booking:** new `GET /bookings/:id/manage?mobile=` — one booking for its customer (signed
+  in, or the booking mobile; operator staff too): journey with boarding / drop stops, times and cities,
+  travellers with their ticket status, the operator's contact. Anyone else gets 404.
+- **Customers change their own bookings:** `POST /bookings/:id/change-seats`, `change-points`,
+  `correct-name` and `reschedule` are no longer staff-only: the signed-in customer who booked, or anyone giving
+  the booking `mobile` in the body, may call them (staff keep `booking:reschedule`); same rules and cutoffs as
+  staff, 404 for anyone else. New `GET /bookings/:id/reschedule-options?date=&mobile=` (the operator's open
+  buses that day through the same boarding and drop points, with free seats on that stretch; 422 unless
+  confirmed) and `GET /bookings/:id/reschedule-quote?newTripId&newFromStopId&newToStopId&seats=a,b&mobile=`
+  (fee, fare difference, amount to pay or refund — nothing changes). `POST /bookings/:id/cancel-seats` uses the
+  same ownership check (unchanged behaviour).
+- **My trips:** `GET /bookings/mine` rows add `routeName`, `departsAt`, `operatorName`, `fromName`, `toName`.
+- **Agent statement / ledger (fix):** `GET /agents/:id/statement` and the agent ledger's `from/to` are the
+  operator's days (its time zone) — a receipt taken at 00:30 in India was counted on the day before.

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { DatabaseService } from '@database';
-import { type BookingId, type TenantId, type TripId, type UserId } from '@kernel';
+import { requireTenantId, type BookingId, type TenantId, type TripId, type UserId } from '@kernel';
 
 export type AmendmentKind = 'reschedule' | 'seat_change' | 'point_change' | 'name_correction';
 
@@ -56,5 +56,46 @@ export class AmendmentRepository {
       { name: 'amendment.countNameCorrections', primary: true },
     );
     return Number(row?.n ?? 0);
+  }
+
+  /**
+   * Other buses of this operator on one day (its own time zone) that stop at
+   * both of the booking's points in order — where a date change can go. Only
+   * open trips whose boarding time is still ahead.
+   */
+  rescheduleTargets(q: {
+    excludeTripId: string;
+    fromStopId: string;
+    toStopId: string;
+    date: string;
+  }): Promise<
+    {
+      tripId: string;
+      routeName: string;
+      departsAt: Date;
+      boardsAt: Date;
+      dropsAt: Date;
+      fromSeq: number;
+      toSeq: number;
+    }[]
+  > {
+    return this.db.query(
+      `SELECT t.id AS "tripId", r.name AS "routeName", t.departs_at AS "departsAt",
+              f.departs_at AS "boardsAt", d.arrives_at AS "dropsAt",
+              f.sequence AS "fromSeq", d.sequence AS "toSeq"
+         FROM trips t
+         JOIN routes r ON r.id = t.route_id
+         JOIN tenants tn ON tn.id = t.tenant_id
+         JOIN trip_stops f ON f.trip_id = t.id AND f.stop_id = $3 AND f.can_board
+         JOIN trip_stops d ON d.trip_id = t.id AND d.stop_id = $4 AND d.can_alight
+                          AND d.sequence > f.sequence
+        WHERE t.tenant_id = $1 AND t.id <> $2 AND t.status = 'open'
+          AND f.departs_at > now()
+          AND (f.departs_at AT TIME ZONE tn.timezone)::date = $5::date
+        ORDER BY f.departs_at
+        LIMIT 30`,
+      [requireTenantId(), q.excludeTripId, q.fromStopId, q.toStopId, q.date],
+      { name: 'amend.rescheduleTargets' },
+    );
   }
 }

@@ -85,6 +85,9 @@ const COMMISSION_ON_BOOKING = `(SELECT coalesce(sum(l.amount_minor), 0) FROM age
     WHERE l.booking_id = b.id AND l.agent_id = b.agent_id
       AND l.kind IN ('commission_credit', 'commission_reversal'))`;
 
+/** The operator's time zone, for turning its calendar days into instants ($1 is the tenant). */
+const OPERATOR_TZ = `(SELECT timezone FROM tenants WHERE id = $1)`;
+
 @Injectable()
 export class AgentRepository {
   constructor(
@@ -308,8 +311,8 @@ export class AgentRepository {
          FROM agent_ledger l
          LEFT JOIN bookings b ON b.id = l.booking_id
         WHERE l.tenant_id = $1 AND l.agent_id = $2
-          AND ($3::date IS NULL OR l.created_at >= $3::date)
-          AND ($4::date IS NULL OR l.created_at < ($4::date + 1))
+          AND ($3::date IS NULL OR l.created_at >= ($3::date::timestamp AT TIME ZONE ${OPERATOR_TZ}))
+          AND ($4::date IS NULL OR l.created_at < (($4::date + 1)::timestamp AT TIME ZONE ${OPERATOR_TZ}))
         ORDER BY l.created_at DESC, l.id DESC
         LIMIT $5`,
       [
@@ -335,6 +338,10 @@ export class AgentRepository {
   }
 
   /** Period statement: opening/closing balance and totals by kind. */
+  /**
+   * An agent statement for operator days (its own time zone): a receipt taken
+   * at 00:30 in India belongs to that day, not to the day before in UTC.
+   */
   async statement(
     agentId: AgentId,
     from: string,
@@ -348,13 +355,16 @@ export class AgentRepository {
     const tenantId = requireTenantId();
     const opening = await this.db.queryOne<{ bal: string }>(
       `SELECT coalesce(sum(amount_minor), 0) AS bal FROM agent_ledger
-        WHERE tenant_id = $1 AND agent_id = $2 AND created_at < $3::date`,
+        WHERE tenant_id = $1 AND agent_id = $2
+          AND created_at < ($3::date::timestamp AT TIME ZONE ${OPERATOR_TZ})`,
       [tenantId, agentId, from],
       { name: 'agent.statement.opening' },
     );
     const byKind = await this.db.query<{ kind: string; total: string; n: string }>(
       `SELECT kind, coalesce(sum(amount_minor), 0) AS total, count(DISTINCT booking_id) AS n FROM agent_ledger
-        WHERE tenant_id = $1 AND agent_id = $2 AND created_at >= $3::date AND created_at < ($4::date + 1)
+        WHERE tenant_id = $1 AND agent_id = $2
+          AND created_at >= ($3::date::timestamp AT TIME ZONE ${OPERATOR_TZ})
+          AND created_at < (($4::date + 1)::timestamp AT TIME ZONE ${OPERATOR_TZ})
         GROUP BY kind`,
       [tenantId, agentId, from, to],
       { name: 'agent.statement.byKind' },

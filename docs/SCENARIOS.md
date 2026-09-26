@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| DONE | 499 |
-| TODO | 476 |
+| DONE | 510 |
+| TODO | 465 |
 | DUP | 9 |
 
 
@@ -928,11 +928,11 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 | 1013 | Refund to original payment method fails | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
 | 1014 | Customer requests refund to different account | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
 | 1015 | Bank account details provided for refund are invalid | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
-| 1016 | Refund requested after allowed policy period | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 1016 | Refund requested after allowed policy period | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: Customer site → My trips → Manage booking: refund shown before cancelling, cancel some seats or all, closed after boarding time |
 | 1017 | Multiple refund requests created for same booking | DONE | DONE | GET /refunds queue (action/processing/done), POST /refunds with alternate account (fixed), POST /refunds/:id/manual with UTR (bank transfer or failed), GET /bookings/:id/refunds refundable; over-refund 422, idempotent · UI: Refunds: queue tabs + PNR filter, retry, mark paid with UTR after seeing the account, new refund from PNR with refundable cap and bank checks |
-| 1018 | Refund requested after bus has already departed | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 1018 | Refund requested after bus has already departed | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: Customer site → My trips → Manage booking: refund shown before cancelling, cancel some seats or all, closed after boarding time |
 | 1019 | Refund requested after passenger has boarded | GAP | — | verified manually: not built yet |
-| 1020 | Only some passengers in booking are cancelled | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 1020 | Only some passengers in booking are cancelled | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: Customer site → My trips → Manage booking: refund shown before cancelling, cancel some seats or all, closed after boarding time |
 | 1021 | Agent commission was already paid before refund | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1022 | Commission needs to be reversed after refund | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1023 | TDS needs adjustment after refund | GAP | — | verified manually: not built yet |
@@ -951,7 +951,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 | 1036 | Seat upgrade charges were paid and now refunded | GAP | — | verified manually: not built yet |
 | 1037 | Date change charges paid and later booking cancelled | GAP | — | verified manually: not built yet |
 | 1038 | Multiple date changes done before final cancellation | GAP | — | verified manually: not built yet |
-| 1039 | Free cancellation window expires by few seconds | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 1039 | Free cancellation window expires by few seconds | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: Customer site → My trips → Manage booking: refund shown before cancelling, cancel some seats or all, closed after boarding time |
 | 1040 | Cancellation policy was changed after booking was made | GAP | — | verified manually: not built yet |
 | 1041 | Full refund given under force majeure | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1042 | Operator himself cancels service and refunds | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
@@ -1126,14 +1126,14 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 | 1201 | Attempt to book after service has departed | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1202 | Attempt to book exactly at departure time | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1203 | Attempt to book one minute before departure | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 1204 | Date change requested to a past date | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 1205 | Date change requested to same service | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 1206 | Seat change requested to same seat | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 1204 | Date change requested to a past date | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: Customer site → Manage booking: change date (future days only, other buses), seats (free seats only), boarding / drop point, name spelling — closed after boarding time; backend refusals shown |
+| 1205 | Date change requested to same service | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: Customer site → Manage booking: change date (future days only, other buses), seats (free seats only), boarding / drop point, name spelling — closed after boarding time; backend refusals shown |
+| 1206 | Seat change requested to same seat | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: Customer site → Manage booking: change date (future days only, other buses), seats (free seats only), boarding / drop point, name spelling — closed after boarding time; backend refusals shown |
 | 1207 | Cancellation requested after boarding started | GAP | — | verified manually: not built yet |
 | 1208 | Cancellation requested after all passengers boarded | GAP | — | verified manually: not built yet |
-| 1209 | Name correction requested after boarding | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 1210 | Boarding point change after service departed | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 1211 | Drop point change after service departed | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 1209 | Name correction requested after boarding | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: Customer site → Manage booking: change date (future days only, other buses), seats (free seats only), boarding / drop point, name spelling — closed after boarding time; backend refusals shown |
+| 1210 | Boarding point change after service departed | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: Customer site → Manage booking: change date (future days only, other buses), seats (free seats only), boarding / drop point, name spelling — closed after boarding time; backend refusals shown |
+| 1211 | Drop point change after service departed | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: Customer site → Manage booking: change date (future days only, other buses), seats (free seats only), boarding / drop point, name spelling — closed after boarding time; backend refusals shown |
 | 1212 | Ladies seat wrongly assigned to male passenger | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
 | 1213 | Male passenger tries to force sit on ladies seat | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: checkout: ladies seat + gender validation |
 | 1214 | Child fare applied to adult passenger | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
@@ -1155,7 +1155,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 | 1230 | Coupon usage limit already exhausted | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: checkout coupon: backend message shown, saving vs coupon-less price |
 | 1231 | Insufficient loyalty points for redemption | CONFLICT | — | branch wallet / cash / loyalty / way-side — earlier decision |
 | 1232 | Loyalty points already expired | CONFLICT | — | branch wallet / cash / loyalty / way-side — earlier decision |
-| 1233 | Free cancellation window boundary condition | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 1233 | Free cancellation window boundary condition | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: Customer site → My trips → Manage booking: refund shown before cancelling, cancel some seats or all, closed after boarding time |
 | 1234 | Different cancellation policy for OTA booking | GAP | — | verified manually: not built yet |
 | 1235 | Different cancellation policy for agent booking | GAP | — | verified manually: not built yet |
 | 1236 | Special cancellation rules for group booking | GAP | — | verified manually: not built yet |

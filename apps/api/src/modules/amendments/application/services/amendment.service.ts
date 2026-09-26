@@ -42,6 +42,8 @@ export interface RescheduleInput {
   newFromStopId: StopId;
   newToStopId: StopId;
   newSeatNumbers: string[];
+  /** Only price it: what the change would cost now, nothing moves or is charged. */
+  preview?: boolean;
 }
 
 interface RescheduleMoney {
@@ -62,6 +64,7 @@ export interface RescheduleMetadata extends RescheduleMoney {
 }
 
 export type RescheduleResult =
+  | ({ status: 'quote'; newTotalMinor: number } & RescheduleMoney)
   | ({ status: 'rescheduled'; amendmentId: string } & RescheduleMoney)
   | ({
       status: 'payment_required';
@@ -138,6 +141,10 @@ export class AmendmentService {
         refundMinor: rq.refundDueMinor,
       };
 
+      if (input.preview) {
+        await this.assertSeatsFree(input, target);
+        return { status: 'quote', ...money, newTotalMinor: quote.totalMinor };
+      }
       if (rq.amountDueMinor > 0) {
         await this.assertSeatsFree(input, target);
         const metadata: RescheduleMetadata = {
@@ -161,6 +168,46 @@ export class AmendmentService {
       const amendmentId = await this.moveBooking(input, target, quote.totalMinor, money);
       return { status: 'rescheduled', ...money, amendmentId };
     });
+  }
+
+  /**
+   * Where this booking can move on a given day: the operator's other open buses
+   * through the same boarding and dropping points, with how many seats are free
+   * on that stretch. Only a confirmed booking can move.
+   */
+  async rescheduleOptions(bookingId: BookingId, date: string) {
+    const booking = await this.bookings.customerView(bookingId);
+    if (!booking)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Booking not found' });
+    if (booking.status !== 'confirmed')
+      throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
+        message: 'Only a confirmed booking can move to another date',
+      });
+    const targets = await this.amendments.rescheduleTargets({
+      excludeTripId: booking.tripId,
+      fromStopId: booking.fromStopId,
+      toStopId: booking.toStopId,
+      date,
+    });
+    const trips = await Promise.all(
+      targets.map(async (t) => {
+        const seats = await this.inventory.seatAvailability(t.tripId as TripId, t.fromSeq, t.toSeq);
+        return {
+          tripId: t.tripId,
+          routeName: t.routeName,
+          departsAt: t.departsAt,
+          boardsAt: t.boardsAt,
+          dropsAt: t.dropsAt,
+          freeSeats: seats.filter((s) => s.available).length,
+        };
+      }),
+    );
+    return {
+      fromStopId: booking.fromStopId,
+      toStopId: booking.toStopId,
+      seatsNeeded: booking.passengers.length,
+      trips,
+    };
   }
 
   /**
