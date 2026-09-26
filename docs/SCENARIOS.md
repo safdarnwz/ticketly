@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 572 |
-| DONE | 403 |
+| TODO | 571 |
+| DONE | 404 |
 | DUP | 9 |
 
 
@@ -434,7 +434,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 397 | Process corporate company booking | GAP | — | verified manually: not built yet |
 | 398 | Check current branch wallet balance | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
 | 399 | Raise branch wallet recharge request | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |
-| 400 | Raise formal complaint against agent | DONE | TODO | verified manually: existing module/API |
+| 400 | Raise formal complaint against agent | DONE | DONE | verified manually: existing module/API · UI: Distribution → Travel agents → agent → Complaints (raise with PNR, uphold / dismiss with decision) |
 | 401 | Register passenger complaint in system | DONE | DONE | support tickets: staff raise by PNR / reply / priority / assign / resolve; customers own tickets only; author from account · UI: Support: queue views (active/mine/unassigned/…), search, ticket thread with reply, resolve/reopen/close, priority, assign; raise for a caller by PNR |
 | 402 | Enter lost and found item details | DONE | DONE | POST /lost-found (+claim with PNR check, 30-day disposal) · UI: Operations → Lost & found |
 | 403 | Manage stock of ticket rolls | CONFLICT | — | counter / cash / branch wallet — excluded by the scenario file & earlier decision |

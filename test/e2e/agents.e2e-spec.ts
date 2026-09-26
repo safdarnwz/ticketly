@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { bootstrapTestApp, type TestApp } from './support/bootstrap';
+import { confirmedBooking } from './support/flows';
 
 /**
  * The operator's travel agents: onboarding, terms, money in and out, and the
@@ -12,6 +13,7 @@ describe('agents (e2e)', () => {
   let app: TestApp;
   let other: Record<string, string>;
   let agentId: string;
+  let soldPnr: string | undefined;
   const op = { as: 'operator' as const };
   const run = Date.now().toString(36);
   const phone = `97${String(Date.now()).slice(-8)}`;
@@ -167,6 +169,7 @@ describe('agents (e2e)', () => {
       { ...agent, idempotencyKey: `e2e-agent-sale-${run}` },
     );
     expect(sold.status, JSON.stringify(sold.body)).toBe(201);
+    soldPnr = sold.body.pnr;
     const cancel = await app.post(
       `/agent-portal/bookings/${sold.body.bookingId}/cancel`,
       { reason: 'Passenger changed plans' },
@@ -183,6 +186,71 @@ describe('agents (e2e)', () => {
       expect(refund.status, JSON.stringify(refund.body)).toBe(200);
       expect(refund.body.status).toBe('settled');
     }
+  });
+
+  it('a formal complaint: about its own sale only, decided once', async () => {
+    const raise = (body: Record<string, unknown>, k = key()) =>
+      app.post(`/agents/${agentId}/complaints`, body, k);
+    const what = { category: 'overcharging', description: 'Charged the passenger ₹200 over fare' };
+    expect((await raise({ ...what, description: 'short' })).status).toBe(400);
+    expect((await raise({ ...what, category: 'rude' })).status).toBe(400);
+    expect((await raise({ ...what, pnr: 'NOPE0000' })).status).toBe(404);
+    const direct = await confirmedBooking(app, app.fixtures.seatNumbers[2], {
+      fullName: 'Direct Buyer',
+      age: 33,
+    });
+    expect((await raise({ ...what, pnr: direct.pnr })).status).toBe(422); // not sold by this agent
+    expect(
+      (await app.post('/agents/00000000-0000-4000-8000-000000000000/complaints', what, key()))
+        .status,
+    ).toBe(404);
+    expect(
+      (
+        await app.post(`/agents/${agentId}/complaints`, what, {
+          headers: other,
+          idempotencyKey: `e2e-agent-other-${run}`,
+        })
+      ).status,
+    ).toBe(404);
+
+    const k = key();
+    const body = { ...what, pnr: soldPnr?.toLowerCase() };
+    const made = await raise(body, k);
+    expect(made.status, JSON.stringify(made.body)).toBe(201);
+    expect((await raise(body, k)).body.id).toBe(made.body.id); // retry
+
+    const list = await app.get(`/agents/${agentId}/complaints`, op);
+    expect(list.body.items[0]).toMatchObject({
+      id: made.body.id,
+      status: 'open',
+      pnr: soldPnr ?? null,
+    });
+    expect((await app.get(`/agents/${agentId}/complaints`, { headers: other })).status).toBe(404);
+
+    const decide = (outcome: string, resolution = 'Warned in writing; fare difference refunded') =>
+      app.post(
+        `/agents/${agentId}/complaints/${made.body.id}/decision`,
+        { outcome, resolution },
+        key(),
+      );
+    expect((await decide('upheld', 'ok')).status).toBe(400);
+    expect((await decide('upheld')).status).toBe(200);
+    expect((await decide('upheld')).status).toBe(200); // the same decision again is a retry
+    expect((await decide('dismissed')).status).toBe(422);
+    expect(
+      (
+        await app.post(
+          `/agents/${agentId}/complaints/00000000-0000-4000-8000-000000000000/decision`,
+          { outcome: 'dismissed', resolution: 'Not found' },
+          key(),
+        )
+      ).status,
+    ).toBe(404);
+    const after = await app.get(`/agents/${agentId}/complaints`, op);
+    expect(after.body.items[0]).toMatchObject({
+      status: 'upheld',
+      resolvedByName: expect.any(String),
+    });
   });
 
   it('suspends with a reason and cannot cut credit below what is owed', async () => {

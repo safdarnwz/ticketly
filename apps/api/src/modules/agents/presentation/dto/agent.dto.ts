@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { COMPLAINT_CATEGORIES, COMPLAINT_OUTCOMES } from '../../domain/agent-complaint';
 
 import { OptionalDateRangeQuerySchema, searchText } from '@http';
 
@@ -158,3 +159,17 @@ export const SlabsSchema = z.object({
     .max(10),
 });
 export type SlabsDto = z.infer<typeof SlabsSchema>;
+
+export const RaiseComplaintSchema = z.object({
+  category: z.enum(COMPLAINT_CATEGORIES),
+  description: z.string().trim().min(10, 'Say what happened (at least 10 characters)').max(2000),
+  /** The booking it is about — must be one this agent sold. */
+  pnr: z.string().trim().toUpperCase().min(4).max(20).optional(),
+});
+export type RaiseComplaintDto = z.infer<typeof RaiseComplaintSchema>;
+
+export const DecideComplaintSchema = z.object({
+  outcome: z.enum(COMPLAINT_OUTCOMES),
+  resolution: z.string().trim().min(5, 'Say what was decided').max(2000),
+});
+export type DecideComplaintDto = z.infer<typeof DecideComplaintSchema>;

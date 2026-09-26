@@ -14,10 +14,15 @@ import {
 } from '@http';
 import { type AgentId } from '@kernel';
 
+import { AgentComplaintService } from '../application/services/agent-complaint.service';
 import { AgentService } from '../application/services/agent.service';
 import {
   AdjustmentSchema,
   AgentStatusSchema,
+  DecideComplaintSchema,
+  RaiseComplaintSchema,
+  type DecideComplaintDto,
+  type RaiseComplaintDto,
   CreateAgentSchema,
   ReceiptSchema,
   SlabsSchema,
@@ -40,7 +45,10 @@ import {
 @Controller({ path: 'agents', version: '1' })
 @ApiStandardErrors()
 export class AgentController {
-  constructor(private readonly agents: AgentService) {}
+  constructor(
+    private readonly agents: AgentService,
+    private readonly complaintService: AgentComplaintService,
+  ) {}
 
   @Post()
   @HttpCode(201)
@@ -167,5 +175,39 @@ export class AgentController {
     @Query(zodQuery(DateRangeQuerySchema)) q: DateRangeQuery,
   ) {
     return this.agents.statement(id as AgentId, q.from, q.to);
+  }
+
+  @Get(':id/complaints')
+  @RequirePermission(Permission.AGENT_READ)
+  @ApiOperation({ summary: 'Formal complaints against this agent, newest first' })
+  async complaints(@UuidParam('id') id: string) {
+    return { items: await this.complaintService.list(id as AgentId) };
+  }
+
+  @Post(':id/complaints')
+  @HttpCode(201)
+  @RequirePermission(Permission.AGENT_MANAGE)
+  @Idempotent()
+  @ApiOperation({
+    summary: 'Raise a formal complaint (optionally about a booking the agent sold, by PNR)',
+  })
+  async raiseComplaint(
+    @UuidParam('id') id: string,
+    @Body(zodBody(RaiseComplaintSchema)) dto: RaiseComplaintDto,
+  ) {
+    return this.complaintService.raise(id as AgentId, dto);
+  }
+
+  @Post(':id/complaints/:complaintId/decision')
+  @HttpCode(200)
+  @RequirePermission(Permission.AGENT_MANAGE)
+  @Idempotent()
+  @ApiOperation({ summary: 'Uphold or dismiss a complaint with what was decided (final)' })
+  async decideComplaint(
+    @UuidParam('id') id: string,
+    @UuidParam('complaintId') complaintId: string,
+    @Body(zodBody(DecideComplaintSchema)) dto: DecideComplaintDto,
+  ) {
+    return this.complaintService.decide(id as AgentId, complaintId, dto.outcome, dto.resolution);
   }
 }

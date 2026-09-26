@@ -12,7 +12,9 @@ import { IamModule } from '../iam/iam.module';
 import { PaymentModule } from '../payment/payment.module';
 import { QuotasModule } from '../quotas/quotas.module';
 import { RefundModule } from '../refunds/refund.module';
+import { AgentComplaintRepository } from './infrastructure/persistence/agent-complaint.repository';
 import { AgentRepository } from './infrastructure/persistence/agent.repository';
+import { AgentComplaintService } from './application/services/agent-complaint.service';
 import { AgentRefundService } from './application/services/agent-refund.service';
 import { AgentService } from './application/services/agent.service';
 import { AgentPortalController } from './presentation/agent-portal.controller';
@@ -35,7 +37,13 @@ import { PlatformSettingsModule } from '../platform-settings/platform-settings.m
     EntitlementsModule,
   ],
   controllers: [AgentController, AgentPortalController],
-  providers: [AgentService, AgentRepository, AgentRefundService],
+  providers: [
+    AgentService,
+    AgentRepository,
+    AgentRefundService,
+    AgentComplaintService,
+    AgentComplaintRepository,
+  ],
   exports: [AgentService],
 })
 export class AgentsModule {}

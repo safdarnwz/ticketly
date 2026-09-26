@@ -427,3 +427,7 @@ an unknown id is now 404 (was 200).
   `escalatedAt`; `GET /support/tickets?escalated=1` lists the ones with the platform. Category `technical`
   added. Platform desk (platform admins): `GET /admin/support/escalations[?status]`, `GET …/:id`,
   `POST …/:id/messages {body}` (422 once closed), `POST …/:id/close`. Migration 0098.
+- **Complaints against an agent:** new `GET /agents/:id/complaints`, `POST /agents/:id/complaints
+  {category, description, pnr?}` (idempotent; the PNR must be a booking this agent sold — 404 unknown,
+  422 someone else's) and `POST /agents/:id/complaints/:complaintId/decision {outcome: upheld|dismissed,
+  resolution}` (idempotent; final: the same decision again is a no-op, a different one 422). Migration 0099.
