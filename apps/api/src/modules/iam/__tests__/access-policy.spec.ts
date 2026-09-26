@@ -73,4 +73,18 @@ describe('evaluateAccess', () => {
       }),
     ).toBeNull();
   });
+  it('a sign-in in the same second after the cut-off works; one just before it does not', () => {
+    const cut = new Date('2026-10-05T05:00:00.600Z');
+    const at = (ms: number) =>
+      evaluateAccess({
+        accessExpiresAt: null,
+        tokensValidAfter: cut,
+        tokenIssuedAtSec: Math.floor(ms / 1000),
+        tokenIssuedAtMs: ms,
+        loginWindow: null,
+        now,
+      });
+    expect(at(cut.getTime() + 200)).toBeNull();
+    expect(at(cut.getTime() - 200)).toBe('session_revoked');
+  });
 });

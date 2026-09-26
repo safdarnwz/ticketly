@@ -23,7 +23,15 @@ import {
   zodQuery,
   type DateRangeQuery,
 } from '@http';
-import { daysBetween, localDate, NotFoundError, toCsv, type UserId } from '@kernel';
+import {
+  daysBetween,
+  getContext,
+  getUserId,
+  localDate,
+  NotFoundError,
+  toCsv,
+  type UserId,
+} from '@kernel';
 
 import {
   AssignRolesSchema,
@@ -32,7 +40,11 @@ import {
   ResetStaffPasswordSchema,
   StaffAccessSchema,
   StaffBranchSchema,
+  StaffImportRowSchema,
+  StaffImportSchema,
   StaffListQuerySchema,
+  StaffTargetSchema,
+  StaffWarningSchema,
   UpdateUserSchema,
   type AssignRolesDto,
   type GrantRoleDto,
@@ -40,11 +52,16 @@ import {
   type ResetStaffPasswordDto,
   type StaffAccessDto,
   type StaffBranchDto,
+  type StaffImportDto,
   type StaffListQueryDto,
+  type StaffTargetDto,
+  type StaffWarningDto,
   type UpdateUserDto,
 } from './dto/user.dto';
 import { StaffAccessService } from '../application/services/staff-access.service';
+import { StaffManagementService } from '../application/services/staff-management.service';
 import { UserService } from '../application/services/user.service';
+import { STAFF_IMPORT_COLUMNS } from '../domain/staff-import';
 import { StaffDirectoryRepository } from '../infrastructure/persistence/staff-directory.repository';
 
 const PerformanceRangeSchema = DateRangeQuerySchema.refine(
@@ -59,6 +76,7 @@ const PerformanceRangeSchema = DateRangeQuerySchema.refine(
 export class UserController {
   constructor(
     private readonly users: UserService,
+    private readonly management: StaffManagementService,
     private readonly access: StaffAccessService,
     private readonly staff: StaffDirectoryRepository,
     private readonly config: AppConfig,
@@ -110,13 +128,111 @@ export class UserController {
     return { from, to, items: await this.staff.performance(from, to, this.config.domain.timezone) };
   }
 
+  @Get('import-template.csv')
+  @RequirePermission(Permission.USER_MANAGE)
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header('Content-Disposition', 'attachment; filename="staff-upload-template.csv"')
+  @ApiOperation({ summary: 'The staff upload template (opens in Excel; save as CSV to upload)' })
+  importTemplate() {
+    return toCsv(
+      [...STAFF_IMPORT_COLUMNS],
+      [
+        {
+          full_name: 'Asha Verma',
+          email: 'asha@example.com',
+          mobile: '9876543210',
+          role: 'Agent',
+          branch: '',
+        },
+      ],
+    );
+  }
+
+  @Post('bulk-import')
+  @RequirePermission(Permission.USER_MANAGE)
+  @ApiOperation({
+    summary:
+      'Add many staff at once; each row stands alone. Starting passwords are returned once — share them privately',
+  })
+  bulkImport(@Body(zodBody(StaffImportSchema)) dto: StaffImportDto) {
+    return this.management.bulkInvite(
+      dto.rows.map((raw) => {
+        const r = StaffImportRowSchema.safeParse(raw);
+        if (!r.success) return { error: r.error.issues.map((i) => i.message).join('; ') };
+        return {
+          fullName: r.data.full_name,
+          email: r.data.email,
+          phone: r.data.mobile,
+          role: r.data.role,
+          branch: r.data.branch,
+        };
+      }),
+    );
+  }
+
+  @Get('me')
+  @ApiOperation({ summary: 'My own staff record: roles, what I did, warnings and my daily target' })
+  async me() {
+    const id = getUserId();
+    const person = getContext()?.tenantId && id ? await this.staff.find(id) : null;
+    if (!person || !id) throw new NotFoundError('Staff member', 'me');
+    return this.withRecords(person, id);
+  }
+
+  @Post('me/warnings/:warningId/acknowledge')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Confirm I have read a warning' })
+  async acknowledge(@UuidParam('warningId') warningId: string) {
+    if (!getContext()?.tenantId) throw new NotFoundError('Warning', warningId);
+    await this.management.acknowledge(warningId);
+    return { ok: true };
+  }
+
   @Get(':id')
   @RequirePermission(Permission.USER_READ)
-  @ApiOperation({ summary: 'A staff member: roles, branch, access, and what they did recently' })
+  @ApiOperation({
+    summary: 'A staff member: roles, branch, access, what they did, warnings and target',
+  })
   async detail(@UuidParam('id') id: string) {
     const person = await this.staff.find(id);
     if (!person) throw new NotFoundError('User', id);
-    return { ...person, activity: await this.staff.activity(id, 50) };
+    return this.withRecords(person, id);
+  }
+
+  private async withRecords<T extends object>(person: T, id: string) {
+    const [activity, warnings, target] = await Promise.all([
+      this.staff.activity(id, 50),
+      this.staff.warnings(id),
+      this.staff.target(id),
+    ]);
+    return { ...person, activity, warnings, target };
+  }
+
+  @Put(':id/target')
+  @RequirePermission(Permission.USER_MANAGE)
+  @ApiOperation({ summary: 'Set a daily counter-sales target (bookings, optionally revenue)' })
+  async setTarget(
+    @UuidParam('id') id: string,
+    @Body(zodBody(StaffTargetSchema)) dto: StaffTargetDto,
+  ) {
+    await this.management.setTarget(id, dto);
+    return { ok: true };
+  }
+
+  @Delete(':id/target')
+  @RequirePermission(Permission.USER_MANAGE)
+  @ApiOperation({ summary: 'Remove the daily target' })
+  async clearTarget(@UuidParam('id') id: string) {
+    await this.management.setTarget(id, null);
+    return { ok: true };
+  }
+
+  @Post(':id/warnings')
+  @HttpCode(201)
+  @RequirePermission(Permission.USER_MANAGE)
+  @ApiOperation({ summary: 'Issue a written warning; the staff member sees it on their account' })
+  warn(@UuidParam('id') id: string, @Body(zodBody(StaffWarningSchema)) dto: StaffWarningDto) {
+    return this.management.warn(id, dto.reason, dto.note);
   }
 
   @Put(':id/branch')

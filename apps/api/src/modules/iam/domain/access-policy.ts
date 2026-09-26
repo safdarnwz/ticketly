@@ -60,6 +60,8 @@ export function evaluateAccess(input: {
   accessExpiresAt: Date | null;
   tokensValidAfter: Date | null;
   tokenIssuedAtSec: number | undefined;
+  /** Millisecond issue time when the token carries one (tokens minted before it only have seconds). */
+  tokenIssuedAtMs?: number;
   loginWindow: LoginWindow | null;
   now?: Date;
 }): AccessDenial | null {
@@ -67,8 +69,8 @@ export function evaluateAccess(input: {
   if (input.accessExpiresAt && input.accessExpiresAt <= now) return 'expired';
   if (
     input.tokensValidAfter &&
-    input.tokenIssuedAtSec !== undefined &&
-    input.tokenIssuedAtSec * 1000 < input.tokensValidAfter.getTime()
+    (input.tokenIssuedAtMs ?? (input.tokenIssuedAtSec ?? Infinity) * 1000) <
+      input.tokensValidAfter.getTime()
   )
     return 'session_revoked';
   if (!isWithinWindow(input.loginWindow, now)) return 'outside_login_window';

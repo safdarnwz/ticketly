@@ -64,3 +64,39 @@ export type StaffListQueryDto = z.infer<typeof StaffListQuerySchema>;
 /** `branchId: null` takes the staff member off any branch. */
 export const StaffBranchSchema = z.object({ branchId: z.string().uuid().nullable() });
 export type StaffBranchDto = z.infer<typeof StaffBranchSchema>;
+
+/** One uploaded staff row (template columns); checked row by row so one bad row stops nothing. */
+export const StaffImportRowSchema = z.object({
+  full_name: z.string().trim().min(2, 'Name: at least 2 characters').max(120),
+  email: z.string().trim().toLowerCase().email('Email is not valid').max(320),
+  mobile: mobile.optional(),
+  role: z.string().trim().min(1, 'Role is missing').max(80),
+  branch: z
+    .string()
+    .trim()
+    .max(120)
+    .optional()
+    .transform((v) => v || undefined),
+});
+export const StaffImportSchema = z.object({
+  rows: z.array(z.record(z.string(), z.unknown())).min(1, 'The file has no rows').max(200),
+});
+export type StaffImportDto = z.infer<typeof StaffImportSchema>;
+
+export const StaffTargetSchema = z.object({
+  dailyBookings: z.number().int().min(1).max(1000),
+  dailyRevenueMinor: z.number().int().min(100).max(1_000_000_000).nullable().default(null),
+});
+export type StaffTargetDto = z.infer<typeof StaffTargetSchema>;
+
+export const StaffWarningSchema = z.object({
+  reason: z.enum(['low_sales', 'high_cancellations', 'conduct', 'attendance', 'other']),
+  note: z.string().trim().min(10, 'Say what happened, in at least 10 characters').max(1000),
+});
+export type StaffWarningDto = z.infer<typeof StaffWarningSchema>;
+
+export const ChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(256),
+  newPassword: z.string().min(8).max(256),
+});
+export type ChangePasswordDto = z.infer<typeof ChangePasswordSchema>;

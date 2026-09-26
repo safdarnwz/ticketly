@@ -111,6 +111,7 @@ export class AuthGuard implements CanActivate {
       accessExpiresAt: resolved.accessExpiresAt ? new Date(resolved.accessExpiresAt) : null,
       tokensValidAfter: resolved.tokensValidAfter ? new Date(resolved.tokensValidAfter) : null,
       tokenIssuedAtSec: (claims as { iat?: number }).iat,
+      tokenIssuedAtMs: (claims as { iatMs?: number }).iatMs,
       loginWindow: resolved.loginWindow,
     });
     if (denied === 'expired')

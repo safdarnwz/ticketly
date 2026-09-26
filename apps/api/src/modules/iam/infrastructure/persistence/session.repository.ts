@@ -96,6 +96,16 @@ export class SessionRepository {
     );
   }
 
+  /** Every session of the user except the one in use (null = all of them). */
+  async revokeOthers(userId: UserId, keep: string | null, reason: string): Promise<number> {
+    return this.db.execute_(
+      `UPDATE sessions SET revoked_at = now(), revoked_reason = $3
+        WHERE user_id = $1 AND revoked_at IS NULL AND ($2::uuid IS NULL OR id <> $2)`,
+      [userId, keep, reason],
+      { name: 'session.revokeOthers', primary: true },
+    );
+  }
+
   /** Distinct IPs of the user's most recent sessions (for new-IP login alerts). */
   async recentIps(userId: UserId, tenantId: TenantId | null, limit = 20): Promise<string[]> {
     const rows = await this.db.query<{ ip: string }>(

@@ -318,3 +318,14 @@ an unknown id is now 404 (was 200).
   manager cannot be limited. New `PUT /users/:id/password { password }` (USER_MANAGE): an admin sets a new
   password for a staff member, lifts a failed-login lock and signs them out everywhere; not for yourself.
   Directory rows carry `loginWindow`.
+- **Staff upload, targets, warnings, own account:** `GET /users/import-template.csv` and
+  `POST /users/bulk-import { rows }` (≤200 rows, columns full_name, email, mobile, role, branch) — each row
+  stands alone with its own error (bad fields, same email/mobile as an earlier row, unknown role or
+  branch, already used); starting passwords come back once in `created`. `PUT|DELETE /users/:id/target
+  { dailyBookings, dailyRevenueMinor? }`; `GET /users/performance` rows carry `targetBookings` /
+  `targetRevenueMinor` for the period. `POST /users/:id/warnings { reason, note }` (not yourself, active
+  staff only, the same warning twice within 10 minutes is a 409). `GET /users/me` — my roles, activity,
+  warnings and target; `POST /users/me/warnings/:id/acknowledge`. `GET /users/:id` adds `warnings` and
+  `target`. New `POST /auth/password { currentPassword, newPassword }` changes your own password (it did
+  not exist); other sessions end, this one stays. Access tokens carry `iatMs`: signing in within the same
+  second as a forced sign-out was refused. Migration 0095.

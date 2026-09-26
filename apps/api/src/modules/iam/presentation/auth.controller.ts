@@ -10,7 +10,7 @@ import {
   zodBody,
   type AuthPrincipal,
 } from '@http';
-import { getContext } from '@kernel';
+import { ErrorCode, getContext, UnauthenticatedError } from '@kernel';
 
 import {
   CheckIdentitySchema,
@@ -30,6 +30,7 @@ import {
   VerifyRegistrationSchema,
   type VerifyRegistrationDto,
 } from './dto/auth.dto';
+import { ChangePasswordSchema, type ChangePasswordDto } from './dto/user.dto';
 import { AuthService } from '../application/services/auth.service';
 
 /**
@@ -169,6 +170,26 @@ export class AuthController {
   @ApiOperation({ summary: 'Revoke every session for the current user' })
   async logoutAll(@CurrentUser() user: AuthPrincipal): Promise<void> {
     if (user.userId) await this.auth.logoutAll(user.userId);
+  }
+
+  @Post('password')
+  @HttpCode(204)
+  @RateLimit(10, 15 * 60_000, 'ip')
+  @ApiOperation({
+    summary: 'Change my own password — the current one is required; my other sessions end',
+  })
+  async changePassword(
+    @CurrentUser() user: AuthPrincipal,
+    @Body(zodBody(ChangePasswordSchema)) dto: ChangePasswordDto,
+  ): Promise<void> {
+    if (!user.userId) throw new UnauthenticatedError(ErrorCode.AUTH_SESSION_REVOKED);
+    const sessionId = getContext()?.extra?.sessionId;
+    await this.auth.changePassword({
+      userId: user.userId,
+      currentPassword: dto.currentPassword,
+      newPassword: dto.newPassword,
+      sessionId: typeof sessionId === 'string' ? sessionId : null,
+    });
   }
 
   @Get('me')

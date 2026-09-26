@@ -3,6 +3,7 @@ import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { APP_GUARD } from '@nestjs/core';
 import { MaintenanceGuard } from './presentation/guards/maintenance.guard';
 import { StaffAccessService } from './application/services/staff-access.service';
+import { StaffManagementService } from './application/services/staff-management.service';
 import { StaffDirectoryRepository } from './infrastructure/persistence/staff-directory.repository';
 import { StaffAccessRepository } from './infrastructure/persistence/staff-access.repository';
 import { RoleTemplateAdminController } from './presentation/role-template-admin.controller';
@@ -77,6 +78,7 @@ import { OtpDeliveryRouter } from './infrastructure/otp/otp-delivery.router';
   ],
   providers: [
     StaffDirectoryRepository,
+    StaffManagementService,
     StaffAccessRepository,
     StaffAccessService,
     RoleTemplateRepository,

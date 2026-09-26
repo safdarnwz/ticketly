@@ -6,6 +6,7 @@ import {
   AppError,
   createContext,
   ErrorCode,
+  getTenantId,
   newId,
   runWithContext,
   UnauthenticatedError,
@@ -588,6 +589,41 @@ export class AuthService {
         return tokens;
       },
     );
+  }
+
+  /**
+   * A signed-in user changes their own password (478). The current password
+   * must be right; every other session ends, this one stays signed in.
+   */
+  async changePassword(input: {
+    userId: UserId;
+    currentPassword: string;
+    newPassword: string;
+    sessionId: string | null;
+  }): Promise<void> {
+    if (input.currentPassword === input.newPassword)
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+        message: 'The new password must be different from the current one',
+      });
+    await this.policies.assertPasswordAcceptable(input.newPassword);
+    const hash = await this.hasher.hash(input.newPassword);
+    await this.uow.run(
+      { name: 'auth.changePassword', tenantId: getTenantId() ?? null },
+      async () => {
+        const user = await this.users.findById(input.userId);
+        if (!user) throw new UnauthenticatedError(ErrorCode.AUTH_SESSION_REVOKED);
+        if (
+          !user.passwordHash ||
+          !(await this.hasher.verify(input.currentPassword, user.passwordHash))
+        )
+          throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+            message: 'Your current password is not right',
+          });
+        user.setPassword(hash);
+        await this.users.update(user, user.version);
+      },
+    );
+    await this.sessions.revokeOthers(input.userId, input.sessionId, 'password-changed');
   }
 
   async logout(refreshToken: string): Promise<void> {

@@ -40,6 +40,8 @@ export interface AccessTokenClaims {
   iss: string;
   aud: string;
   iat: number;
+  /** Issue time in milliseconds — `iat` is whole seconds, too coarse for a sign-out cut-off. */
+  iatMs?: number;
   exp: number;
   jti: string;
 }
@@ -60,7 +62,7 @@ export interface RefreshTokenClaims {
 export class TokenService {
   constructor(private readonly config: AppConfig) {}
 
-  signAccess(claims: Omit<AccessTokenClaims, 'iss' | 'aud' | 'iat' | 'exp' | 'typ'>): {
+  signAccess(claims: Omit<AccessTokenClaims, 'iss' | 'aud' | 'iat' | 'iatMs' | 'exp' | 'typ'>): {
     token: string;
     expiresAt: Date;
   } {
@@ -100,13 +102,15 @@ export class TokenService {
     payload: Record<string, unknown>,
     ttlSeconds: number,
   ): { token: string; expiresAt: Date } {
-    const now = Math.floor(Date.now() / 1000);
+    const nowMs = Date.now();
+    const now = Math.floor(nowMs / 1000);
     const exp = now + ttlSeconds;
     const fullPayload = {
       ...payload,
       iss: this.config.security.issuer,
       aud: this.config.security.audience,
       iat: now,
+      iatMs: nowMs,
       exp,
     };
     const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));

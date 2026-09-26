@@ -283,6 +283,152 @@ describe('staff (e2e)', () => {
     expect((await signIn('Fresh-pass-456')).status).toBe(200);
   });
 
+  it('upload, targets, warnings and my own account', async () => {
+    const tpl = await app.nest.inject({
+      method: 'GET',
+      url: '/api/v1/users/import-template.csv',
+      headers: {
+        authorization: `Bearer ${app.fixtures.operatorToken}`,
+        'x-tenant-slug': app.fixtures.tenantSlug,
+      },
+    });
+    expect(tpl.statusCode).toBe(200);
+    expect(tpl.body.split('\n')[0]).toBe('full_name,email,mobile,role,branch');
+
+    expect((await app.post('/users/bulk-import', { rows: [] }, op)).status).toBe(400);
+    const up = `98${String(Date.now() + 7).slice(-8)}`;
+    const rows = [
+      {
+        full_name: 'Bulk One',
+        email: `bulk1.${run}@demo-travels.example`,
+        mobile: up,
+        role: 'Travel Agent',
+      },
+      { full_name: 'Bulk Dup', email: `BULK1.${run}@demo-travels.example`, role: 'agent' },
+      { full_name: 'x', email: 'not-an-email', role: 'agent' },
+      { full_name: 'Bulk Role', email: `bulk3.${run}@demo-travels.example`, role: 'Astronaut' },
+      {
+        full_name: 'Bulk Branch',
+        email: `bulk4.${run}@demo-travels.example`,
+        role: 'agent',
+        branch: 'Nowhere Branch',
+      },
+      {
+        full_name: 'Bulk Phone',
+        email: `bulk5.${run}@demo-travels.example`,
+        mobile: up,
+        role: 'agent',
+      },
+      { full_name: 'Already Here', email: `clerk.${run}@demo-travels.example`, role: 'agent' },
+    ];
+    const res = await app.post('/users/bulk-import', { rows }, op);
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+    expect(res.body.imported).toBe(1);
+    expect(res.body.created[0]).toMatchObject({
+      row: 1,
+      email: `bulk1.${run}@demo-travels.example`,
+    });
+    expect(res.body.created[0].password.length).toBeGreaterThanOrEqual(12);
+    const errs = Object.fromEntries(
+      res.body.failed.map((f: { row: number; error: string }) => [f.row, f.error]),
+    );
+    expect(errs[2]).toMatch(/earlier row/);
+    expect(errs[3]).toMatch(/Name|Email/);
+    expect(errs[4]).toMatch(/No role called/);
+    expect(errs[5]).toMatch(/No active branch/);
+    expect(errs[6]).toMatch(/earlier row/);
+    expect(errs[7]).toMatch(/already/);
+    // Uploading the same file again adds nobody twice.
+    expect((await app.post('/users/bulk-import', { rows }, op)).body.imported).toBe(0);
+
+    expect((await app.put(`/users/${hired}/target`, { dailyBookings: 0 }, op)).status).toBe(400);
+    expect(
+      (await app.put(`/users/${hired}/target`, { dailyBookings: 5, dailyRevenueMinor: 500000 }, op))
+        .status,
+    ).toBe(200);
+    const day = new Date(Date.now() + 5.5 * 3_600_000).toISOString().slice(0, 10);
+    const perf = await app.get(`/users/performance?from=${day}&to=${day}`, op);
+    expect(perf.body.items.find((r: { userId: string }) => r.userId === hired)).toMatchObject({
+      targetBookings: 5,
+      targetRevenueMinor: 500000,
+    });
+
+    const warn = (body: object) =>
+      app.post(
+        `/users/${hired}/warnings`,
+        { reason: 'low_sales', note: `Below target ${run}`, ...body },
+        op,
+      );
+    expect((await warn({ note: 'short' })).status).toBe(400);
+    expect(
+      (
+        await app.post(
+          `/users/${me}/warnings`,
+          { reason: 'conduct', note: 'Warning myself here' },
+          op,
+        )
+      ).status,
+    ).toBe(422);
+    const w = await warn({});
+    expect(w.status, JSON.stringify(w.body)).toBe(201);
+    expect((await warn({})).status).toBe(409); // double click
+    expect(
+      (
+        await app.post(
+          `/users/${hired}/warnings`,
+          { reason: 'conduct', note: 'Other operator try' },
+          { headers: otherOperator },
+        )
+      ).status,
+    ).toBe(404);
+
+    // The warned person sees it on their own account and acknowledges it.
+    const signIn = await app.post(
+      '/auth/login',
+      { identifier: `clerk.${run}@demo-travels.example`, password: 'Fresh-pass-456' },
+      { headers: { 'x-tenant-slug': app.fixtures.tenantSlug, 'x-debug-surface': 'tenantAdmin' } },
+    );
+    expect(signIn.status, JSON.stringify(signIn.body)).toBe(200);
+    const theirs = {
+      headers: {
+        authorization: `Bearer ${signIn.body.accessToken}`,
+        'x-tenant-slug': app.fixtures.tenantSlug,
+      },
+    };
+    const mine = await app.get('/users/me', theirs);
+    expect(mine.status, JSON.stringify(mine.body)).toBe(200);
+    expect(mine.body.warnings[0]).toMatchObject({ id: w.body.id, acknowledgedAt: null });
+    expect(mine.body.target).toMatchObject({ dailyBookings: 5 });
+    expect((await app.post(`/users/me/warnings/${w.body.id}/acknowledge`, {}, op)).status).toBe(
+      404,
+    ); // not the admin's
+    expect((await app.post(`/users/me/warnings/${w.body.id}/acknowledge`, {}, theirs)).status).toBe(
+      200,
+    );
+    expect((await app.post(`/users/me/warnings/${w.body.id}/acknowledge`, {}, theirs)).status).toBe(
+      200,
+    );
+    expect((await app.get('/users/me', theirs)).body.warnings[0].acknowledgedAt).toBeTruthy();
+    expect((await app.get(`/users/${hired}`, theirs)).status).toBe(403); // no staff directory for them
+
+    // Changing my own password.
+    const change = (body: object) => app.post('/auth/password', body, theirs);
+    expect(
+      (await change({ currentPassword: 'wrong-one-1', newPassword: 'Newer-pass-789' })).status,
+    ).toBe(422);
+    expect(
+      (await change({ currentPassword: 'Fresh-pass-456', newPassword: 'Fresh-pass-456' })).status,
+    ).toBe(422);
+    expect(
+      (await change({ currentPassword: 'Fresh-pass-456', newPassword: 'Newer-pass-789' })).status,
+    ).toBe(204);
+    expect((await app.get('/users/me', theirs)).status).toBe(200); // this session stays
+    expect(
+      (await app.post('/auth/refresh', { refreshToken: signIn.body.refreshToken })).status,
+    ).toBe(200);
+    expect((await app.del(`/users/${hired}/target`, op)).status).toBe(200);
+  });
+
   it('a counter sale belongs to the seller, not the customer list', async () => {
     const day = new Date(Date.now() + 5.5 * 3_600_000).toISOString().slice(0, 10);
     const f = app.fixtures;
