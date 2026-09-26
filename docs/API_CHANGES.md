@@ -297,3 +297,14 @@ an unknown id is now 404 (was 200).
   `POST /notifications/templates` only for known events, with the placeholders each event fills in (a
   typo went out as a blank), closed braces, an email subject, and SMS up to 480 characters;
   `GET /notifications/templates` also returns `catalogue` (event → label, placeholders).
+- **Staff:** `GET /users?q&status&roleId&branchId&cursor` lists the operator's staff with roles, branch and
+  last login; `GET /users/export.csv` exports it (formula-safe). `GET /users/:id` adds recent activity from
+  the audit log. `PUT /users/:id/branch { branchId|null }` — an active branch of this operator only.
+  `DELETE /users/:id/roles/:roleId` removes a role and signs the person out; a staff member keeps at least
+  one role (422). Nobody can disable themselves, and the last active person who can manage users can be
+  neither disabled nor stripped of that role (422). Invite: mobile normalised to 10 digits, email
+  lower-cased, name trimmed; a used email or mobile is a 409 with a readable message.
+  `GET /users/performance?from&to` (REPORT_READ, ≤366 days) — bookings, seats, sales and cancellations per
+  staff member. Bookings made at the counter now record the seller in `bookings.booked_by` instead of
+  `customer_id` (staff sales no longer show up as the staff member's own trips); migration 0094 moves
+  existing rows.

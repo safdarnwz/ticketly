@@ -1,10 +1,15 @@
 import { Injectable } from '@nestjs/common';
 
-import { DatabaseService, UnitOfWork } from '@database';
+import { DatabaseService, registerConstraintMessages, UnitOfWork } from '@database';
 import { requireTenantId, type TenantId, type UserId } from '@kernel';
 import { FieldEncryptor } from '@security';
 
 import { User, type UserKind, type UserProps, type UserStatus } from '../../domain/user.entity';
+
+registerConstraintMessages({
+  users_tenant_email_idx: 'Someone already uses this email',
+  users_tenant_phone_idx: 'Someone already uses this mobile number',
+});
 
 interface UserRow {
   id: UserId;

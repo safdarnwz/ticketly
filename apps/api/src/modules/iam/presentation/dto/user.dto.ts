@@ -1,17 +1,23 @@
 import { z } from 'zod';
 
+const mobile = z
+  .string()
+  .transform((v) => v.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, ''))
+  .refine((v) => v === '' || /^[6-9]\d{9}$/.test(v), { message: 'Enter a 10-digit mobile number' })
+  .transform((v) => v || undefined);
+
 export const InviteUserSchema = z.object({
-  fullName: z.string().min(1).max(120),
-  email: z.string().email().max(320),
-  phone: z.string().max(20).optional(),
+  fullName: z.string().trim().min(2, 'At least 2 characters').max(120),
+  email: z.string().trim().toLowerCase().email().max(320),
+  phone: mobile.optional(),
   password: z.string().min(8).max(256),
   roles: z.array(z.string().min(1)).min(1),
 });
 export type InviteUserDto = z.infer<typeof InviteUserSchema>;
 
 export const UpdateUserSchema = z.object({
-  fullName: z.string().min(1).max(120).optional(),
-  phone: z.string().max(20).optional(),
+  fullName: z.string().trim().min(2, 'At least 2 characters').max(120).optional(),
+  phone: mobile.optional(),
   status: z.enum(['active', 'disabled']).optional(),
 });
 export type UpdateUserDto = z.infer<typeof UpdateUserSchema>;
@@ -40,3 +46,17 @@ export const GrantRoleSchema = z.object({
   expiresAt: z.string().datetime({ offset: true }).nullable().default(null),
 });
 export type GrantRoleDto = z.infer<typeof GrantRoleSchema>;
+
+export const StaffListQuerySchema = z.object({
+  q: z.string().trim().max(120).optional(),
+  status: z.enum(['active', 'disabled']).optional(),
+  branchId: z.string().uuid().optional(),
+  roleId: z.string().uuid().optional(),
+  page: z.coerce.number().int().min(1).max(1000).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+export type StaffListQueryDto = z.infer<typeof StaffListQuerySchema>;
+
+/** `branchId: null` takes the staff member off any branch. */
+export const StaffBranchSchema = z.object({ branchId: z.string().uuid().nullable() });
+export type StaffBranchDto = z.infer<typeof StaffBranchSchema>;

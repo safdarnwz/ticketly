@@ -6,6 +6,7 @@ import { isUniqueViolation, UnitOfWork } from '@database';
 import {
   AppError,
   ErrorCode,
+  getContext,
   getUserId,
   hasPermission,
   requireTenantId,
@@ -232,7 +233,10 @@ export class BookingService {
     }
     // ONE instant: stored and returned identically.
     const holdExpiresAt = opts.holdUntil ?? new Date(Date.now() + holdTtl * 1000);
-    const userId = getUserId() ?? null;
+    // Operator staff selling at the counter are the seller, never the customer.
+    const staffSale = Boolean(getContext()?.tenantId) && hasPermission(Permission.BOOKING_READ);
+    const userId = staffSale ? null : (getUserId() ?? null);
+    const bookedBy = staffSale ? (getUserId() ?? null) : null;
 
     return this.uow.run(
       { name: 'booking.hold', tenantId: requireTenantId(), isolation: 'read committed' },
@@ -282,6 +286,7 @@ export class BookingService {
             toStopId: quote.toStopId,
             channel: req.channel ?? 'direct_web',
             customerId: userId,
+            bookedBy,
             contactEmail: req.contactEmail,
             contactPhone: req.contactPhone,
             currency: quote.currency,

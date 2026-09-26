@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
 import {
+  AppError,
   ConflictError,
+  ErrorCode,
   NotFoundError,
   getUserId,
   newId,
@@ -17,6 +19,7 @@ import { User } from '../../domain/user.entity';
 import { RoleRepository } from '../../infrastructure/persistence/role.repository';
 import { SessionRepository } from '../../infrastructure/persistence/session.repository';
 import { UserRepository } from '../../infrastructure/persistence/user.repository';
+import { StaffDirectoryRepository } from '../../infrastructure/persistence/staff-directory.repository';
 import { PlanQuotaService, QUOTA_KEYS } from '../../../entitlements';
 import { PlatformPoliciesService } from '../../../platform-settings';
 
@@ -38,7 +41,20 @@ export class UserService {
     private readonly audit: AuditService,
     private readonly policies: PlatformPoliciesService,
     private readonly planQuotas: PlanQuotaService,
+    private readonly staff: StaffDirectoryRepository,
   ) {}
+
+  /** Nobody may take away the operator's last way to manage its staff. */
+  private async assertNotLastManager(userId: string, withoutRoleId?: string): Promise<void> {
+    const managesNow = await this.staff.canManageUsers(userId);
+    const managesAfter = withoutRoleId
+      ? await this.staff.canManageUsers(userId, withoutRoleId)
+      : false;
+    if (managesNow && !managesAfter && (await this.staff.activeUserManagers(userId)) === 0)
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+        message: 'This is the last person who can manage staff — give someone else that role first',
+      });
+  }
 
   async invite(input: {
     fullName: string;
@@ -102,6 +118,11 @@ export class UserService {
           phone: patch.phone ?? user.snapshot().phone,
         });
       if (patch.status === 'disabled') {
+        if (userId === getUserId())
+          throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+            message: 'You cannot disable your own account',
+          });
+        await this.assertNotLastManager(userId);
         user.disable();
         await this.sessions.revokeAllForUser(userId, 'user-disabled');
       }
@@ -138,6 +159,46 @@ export class UserService {
         resourceType: 'user',
         resourceId: userId,
         changes: { roles: roleCodes },
+      });
+    });
+  }
+
+  /** Take one role away; a staff member keeps at least one, and the last user manager keeps theirs. */
+  async revokeRole(userId: UserId, roleId: string): Promise<void> {
+    await this.uow.run({ name: 'user.revokeRole', tenantId: requireTenantId() }, async () => {
+      const person = await this.staff.find(userId);
+      if (!person) throw new NotFoundError('User', userId);
+      if (!person.roles.some((r) => r.id === roleId)) throw new NotFoundError('Role', roleId);
+      if (person.roles.length === 1)
+        throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+          message: 'A staff member needs at least one role — give another first, or disable them',
+        });
+      await this.assertNotLastManager(userId, roleId);
+      await this.roles.revokeFromUser(userId, roleId as never);
+      await this.sessions.revokeAllForUser(userId, 'roles-changed');
+      await this.audit.recordInTx({
+        action: 'user.role_revoked',
+        resourceType: 'user',
+        resourceId: userId,
+        changes: { roleId },
+      });
+    });
+  }
+
+  /** Move a staff member to a branch (an active one of this operator), or off every branch. */
+  async setBranch(userId: UserId, branchId: string | null): Promise<void> {
+    await this.uow.run({ name: 'user.setBranch', tenantId: requireTenantId() }, async () => {
+      const person = await this.staff.find(userId);
+      if (!person) throw new NotFoundError('User', userId);
+      if (branchId && !(await this.staff.activeBranch(branchId)))
+        throw new NotFoundError('Branch', branchId);
+      if (person.branchId === branchId) return;
+      await this.staff.setBranch(userId, branchId);
+      await this.audit.recordInTx({
+        action: 'user.branch_changed',
+        resourceType: 'user',
+        resourceId: userId,
+        changes: { from: person.branchId, to: branchId },
       });
     });
   }

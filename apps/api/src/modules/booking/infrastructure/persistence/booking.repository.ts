@@ -107,6 +107,8 @@ export class BookingRepository {
     toStopId: StopId;
     channel: string;
     customerId: UserId | null;
+    /** Staff member who sold it at the counter. */
+    bookedBy?: string | null;
     contactEmail?: string;
     contactPhone?: string;
     currency: string;
@@ -139,8 +141,8 @@ export class BookingRepository {
          (id, tenant_id, pnr, trip_id, route_id, from_seq, to_seq, from_stop_id, to_stop_id,
           channel, status, customer_id, contact_email, contact_phone, seat_count, currency,
           base_minor, discount_minor, tax_minor, total_minor, coupon_code, quote_id,
-          fare_breakup, hold_expires_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'held',$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
+          fare_breakup, hold_expires_at, booked_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'held',$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
       [
         id,
         tenantId,
@@ -165,6 +167,7 @@ export class BookingRepository {
         input.quoteId,
         JSON.stringify(input.fareBreakup),
         input.holdExpiresAt,
+        input.bookedBy ?? null,
       ],
     );
 

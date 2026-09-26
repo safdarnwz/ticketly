@@ -1,24 +1,54 @@
-import { Body, Controller, Patch, Post, Put, HttpCode } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Header,
+  Patch,
+  Post,
+  Put,
+  HttpCode,
+  Query,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
-import { ApiStandardErrors, RequirePermission, UuidParam, zodBody } from '@http';
-import { type UserId } from '@kernel';
+import { AppConfig } from '@config';
+import {
+  ApiStandardErrors,
+  DateRangeQuerySchema,
+  RequirePermission,
+  UuidParam,
+  zodBody,
+  zodQuery,
+  type DateRangeQuery,
+} from '@http';
+import { daysBetween, localDate, NotFoundError, toCsv, type UserId } from '@kernel';
 
 import {
   AssignRolesSchema,
   GrantRoleSchema,
   InviteUserSchema,
   StaffAccessSchema,
+  StaffBranchSchema,
+  StaffListQuerySchema,
   UpdateUserSchema,
   type AssignRolesDto,
   type GrantRoleDto,
   type InviteUserDto,
   type StaffAccessDto,
+  type StaffBranchDto,
+  type StaffListQueryDto,
   type UpdateUserDto,
 } from './dto/user.dto';
 import { StaffAccessService } from '../application/services/staff-access.service';
 import { UserService } from '../application/services/user.service';
+import { StaffDirectoryRepository } from '../infrastructure/persistence/staff-directory.repository';
+
+const PerformanceRangeSchema = DateRangeQuerySchema.refine(
+  (v) => daysBetween(localDate(v.from), localDate(v.to)) <= 366,
+  { message: 'Pick at most a year', path: ['to'] },
+);
 
 @ApiTags('users')
 @ApiBearerAuth('bearer')
@@ -28,7 +58,85 @@ export class UserController {
   constructor(
     private readonly users: UserService,
     private readonly access: StaffAccessService,
+    private readonly staff: StaffDirectoryRepository,
+    private readonly config: AppConfig,
   ) {}
+
+  @Get()
+  @RequirePermission(Permission.USER_READ)
+  @ApiOperation({
+    summary: 'Staff directory — search by name or exact email/mobile, by status, branch or role',
+  })
+  async list(@Query(zodQuery(StaffListQuerySchema)) q: StaffListQueryDto) {
+    const rows = await this.staff.list({
+      ...q,
+      offset: (q.page - 1) * q.limit,
+      limit: q.limit + 1,
+    });
+    return { items: rows.slice(0, q.limit), page: q.page, hasMore: rows.length > q.limit };
+  }
+
+  @Get('export.csv')
+  @RequirePermission(Permission.USER_READ)
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header('Content-Disposition', 'attachment; filename="staff.csv"')
+  @ApiOperation({ summary: 'The whole staff directory as CSV' })
+  async exportCsv() {
+    const rows = await this.staff.list({ offset: 0, limit: 5000 });
+    return toCsv(
+      ['name', 'email', 'mobile', 'status', 'branch', 'roles', 'last_login', 'access_until'],
+      rows.map((r) => ({
+        name: r.fullName,
+        email: r.email,
+        mobile: r.phone,
+        status: r.status,
+        branch: r.branchName,
+        roles: r.roles.map((x) => x.name).join('; '),
+        last_login: r.lastLoginAt,
+        access_until: r.accessExpiresAt,
+      })),
+    );
+  }
+
+  @Get('performance')
+  @RequirePermission(Permission.REPORT_READ)
+  @ApiOperation({
+    summary:
+      'Counter sales per staff member over a period: bookings, seats, revenue, cancellation rate',
+  })
+  async performance(@Query(zodQuery(PerformanceRangeSchema)) { from, to }: DateRangeQuery) {
+    return { from, to, items: await this.staff.performance(from, to, this.config.domain.timezone) };
+  }
+
+  @Get(':id')
+  @RequirePermission(Permission.USER_READ)
+  @ApiOperation({ summary: 'A staff member: roles, branch, access, and what they did recently' })
+  async detail(@UuidParam('id') id: string) {
+    const person = await this.staff.find(id);
+    if (!person) throw new NotFoundError('User', id);
+    return { ...person, activity: await this.staff.activity(id, 50) };
+  }
+
+  @Put(':id/branch')
+  @RequirePermission(Permission.USER_MANAGE)
+  @ApiOperation({ summary: 'Move a staff member to a branch, or off every branch' })
+  async setBranch(
+    @UuidParam('id') id: string,
+    @Body(zodBody(StaffBranchSchema)) dto: StaffBranchDto,
+  ) {
+    await this.users.setBranch(id as UserId, dto.branchId);
+    return { ok: true };
+  }
+
+  @Delete(':id/roles/:roleId')
+  @RequirePermission(Permission.ROLE_MANAGE)
+  @ApiOperation({
+    summary: 'Take one role away (never the last role, never the last user manager)',
+  })
+  async revokeRole(@UuidParam('id') id: string, @UuidParam('roleId') roleId: string) {
+    await this.users.revokeRole(id as UserId, roleId);
+    return { ok: true };
+  }
 
   @Post()
   @HttpCode(201)
