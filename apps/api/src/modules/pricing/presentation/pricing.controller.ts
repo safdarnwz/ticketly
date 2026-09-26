@@ -262,6 +262,20 @@ export class PricingController {
     });
   }
 
+  @Get('routes/:routeId/rules')
+  @RequirePermission(Permission.FARE_READ)
+  @ApiOperation({ summary: 'Route fare floor / ceiling and peak windows now' })
+  getRouteRules(@UuidParam('routeId') routeId: string) {
+    return this.fares.routeRules(routeId);
+  }
+
+  @Get('trips/:tripId/adjustment')
+  @RequirePermission(Permission.FARE_READ)
+  @ApiOperation({ summary: "One trip's manual fare change now (pct null = none)" })
+  getTripAdjustment(@UuidParam('tripId') tripId: string) {
+    return this.fares.tripAdjustment(tripId);
+  }
+
   @Put('routes/:routeId/rules')
   @RequirePermission(Permission.FARE_MANAGE)
   @ApiOperation({

@@ -359,3 +359,7 @@ an unknown id is now 404 (was 200).
   old seat, the new seat looked free while its inventory was taken, and boarding on the new bus failed.
   Migration 0096 repairs bookings already affected. A reschedule must name one new seat per passenger,
   each once (422).
+- **Pricing rules:** new `GET /pricing/routes/:routeId/rules` and `GET /pricing/trips/:tripId/adjustment`.
+  Saving route rules or a trip fare change checks the route / trip is this operator's (404; an unknown id
+  was a 409 and another operator's could be linked); a trip fare change is refused once the trip left or
+  was cancelled (422); both refresh cached search prices.

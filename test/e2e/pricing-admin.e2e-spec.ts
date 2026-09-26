@@ -321,4 +321,36 @@ describe('pricing admin (e2e)', () => {
         .status,
     ).toBe(200);
   });
+
+  it('route rules and one-trip fare changes: this operator only, upcoming trips only', async () => {
+    const op = { as: 'operator' as const };
+    const f = app.fixtures;
+    const routeId = (await app.get(`/bookings/trips/${f.tripId}/chart`, op)).body.trip
+      .routeId as string;
+    const nobody = '00000000-0000-4000-8000-000000000000';
+    const put = (id: string, body: object) => app.put(`/pricing/routes/${id}/rules`, body, op);
+    const none = { floorMinor: null, ceilingMinor: null, peakWindows: [] };
+    expect((await put(nobody, none)).status).toBe(404); // was a 409 "record in use"
+    expect((await put(routeId, { ...none, floorMinor: 90_000, ceilingMinor: 50_000 })).status).toBe(
+      400,
+    );
+    const peak = [{ startMinute: 1080, endMinute: 1320, pct: 10, label: 'Evening' }];
+    expect(
+      (await put(routeId, { floorMinor: 10_000, ceilingMinor: 500_000, peakWindows: peak })).status,
+    ).toBe(200);
+    expect((await app.get(`/pricing/routes/${routeId}/rules`, op)).body).toMatchObject({
+      floorMinor: 10_000,
+      peakWindows: [{ pct: 10, label: 'Evening' }],
+    });
+
+    const adj = (id: string, body: object) => app.put(`/pricing/trips/${id}/adjustment`, body, op);
+    expect((await adj(nobody, { pct: 10, reason: 'Festival rush' })).status).toBe(404);
+    expect((await adj(f.tripId, { pct: 10 })).status).toBe(400); // a reason is needed
+    expect((await adj(f.tripId, { pct: 10, reason: 'Festival rush' })).status).toBe(200);
+    expect((await app.get(`/pricing/trips/${f.tripId}/adjustment`, op)).body).toMatchObject({
+      pct: 10,
+    });
+    expect((await adj(f.tripId, { pct: null })).status).toBe(200);
+    expect((await put(routeId, none)).status).toBe(200);
+  });
 });

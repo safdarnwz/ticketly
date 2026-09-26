@@ -176,6 +176,7 @@ export class FareRepository {
     i: { floorMinor: number | null; ceilingMinor: number | null; peakWindows: PeakWindow[] },
     by: string | null,
   ): Promise<void> {
+    await this.requireRoute(routeId);
     await this.db.execute_(
       `INSERT INTO route_pricing_rules (tenant_id, route_id, floor_minor, ceiling_minor, peak_windows, updated_by) VALUES ($1,$2,$3,$4,$5,$6)
        ON CONFLICT (tenant_id, route_id) DO UPDATE SET floor_minor = EXCLUDED.floor_minor, ceiling_minor = EXCLUDED.ceiling_minor,
@@ -183,6 +184,53 @@ export class FareRepository {
       [requireTenantId(), routeId, i.floorMinor, i.ceilingMinor, JSON.stringify(i.peakWindows), by],
       { name: 'fare.saveRouteRules', primary: true },
     );
+    await this.pricesChanged(CacheNamespace.PRICING_POLICY);
+  }
+
+  /** What the route rules and one trip's manual change are now (for the editors). */
+  async routeRules(routeId: string) {
+    await this.requireRoute(routeId);
+    const r = await this.db.queryOne<{
+      floor_minor: string | null;
+      ceiling_minor: string | null;
+      peak_windows: PeakWindow[];
+    }>(
+      `SELECT floor_minor, ceiling_minor, peak_windows FROM route_pricing_rules WHERE tenant_id = $1 AND route_id = $2`,
+      [requireTenantId(), routeId],
+      { name: 'fare.getRouteRules', primary: true },
+    );
+    return {
+      floorMinor: r?.floor_minor != null ? Number(r.floor_minor) : null,
+      ceilingMinor: r?.ceiling_minor != null ? Number(r.ceiling_minor) : null,
+      peakWindows: Array.isArray(r?.peak_windows) ? r.peak_windows : [],
+    };
+  }
+
+  async tripAdjustment(tripId: string) {
+    await this.requireTrip(tripId, false);
+    const t = await this.db.queryOne<{ pct: string; reason: string | null; updated_at: string }>(
+      `SELECT pct, reason, updated_at FROM trip_fare_adjustments WHERE tenant_id = $1 AND trip_id = $2`,
+      [requireTenantId(), tripId],
+      { name: 'fare.getTripAdjustment', primary: true },
+    );
+    return t
+      ? { pct: Number(t.pct), reason: t.reason, updatedAt: t.updated_at }
+      : { pct: null, reason: null, updatedAt: null };
+  }
+
+  /** This operator's trip; for a change, one still on sale ahead (a fare change after departure means nothing). */
+  private async requireTrip(tripId: string, forChange: boolean): Promise<void> {
+    const t = await this.db.queryOne<{ upcoming: boolean }>(
+      `SELECT (status IN ('scheduled', 'open', 'closed') AND departs_at > now()) AS upcoming
+         FROM trips WHERE tenant_id = $1 AND id = $2`,
+      [requireTenantId(), tripId],
+      { name: 'fare.requireTrip', primary: true },
+    );
+    if (!t) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Trip not found' });
+    if (forChange && !t.upcoming)
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+        message: 'This trip has left or was cancelled — its fare cannot change',
+      });
   }
 
   async setTripAdjustment(
@@ -191,12 +239,14 @@ export class FareRepository {
     reason: string | null,
     by: string | null,
   ): Promise<void> {
+    await this.requireTrip(tripId, true);
     if (pct === null) {
       await this.db.execute_(
         `DELETE FROM trip_fare_adjustments WHERE tenant_id = $1 AND trip_id = $2`,
         [requireTenantId(), tripId],
         { name: 'fare.clearTripAdj', primary: true },
       );
+      await this.pricesChanged(CacheNamespace.PRICING_POLICY);
       return;
     }
     await this.db.execute_(
@@ -205,6 +255,7 @@ export class FareRepository {
       [requireTenantId(), tripId, pct, reason, by],
       { name: 'fare.setTripAdj', primary: true },
     );
+    await this.pricesChanged(CacheNamespace.PRICING_POLICY);
   }
 
   async routePricing(routeId: RouteId): Promise<RoutePricing> {
