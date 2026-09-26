@@ -14,8 +14,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Backend status | Count |
 |---|---|
 | OPEN | 2711 |
-| DONE | 972 |
-| GAP | 293 |
+| DONE | 974 |
+| GAP | 291 |
 | CONFLICT | 76 |
 | INFRA | 20 |
 | DUP | 9 |
@@ -23,9 +23,9 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 | Frontend status | Count |
 |---|---|
-| — | 3106 |
-| TODO | 799 |
-| DONE | 173 |
+| — | 3104 |
+| TODO | 776 |
+| DONE | 198 |
 | DUP | 9 |
 
 
@@ -205,8 +205,8 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 168 | Set cancellation reason | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Cancel trip (reason) |
 | 169 | Permanently delete a service | DONE | DONE | DELETE /scheduling/services/:id (only without history) · UI: Schedule → Manage service |
 | 170 | Set OTA inventory release percentage per service | DONE | DONE | PUT /scheduling/services/:id/sales-rules {otaReleasePct}; platform default PUT /admin/policies/ota-release; enforced on hold · UI: Schedule → Manage service |
-| 171 | Set agent-wise inventory quota | DONE | TODO | verified manually: existing module/API |
-| 172 | Set branch-wise inventory allocation percentage | DONE | TODO | POST /trips/:tripId/quotas/percentage (branch/agent) |
+| 171 | Set agent-wise inventory quota | DONE | DONE | POST /trips/:tripId/quotas (fixed: every allocation used to fail) · UI: Trip chart → Agent & branch seats |
+| 172 | Set branch-wise inventory allocation percentage | DONE | DONE | POST /trips/:tripId/quotas/percentage (branch/agent) · UI: Trip chart → Agent & branch seats |
 | 173 | Set ladies quota percentage or seats | DONE | DONE | sales-rules categoryQuotas.female/senior (seats or pct, releaseHours), enforced on hold · UI: Schedule → Manage service |
 | 174 | Set senior citizen quota | DONE | DONE | sales-rules categoryQuotas.female/senior (seats or pct, releaseHours), enforced on hold · UI: Schedule → Manage service |
 | 175 | Enable dynamic pricing on selected routes | DONE | TODO | verified manually: existing module/API |
@@ -268,7 +268,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 231 | Configure time-based pricing rule | DONE | TODO | peak windows by departure time |
 | 232 | Configure demand surge pricing rule | GAP | — | verified manually: not built yet |
 | 233 | Block complete inventory for charter | DONE | DONE | verified manually: existing module/API · UI: Trips & Charts › chart: Block / open seats |
-| 234 | Release previously blocked inventory | DONE | TODO | verified manually: existing module/API |
+| 234 | Release previously blocked inventory | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Block / open seats |
 | 235 | Create multi-hop connecting service | DONE | TODO | verified manually: existing module/API |
 | 236 | Define layover time rules | DONE | TODO | verified manually: existing module/API |
 | 237 | Configure waitlist maximum size | GAP | — | verified manually: not built yet |
@@ -294,9 +294,9 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 257 | Manually mark service as departed | DONE | TODO | verified manually: existing module/API |
 | 258 | Manually mark service as arrived | DONE | TODO | verified manually: existing module/API |
 | 259 | Force release all temporary holds on service | DONE | DONE | POST /scheduling/trips/:id/release-holds · UI: Trips & Charts › chart: Release holds |
-| 260 | View live seat map of any service | DONE | TODO | verified manually: existing module/API |
-| 261 | Temporarily block specific seats | DONE | TODO | verified manually: existing module/API |
-| 262 | Release previously blocked seats | DONE | TODO | verified manually: existing module/API |
+| 260 | View live seat map of any service | DONE | DONE | verified manually: existing module/API · UI: Trip chart (live seat map) |
+| 261 | Temporarily block specific seats | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Block / open seats |
+| 262 | Release previously blocked seats | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Block / open seats |
 | 263 | Change allocated bus of a service last minute | DONE | TODO | verified manually: existing module/API |
 | 264 | Change allocated crew last minute | DONE | TODO | verified manually: existing module/API |
 | 265 | Add internal remark on service | DONE | DONE | POST/GET /scheduling/trips/:id/remarks · UI: Trips & Charts › chart: Staff remarks |
@@ -348,7 +348,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 311 | Generate agent TDS report | GAP | — | verified manually: not built yet |
 | 312 | Download agent commission statement | DONE | DONE | verified manually: existing module/API · UI: Distribution → Travel agents |
 | 313 | Block agent from booking specific routes | GAP | — | verified manually: not built yet |
-| 314 | Allocate exclusive inventory to preferred agents | DONE | TODO | verified manually: existing module/API |
+| 314 | Allocate exclusive inventory to preferred agents | DONE | DONE | POST /trips/:tripId/quotas (fixed: every allocation used to fail) · UI: Trip chart → Agent & branch seats |
 | 315 | Set maximum discount percentage agent can give | GAP | — | verified manually: not built yet |
 | 316 | View branch-wise collection report | GAP | — | verified manually: not built yet |
 | 317 | View branch-wise occupancy report | GAP | — | verified manually: not built yet |
@@ -371,9 +371,9 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 334 | View bus-wise profitability ranking | DONE | TODO | verified manually: existing module/API |
 | 335 | Export all financial reports | GAP | — | verified manually: not built yet |
 | 336 | Configure list of expense categories | GAP | — | verified manually: not built yet |
-| 337 | Add fuel expense entry | DONE | TODO | verified manually: existing module/API |
-| 338 | Add maintenance expense entry | DONE | TODO | verified manually: existing module/API |
-| 339 | Add toll expense entry | DONE | TODO | verified manually: existing module/API |
+| 337 | Add fuel expense entry | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Expenses & P&L |
+| 338 | Add maintenance expense entry | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Expenses & P&L |
+| 339 | Add toll expense entry | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Expenses & P&L |
 | 340 | Add crew salary expense entry | GAP | — | verified manually: not built yet |
 | 341 | View monthly expense trends | GAP | — | verified manually: not built yet |
 | 342 | Set budget alert thresholds | GAP | — | verified manually: not built yet |
@@ -387,7 +387,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 350 | Perform final operator health check | GAP | — | verified manually: not built yet |
 | 351 | Login to assigned branch dashboard | GAP | — | verified manually: not built yet |
 | 352 | View list of today’s services under branch | GAP | — | verified manually: not built yet |
-| 353 | View real-time seat occupancy of each service | DONE | TODO | verified manually: existing module/API |
+| 353 | View real-time seat occupancy of each service | DONE | DONE | verified manually: existing module/API · UI: Trip chart (live seat map) |
 | 354 | Apply special discount on low occupancy service | DONE | TODO | PUT /pricing/trips/:id/adjustment (−%) |
 | 355 | Temporarily increase fare on high demand service | DONE | TODO | PUT /pricing/trips/:id/adjustment (+%) |
 | 356 | Assign daily booking targets to staff members | DONE | DONE | PUT/DELETE /users/:id/target; targets in /users/performance · UI: Staff modal target + Performance vs target |
@@ -445,9 +445,9 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 408 | Manually resolve sync conflict | GAP | — | verified manually: not built yet |
 | 409 | Download branch level audit report | GAP | — | verified manually: not built yet |
 | 410 | Prepare and submit month-end branch summary | GAP | — | verified manually: not built yet |
-| 411 | View real-time seat availability of any service | DONE | TODO | verified manually: existing module/API |
+| 411 | View real-time seat availability of any service | DONE | DONE | verified manually: existing module/API · UI: Trip chart (live seat map) |
 | 412 | Block seats for VIP or special movement | DONE | DONE | verified manually: existing module/API · UI: Trips & Charts › chart: Block / open seats |
-| 413 | Release previously blocked VIP seats | DONE | TODO | verified manually: existing module/API |
+| 413 | Release previously blocked VIP seats | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Block / open seats |
 | 414 | Change boarding point for multiple passengers together | DONE | TODO | verified manually: existing module/API |
 | 415 | Search booking using PNR number | DONE | DONE | verified manually: existing module/API · UI: operator Bookings list + detail (find by PNR/mobile/ticket, filters, CSV) |
 | 416 | Search booking using mobile number | DONE | DONE | GET /bookings/search?mobile= (last-10-digit match) · UI: operator Bookings list + detail (find by PNR/mobile/ticket, filters, CSV) |
@@ -467,7 +467,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 430 | View complete no-show passenger list | DONE | TODO | verified manually: existing module/API |
 | 431 | Contact no-show passenger | DONE | TODO | verified manually: existing module/API |
 | 432 | Release no-show seat to waitlist | GAP | — | verified manually: not built yet |
-| 433 | View current waitlist for services | DONE | TODO | verified manually: existing module/API |
+| 433 | View current waitlist for services | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Waitlist |
 | 434 | Confirm passenger from waitlist | GAP | — | verified manually: not built yet |
 | 435 | Cancel entry from waitlist | DONE | TODO | verified manually: existing module/API |
 | 436 | View all group bookings | GAP | — | verified manually: not built yet |
@@ -538,7 +538,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 ## #501–#1000
 
-CONFLICT 11, DONE 257, DUP 2, GAP 66, INFRA 3, PROCESS 2
+CONFLICT 11, DONE 259, DUP 2, GAP 64, INFRA 3, PROCESS 2
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -594,7 +594,7 @@ CONFLICT 11, DONE 257, DUP 2, GAP 66, INFRA 3, PROCESS 2
 | 550 | Perform logout | DONE | TODO | verified manually: existing module/API |
 | 551 | Login to dispatch dashboard | DONE | TODO | verified manually: existing module/API |
 | 552 | View complete list of today’s services | DONE | TODO | verified manually: existing module/API |
-| 553 | View real-time occupancy percentage of each service | DONE | TODO | verified manually: existing module/API |
+| 553 | View real-time occupancy percentage of each service | DONE | DONE | verified manually: existing module/API · UI: Trip chart (live seat map) |
 | 554 | Filter services by on-time status | GAP | — | verified manually: not built yet |
 | 555 | Filter services by delayed status | GAP | — | verified manually: not built yet |
 | 556 | Filter services by cancelled status | DONE | TODO | verified manually: existing module/API |
@@ -650,9 +650,9 @@ CONFLICT 11, DONE 257, DUP 2, GAP 66, INFRA 3, PROCESS 2
 | 606 | Register passenger complaint related to service | DONE | DONE | support tickets: staff raise by PNR / reply / priority / assign / resolve; customers own tickets only; author from account · UI: Support: queue views (active/mine/unassigned/…), search, ticket thread with reply, resolve/reopen/close, priority, assign; raise for a caller by PNR |
 | 607 | Enter details of lost luggage | DONE | TODO | POST /lost-found |
 | 608 | Finalize next day bus and crew allocation | DONE | TODO | verified manually: existing module/API |
-| 609 | Block inventory at last minute | DONE | TODO | verified manually: existing module/API |
-| 610 | Release inventory at last minute | DONE | TODO | verified manually: existing module/API |
-| 611 | Adjust OTA inventory percentage at last minute | GAP | — | verified manually: not built yet |
+| 609 | Block inventory at last minute | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Block / open seats |
+| 610 | Release inventory at last minute | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Block / open seats |
+| 611 | Adjust OTA inventory percentage at last minute | DONE | DONE | PUT /trips/:tripId/closed-channels (ota off/on per trip) · UI: Trip chart → Sales channels |
 | 612 | Add internal dispatch notes | DONE | TODO | verified manually: existing module/API |
 | 613 | Write shift handover notes for next dispatcher | DONE | TODO | POST/GET /shift-notes scope=dispatch |
 | 614 | Perform dispatch updates in offline mode | GAP | — | verified manually: not built yet |
@@ -740,16 +740,16 @@ CONFLICT 11, DONE 257, DUP 2, GAP 66, INFRA 3, PROCESS 2
 | 696 | Permanently cancel a service | DONE | TODO | verified manually: existing module/API |
 | 697 | Stop further inventory release for cancelled service | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
 | 698 | Link correct seat layout to service | DONE | TODO | verified manually: existing module/API |
-| 699 | Block inventory for scheduled maintenance | DONE | TODO | inventory blocks / quotas |
-| 700 | Block inventory for charter booking | DONE | TODO | inventory blocks / quotas |
-| 701 | Release inventory after maintenance | DONE | TODO | inventory blocks / quotas |
-| 702 | Release inventory after charter | DONE | TODO | inventory blocks / quotas |
+| 699 | Block inventory for scheduled maintenance | DONE | DONE | inventory blocks / quotas · UI: Trip chart → Block / open seats |
+| 700 | Block inventory for charter booking | DONE | DONE | inventory blocks / quotas · UI: Trip chart → Block / open seats |
+| 701 | Release inventory after maintenance | DONE | DONE | inventory blocks / quotas · UI: Trip chart → Block / open seats |
+| 702 | Release inventory after charter | DONE | DONE | inventory blocks / quotas · UI: Trip chart → Block / open seats |
 | 703 | Define ladies quota in seats or percentage | DONE | DONE | PUT /scheduling/services/:id/sales-rules (same as #173/#174/#170) · UI: Schedule → Manage service |
 | 704 | Define senior citizen quota | DONE | DONE | PUT /scheduling/services/:id/sales-rules (same as #173/#174/#170) · UI: Schedule → Manage service |
-| 705 | Define inventory quota for each agent | DONE | TODO | verified manually: existing module/API |
-| 706 | Define inventory allocation for each branch | DONE | TODO | verified manually: existing module/API |
+| 705 | Define inventory quota for each agent | DONE | DONE | POST /trips/:tripId/quotas (fixed: every allocation used to fail) · UI: Trip chart → Agent & branch seats |
+| 706 | Define inventory allocation for each branch | DONE | DONE | POST /trips/:tripId/quotas (fixed: every allocation used to fail) · UI: Trip chart → Agent & branch seats |
 | 707 | Set percentage of inventory to release to OTAs | DONE | DONE | PUT /scheduling/services/:id/sales-rules (same as #173/#174/#170) · UI: Schedule → Manage service |
-| 708 | Pull back inventory from OTA at last moment | GAP | — | verified manually: not built yet |
+| 708 | Pull back inventory from OTA at last moment | DONE | DONE | PUT /trips/:tripId/closed-channels (ota off/on per trip) · UI: Trip chart → Sales channels |
 | 709 | Apply dynamic pricing rule on selected service | DONE | TODO | verified manually: existing module/API |
 | 710 | Define peak time fare | DONE | TODO | verified manually: existing module/API |
 | 711 | Define off-peak time fare | DONE | TODO | verified manually: existing module/API |
@@ -794,7 +794,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 ## #501–#1000
 
-CONFLICT 11, DONE 257, DUP 2, GAP 66, INFRA 3, PROCESS 2
+CONFLICT 11, DONE 259, DUP 2, GAP 64, INFRA 3, PROCESS 2
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
