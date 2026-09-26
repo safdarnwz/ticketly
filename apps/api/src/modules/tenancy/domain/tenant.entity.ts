@@ -160,13 +160,7 @@ export class Tenant extends AggregateRoot<TenantId> {
     patch: Partial<
       Pick<
         TenantProps,
-        | 'displayName'
-        | 'contactEmail'
-        | 'contactPhone'
-        | 'timezone'
-        | 'currency'
-        | 'locale'
-        | 'settings'
+        'displayName' | 'contactEmail' | 'contactPhone' | 'timezone' | 'currency' | 'locale'
       >
     >,
   ): void {

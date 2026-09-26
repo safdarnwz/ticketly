@@ -325,6 +325,65 @@ export class TenantRepository {
     };
   }
 
+  /** Contacts and address the operator keeps up to date themselves (plus the verified legal details). */
+  async contactDetails(tenantId?: string): Promise<{
+    contactEmail: string;
+    contactPhone: string | null;
+    secondaryContact: { name: string; phone: string; email?: string } | null;
+    address: { line1: string; line2?: string; city: string; state: string; pincode: string } | null;
+    registeredAddress: string | null;
+    legalName: string;
+    gstin: string | null;
+  } | null> {
+    return this.db.queryOne(
+      `SELECT contact_email AS "contactEmail", contact_phone AS "contactPhone",
+              settings->'secondaryContact' AS "secondaryContact", settings->'address' AS address,
+              registered_address AS "registeredAddress", legal_name AS "legalName", gstin
+         FROM tenants WHERE id = $1`,
+      [tenantId ?? requireTenantId()],
+      { name: 'tenant.contactDetails', primary: true },
+    );
+  }
+
+  /** Second contact (null removes) and the structured address, which is also the invoice address. */
+  async setContactExtras(input: {
+    secondaryContact?: { name: string; phone: string; email?: string } | null;
+    address?: { line1: string; line2?: string; city: string; state: string; pincode: string };
+  }): Promise<void> {
+    const a = input.address;
+    await this.db.execute_(
+      `UPDATE tenants SET
+         settings = CASE WHEN $2::boolean THEN
+                      (CASE WHEN $3::jsonb IS NULL THEN settings - 'secondaryContact'
+                            ELSE settings || jsonb_build_object('secondaryContact', $3::jsonb) END)
+                    ELSE settings END
+                    || CASE WHEN $4::jsonb IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('address', $4::jsonb) END,
+         registered_address = coalesce($5, registered_address),
+         version = version + 1
+       WHERE id = $1`,
+      [
+        requireTenantId(),
+        input.secondaryContact !== undefined,
+        input.secondaryContact ? JSON.stringify(input.secondaryContact) : null,
+        a ? JSON.stringify(a) : null,
+        a
+          ? [a.line1, a.line2, `${a.city}, ${a.state} ${a.pincode}`].filter(Boolean).join(', ')
+          : null,
+      ],
+      { name: 'tenant.setContactExtras', primary: true },
+    );
+  }
+
+  /** Whether this operator has sold anything yet (currency can only change before that). */
+  async hasBookings(tenantId?: string): Promise<boolean> {
+    const row = await this.db.queryOne(
+      `SELECT 1 FROM bookings WHERE tenant_id = $1 LIMIT 1`,
+      [tenantId ?? requireTenantId()],
+      { name: 'tenant.hasBookings', primary: true },
+    );
+    return !!row;
+  }
+
   /** GSTIN + registered address + legal name for tax-invoice/e-ticket issuance (CGST Rule 46 mandatory supplier fields) — see migration 0036. */
   async getGstDetails(
     tenantId?: string,

@@ -20,15 +20,58 @@ export const SuspendTenantSchema = z.object({
 });
 export type SuspendTenantDto = z.infer<typeof SuspendTenantSchema>;
 
-export const UpdateTenantSchema = z.object({
-  displayName: z.string().min(1).max(120).optional(),
-  contactEmail: z.string().email().max(320).optional(),
-  contactPhone: z.string().max(20).optional(),
-  timezone: z.string().max(64).optional(),
-  currency: z.enum(['INR', 'USD', 'AED', 'LKR', 'NPR', 'BDT']).optional(),
-  locale: z.string().max(16).optional(),
-  settings: z.record(z.string(), z.unknown()).optional(),
-});
+const mobile10 = z
+  .string()
+  .transform((v) => v.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, ''))
+  .pipe(z.string().regex(/^[6-9]\d{9}$/, 'Enter a 10-digit mobile number'));
+const knownTimeZone = (tz: string) => {
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * The operator's own company profile. Legal name and GSTIN are verified by the
+ * platform and printed on tax invoices, so they are not editable here; logo and
+ * invoice prefix have their own endpoints. Unknown fields are refused.
+ */
+export const UpdateTenantSchema = z
+  .object({
+    displayName: z.string().trim().min(2, 'At least 2 characters').max(120).optional(),
+    contactEmail: z.string().trim().toLowerCase().email('Enter a valid email').max(320).optional(),
+    contactPhone: mobile10.optional(),
+    /** A second person to call — `null` removes them. */
+    secondaryContact: z
+      .object({
+        name: z.string().trim().min(2, 'At least 2 characters').max(120),
+        phone: mobile10,
+        email: z.string().trim().toLowerCase().email('Enter a valid email').max(320).optional(),
+      })
+      .nullable()
+      .optional(),
+    address: z
+      .object({
+        line1: z.string().trim().min(3, 'Building and street').max(200),
+        line2: z.string().trim().max(200).optional(),
+        city: z.string().trim().min(2, 'City').max(80),
+        state: z.string().trim().min(2, 'State').max(80),
+        pincode: z
+          .string()
+          .trim()
+          .regex(/^[1-9]\d{5}$/, 'A 6-digit PIN code'),
+      })
+      .optional(),
+    timezone: z.string().refine(knownTimeZone, 'Not a known time zone').optional(),
+    currency: z.enum(['INR', 'USD', 'AED', 'LKR', 'NPR', 'BDT']).optional(),
+    locale: z
+      .string()
+      .regex(/^[a-z]{2}(-[A-Z]{2})?$/, 'Like en-IN')
+      .optional(),
+  })
+  .strict();
 export type UpdateTenantDto = z.infer<typeof UpdateTenantSchema>;
 
 export const SetBankDetailsSchema = z.object({

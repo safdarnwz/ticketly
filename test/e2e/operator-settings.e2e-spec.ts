@@ -126,4 +126,44 @@ describe('operator settings (e2e)', () => {
     if (original)
       await save({ eventType: 'booking.confirmed', channel: 'sms', body: original.body });
   });
+
+  it('company profile: contacts and address, verified legal details fixed, logo kept', async () => {
+    const before = (await app.get('/operator/profile', op)).body;
+    expect(before).toHaveProperty('contactEmail');
+    const logoBefore = (await app.get('/operator/logo', op)).body;
+    const patch = (body: object) => app.patch('/operator/profile', body, op);
+    expect((await patch({ settings: {} })).status).toBe(400); // could wipe logo and invoice prefix
+    expect((await patch({ legalName: 'Someone Else Pvt Ltd' })).status).toBe(400);
+    expect((await patch({ timezone: 'Mars/Olympus' })).status).toBe(400);
+    expect((await patch({ contactPhone: '12345' })).status).toBe(400);
+    expect(
+      (await patch({ address: { line1: 'x', city: 'J', state: 'R', pincode: '012345' } })).status,
+    ).toBe(400);
+    expect((await patch({ currency: 'USD' })).status).toBe(422); // demo operator has bookings
+
+    const ok = await patch({
+      contactPhone: '+91 98290 12345',
+      secondaryContact: {
+        name: 'Ops Desk',
+        phone: '9829012346',
+        email: 'OPS@demo-travels.example',
+      },
+      address: { line1: '12 Station Road', city: 'Jaipur', state: 'Rajasthan', pincode: '302001' },
+    });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    const after = (await app.get('/operator/profile', op)).body;
+    expect(after).toMatchObject({
+      contactPhone: '9829012346'.replace(/6$/, '5'),
+      secondaryContact: {
+        name: 'Ops Desk',
+        phone: '9829012346',
+        email: 'ops@demo-travels.example',
+      },
+      address: { city: 'Jaipur', pincode: '302001' },
+      registeredAddress: '12 Station Road, Jaipur, Rajasthan 302001',
+    });
+    expect((await patch({ secondaryContact: null })).status).toBe(200);
+    expect((await app.get('/operator/profile', op)).body.secondaryContact).toBeNull();
+    expect((await app.get('/operator/logo', op)).body).toEqual(logoBefore);
+  });
 });

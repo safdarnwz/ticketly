@@ -334,3 +334,8 @@ an unknown id is now 404 (was 200).
   scopes become the key's permissions, so they must be catalogue permissions the issuer holds — never `*`
   or platform ones (403; any `role:manage`-style escalation was possible before); IP allow-list entries
   are checked, the expiry must be in the future, the name is trimmed, and the issuer is recorded.
+- **Company profile:** `PATCH /operator/profile` no longer takes `settings` (sending it replaced the
+  whole JSON and wiped the logo and invoice prefix) and refuses unknown fields; it takes `secondaryContact`
+  (null removes) and a structured `address` (also the invoice address); mobile numbers are normalised,
+  the time zone must exist, and the currency cannot change once there are bookings (422). `GET` returns
+  the contacts, address, legal name and GSTIN (those two stay with the platform).

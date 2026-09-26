@@ -56,10 +56,13 @@ export class TenantController {
 
   @Get('profile')
   @RequirePermission(Permission.TENANT_READ)
-  @ApiOperation({ summary: 'Current operator profile & enabled features' })
+  @ApiOperation({ summary: 'Current operator profile, contacts, address & enabled features' })
   async profile() {
     const tenantId = requireTenantId();
-    const profile = await this.tenantContext.getProfile(tenantId);
+    const [profile, details] = await Promise.all([
+      this.tenantContext.getProfile(tenantId),
+      this.tenants.contactDetails(tenantId),
+    ]);
     return {
       tenantId: profile.tenantId,
       slug: profile.slug,
@@ -70,19 +73,35 @@ export class TenantController {
       locale: profile.locale,
       features: [...profile.features],
       quotas: profile.quotas,
+      ...details,
     };
   }
 
   @Patch('profile')
   @RequirePermission(Permission.TENANT_MANAGE)
-  @ApiOperation({ summary: 'Update operator profile' })
+  @ApiOperation({
+    summary:
+      'Update the company profile: name, contacts, address, time zone (legal name / GSTIN are set by the platform)',
+  })
   async update(@Body(zodBody(UpdateTenantSchema)) dto: UpdateTenantDto) {
     const tenantId = requireTenantId();
+    const { secondaryContact, address, ...core } = dto;
     await this.uow.run({ name: 'tenant.updateProfile', tenantId }, async () => {
       const tenant = await this.tenants.findById(tenantId);
-      if (!tenant) return;
-      tenant.updateProfile(dto as never);
+      if (!tenant) throw new NotFoundError('Operator', tenantId);
+      if (
+        core.currency &&
+        core.currency !== tenant.snapshot().currency &&
+        (await this.tenants.hasBookings(tenantId))
+      )
+        throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+          message: 'The currency cannot change once you have bookings',
+        });
+      tenant.updateProfile(core);
       await this.tenants.update(tenant, tenant.version);
+      // After the entity write, which saves the settings it loaded.
+      if (secondaryContact !== undefined || address)
+        await this.tenants.setContactExtras({ secondaryContact, address });
     });
     await this.tenantContext.invalidate(tenantId);
     return { ok: true };
