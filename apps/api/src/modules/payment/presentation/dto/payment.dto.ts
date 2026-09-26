@@ -79,8 +79,18 @@ export const VerifyPaymentSchema = z.object({
 });
 export type VerifyPaymentDto = z.infer<typeof VerifyPaymentSchema>;
 
-export const GenerateSettlementSchema = z.object({
-  periodFrom: localDate,
-  periodTo: localDate,
-});
+/** Platform admin: settle one operator for a finished period (the payout scheduler does this weekly). */
+export const GenerateSettlementSchema = z
+  .object({
+    tenantId: z.string().uuid(),
+    periodFrom: localDate,
+    periodTo: localDate,
+  })
+  .refine((d) => d.periodFrom <= d.periodTo, {
+    message: 'The period must end on or after it starts',
+    path: ['periodTo'],
+  });
 export type GenerateSettlementDto = z.infer<typeof GenerateSettlementSchema>;
+
+export const FinaliseSettlementSchema = z.object({ tenantId: z.string().uuid() });
+export type FinaliseSettlementDto = z.infer<typeof FinaliseSettlementSchema>;

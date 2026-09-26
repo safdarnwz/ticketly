@@ -37,6 +37,22 @@ export class SettlementRepository {
     return row ? { id: row.id, netMinor: Number(row.net_minor) } : null;
   }
 
+  /** An existing settlement whose period overlaps this one (other than the exact same period). */
+  async overlapping(
+    tenantId: TenantId,
+    periodFrom: LocalDate,
+    periodTo: LocalDate,
+  ): Promise<{ periodFrom: string; periodTo: string } | null> {
+    return this.db.queryOne<{ periodFrom: string; periodTo: string }>(
+      `SELECT period_from::text AS "periodFrom", period_to::text AS "periodTo" FROM settlements
+        WHERE tenant_id = $1 AND period_from <= $3 AND period_to >= $2
+          AND NOT (period_from = $2 AND period_to = $3)
+        ORDER BY period_from LIMIT 1`,
+      [tenantId, periodFrom, periodTo],
+      { name: 'settlement.overlapping', primary: true },
+    );
+  }
+
   /** Period figures straight from the ledger (the source of truth). */
   async ledgerFigures(
     tenantId: TenantId,

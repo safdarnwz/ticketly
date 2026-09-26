@@ -389,3 +389,11 @@ an unknown id is now 404 (was 200).
 - **Agent refunds (fix):** `POST /refunds` for a booking an agent sold (offline capture) was a 500
   "Database error" — the refund ledger split compared a text id with a uuid. It now settles and credits
   the agent's account.
+- **Settlements (platform only):** `POST /payments/settlements` and `POST /payments/settlements/:id/finalise`
+  are now platform-admin endpoints and name the operator (`tenantId` in the body) — an operator no longer
+  settles or pays itself (the payout scheduler runs settlements weekly). A settlement must cover a finished
+  period (ending before today, 422) and may not overlap an earlier one (409; the same period again returns
+  the same settlement) — overlapping periods would pay the same bookings twice.
+- **Roles:** `POST /users/:id/roles` (by role code) now runs the same checks as
+  `PUT /users/:id/roles/:roleId` — staff only, grantable roles only.
+- **Expense receipts:** `POST /trips/:tripId/expenses/receipt` is 404 for another operator's trip.

@@ -169,32 +169,6 @@ export class UserService {
     await this.roles.invalidateUser(userId);
   }
 
-  async assignRoles(userId: UserId, roleCodes: string[]): Promise<void> {
-    await this.uow.run({ name: 'user.assignRoles', tenantId: requireTenantId() }, async () => {
-      const user = await this.users.findById(userId);
-      if (!user) throw new NotFoundError('User', userId);
-      // Resolve every code first so a bad one fails before we change anything.
-      const roleIds = [];
-      for (const code of roleCodes) {
-        const role = await this.roles.findByCode(code);
-        if (!role) throw new NotFoundError('Role', code);
-        assertGrantable(role.permissions);
-        roleIds.push(role.id);
-      }
-      for (const roleId of roleIds)
-        await this.roles.grantToUser(userId, roleId, getUserId() ?? null);
-      // Role change → existing access tokens carry stale permissions. Force a
-      // re-login by revoking sessions (the customer app refreshes silently).
-      await this.sessions.revokeAllForUser(userId, 'roles-changed');
-      await this.audit.recordInTx({
-        action: 'user.roles_assigned',
-        resourceType: 'user',
-        resourceId: userId,
-        changes: { roles: roleCodes },
-      });
-    });
-  }
-
   /** Take one role away; a staff member keeps at least one, and the last user manager keeps theirs. */
   async revokeRole(userId: UserId, roleId: string): Promise<void> {
     await this.uow.run({ name: 'user.revokeRole', tenantId: requireTenantId() }, async () => {

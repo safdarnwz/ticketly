@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| TODO | 669 |
-| DONE | 306 |
+| TODO | 660 |
+| DONE | 315 |
 | DUP | 9 |
 
 
@@ -41,7 +41,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 4 | Assign custom domain to operator | DONE | TODO | PUT /admin/tenants/:id/domain (host resolves immediately) |
 | 5 | Upload operator logo | DONE | TODO | verified manually: existing module/API |
 | 6 | Set operator primary contact person | DONE | TODO | verified manually: existing module/API |
-| 7 | Set operator email and phone | DONE | TODO | verified manually: existing module/API |
+| 7 | Set operator email and phone | DONE | DONE | verified manually: existing module/API · UI: Settings → Company profile |
 | 8 | Set GST number for operator | DONE | TODO | verified manually: existing module/API |
 | 9 | Set PAN number for operator | DONE | TODO | verified manually: existing module/API |
 | 10 | Enter bank account details for settlements | DONE | DONE | verified manually: existing module/API · UI: Settings › Bank Details: checked fields, re-enter number, change under review, withdraw |
@@ -395,7 +395,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 358 | View individual staff cancellation rate | DONE | DONE | GET /users/performance (bookings, seats, sales, cancellations per seller; bookings.booked_by) · UI: Staff page |
 | 359 | Hold seats temporarily for walk-in passenger | DONE | DONE | verified manually: existing module/API · UI: Search & Book → hold then pay |
 | 360 | Convert held seats to confirmed booking | DONE | DONE | verified manually: existing module/API · UI: Search & Book → hold then pay |
-| 361 | Confirm booking received on phone | DONE | TODO | verified manually: existing module/API |
+| 361 | Confirm booking received on phone | DONE | DONE | verified manually: existing module/API · UI: Search & Book → Phone booking (hold until a release time) → booking page: Take UPI payment |
 | 362 | Verify booking done by agent | DONE | TODO | verified manually: existing module/API |
 | 363 | Approve agent booking | GAP | — | verified manually: not built yet |
 | 364 | Generate boarding chart in PDF | GAP | — | verified manually: not built yet |
@@ -621,8 +621,8 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 577 | Set departure time for extra trip | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
 | 578 | Release inventory for extra trip | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
 | 579 | Handle bus breakdown report | DONE | DONE | incidents type=breakdown · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
-| 580 | Arrange replacement bus | DONE | TODO | verified manually: existing module/API |
-| 581 | Re-allocate all passengers to replacement bus | DONE | TODO | verified manually: existing module/API |
+| 580 | Arrange replacement bus | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Change bus (re-seats on a different layout) + earlier changes |
+| 581 | Re-allocate all passengers to replacement bus | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Change bus (re-seats on a different layout) + earlier changes |
 | 582 | Generate final boarding chart | DONE | TODO | verified manually: existing module/API |
 | 583 | Share boarding chart with conductor | DUP | DUP | same as #366 |
 | 584 | Receive live boarding updates from conductor | DONE | TODO | verified manually: existing module/API |
@@ -1172,7 +1172,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 | 1247 | Already boarded passenger marked no-show | GAP | — | verified manually: not built yet |
 | 1248 | Service cancelled after some passengers boarded | GAP | — | verified manually: not built yet |
 | 1249 | Handling passengers during mid-route breakdown | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
-| 1250 | Replacement bus has different seat layout | DONE | TODO | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) |
+| 1250 | Replacement bus has different seat layout | DONE | DONE | verified manually: existing mechanism (row locks / idempotency / outbox / policy / cache) · UI: Trip chart → Change bus (re-seats on a different layout) + earlier changes |
 | 1251 | System automatically re-seats passengers | OPEN | — |  |
 | 1252 | Passenger refuses the new seat assigned | OPEN | — |  |
 | 1253 | Route diversion makes some boarding points invalid | OPEN | — |  |
@@ -1260,7 +1260,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 | 1320 | Route diversion invalidates existing boarding points | OPEN | — |  |
 | 1321 | New service creation blocked due to permit expiry | OPEN | — |  |
 | 1322 | Document expiry alerts ignored by users | OPEN | — |  |
-| 1323 | Bus changed to one with different seat count | DONE | TODO | modules/trip-vehicle |
+| 1323 | Bus changed to one with different seat count | DONE | DONE | modules/trip-vehicle · UI: Trip chart → Change bus (re-seats on a different layout) + earlier changes |
 | 1324 | Crew not allocated at time of departure | OPEN | — |  |
 | 1325 | Same crew allocated to overlapping services | OPEN | — |  |
 | 1326 | GPS goes offline during important tracking period | OPEN | — |  |
@@ -1274,8 +1274,8 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 | 1334 | TDS threshold is crossed in middle of month | OPEN | — |  |
 | 1335 | GST rate changes after booking is made | OPEN | — |  |
 | 1336 | Credit note and debit note amounts mismatch | OPEN | — |  |
-| 1337 | Expense is entered in wrong category | DONE | TODO | modules/trip-expenses |
-| 1338 | Same expense is entered twice | DONE | TODO | modules/trip-expenses |
+| 1337 | Expense is entered in wrong category | DONE | DONE | modules/trip-expenses · UI: Trip chart → Expenses & P&L (receipt, void with reason, one add per click) |
+| 1338 | Same expense is entered twice | DONE | DONE | modules/trip-expenses · UI: Trip chart → Expenses & P&L (receipt, void with reason, one add per click) |
 | 1339 | Branch collection is not deposited on time | CONFLICT | — |  |
 | 1340 | Cash shortage needs investigation | OPEN | — |  |
 | 1341 | Agent ledger does not balance | DONE | TODO | modules/agents |
@@ -1676,7 +1676,7 @@ CONFLICT 13, DONE 53, DUP 3, OPEN 431
 | 1754 | Issue goodwill meal coupons | OPEN | — |  |
 | 1755 | Record goodwill gestures given | OPEN | — |  |
 | 1756 | View breakdown history | OPEN | — |  |
-| 1757 | Coordinate replacement bus | DONE | TODO | modules/trip-vehicle |
+| 1757 | Coordinate replacement bus | DONE | DONE | modules/trip-vehicle · UI: Trip chart → Change bus (re-seats on a different layout) + earlier changes |
 | 1758 | Manage passenger transfer | OPEN | — |  |
 | 1759 | Record passenger refusal of alternate | OPEN | — |  |
 | 1760 | Escalate unresolved issues | OPEN | — |  |

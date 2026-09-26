@@ -230,4 +230,38 @@ describe('trip operations (e2e)', () => {
         .status,
     ).toBe(404);
   });
+
+  it("an expense receipt goes on this operator's trip only, then on the expense", async () => {
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    const raw = {
+      headers: {
+        authorization: `Bearer ${app.fixtures.operatorToken}`,
+        'x-tenant-slug': app.fixtures.tenantSlug,
+        'content-type': 'application/octet-stream',
+      },
+    };
+    const unknown = '01a0dddd-0000-7000-8000-000000000000';
+    expect(
+      (await app.post(`/trips/${unknown}/expenses/receipt?fileName=r.png`, png, raw)).status,
+    ).toBe(404);
+    const up = await app.post(
+      `/trips/${app.fixtures.tripId}/expenses/receipt?fileName=r.png`,
+      png,
+      raw,
+    );
+    expect(up.status, JSON.stringify(up.body)).toBe(201);
+    const added = await app.post(
+      `/trips/${app.fixtures.tripId}/expenses`,
+      { category: 'toll', amountMinor: 45_000, note: 'Toll plaza', receiptFileId: up.body.fileId },
+      { as: 'operator', idempotencyKey: `e2e-receipt-${Date.now()}` },
+    );
+    expect(added.status, JSON.stringify(added.body)).toBe(201);
+    const list = await app.get(`/trips/${app.fixtures.tripId}/expenses`, { as: 'operator' });
+    expect(list.body.items.find((x: { id: string }) => x.id === added.body.id)).toMatchObject({
+      receiptFileId: up.body.fileId,
+    });
+  });
 });

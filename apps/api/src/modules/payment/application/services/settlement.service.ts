@@ -1,7 +1,16 @@
 import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
-import { newId, NotFoundError, requireTenantId, type LocalDate } from '@kernel';
+import {
+  AppError,
+  ConflictError,
+  ErrorCode,
+  newId,
+  NotFoundError,
+  requireTenantId,
+  todayIn,
+  type LocalDate,
+} from '@kernel';
 import { EventBus } from '@messaging';
 
 import { PlatformChargeRepository } from '../../../platform-settings';
@@ -54,6 +63,17 @@ export class SettlementService {
 
     const existing = await this.settlements.findForPeriod(tenantId, periodFrom, periodTo);
     if (existing) return { settlementId: existing.id, netMinor: existing.netMinor };
+    // Only a finished period, and never one that overlaps an earlier settlement
+    // — the same booking would be paid out twice.
+    if (periodFrom > periodTo || periodTo >= todayIn())
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+        message: 'Settle only a finished period (it must end before today)',
+      });
+    const clash = await this.settlements.overlapping(tenantId, periodFrom, periodTo);
+    if (clash)
+      throw new ConflictError(
+        `This period overlaps the settlement for ${clash.periodFrom} to ${clash.periodTo}`,
+      );
 
     const figures = await this.settlements.ledgerFigures(tenantId, periodFrom, periodTo);
     // Outstanding one-time platform charges (the per-bus fee, an earlier

@@ -65,6 +65,9 @@ export class TripExpenseService {
   }
 
   async uploadReceipt(tripId: TripId, bytes: Buffer, fileName?: string) {
+    // Only for this operator's trips (the id also names the storage folder).
+    if (!(await this.expenses.tripForExpense(requireTenantId(), tripId)))
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Trip not found' });
     const f = await this.files.upload({
       purpose: 'expense_receipt',
       bytes,

@@ -14,11 +14,12 @@ import {
   UuidParam,
   zodBody,
 } from '@http';
-import { localDate, type BookingId } from '@kernel';
+import { localDate, runAsTenant, type BookingId, type TenantId } from '@kernel';
 
 import {
   ChargeTestSchema,
   CreateIntentSchema,
+  FinaliseSettlementSchema,
   GenerateSettlementSchema,
   SelfUpgradeSeatSchema,
   SetCommissionSchema,
@@ -27,6 +28,7 @@ import {
   VerifyPaymentSchema,
   type ChargeTestDto,
   type CreateIntentDto,
+  type FinaliseSettlementDto,
   type GenerateSettlementDto,
   type SelfUpgradeSeatDto,
   type SetCommissionDto,
@@ -223,21 +225,33 @@ export class PaymentController {
     return { accounts, total, balanced: total === 0 };
   }
 
+  // Payouts are the platform's to make (the payout scheduler runs them weekly);
+  // an operator never settles or pays itself.
   @Post('settlements')
   @HttpCode(201)
   @ApiBearerAuth('bearer')
-  @RequirePermission(Permission.SETTLEMENT_MANAGE)
-  @ApiOperation({ summary: 'Generate a settlement for a period' })
+  @RequirePermission(Permission.ALL)
+  @RequirePlatformAdmin()
+  @ApiOperation({
+    summary:
+      'Platform: settle one operator for a finished period (no overlap with an earlier settlement)',
+  })
   async generateSettlement(@Body(zodBody(GenerateSettlementSchema)) dto: GenerateSettlementDto) {
-    return this.settlement.generate(localDate(dto.periodFrom), localDate(dto.periodTo));
+    return runAsTenant(dto.tenantId as TenantId, () =>
+      this.settlement.generate(localDate(dto.periodFrom), localDate(dto.periodTo)),
+    );
   }
 
   @Post('settlements/:id/finalise')
   @ApiBearerAuth('bearer')
-  @RequirePermission(Permission.SETTLEMENT_MANAGE)
-  @ApiOperation({ summary: 'Finalise & pay a settlement' })
-  async finaliseSettlement(@UuidParam('id') id: string) {
-    await this.settlement.finalise(id);
+  @RequirePermission(Permission.ALL)
+  @RequirePlatformAdmin()
+  @ApiOperation({ summary: "Platform: finalise one operator's settlement and queue its payout" })
+  async finaliseSettlement(
+    @UuidParam('id') id: string,
+    @Body(zodBody(FinaliseSettlementSchema)) dto: FinaliseSettlementDto,
+  ) {
+    await runAsTenant(dto.tenantId as TenantId, () => this.settlement.finalise(id));
     return { ok: true };
   }
 }

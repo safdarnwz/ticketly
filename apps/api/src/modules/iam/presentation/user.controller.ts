@@ -275,12 +275,14 @@ export class UserController {
 
   @Post(':id/roles')
   @RequirePermission(Permission.ROLE_MANAGE)
-  @ApiOperation({ summary: 'Assign roles to a user' })
+  @ApiOperation({
+    summary: 'Grant roles by code (older clients) — same checks as PUT /users/:id/roles/:roleId',
+  })
   async assignRoles(
     @UuidParam('id') id: string,
     @Body(zodBody(AssignRolesSchema)) dto: AssignRolesDto,
   ) {
-    await this.users.assignRoles(id as UserId, dto.roles);
+    await this.access.grantRolesByCode(id, dto.roles);
     return { ok: true };
   }
 

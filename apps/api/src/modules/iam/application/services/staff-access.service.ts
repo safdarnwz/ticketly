@@ -132,6 +132,18 @@ export class StaffAccessService {
     );
   }
 
+  /** Grant several roles by code (older API clients) — each through the same checks as grantRole. */
+  async grantRolesByCode(userId: string, codes: string[]): Promise<void> {
+    await this.assertStaff(userId);
+    const roleIds: string[] = [];
+    for (const code of codes) {
+      const role = await this.roles.findByCode(code);
+      if (!role) throw new NotFoundError('Role', code);
+      roleIds.push(role.id);
+    }
+    for (const roleId of roleIds) await this.grantRole(userId, roleId, null);
+  }
+
   /** A custom role; every permission must be one the caller may hand out. */
   private async assertNameFree(name: string, exceptId?: string): Promise<void> {
     if (await this.roles.nameTaken(name, exceptId))
