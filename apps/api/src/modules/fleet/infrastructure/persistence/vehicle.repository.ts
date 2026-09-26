@@ -271,9 +271,7 @@ export class VehicleRepository {
   }
 
   /** Documents of active buses that expire within `days` (or already have) — soonest first. */
-  expiringDocuments(
-    days: number,
-  ): Promise<
+  expiringDocuments(days: number): Promise<
     {
       vehicleId: string;
       registrationNo: string;
