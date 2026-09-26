@@ -58,4 +58,120 @@ describe('fleet (e2e)', () => {
     );
     expect(again.status).toBe(409);
   });
+
+  const day = (offset: number) =>
+    new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+  const at = (hoursAhead: number) => new Date(Date.now() + hoursAhead * 3_600_000).toISOString();
+  const unknownId = '01a0dddd-0000-7000-8000-000000000000';
+
+  it("maintenance: done work only, next due after it, this operator's bus only", async () => {
+    const list = await app.get('/fleet/vehicles', { as: 'operator' });
+    const vehicleId: string = (list.body.items ?? list.body)[0].id;
+    const log = (body: Record<string, unknown>, id = vehicleId) =>
+      app.post(`/fleet/vehicles/${id}/maintenance`, body, { as: 'operator' });
+    const good = {
+      kind: 'service',
+      description: 'Oil and filter change',
+      performedOn: day(-1),
+      costMinor: 250000,
+    };
+
+    expect((await log({ ...good, description: '  ' })).status).toBe(400);
+    expect((await log({ ...good, performedOn: day(3) })).status).toBe(422);
+    expect((await log({ ...good, nextDueOn: day(-2) })).status).toBe(400);
+    expect((await log({ ...good, costMinor: -1 })).status).toBe(400);
+    expect((await log(good, unknownId)).status).toBe(404);
+    expect(
+      (await app.get(`/fleet/vehicles/${unknownId}/maintenance`, { as: 'operator' })).status,
+    ).toBe(404);
+
+    const ok = await log({ ...good, nextDueOn: day(90), odometerKm: 120000 });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(201);
+    const history = await app.get(`/fleet/vehicles/${vehicleId}/maintenance`, { as: 'operator' });
+    expect(
+      history.body.items.some(
+        (m: { description: string }) => m.description === 'Oil and filter change',
+      ),
+    ).toBe(true);
+  });
+
+  it('crew: driver needs a licence, one mobile per person, leave refused while holding duties', async () => {
+    const phone = `9${String(Math.floor(Math.random() * 1e9)).padStart(9, '0')}`;
+    const noLicence = await app.post(
+      '/fleet/crew',
+      { role: 'driver', fullName: 'Ravi Driver' },
+      { as: 'operator' },
+    );
+    expect(noLicence.status).toBe(400);
+    const created = await app.post(
+      '/fleet/crew',
+      {
+        role: 'driver',
+        fullName: 'Ravi Driver',
+        phone,
+        licenceNo: 'rj14 2019 0001234',
+        licenceExpiresOn: day(20),
+      },
+      { as: 'operator' },
+    );
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    const crewId: string = created.body.id;
+    const samePhone = await app.post(
+      '/fleet/crew',
+      { role: 'conductor', fullName: 'Other', phone },
+      { as: 'operator' },
+    );
+    expect(samePhone.status).toBe(409);
+
+    // Duties: past ones, unknown crew / trip, a licence that ends before the duty.
+    const duty = (body: Record<string, unknown>) =>
+      app.post('/fleet/crew/duties', { crewId, drivingMinutes: 60, ...body }, { as: 'operator' });
+    expect((await duty({ startsAt: at(-50), endsAt: at(-48) })).status).toBe(400);
+    expect((await duty({ crewId: unknownId, startsAt: at(24), endsAt: at(26) })).status).toBe(404);
+    expect((await duty({ tripId: unknownId, startsAt: at(24), endsAt: at(26) })).status).toBe(404);
+    expect((await duty({ startsAt: at(24 * 25), endsAt: at(24 * 25 + 2) })).status).toBe(422);
+    const assigned = await duty({ startsAt: at(24), endsAt: at(26) });
+    expect(assigned.status, JSON.stringify(assigned.body)).toBe(201);
+
+    const crew = await app.get('/fleet/crew?role=driver', { as: 'operator' });
+    const me = crew.body.items.find((c: { id: string }) => c.id === crewId);
+    expect(me).toMatchObject({ licenceNo: 'RJ1420190001234', upcomingDuties: 1, phone });
+
+    const leave = await app.patch(
+      `/fleet/crew/${crewId}`,
+      { status: 'on_leave' },
+      { as: 'operator' },
+    );
+    expect(leave.status).toBe(422);
+    expect(
+      (await app.patch(`/fleet/crew/${crewId}`, { licenceNo: null }, { as: 'operator' })).status,
+    ).toBe(422);
+    expect((await app.patch(`/fleet/crew/${crewId}`, {}, { as: 'operator' })).status).toBe(400);
+    expect(
+      (await app.patch(`/fleet/crew/${unknownId}`, { fullName: 'X Y' }, { as: 'operator' })).status,
+    ).toBe(404);
+
+    // Cancel is idempotent; then leave is allowed and a new duty is refused.
+    const dutyId: string = assigned.body.id;
+    expect(
+      (await app.post(`/fleet/crew/duties/${dutyId}/cancel`, {}, { as: 'operator' })).status,
+    ).toBe(201);
+    expect(
+      (await app.post(`/fleet/crew/duties/${dutyId}/cancel`, {}, { as: 'operator' })).status,
+    ).toBe(201);
+    expect(
+      (await app.post(`/fleet/crew/duties/${unknownId}/cancel`, {}, { as: 'operator' })).status,
+    ).toBe(404);
+    const onLeave = await app.patch(
+      `/fleet/crew/${crewId}`,
+      { status: 'on_leave' },
+      { as: 'operator' },
+    );
+    expect(onLeave.status, JSON.stringify(onLeave.body)).toBe(200);
+    expect(onLeave.body).toMatchObject({ status: 'on_leave', upcomingDuties: 0 });
+    expect((await duty({ startsAt: at(30), endsAt: at(32) })).status).toBe(422);
+    expect((await app.get(`/fleet/crew/${unknownId}/allowance`, { as: 'operator' })).status).toBe(
+      404,
+    );
+  });
 });

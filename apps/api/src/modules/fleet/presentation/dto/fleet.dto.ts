@@ -6,7 +6,7 @@ import {
   PERMIT_TYPES,
   VEHICLE_STATUSES,
 } from '../../domain/vehicle';
-import { ATTENDANCE_STATUSES, CREW_ROLES } from '../../domain/crew';
+import { ATTENDANCE_STATUSES, CREW_ROLES, CREW_STATUSES } from '../../domain/crew';
 import { UPLOADABLE_DOC_TYPES, VERIFICATION_STATUSES } from '../../domain/vehicle-verification';
 
 const uuid = z.string().uuid();
@@ -94,15 +94,42 @@ export const OptionalNoteSchema = z
   .default({});
 export type OptionalNoteDto = z.infer<typeof OptionalNoteSchema>;
 
-export const CreateCrewSchema = z.object({
-  role: z.enum(CREW_ROLES),
+const crewDetails = {
   fullName: z.string().trim().min(2, 'Enter the full name').max(120),
   phone: mobile.optional(),
-  licenceNo: z.string().max(40).optional(),
+  licenceNo: z
+    .string()
+    .transform((v) => v.replace(/[\s-]/g, '').toUpperCase())
+    .refine((v) => /^[A-Z0-9]{6,20}$/.test(v), {
+      message: 'Enter the licence number (6 to 20 letters and digits)',
+    })
+    .optional(),
   licenceExpiresOn: localDate.optional(),
-  employeeCode: z.string().max(40).optional(),
-});
+  employeeCode: z.string().trim().min(1).max(40).optional(),
+};
+
+/** A driver drives only with a licence on file — number and expiry. */
+export const CreateCrewSchema = z
+  .object({ role: z.enum(CREW_ROLES), ...crewDetails })
+  .refine((d) => d.role !== 'driver' || (d.licenceNo && d.licenceExpiresOn), {
+    message: 'A driver needs a licence number and its expiry date',
+    path: ['licenceNo'],
+  });
 export type CreateCrewDto = z.infer<typeof CreateCrewSchema>;
+
+/** Edit a crew member; null clears an optional detail. Status puts them on leave or inactive. */
+export const UpdateCrewSchema = z
+  .object({
+    fullName: crewDetails.fullName.optional(),
+    phone: mobile.nullable().optional(),
+    licenceNo: crewDetails.licenceNo.unwrap().nullable().optional(),
+    licenceExpiresOn: localDate.nullable().optional(),
+    employeeCode: z.string().trim().min(1).max(40).nullable().optional(),
+    status: z.enum(CREW_STATUSES).optional(),
+  })
+  .strict()
+  .refine((d) => Object.keys(d).length > 0, { message: 'Nothing to change' });
+export type UpdateCrewDto = z.infer<typeof UpdateCrewSchema>;
 
 export const AssignDutySchema = z
   .object({
@@ -119,6 +146,10 @@ export const AssignDutySchema = z
   })
   .refine((d) => d.drivingMinutes <= (Date.parse(d.endsAt) - Date.parse(d.startsAt)) / 60_000, {
     message: 'Driving minutes cannot exceed the duty length',
+  })
+  .refine((d) => Date.parse(d.endsAt) > Date.now(), {
+    message: 'This duty has already ended — only current or future duties can be assigned',
+    path: ['endsAt'],
   });
 export type AssignDutyDto = z.infer<typeof AssignDutySchema>;
 
@@ -130,14 +161,20 @@ export const CrewRulesSchema = z.object({
   maxContinuousDrivingMinutes: z.number().int().min(60).max(1440).optional(),
 });
 
-export const MaintenanceLogSchema = z.object({
-  kind: z.enum(MAINTENANCE_KINDS),
-  description: z.string().min(1).max(500),
-  odometerKm: z.number().int().min(0).optional(),
-  costMinor: z.number().int().min(0).default(0),
-  performedOn: localDate,
-  nextDueOn: localDate.optional(),
-});
+export const MaintenanceLogSchema = z
+  .object({
+    kind: z.enum(MAINTENANCE_KINDS),
+    description: z.string().trim().min(3, 'Say what was done, in at least 3 characters').max(500),
+    odometerKm: z.number().int().min(0).max(5_000_000).optional(),
+    /** Up to ₹1 crore for one job. */
+    costMinor: z.number().int().min(0).max(1_000_000_000).default(0),
+    performedOn: localDate,
+    nextDueOn: localDate.optional(),
+  })
+  .refine((d) => !d.nextDueOn || d.nextDueOn > d.performedOn, {
+    message: 'The next service must be due after the day this work was done',
+    path: ['nextDueOn'],
+  });
 export type MaintenanceLogDto = z.infer<typeof MaintenanceLogSchema>;
 
 export const BulkImportVehiclesSchema = z.object({
@@ -191,5 +228,8 @@ export const VehiclePhotoUploadQuerySchema = z.object({
 });
 export type VehiclePhotoUploadQueryDto = z.infer<typeof VehiclePhotoUploadQuerySchema>;
 
-export const ListCrewQuerySchema = z.object({ role: z.enum(CREW_ROLES).optional() });
+export const ListCrewQuerySchema = z.object({
+  role: z.enum(CREW_ROLES).optional(),
+  status: z.enum(CREW_STATUSES).optional(),
+});
 export type ListCrewQueryDto = z.infer<typeof ListCrewQuerySchema>;

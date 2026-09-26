@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Patch, Post, Put, Query, HttpCode } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
+import { AppConfig } from '@config';
 import { Permission } from '@contracts';
 import { UnitOfWork } from '@database';
 import {
@@ -14,8 +15,11 @@ import {
 } from '@http';
 import {
   BadRequestError,
+  DomainError,
+  ErrorCode,
   localDate,
   requireTenantId,
+  todayIn,
   type CrewId,
   type DutyId,
   type TripId,
@@ -34,6 +38,7 @@ import {
   ListCrewQuerySchema,
   ListVehiclesQuerySchema,
   MaintenanceLogSchema,
+  UpdateCrewSchema,
   UpdateVehicleSchema,
   UploadDocumentSchema,
   VehicleDocumentUploadQuerySchema,
@@ -48,6 +53,7 @@ import {
   type ListCrewQueryDto,
   type ListVehiclesQueryDto,
   type MaintenanceLogDto,
+  type UpdateCrewDto,
   type UpdateVehicleDto,
   type UploadDocumentDto,
   type VehicleDocumentUploadQueryDto,
@@ -76,6 +82,7 @@ export class FleetController {
     private readonly uow: UnitOfWork,
     private readonly billing: PlatformBillingService,
     private readonly verification: VehicleVerificationService,
+    private readonly config: AppConfig,
   ) {}
 
   /* ── vehicles ───────────────────────────────────────────────────────────*/
@@ -291,16 +298,22 @@ export class FleetController {
     @UuidParam('id') id: string,
     @Body(zodBody(MaintenanceLogSchema)) dto: MaintenanceLogDto,
   ) {
-    await this.uow.run({ name: 'fleet.addMaintenance', tenantId: requireTenantId() }, async () =>
-      this.logs.addMaintenance(id as VehicleId, {
+    if (dto.performedOn > todayIn(this.config.domain.timezone))
+      throw new DomainError(
+        ErrorCode.COMMON_VALIDATION,
+        'Maintenance can only be recorded once it is done — the date is in the future',
+      );
+    await this.uow.run({ name: 'fleet.addMaintenance', tenantId: requireTenantId() }, async () => {
+      await this.vehicles.getById(id as VehicleId); // 404 for an unknown or another operator's bus
+      await this.logs.addMaintenance(id as VehicleId, {
         kind: dto.kind,
         description: dto.description,
         odometerKm: dto.odometerKm,
         costMinor: dto.costMinor,
         performedOn: localDate(dto.performedOn),
         nextDueOn: dto.nextDueOn ? localDate(dto.nextDueOn) : undefined,
-      }),
-    );
+      });
+    });
     return { ok: true };
   }
 
@@ -308,6 +321,7 @@ export class FleetController {
   @RequirePermission(Permission.VEHICLE_READ)
   @ApiOperation({ summary: 'Maintenance history' })
   async listMaintenance(@UuidParam('id') id: string) {
+    await this.vehicles.getById(id as VehicleId);
     return { items: await this.logs.listMaintenance(id as VehicleId) };
   }
 
@@ -318,26 +332,42 @@ export class FleetController {
   @RequirePermission(Permission.CREW_MANAGE)
   @ApiOperation({ summary: 'Add a crew member' })
   async createCrew(@Body(zodBody(CreateCrewSchema)) dto: CreateCrewDto) {
-    const id = await this.uow.run(
-      { name: 'fleet.createCrew', tenantId: requireTenantId() },
-      async () =>
-        this.crew.create({
-          role: dto.role,
-          fullName: dto.fullName,
-          phone: dto.phone,
-          licenceNo: dto.licenceNo,
-          licenceExpiresOn: dto.licenceExpiresOn ? localDate(dto.licenceExpiresOn) : undefined,
-          employeeCode: dto.employeeCode,
-        }),
-    );
+    const id = await this.crewService.addCrew({
+      role: dto.role,
+      fullName: dto.fullName,
+      phone: dto.phone,
+      licenceNo: dto.licenceNo,
+      licenceExpiresOn: dto.licenceExpiresOn ? localDate(dto.licenceExpiresOn) : undefined,
+      employeeCode: dto.employeeCode,
+    });
     return { id };
   }
 
   @Get('crew')
   @RequirePermission(Permission.CREW_MANAGE)
-  @ApiOperation({ summary: 'List crew' })
+  @ApiOperation({ summary: 'List crew, with how many upcoming duties each holds' })
   async listCrew(@Query(zodQuery(ListCrewQuerySchema)) q: ListCrewQueryDto) {
-    return { items: await this.crew.list(q.role) };
+    return { items: await this.crew.list({ role: q.role, status: q.status }) };
+  }
+
+  @Patch('crew/:id')
+  @RequirePermission(Permission.CREW_MANAGE)
+  @ApiOperation({
+    summary:
+      'Edit a crew member, or put them on leave / inactive (refused while they hold upcoming duties)',
+  })
+  async updateCrew(
+    @UuidParam('id') id: string,
+    @Body(zodBody(UpdateCrewSchema)) dto: UpdateCrewDto,
+  ) {
+    await this.crewService.updateCrew(id as CrewId, {
+      ...dto,
+      licenceExpiresOn:
+        dto.licenceExpiresOn === undefined || dto.licenceExpiresOn === null
+          ? dto.licenceExpiresOn
+          : localDate(dto.licenceExpiresOn),
+    });
+    return this.crew.getById(id as CrewId);
   }
 
   @Post('crew/duties')

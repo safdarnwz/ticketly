@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { RECOMMENDED_REST_RULES, type RestRules } from '../../domain/duty-roster';
 
-import { DatabaseService } from '@database';
+import { DatabaseService, registerConstraintMessages } from '@database';
 import {
   newId,
   NotFoundError,
@@ -24,7 +24,18 @@ export interface Crew {
   status: string;
   licenceNo: string | null;
   licenceExpiresOn: LocalDate | null;
+  phone: string | null;
+  employeeCode: string | null;
+  /** Upcoming duties still assigned. */
+  upcomingDuties: number;
 }
+
+registerConstraintMessages({
+  crew_tenant_id_employee_code_key: 'Another crew member already has this employee code',
+});
+
+const CREW_COLUMNS = `c.id, c.role, c.full_name, c.status, c.licence_no, c.licence_expires_on, c.phone, c.employee_code,
+  (SELECT count(*) FROM crew_duties d WHERE d.crew_id = c.id AND d.status = 'assigned' AND d.ends_at > now()) AS upcoming_duties`;
 
 @Injectable()
 export class CrewRepository {
@@ -57,26 +68,81 @@ export class CrewRepository {
     return id;
   }
 
-  async getById(id: CrewId): Promise<Crew> {
+  async getById(id: CrewId, forUpdate = false): Promise<Crew> {
     const row = await this.db.queryOne<CrewRow>(
-      `SELECT id, role, full_name, status, licence_no, licence_expires_on
-         FROM crew WHERE tenant_id = $1 AND id = $2 AND deleted_at IS NULL`,
+      `SELECT ${CREW_COLUMNS}
+         FROM crew c WHERE c.tenant_id = $1 AND c.id = $2 AND c.deleted_at IS NULL${forUpdate ? ' FOR UPDATE' : ''}`,
       [requireTenantId(), id],
-      { name: 'crew.getById' },
+      { name: 'crew.getById', primary: forUpdate },
     );
     if (!row) throw new NotFoundError('Crew', id);
     return mapCrew(row);
   }
 
-  async list(role?: CrewRole): Promise<Crew[]> {
+  async list(filter: { role?: CrewRole; status?: string } = {}): Promise<Crew[]> {
+    const params: unknown[] = [requireTenantId()];
+    let where = 'c.tenant_id = $1 AND c.deleted_at IS NULL';
+    if (filter.role) {
+      params.push(filter.role);
+      where += ` AND c.role = $${params.length}`;
+    }
+    if (filter.status) {
+      params.push(filter.status);
+      where += ` AND c.status = $${params.length}::crew_status`;
+    }
     const rows = await this.db.query<CrewRow>(
-      `SELECT id, role, full_name, status, licence_no, licence_expires_on
-         FROM crew WHERE tenant_id = $1 AND deleted_at IS NULL ${role ? 'AND role = $2' : ''}
-        ORDER BY full_name`,
-      role ? [requireTenantId(), role] : [requireTenantId()],
+      `SELECT ${CREW_COLUMNS} FROM crew c WHERE ${where} ORDER BY c.full_name`,
+      params,
       { name: 'crew.list' },
     );
     return rows.map(mapCrew);
+  }
+
+  /** Another crew member (not `except`) with this mobile, if any — older rows may hold +91 or spaces. */
+  async phoneTakenBy(phone: string, except?: CrewId): Promise<string | null> {
+    const row = await this.db.queryOne<{ full_name: string }>(
+      `SELECT full_name FROM crew
+        WHERE tenant_id = $1 AND right(regexp_replace(phone, '\\D', '', 'g'), 10) = $2
+          AND deleted_at IS NULL AND ($3::uuid IS NULL OR id <> $3)`,
+      [requireTenantId(), phone, except ?? null],
+      { name: 'crew.phoneTaken' },
+    );
+    return row?.full_name ?? null;
+  }
+
+  async update(
+    id: CrewId,
+    patch: {
+      fullName?: string;
+      phone?: string | null;
+      licenceNo?: string | null;
+      licenceExpiresOn?: LocalDate | null;
+      employeeCode?: string | null;
+      status?: string;
+    },
+  ): Promise<void> {
+    const cols: Record<string, string> = {
+      fullName: 'full_name',
+      phone: 'phone',
+      licenceNo: 'licence_no',
+      licenceExpiresOn: 'licence_expires_on',
+      employeeCode: 'employee_code',
+      status: 'status',
+    };
+    const sets: string[] = [];
+    const params: unknown[] = [requireTenantId(), id];
+    for (const [k, col] of Object.entries(cols)) {
+      const v = (patch as Record<string, unknown>)[k];
+      if (v === undefined) continue;
+      params.push(v);
+      sets.push(`${col} = $${params.length}${k === 'status' ? '::crew_status' : ''}`);
+    }
+    if (sets.length === 0) return;
+    await this.db.execute_(
+      `UPDATE crew SET ${sets.join(', ')}, version = version + 1 WHERE tenant_id = $1 AND id = $2`,
+      params,
+      { name: 'crew.update', primary: true },
+    );
   }
 
   /**
@@ -108,6 +174,15 @@ export class CrewRepository {
    * INSERT fails with a unique/exclusion violation, which the mapper turns into
    * a clean 409 rather than a double-booked driver.
    */
+  /** The trip a duty is for — this operator's only; null when not found. */
+  async tripForDuty(tripId: TripId): Promise<{ status: string } | null> {
+    return this.db.queryOne<{ status: string }>(
+      `SELECT status::text AS status FROM trips WHERE tenant_id = $1 AND id = $2`,
+      [requireTenantId(), tripId],
+      { name: 'crew.tripForDuty' },
+    );
+  }
+
   async insertDuty(input: {
     crewId: CrewId;
     tripId: TripId | null;
@@ -227,21 +302,29 @@ export class CrewRepository {
   }
 
   /** Every upcoming assigned duty across all crew — for the roster view. */
-  async listUpcomingDuties(limit = 100): Promise<
+  async listUpcomingDuties(limit = 200): Promise<
     {
       id: string;
       crewId: string;
       crewName: string;
+      crewRole: string;
       tripId: string | null;
+      tripLabel: string | null;
       startsAt: Date;
       endsAt: Date;
       drivingMinutes: number;
+      attendance: string;
+      overrideReason: string | null;
     }[]
   > {
     return this.db.query(
-      `SELECT d.id, d.crew_id AS "crewId", c.full_name AS "crewName", d.trip_id AS "tripId",
-              d.starts_at AS "startsAt", d.ends_at AS "endsAt", d.driving_minutes AS "drivingMinutes"
+      `SELECT d.id, d.crew_id AS "crewId", c.full_name AS "crewName", c.role::text AS "crewRole", d.trip_id AS "tripId",
+              CASE WHEN t.id IS NULL THEN NULL ELSE s.code || ' · ' || to_char(t.journey_date, 'DD Mon') END AS "tripLabel",
+              d.starts_at AS "startsAt", d.ends_at AS "endsAt", d.driving_minutes AS "drivingMinutes",
+              d.attendance, d.override_reason AS "overrideReason"
          FROM crew_duties d JOIN crew c ON c.id = d.crew_id
+         LEFT JOIN trips t ON t.id = d.trip_id AND t.tenant_id = d.tenant_id
+         LEFT JOIN services s ON s.id = t.service_id
         WHERE d.tenant_id = $1 AND d.status = 'assigned' AND d.ends_at > now()
         ORDER BY d.starts_at LIMIT $2`,
       [requireTenantId(), limit],
@@ -257,6 +340,9 @@ interface CrewRow {
   status: string;
   licence_no: string | null;
   licence_expires_on: LocalDate | null;
+  phone: string | null;
+  employee_code: string | null;
+  upcoming_duties: number;
 }
 interface DutyRow {
   id: string;
@@ -273,5 +359,8 @@ function mapCrew(r: CrewRow): Crew {
     status: r.status,
     licenceNo: r.licence_no,
     licenceExpiresOn: r.licence_expires_on,
+    phone: r.phone,
+    employeeCode: r.employee_code,
+    upcomingDuties: Number(r.upcoming_duties),
   };
 }

@@ -69,6 +69,36 @@ export class CrewService {
       drivingMinutes: input.drivingMinutes,
     };
     return this.uow.run({ name: 'crew.assignDuty', tenantId: requireTenantId() }, async () => {
+      const member = await this.crew.getById(input.crewId); // 404 for another operator's crew
+      if (member.status !== 'active')
+        throw new DomainError(
+          ErrorCode.COMMON_VALIDATION,
+          member.status === 'on_leave'
+            ? `${member.fullName} is on leave and cannot be given a duty`
+            : `${member.fullName} is inactive and cannot be given a duty`,
+        );
+      if (member.role === 'driver') {
+        const lastDay = input.endsAt.toISOString().slice(0, 10);
+        if (!member.licenceExpiresOn)
+          throw new DomainError(
+            ErrorCode.COMMON_VALIDATION,
+            `${member.fullName} has no driving licence on file — add it before giving a duty`,
+          );
+        if (member.licenceExpiresOn < lastDay)
+          throw new DomainError(
+            ErrorCode.COMMON_VALIDATION,
+            `${member.fullName}'s driving licence expires on ${member.licenceExpiresOn}, before this duty ends`,
+          );
+      }
+      if (input.tripId) {
+        const trip = await this.crew.tripForDuty(input.tripId);
+        if (!trip) throw new NotFoundError('Trip', input.tripId);
+        if (trip.status === 'cancelled')
+          throw new DomainError(
+            ErrorCode.COMMON_VALIDATION,
+            'That trip is cancelled — it needs no crew',
+          );
+      }
       const rules = input.rules ?? (await this.crew.loadRules());
       const existing = await this.crew.loadDuties(
         input.crewId,
@@ -146,6 +176,7 @@ export class CrewService {
 
   /** Driving still allowed now in the rolling 24h window, and when the crew member is next rested. */
   async allowance(crewId: CrewId) {
+    await this.crew.getById(crewId);
     const now = Date.now();
     const [rules, duties] = await Promise.all([
       this.crew.loadRules(),
@@ -176,9 +207,57 @@ export class CrewService {
     return this.crew.compliance(from, to);
   }
 
+  /** Cancel a duty that has not started yet and was not marked — a done duty is history. */
   async cancelDuty(id: DutyId): Promise<void> {
     await this.uow.run({ name: 'crew.cancelDuty', tenantId: requireTenantId() }, async () => {
+      const d = await this.crew.dutyForUpdate(id);
+      if (!d) throw new NotFoundError('Duty', id);
+      if (d.status === 'cancelled') return; // already cancelled: a retry is a no-op
+      if (d.attendance !== 'pending')
+        throw new DomainError(
+          ErrorCode.COMMON_VALIDATION,
+          'Attendance is already marked for this duty — it cannot be cancelled',
+        );
+      if (d.endsAt.getTime() <= Date.now())
+        throw new DomainError(ErrorCode.COMMON_VALIDATION, 'This duty has already ended');
       await this.crew.cancelDuty(id);
     });
+  }
+
+  /** Add a crew member. One mobile belongs to one person in the team. */
+  async addCrew(input: Parameters<CrewRepository['create']>[0]): Promise<CrewId> {
+    return this.uow.run({ name: 'crew.add', tenantId: requireTenantId() }, async () => {
+      await this.assertPhoneFree(input.phone);
+      return this.crew.create(input);
+    });
+  }
+
+  /**
+   * Edit a crew member. Going on leave or inactive is refused while they
+   * still hold upcoming duties — hand those to someone else first; a driver
+   * keeps a licence on file.
+   */
+  async updateCrew(id: CrewId, patch: Parameters<CrewRepository['update']>[1]): Promise<void> {
+    await this.uow.run({ name: 'crew.update', tenantId: requireTenantId() }, async () => {
+      const member = await this.crew.getById(id, true);
+      if (patch.phone) await this.assertPhoneFree(patch.phone, id);
+      if (member.role === 'driver' && (patch.licenceNo === null || patch.licenceExpiresOn === null))
+        throw new DomainError(
+          ErrorCode.COMMON_VALIDATION,
+          'A driver needs a licence number and its expiry date',
+        );
+      if (patch.status && patch.status !== 'active' && member.upcomingDuties > 0)
+        throw new DomainError(
+          ErrorCode.COMMON_VALIDATION,
+          `${member.fullName} still has ${member.upcomingDuties} upcoming ${member.upcomingDuties === 1 ? 'duty' : 'duties'} — cancel or reassign them first`,
+        );
+      await this.crew.update(id, patch);
+    });
+  }
+
+  private async assertPhoneFree(phone: string | undefined | null, except?: CrewId) {
+    if (!phone) return;
+    const holder = await this.crew.phoneTakenBy(phone, except);
+    if (holder) throw new ConflictError(`This mobile already belongs to ${holder} in your crew`);
   }
 }
