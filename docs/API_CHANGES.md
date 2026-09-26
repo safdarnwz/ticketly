@@ -406,3 +406,5 @@ an unknown id is now 404 (was 200).
   already expired (active buses), and drivers whose licence is expiring, expired or not on file.
 - **Branch code:** branches take an optional `code` (2–12 letters, digits or dashes, stored in capitals),
   unique per operator ignoring case (409). Migration 0097.
+- **Fleet on the road:** new `GET /tracking/fleet` (staff): every bus of the operator that has left and not
+  arrived, with its last GPS fix, speed, next stop and ETA.

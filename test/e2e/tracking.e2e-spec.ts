@@ -63,4 +63,13 @@ describe('live tracking (e2e)', () => {
     expect(byLink.body.fromStopName).not.toBe('Boarding point');
     expect(byLink.body.recentPings.length).toBeGreaterThan(0);
   });
+
+  it('the fleet view lists only buses on the road, for staff only', async () => {
+    const r = await app.get('/tracking/fleet', { as: 'operator' });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(Array.isArray(r.body.items)).toBe(true);
+    expect(r.body.items.every((x: { tripId: string }) => typeof x.tripId === 'string')).toBe(true);
+    expect((await app.get('/tracking/fleet', { as: 'anonymous' })).status).toBe(401);
+    expect((await app.get('/tracking/fleet', { as: 'customer' })).status).toBe(403);
+  });
 });

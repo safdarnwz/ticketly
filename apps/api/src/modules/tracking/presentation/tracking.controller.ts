@@ -23,6 +23,16 @@ export class TrackingController {
     return this.tracking.ingestPing(dto as never);
   }
 
+  @Get('fleet')
+  @ApiBearerAuth('bearer')
+  @RequirePermission(Permission.TRIP_OPERATE)
+  @ApiOperation({
+    summary: 'Every bus of this operator on the road now, with its last GPS position and ETA',
+  })
+  async fleet() {
+    return { items: await this.tracking.fleetOnTheRoad() };
+  }
+
   @Public()
   @Get('trips/:id/live')
   @ApiOperation({ summary: 'Live position & ETA for a trip (passenger tracking)' })

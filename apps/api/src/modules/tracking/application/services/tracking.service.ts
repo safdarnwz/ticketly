@@ -115,6 +115,11 @@ export class TrackingService {
    * tenant-bound crew/device context), this runs with bypassRls and filters
    * on trip_id alone.
    */
+  /** Every bus of this operator on the road, with its last position. */
+  fleetOnTheRoad() {
+    return this.tracking.fleetOnTheRoad();
+  }
+
   liveState(tripId: TripId): Promise<Record<string, unknown> | null> {
     return this.tracking.liveStatePublic(tripId);
   }

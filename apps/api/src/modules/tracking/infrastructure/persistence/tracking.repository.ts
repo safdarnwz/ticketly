@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { DatabaseService, UnitOfWork } from '@database';
-import { type StopId, type TenantId, type TripId } from '@kernel';
+import { requireTenantId, type StopId, type TenantId, type TripId } from '@kernel';
 
 export interface LiveRow {
   status: string;
@@ -98,6 +98,24 @@ export class TrackingRepository {
         l.lastPingAt,
       ],
       { name: 'tracking.upsertLive', primary: true },
+    );
+  }
+
+  /** This operator's buses on the road now, with their last GPS fix (none yet = no row data). */
+  fleetOnTheRoad(): Promise<Record<string, unknown>[]> {
+    return this.db.query(
+      `SELECT t.id AS "tripId", r.name AS "routeName", v.registration_no AS "bus", t.departs_at AS "departsAt",
+              t.arrives_at AS "arrivesAt", l.lat, l.lng, l.speed_kmph AS "speedKmph", s.name AS "nextStop",
+              l.next_stop_eta_at AS "nextStopEtaAt", l.delay_minutes AS "delayMinutes", l.last_ping_at AS "lastPingAt"
+         FROM trips t
+         JOIN routes r ON r.id = t.route_id
+         LEFT JOIN vehicles v ON v.id = t.vehicle_id
+         LEFT JOIN trip_live l ON l.trip_id = t.id
+         LEFT JOIN stops s ON s.id = l.next_stop_id
+        WHERE t.tenant_id = $1 AND t.status = 'departed'
+        ORDER BY l.last_ping_at NULLS FIRST, t.departs_at`,
+      [requireTenantId()],
+      { name: 'tracking.fleet' },
     );
   }
 
