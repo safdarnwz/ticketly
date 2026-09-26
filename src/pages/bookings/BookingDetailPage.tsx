@@ -16,7 +16,7 @@ import { refundsApi } from '@/lib/api/ops';
 import { isEmail } from '@/lib/checkout';
 import { formatMoney, formatTime } from '@/lib/utils';
 
-const CHANNEL_LABEL: Record<string, string> = { direct_web: 'Website', direct_app: 'Mobile app', ota: 'OTA partner', backoffice: 'Counter', phone: 'Phone booking' };
+const CHANNEL_LABEL: Record<string, string> = { direct_web: 'Website', direct_app: 'Mobile app', ota: 'OTA partner', backoffice: 'Counter', phone: 'Phone booking', agent: 'Travel agent' };
 const dt = (iso: string) =>
   new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
 const errText = (e: unknown, fallback: string) => (e instanceof ApiError || e instanceof Error ? e.message : fallback);
@@ -112,6 +112,8 @@ export function BookingDetailPage() {
             <Row label="Status"><Badge tone={d?.liveHold ? 'warning' : statusTone(booking.status)}>{status}</Badge></Row>
             {d && <Row label="Booked">{dt(d.createdAt)}</Row>}
             {d && <Row label="Channel">{CHANNEL_LABEL[d.channel] ?? d.channel}</Row>}
+            {d?.agentName && <Row label="Sold by agent">{d.agentName}</Row>}
+            {d?.noShowSeats?.length ? <Row label="No-show"><Badge tone="danger">{d.noShowSeats.join(', ')}</Badge></Row> : null}
             <Row label="Seats">{d?.seats.join(', ') || booking.seatCount}</Row>
             <Row label="Total">{formatMoney(booking.totalMinor, booking.currency)}</Row>
             <Row label="Paid">{formatMoney(booking.paidMinor, booking.currency)}</Row>

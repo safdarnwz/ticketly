@@ -30,12 +30,16 @@ export interface StaffBookingRow {
   createdAt: string; confirmedAt: string | null; cancelledAt: string | null;
   tripId: string; journeyDate: string; departsAt: string; routeName: string;
   fromName: string | null; toName: string | null; leadPassenger: string | null; seats: string[];
+  /** The travel agent who sold it, if any. */
+  agentName?: string | null;
+  /** Seats whose passenger did not turn up. */
+  noShowSeats?: string[];
 }
 export type StaffBookingStatus = 'live' | 'confirmed' | 'cancelled' | 'expired' | 'completed';
 export interface StaffBookingFilters {
   pnr?: string; mobile?: string; ticket?: string;
   from?: string; to?: string; dateBasis?: 'booked' | 'journey';
-  status?: StaffBookingStatus; channel?: string; tripId?: string;
+  status?: StaffBookingStatus; channel?: string; tripId?: string; agentId?: string; noShow?: boolean;
 }
 
 export const bookingsApi = {
