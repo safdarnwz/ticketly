@@ -1,11 +1,15 @@
-import { post } from './client';
+import { get, post } from './client';
 
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
 }
 
+export interface Principal { userId: string | null; tenantId: string | null; actorType: string; roles: string[]; permissions: string[] }
+
 export const authApi = {
+  /** Who I am and what my roles let me do right now. */
+  me: () => get<Principal>('/v1/auth/me'),
   /** Unified login — identifier is an email OR a mobile number. */
   login: (identifier: string, password: string) =>
     post<AuthTokens>('/v1/auth/login', { identifier, password }),

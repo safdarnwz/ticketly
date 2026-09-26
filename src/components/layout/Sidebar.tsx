@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   Activity,
   LayoutDashboard, Search, Ticket, RotateCcw, Star, LifeBuoy,
@@ -6,29 +7,30 @@ import {
   Route as RouteIcon, Truck, Calendar, IndianRupee, TrendingUp, Radio, Users, BarChart3, UserCog,
 } from 'lucide-react';
 
+import { authApi } from '@/lib/api/auth';
 import { cn } from '@/lib/utils';
 import { isSuperAdmin, SURFACE_TENANT_SLUG } from '@/lib/host';
 
 /** app.<slug>.ticketly.com — one operator's own console. Purely their own trading operations. */
-const tenantAdminNav = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/trips', label: 'Trips & Charts', icon: Bus },
-  { to: '/routes', label: 'Routes & Stops', icon: RouteIcon },
-  { to: '/fleet', label: 'Fleet & Crew', icon: Truck },
-  { to: '/schedule', label: 'Schedule', icon: Calendar },
-  { to: '/pricing', label: 'Pricing', icon: IndianRupee },
-  { to: '/distribution', label: 'Distribution', icon: Radio },
-  { to: '/promotions', label: 'Promotions', icon: TrendingUp },
-  { to: '/branches', label: 'Branches', icon: Building2 },
-  { to: '/staff', label: 'Staff', icon: UserCog },
-  { to: '/customers', label: 'Customers', icon: Users },
-  { to: '/reports', label: 'Reports', icon: BarChart3 },
-  { to: '/search', label: 'Search & Book', icon: Search },
-  { to: '/bookings', label: 'Bookings', icon: Ticket },
-  { to: '/refunds', label: 'Refunds', icon: RotateCcw },
-  { to: '/reviews', label: 'Reviews', icon: Star },
-  { to: '/support', label: 'Support', icon: LifeBuoy },
-  { to: '/settings', label: 'Settings', icon: SettingsIcon },
+const tenantAdminNav: { to: string; label: string; icon: typeof Bus; needs: string[] }[] = [
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, needs: [] },
+  { to: '/trips', label: 'Trips & Charts', icon: Bus, needs: ['service:read', 'trip:manage', 'trip:operate'] },
+  { to: '/routes', label: 'Routes & Stops', icon: RouteIcon, needs: ['route:read', 'stop:manage'] },
+  { to: '/fleet', label: 'Fleet & Crew', icon: Truck, needs: ['vehicle:read', 'crew:manage'] },
+  { to: '/schedule', label: 'Schedule', icon: Calendar, needs: ['service:read'] },
+  { to: '/pricing', label: 'Pricing', icon: IndianRupee, needs: ['fare:read'] },
+  { to: '/distribution', label: 'Distribution', icon: Radio, needs: ['agent:read'] },
+  { to: '/promotions', label: 'Promotions', icon: TrendingUp, needs: ['route:manage'] },
+  { to: '/branches', label: 'Branches', icon: Building2, needs: ['tenant:read'] },
+  { to: '/staff', label: 'Staff', icon: UserCog, needs: ['user:read', 'role:manage', 'report:read'] },
+  { to: '/customers', label: 'Customers', icon: Users, needs: ['booking:read'] },
+  { to: '/reports', label: 'Reports', icon: BarChart3, needs: ['report:read'] },
+  { to: '/search', label: 'Search & Book', icon: Search, needs: ['booking:create'] },
+  { to: '/bookings', label: 'Bookings', icon: Ticket, needs: ['booking:read'] },
+  { to: '/refunds', label: 'Refunds', icon: RotateCcw, needs: ['payment:read', 'payment:refund'] },
+  { to: '/reviews', label: 'Reviews', icon: Star, needs: ['tenant:read'] },
+  { to: '/support', label: 'Support', icon: LifeBuoy, needs: ['booking:read'] },
+  { to: '/settings', label: 'Settings', icon: SettingsIcon, needs: ['tenant:read'] },
 ];
 
 /**
@@ -50,7 +52,12 @@ const superAdminNav = [
 ];
 
 export function Sidebar() {
-  const nav = isSuperAdmin ? superAdminNav : tenantAdminNav;
+  // Staff only see the menus their roles open (any one of `needs`); the API refuses the rest anyway.
+  const me = useQuery({ queryKey: ['auth-me'], queryFn: authApi.me, enabled: !isSuperAdmin, staleTime: 60_000 });
+  const held = new Set(me.data?.permissions ?? []);
+  const nav = isSuperAdmin
+    ? superAdminNav
+    : tenantAdminNav.filter((n) => n.needs.length === 0 || held.has('*') || n.needs.some((p) => held.has(p)));
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface text-text-muted md:flex">
