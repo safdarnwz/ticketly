@@ -66,6 +66,7 @@ import { OperatorsPage } from '@/pages/admin/OperatorsPage';
 import { TenantsPage } from '@/pages/admin/TenantsPage';
 import { AnalyticsPage } from '@/pages/admin/AnalyticsPage';
 import { LiveBookingsPage } from '@/pages/admin/LiveBookingsPage';
+import { EscalationsPage } from '@/pages/admin/EscalationsPage';
 import { CmsPage } from '@/pages/cms/CmsPage';
 import { FraudPage } from '@/pages/fraud/FraudPage';
 import { I18nPage } from '@/pages/i18n/I18nPage';
@@ -168,6 +169,7 @@ const superAdminRouter = createBrowserRouter([
           { path: '/admin/operators', element: <OperatorsPage /> },
           { path: '/admin/analytics', element: <AnalyticsPage /> },
           { path: '/admin/bookings', element: <LiveBookingsPage /> },
+          { path: '/admin/escalations', element: <EscalationsPage /> },
           { path: '/cms', element: <CmsPage /> },
           { path: '/fraud', element: <FraudPage /> },
           {

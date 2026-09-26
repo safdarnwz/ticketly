@@ -36,14 +36,19 @@ export const reviewsApi = {
 
 // Support
 export type TicketStatus = 'open' | 'pending' | 'resolved' | 'closed';
+/** Escalated to the platform's support team: waiting on it, answered, or closed by it. */
+export type EscalationStatus = 'open' | 'answered' | 'closed';
+/** 'escalation' (operator → platform) and 'platform' (platform → operator) are internal notes. */
+export type AuthorKind = 'customer' | 'agent' | 'system' | 'escalation' | 'platform';
 export interface Ticket {
   id: string; subject: string; category: string; priority: 'low' | 'normal' | 'high' | 'urgent'; status: TicketStatus;
   pnr: string | null; bookingId: string | null; customerName: string | null; customerPhone: string | null;
-  assignedTo: string | null; assignedName: string | null; messages: number; lastAuthor: 'customer' | 'agent' | 'system' | null; lastMessageAt: string | null;
+  assignedTo: string | null; assignedName: string | null; messages: number; lastAuthor: AuthorKind | null; lastMessageAt: string | null;
+  escalationStatus: EscalationStatus | null; escalatedAt: string | null;
   createdAt: string; updatedAt: string;
 }
-export interface TicketMessage { id: string; authorKind: 'customer' | 'agent' | 'system'; authorId: string | null; authorName: string | null; body: string; createdAt: string }
-export interface TicketQuery { status?: TicketStatus | 'active'; priority?: string; category?: string; assigned?: 'me' | 'none'; q?: string }
+export interface TicketMessage { id: string; authorKind: AuthorKind; authorId: string | null; authorName: string | null; body: string; createdAt: string }
+export interface TicketQuery { status?: TicketStatus | 'active'; priority?: string; category?: string; assigned?: 'me' | 'none'; q?: string; escalated?: 1 }
 export const supportApi = {
   list: (f: TicketQuery = {}) => {
     const q = new URLSearchParams();
@@ -58,6 +63,20 @@ export const supportApi = {
   reply: (id: string, body: string) => post<{ status: TicketStatus }>(`/v1/support/tickets/${id}/messages`, { body }),
   setStatus: (id: string, status: TicketStatus) => post<{ status: TicketStatus }>(`/v1/support/tickets/${id}/status`, { status }),
   update: (id: string, changes: { priority?: string; assignedTo?: string | null }) => patch<{ ok: boolean }>(`/v1/support/tickets/${id}`, changes),
+  /** Hand it to the platform's support team (an internal note — the customer never sees it). */
+  escalate: (id: string, reason: string, key: string) => post<{ escalationStatus: EscalationStatus }>(`/v1/support/tickets/${id}/escalate`, { reason }, withIdempotency(key)),
+};
+
+/** The platform's support desk: tickets operators escalated. */
+export interface Escalation {
+  id: string; tenantId: string; operatorName: string; subject: string; category: string; priority: Ticket['priority']; status: TicketStatus;
+  escalationStatus: EscalationStatus; escalatedAt: string; escalatedByName: string | null; pnr: string | null; lastAuthor: AuthorKind | null; lastMessageAt: string | null;
+}
+export const escalationsApi = {
+  list: (status: EscalationStatus | 'active') => get<{ items: Escalation[] }>(`/v1/admin/support/escalations?status=${status}`),
+  get: (id: string) => get<{ ticket: Escalation; messages: Omit<TicketMessage, 'authorId'>[] }>(`/v1/admin/support/escalations/${id}`),
+  reply: (id: string, body: string) => post<{ escalationStatus: 'answered' }>(`/v1/admin/support/escalations/${id}/messages`, { body }),
+  close: (id: string) => post<{ escalationStatus: 'closed' }>(`/v1/admin/support/escalations/${id}/close`, {}),
 };
 
 // CMS + offers (Part 14)

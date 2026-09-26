@@ -45,6 +45,7 @@ const superAdminNav = [
   { to: '/admin/tenants', label: 'Operators', icon: Building2 },
   { to: '/admin/operators', label: 'Applications', icon: ClipboardList },
   { to: '/admin/bookings', label: 'Live bookings', icon: Activity },
+  { to: '/admin/escalations', label: 'Support escalations', icon: LifeBuoy },
   { to: '/admin/analytics', label: 'Analytics & Billing', icon: TrendingUp },
   { to: '/cms', label: 'CMS & Offers', icon: Megaphone },
   { to: '/fraud', label: 'Risk & Fraud', icon: ShieldAlert },
