@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Badge, Button, Card, CardBody, EmptyState, ErrorState, Input, PageLoader, Select, Table, useToast, type Column } from '@/components/ui';
@@ -35,12 +36,13 @@ export function TripOpsSection({ chart, locked, onChanged }: { chart: TripChart;
 }
 
 function Channels({ chart, locked, onChanged }: { chart: TripChart; locked: boolean; onChanged: () => void }) {
+  const qc = useQueryClient();
   const toast = useToast();
   const own = (chart.trip.closedOnTrip ?? []) as Channel[];
   const bySvc = chart.trip.closedByService ?? [];
   const save = useMutation({
     mutationFn: (closed: Channel[]) => tripOpsExtraApi.setClosedChannels(chart.trip.id, closed),
-    onSuccess: () => { toast.success('Sales channels updated'); onChanged(); },
+    onSuccess: () => { toast.success('Sales channels updated'); void qc.invalidateQueries({ queryKey: ['partner-sync', chart.trip.id] }); onChanged(); },
     onError: (e) => toast.error(errText(e)),
   });
   return (
@@ -61,6 +63,54 @@ function Channels({ chart, locked, onChanged }: { chart: TripChart; locked: bool
         );
       })}
       {locked && <p className="text-xs text-text-muted">This bus has left or was cancelled — sales cannot change.</p>}
+      <PartnerSyncCard tripId={chart.trip.id} own={own} locked={locked} onChanged={onChanged} />
+    </div>
+  );
+}
+
+/** What the OTAs see for this bus right now, and one-click fixes for what stops them. */
+function PartnerSyncCard({ tripId, own, locked, onChanged }: { tripId: string; own: Channel[]; locked: boolean; onChanged: () => void }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const q = useQuery({ queryKey: ['partner-sync', tripId], queryFn: () => tripOpsExtraApi.partnerSync(tripId) });
+  const reopen = useMutation({
+    mutationFn: () => tripOpsExtraApi.setClosedChannels(tripId, own.filter((c) => c !== 'ota')),
+    onSuccess: () => { toast.success('Partners can sell this bus again'); void qc.invalidateQueries({ queryKey: ['partner-sync', tripId] }); onChanged(); },
+    onError: (e) => toast.error(errText(e)),
+  });
+  // A channel change above moves this too.
+  const recheck = () => void q.refetch();
+  if (q.isLoading) return <PageLoader />;
+  if (q.isError) return <ErrorState error={q.error} onRetry={q.refetch} />;
+  const d = q.data!;
+  return (
+    <div className="mt-3 rounded-md border border-border p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <span className="font-medium text-text">OTA partners — what they see now</span>
+        <span className="flex items-center gap-2">
+          <Badge tone={d.selling ? 'success' : d.departed ? 'neutral' : 'warning'}>{d.selling ? 'In sync · selling' : d.departed ? 'Departed' : 'Not reaching partners'}</Badge>
+          <Button size="sm" variant="ghost" loading={q.isFetching} onClick={recheck}>Check again</Button>
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div><div className="text-xs text-text-muted">Seats partners see</div><div className="font-semibold">{d.seats.freeForPartners} of {d.seats.total}</div></div>
+        <div><div className="text-xs text-text-muted">Free for the full journey</div><div className="font-semibold">{d.seats.freeNow}</div></div>
+        <div><div className="text-xs text-text-muted">Sold by partners</div><div className="font-semibold">{d.seats.partnerSold}</div></div>
+        <div><div className="text-xs text-text-muted">Partner customers paying</div><div className="font-semibold">{d.seats.partnerHolding}</div></div>
+      </div>
+      <p className="mt-2 text-xs text-text-muted">Partners read the same live seat map as your website, so a seat sold anywhere disappears for them at once. {d.partners.some((p) => p.receiving) ? `${d.partners.filter((p) => p.receiving).map((p) => p.name).join(', ')} ${d.partners.filter((p) => p.receiving).length === 1 ? 'receives' : 'receive'} your seats` : 'No partner receives your seats yet'}{d.partners.some((p) => p.paused) ? `; paused: ${d.partners.filter((p) => p.paused).map((p) => p.name).join(', ')}` : ''}.</p>
+      {d.issues.length > 0 && (
+        <ul className="mt-2 flex flex-col gap-1">
+          {d.issues.map((i) => (
+            <li key={i.code} className="flex flex-wrap items-center justify-between gap-2 rounded bg-warning/10 px-2 py-1 text-xs text-text">
+              <span>{i.message}</span>
+              {i.code === 'closed_on_trip' && !locked && <Button size="sm" variant="outline" loading={reopen.isPending} disabled={reopen.isPending} onClick={() => reopen.mutate()}>Reopen for partners</Button>}
+              {(i.code === 'no_partner') && <Link className="text-primary underline" to="/distribution">Distribution → Partners</Link>}
+              {i.code === 'closed_on_service' && <Link className="text-primary underline" to="/schedule">Open the service</Link>}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

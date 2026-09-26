@@ -1,6 +1,12 @@
 import { download, get, post, put, withIdempotency } from './client';
 
 export interface Quota { id: string; seatNumber: string; holderType: 'agent' | 'branch'; holderId: string; holderName: string | null; releaseAt: string; releasedAt: string | null; releaseReason: string | null; consumedAt: string | null }
+export interface PartnerSync {
+  tripId: string; selling: boolean; departed: boolean;
+  seats: { total: number; freeForPartners: number; freeNow: number; partnerSold: number; partnerHolding: number };
+  partners: { partnerId: string; name: string; receiving: boolean; paused: boolean; commissionPct: number | null }[];
+  issues: { code: 'closed_on_service' | 'closed_on_trip' | 'no_partner' | 'sold_out'; message: string }[];
+}
 export interface WaitlistEntry { id: string; seatCount: number; contactPhone: string; status: string; notifiedAt: string | null; createdAt: string; fromStop: string; toStop: string }
 export const EXPENSE_CATEGORIES = ['diesel', 'cng', 'toll', 'driver_bata', 'cleaner_bata', 'parking', 'permit_fee', 'state_tax', 'repair', 'food', 'cleaning', 'other'] as const;
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
@@ -24,6 +30,8 @@ export const tripOpsExtraApi = {
     post<{ allocated: number; releaseAt: string }>(`/v1/trips/${tripId}/quotas/percentage`, body, withIdempotency(key)),
   release: (tripId: string, seatNumbers: string[], reason: string, key: string) =>
     post<{ released: number }>(`/v1/trips/${tripId}/quotas/release`, { seatNumbers, reason }, withIdempotency(key)),
+  /** Is this trip reaching the OTAs: seats partners see now, partner sold/holding, and what blocks them. */
+  partnerSync: (tripId: string) => get<PartnerSync>(`/v1/trips/${tripId}/partner-sync`),
   setClosedChannels: (tripId: string, closed: Channel[]) => put<{ ok: boolean; closed: Channel[] }>(`/v1/trips/${tripId}/closed-channels`, { closed }),
   waitlist: (tripId: string) => get<{ items: WaitlistEntry[] }>(`/v1/trips/${tripId}/waitlist`),
   expenses: (tripId: string, includeVoided = true) => get<{ items: Expense[] }>(`/v1/trips/${tripId}/expenses${includeVoided ? '?includeVoided=1' : ''}`),
