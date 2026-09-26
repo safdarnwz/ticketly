@@ -44,13 +44,14 @@ export class TripChartService {
     const stops = detail.stops;
     const first = stops[0];
     const last = stops[stops.length - 1];
-    const [map, occupants, heldBack, ran] = await Promise.all([
+    const [map, occupants, heldBack, ran, channels] = await Promise.all([
       first && last
         ? this.scheduling.seatMap(tripId, first.stopId, last.stopId)
         : Promise.resolve(null),
       this.bookings.tripOccupants(tripId),
       this.inventory.heldBack(tripId),
       this.trips.hasRun(tripId),
+      this.trips.channelState(tripId),
     ]);
     const nameAt = new Map(stops.map((s) => [s.sequence, s.name]));
     const bySeat = new Map<string, ChartSeat['occupants']>();
@@ -77,7 +78,7 @@ export class TripChartService {
     const paid = occupants.filter((o) => !o.onHold);
     const bookingIds = new Set(paid.map((o) => o.bookingId));
     return {
-      trip: { ...detail.trip, hasRun: ran },
+      trip: { ...detail.trip, hasRun: ran, ...channels },
       stops,
       layout: map?.layout ?? { decks: 1, rows: 0, columns: 0 },
       seats,

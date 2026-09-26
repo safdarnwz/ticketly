@@ -231,6 +231,19 @@ export class TripRepository {
     return n > 0;
   }
 
+  /** Closed channels split by where they were closed: this trip, or its whole service. */
+  async channelState(
+    tripId: TripId,
+  ): Promise<{ closedOnTrip: string[]; closedByService: string[] }> {
+    const row = await this.db.queryOne<{ own: string[] | null; svc: string[] | null }>(
+      `SELECT t.closed_channels AS own, s.closed_channels AS svc
+         FROM trips t LEFT JOIN services s ON s.id = t.service_id WHERE t.tenant_id = $1 AND t.id = $2`,
+      [requireTenantId(), tripId],
+      { name: 'trip.channelState' },
+    );
+    return { closedOnTrip: row?.own ?? [], closedByService: row?.svc ?? [] };
+  }
+
   /** Channels whose sales are closed for this trip (its own list ∪ its service's list). */
   async closedChannels(tripId: TripId): Promise<string[]> {
     const row = await this.db.queryOne<{ closed: string[] | null }>(

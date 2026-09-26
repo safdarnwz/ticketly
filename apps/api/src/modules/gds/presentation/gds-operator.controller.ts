@@ -2,8 +2,8 @@ import { Body, Controller, Get, Put } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
+import { AppError, ErrorCode, type TripId } from '@kernel';
 import { ApiStandardErrors, RequirePermission, UuidParam, zodBody } from '@http';
-import { type TripId } from '@kernel';
 
 import { TripRepository } from '../../scheduling';
 import { GdsService } from '../application/gds.service';
@@ -54,7 +54,14 @@ export class GdsOperatorController {
     @UuidParam('tripId') tripId: string,
     @Body(zodBody(ClosedChannelsSchema)) dto: ClosedChannelsDto,
   ) {
-    await this.trips.getById(tripId as TripId);
+    const trip = await this.trips.getById(tripId as TripId);
+    if (
+      !['scheduled', 'open', 'closed'].includes(trip.status) ||
+      (await this.trips.hasRun(trip.id))
+    )
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+        message: 'This trip has left or was cancelled — its sales cannot change',
+      });
     await this.trips.setClosedChannels(tripId as TripId, dto.closed);
     return { ok: true, closed: [...new Set(dto.closed)] };
   }

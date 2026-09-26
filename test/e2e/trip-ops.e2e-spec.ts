@@ -198,4 +198,14 @@ describe('trip operations (e2e)', () => {
     );
     expect((await allocate({})).status).toBe(422); // suspended agent
   });
+
+  it('sales channels per trip, shown on the chart', async () => {
+    const f = app.fixtures;
+    const set = (closed: string[]) => app.put(`/trips/${f.tripId}/closed-channels`, { closed }, op);
+    expect((await set(['ota', 'agent'])).status).toBe(200);
+    expect((await chart(f.tripId)).body.trip.closedOnTrip.sort()).toEqual(['agent', 'ota']);
+    expect((await set(['teleport'])).status).toBe(400);
+    expect((await set([])).status).toBe(200);
+    expect((await chart(f.tripId)).body.trip.closedOnTrip).toEqual([]);
+  });
 });

@@ -350,3 +350,5 @@ an unknown id is now 404 (was 200).
 - **Seat quotas (fix):** `POST /trips/:tripId/quotas` and `/quotas/percentage` never succeeded — the
   free-seat check compared bigint masks (parsed to numbers) with the string '0', so every seat looked sold
   and every allocation was a 409. The check is now done in SQL.
+- **Trip sales channels:** the chart's `trip` carries `closedOnTrip` and `closedByService`;
+  `PUT /trips/:tripId/closed-channels` is refused (422) once the bus has left or the trip was cancelled.
