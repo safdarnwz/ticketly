@@ -347,3 +347,6 @@ an unknown id is now 404 (was 200).
   and an ended service is not edited (clone it); restoring a version that already ended is refused;
   blackout dates must be today or later; a women / senior quota in seats cannot exceed the bus's seats
   (a 100 % ladies-special quota stays allowed). All 422 with the reason.
+- **Seat quotas (fix):** `POST /trips/:tripId/quotas` and `/quotas/percentage` never succeeded — the
+  free-seat check compared bigint masks (parsed to numbers) with the string '0', so every seat looked sold
+  and every allocation was a 409. The check is now done in SQL.

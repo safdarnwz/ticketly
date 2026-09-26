@@ -145,4 +145,57 @@ describe('trip operations (e2e)', () => {
       ).status,
     ).toBe(400);
   });
+
+  it('seat quotas for an agent or branch: free seats only, active holders only, released on demand', async () => {
+    const f = app.fixtures;
+    const run = Date.now().toString(36);
+    const agent = await app.post(
+      '/agents',
+      {
+        name: `Quota Travels ${run}`,
+        contactPhone: `96${String(Date.now()).slice(-8)}`,
+        billingMode: 'prepaid',
+        commissionPct: 5,
+        loginEmail: `quota.${run}@demo-travels.example`,
+        password: 'Quota-pass-123',
+      },
+      { ...op, idempotencyKey: `e2e-quota-agent-${run}` },
+    );
+    expect(agent.status, JSON.stringify(agent.body)).toBe(201);
+    const holderId = agent.body.agentId as string;
+    const c = (await chart(f.tripId)).body as {
+      seats: { seatNumber: string; blocked: boolean; bookable: boolean; occupants: unknown[] }[];
+    };
+    const free = c.seats.filter((s) => s.bookable && !s.blocked && s.occupants.length === 0);
+    const sold = c.seats.find((s) => s.occupants.length > 0);
+    const seat = free[free.length - 1].seatNumber;
+    const allocate = (body: object) =>
+      app.post(
+        `/trips/${f.tripId}/quotas`,
+        { seatNumbers: [seat], holderType: 'agent', holderId, releaseMinutesBefore: 120, ...body },
+        { ...op, idempotencyKey: `e2e-quota-${run}-${Math.random()}` },
+      );
+    if (sold) expect((await allocate({ seatNumbers: [sold.seatNumber] })).status).toBe(409);
+    expect((await allocate({ seatNumbers: ['NOPE-1'] })).status).toBe(404);
+    expect((await allocate({ holderId: '00000000-0000-4000-8000-000000000000' })).status).toBe(404);
+    const ok = await allocate({});
+    expect(ok.status, JSON.stringify(ok.body)).toBe(201); // every allocation used to fail as "already sold"
+    expect((await allocate({})).status).toBe(409); // allocated already
+    const list = (await app.get(`/trips/${f.tripId}/quotas`, op)).body.items as {
+      seatNumber: string;
+    }[];
+    expect(list.map((q) => q.seatNumber)).toContain(seat);
+    const release = await app.post(
+      `/trips/${f.tripId}/quotas/release`,
+      { seatNumbers: [seat], reason: 'Back to general sale' },
+      { ...op, idempotencyKey: `e2e-quota-rel-${run}` },
+    );
+    expect(release.status, JSON.stringify(release.body)).toBe(200);
+    await app.post(
+      `/agents/${holderId}/status`,
+      { status: 'suspended', reason: 'End of the e2e run' },
+      op,
+    );
+    expect((await allocate({})).status).toBe(422); // suspended agent
+  });
 });

@@ -66,16 +66,16 @@ export class SeatQuotaRepository {
   ): Promise<{ missing: string[]; busy: string[] }> {
     const t = this.tx();
     const rows = (
-      await t.client.query<{ seat_number: string; occupied_legs: string; blocked_legs: string }>(
-        `SELECT seat_number, occupied_legs, blocked_legs FROM trip_seats
+      await t.client.query<{ seat_number: string; busy: boolean }>(
+        // Decided in SQL: the pool parses bigint masks to numbers, so comparing them to '0' here
+        // called every seat busy and no allocation ever succeeded.
+        `SELECT seat_number, (occupied_legs <> 0 OR blocked_legs <> 0) AS busy FROM trip_seats
         WHERE tenant_id = $1 AND trip_id = $2 AND seat_number = ANY($3::text[]) FOR UPDATE`,
         [requireTenantId(), tripId, seats],
       )
     ).rows;
     const found = new Set(rows.map((r) => r.seat_number));
-    const busy = rows
-      .filter((r) => r.occupied_legs !== '0' || r.blocked_legs !== '0')
-      .map((r) => r.seat_number);
+    const busy = rows.filter((r) => r.busy).map((r) => r.seat_number);
     // A customer may be mid-checkout on the seat: occupancy is only committed
     // at confirm, so an unexpired HELD booking must also count as busy.
     const held = (
