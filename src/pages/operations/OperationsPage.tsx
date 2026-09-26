@@ -1,14 +1,15 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Archive, ClipboardList, PackageSearch, Plus, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, Archive, ClipboardList, Navigation, PackageSearch, Plus, ShieldAlert } from 'lucide-react';
 
 import { Badge, Button, Card, CardBody, EmptyState, ErrorState, Input, Modal, PageLoader, Select, Table, type Column, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ApiError } from '@/lib/api/client';
 import { branchesApi } from '@/lib/api/branches';
-import { DELAY_CATEGORIES, INCIDENT_TYPES, operationsApi, type Incident, type LostItem } from '@/lib/api/operations';
+import { DELAY_CATEGORIES, INCIDENT_TYPES, operationsApi, type BusOnRoad, type Incident, type LostItem } from '@/lib/api/operations';
 import { schedulingApi } from '@/lib/api/scheduling';
-import { cn, formatDateTime, idempotencyKey, todayLocal } from '@/lib/utils';
+import { cn, formatDateTime, formatTime, idempotencyKey, todayLocal } from '@/lib/utils';
 
 const errText = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
 const typeLabel = (t: string) => INCIDENT_TYPES.find((x) => x.value === t)?.label ?? (t === 'sos' ? 'SOS / panic' : t);
@@ -16,12 +17,13 @@ const SEVERITY_TONE = { critical: 'danger', high: 'warning', normal: 'neutral' }
 const STATUS_TONE = { open: 'danger', acknowledged: 'warning', resolved: 'success', closed: 'neutral' } as const;
 const DISPOSE_AFTER_DAYS = 30;
 
-type Tab = 'incidents' | 'lost' | 'notes';
+type Tab = 'road' | 'incidents' | 'lost' | 'notes';
 
 /** The dispatch desk: incidents on the road, lost & found, and shift handover notes. */
 export function OperationsPage() {
-  const [tab, setTab] = useState<Tab>('incidents');
+  const [tab, setTab] = useState<Tab>('road');
   const tabs = [
+    { key: 'road' as const, label: 'On the road', icon: Navigation },
     { key: 'incidents' as const, label: 'Incidents', icon: ShieldAlert },
     { key: 'lost' as const, label: 'Lost & found', icon: PackageSearch },
     { key: 'notes' as const, label: 'Shift notes', icon: ClipboardList },
@@ -37,6 +39,7 @@ export function OperationsPage() {
           </button>
         ))}
       </div>
+      {tab === 'road' && <OnTheRoad />}
       {tab === 'incidents' && <Incidents />}
       {tab === 'lost' && <LostFound />}
       {tab === 'notes' && <ShiftNotes />}
@@ -55,6 +58,37 @@ function TripPicker({ value, onChange, label = 'Trip' }: { value: string; onChan
         options={[{ label: trips.isLoading ? 'Loading…' : trips.data?.items.length ? 'Not tied to a trip' : 'No trips that day', value: '' },
           ...(trips.data?.items ?? []).map((t) => ({ value: t.id, label: `${t.routeName} · ${formatDateTime(t.departsAt)}${t.status === 'cancelled' ? ' (cancelled)' : ''}` }))]} />
     </div>
+  );
+}
+
+/* ── on the road ───────────────────────────────────────────────────────── */
+
+const SIGNAL_LOST_MS = 10 * 60_000;
+
+/** Every bus that has left and not arrived, with its last GPS fix — refreshes every 30 seconds. */
+function OnTheRoad() {
+  const q = useQuery({ queryKey: ['on-the-road'], queryFn: operationsApi.onTheRoad, refetchInterval: 30_000 });
+  const now = Date.now();
+  const columns: Column<BusOnRoad>[] = [
+    { key: 'bus', header: 'Bus', render: (r) => <div><Link className="font-medium text-primary hover:underline" to={`/trips/${r.tripId}`}>{r.routeName}</Link><div className="font-mono text-xs text-text-muted">{r.bus ?? 'no bus assigned'} · left {formatTime(r.departsAt)}</div></div> },
+    { key: 'where', header: 'Where', render: (r) => r.lat == null || r.lng == null ? <span className="text-text-muted">No GPS yet</span>
+      : <a className="text-primary underline" href={`https://www.google.com/maps?q=${r.lat},${r.lng}`} target="_blank" rel="noreferrer">{Number(r.lat).toFixed(4)}, {Number(r.lng).toFixed(4)}</a> },
+    { key: 'speed', header: 'Speed', render: (r) => (r.speedKmph == null ? '—' : `${Math.round(Number(r.speedKmph))} km/h`) },
+    { key: 'next', header: 'Next stop', render: (r) => r.nextStop ? <span>{r.nextStop}{r.nextStopEtaAt ? <span className="text-text-muted"> · {formatTime(r.nextStopEtaAt)}</span> : null}</span> : '—' },
+    { key: 'late', header: 'Running', render: (r) => { const d = Number(r.delayMinutes); return d > 0 && d < 1440 ? <Badge tone="warning">{d} min late</Badge> : d < -5 && d > -1440 ? <Badge tone="success">{-d} min early</Badge> : <span className="text-text-muted">on time</span>; } },
+    { key: 'ping', header: 'Signal', render: (r) => !r.lastPingAt ? <Badge tone="danger">none</Badge>
+      : now - new Date(r.lastPingAt).getTime() > SIGNAL_LOST_MS ? <Badge tone="danger">lost · {formatTime(r.lastPingAt)}</Badge>
+        : <span className="text-xs text-text-muted">{formatTime(r.lastPingAt)}</span> },
+  ];
+  if (q.isLoading) return <PageLoader />;
+  if (q.isError) return <ErrorState error={q.error} onRetry={q.refetch} />;
+  const items = q.data?.items ?? [];
+  const lost = items.filter((r) => !r.lastPingAt || now - new Date(r.lastPingAt).getTime() > SIGNAL_LOST_MS).length;
+  return (
+    <>
+      <p className="mb-3 text-sm text-text-muted">{items.length} bus{items.length === 1 ? '' : 'es'} on the road{lost ? ` · ${lost} without a recent GPS signal` : ''}. Positions come from the crew app.</p>
+      {items.length ? <Table columns={columns} rows={items} /> : <EmptyState title="No bus is on the road right now" icon={<Navigation className="h-10 w-10" />} />}
+    </>
   );
 }
 

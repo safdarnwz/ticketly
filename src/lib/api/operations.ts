@@ -19,7 +19,10 @@ export interface LostItem {
 }
 export interface ShiftNote { id: string; note: string; createdAt: string; writtenBy: string | null }
 
+export interface BusOnRoad { tripId: string; routeName: string; bus: string | null; departsAt: string; arrivesAt: string; lat: number | null; lng: number | null; speedKmph: number | null; nextStop: string | null; nextStopEtaAt: string | null; delayMinutes: number | null; lastPingAt: string | null }
+
 export const operationsApi = {
+  onTheRoad: () => get<{ items: BusOnRoad[] }>('/v1/tracking/fleet'),
   incidents: (f: { status?: string; tripId?: string } = {}) => {
     const qs = new URLSearchParams(Object.entries(f).filter(([, v]) => v) as [string, string][]).toString();
     return get<{ items: Incident[] }>(`/v1/incidents${qs ? `?${qs}` : ''}`);
