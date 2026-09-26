@@ -1,4 +1,4 @@
-import { get, post, withIdempotency } from './client';
+import { del, get, patch, post, put, withIdempotency } from './client';
 
 export interface ServiceRow {
   id: string; code: string; routeId: string; vehicleTypeId: string; status: string;
@@ -13,6 +13,34 @@ export interface TripRow {
   /** Paid seats, and seats a customer is paying for right now. */
   bookedSeats: number; heldSeats: number;
 }
+
+export type Recurrence = NonNullable<ServiceRow['recurrence']> & { exceptions?: string[]; additions?: string[] };
+export interface CategoryQuota { seats?: number; pct?: number; releaseHours: number }
+export interface SalesRules { otaReleasePct?: number | null; categoryQuotas?: { female?: CategoryQuota; senior?: CategoryQuota } }
+export interface ServiceVersion { versionNumber: number; snapshot: { recurrence: Recurrence; startMinute: number; vehicleTypeId: string; defaultVehicleId: string | null }; note: string; createdAt: string }
+export interface ExtraTripSuggestion { tripId: string; journeyDate: string; departsAt: string; routeName: string; serviceId: string; totalSeats: number; sold: number; waitingSeats: number }
+export interface Blackout { date: string; reason: string; [k: string]: unknown }
+
+/** Service upkeep: timetable edits (versioned), copies, extra trips, sales rules, route blackouts. */
+export const serviceAdminApi = {
+  update: (id: string, body: { startTime?: string; recurrence?: Recurrence; vehicleTypeId?: string; note?: string }) =>
+    patch<{ version: number }>(`/v1/scheduling/services/${id}`, body),
+  versions: (id: string) => get<{ items: ServiceVersion[] }>(`/v1/scheduling/services/${id}/versions`),
+  restore: (id: string, versionNumber: number) => post<{ version: number }>(`/v1/scheduling/services/${id}/versions/${versionNumber}/restore`, {}),
+  clone: (id: string, body: { code: string; startDate: string; endDate: string; startTime?: string; weekdays?: number[]; season?: boolean }, key: string) =>
+    post<{ id: string }>(`/v1/scheduling/services/${id}/clone`, body, withIdempotency(key)),
+  remove: (id: string) => del<{ tripsDeleted: number }>(`/v1/scheduling/services/${id}`),
+  salesRules: (id: string) => get<SalesRules>(`/v1/scheduling/services/${id}/sales-rules`),
+  setSalesRules: (id: string, rules: SalesRules) => put<SalesRules>(`/v1/scheduling/services/${id}/sales-rules`, rules),
+  extraTrips: (id: string, body: { journeyDates: string[]; departureTime?: string; reason: string; openForSale?: boolean; ladiesSpecial?: boolean }, key: string) =>
+    post<{ created: { tripId: string; journeyDate: string }[]; skipped: { journeyDate: string; reason: string }[] }>(`/v1/scheduling/services/${id}/extra-trips`, body, withIdempotency(key)),
+  suggestions: () => get<{ items: ExtraTripSuggestion[] }>('/v1/scheduling/extra-trip-suggestions'),
+  releaseForSale: (tripId: string) => post<{ ok: boolean }>(`/v1/scheduling/trips/${tripId}/release-inventory`, {}),
+  blackouts: (routeId: string) => get<{ items: Blackout[] }>(`/v1/scheduling/routes/${routeId}/blackouts`),
+  addBlackouts: (routeId: string, dates: string[], reason: string) =>
+    post<{ dates: string[]; tripsCancelled: number; tripsWithBookings: unknown[] }>(`/v1/scheduling/routes/${routeId}/blackouts`, { dates, reason }),
+  removeBlackouts: (routeId: string, dates: string[]) => post<{ removed: number }>(`/v1/scheduling/routes/${routeId}/blackouts/remove`, { dates }),
+};
 
 export const schedulingApi = {
   listServices: () => get<{ services: ServiceRow[] }>('/v1/scheduling/services'),

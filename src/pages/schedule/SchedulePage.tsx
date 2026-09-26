@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Calendar, PlayCircle, PauseCircle, RefreshCw, Bus } from 'lucide-react';
+import { Plus, Calendar, PlayCircle, PauseCircle, RefreshCw, Bus, Settings2 } from 'lucide-react';
 
 import { Button, Badge, statusTone, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { schedulingApi, type ServiceRow } from '@/lib/api/scheduling';
 import { masterDataApi } from '@/lib/api/masterData';
+import { ExtraTripSuggestions, RouteBlackouts } from './ScheduleExtras';
+import { ServiceManageModal, type ManageTab } from './ServiceManageModal';
 import { addDaysIso, cn, dayDiff, todayLocal } from '@/lib/utils';
 
 // ISO weekdays, as the backend's recurrence rule counts them (1 = Monday … 7 = Sunday).
@@ -38,6 +40,7 @@ function ServicesTab() {
   const qc = useQueryClient();
   const toast = useToast();
   const [adding, setAdding] = useState(false);
+  const [managing, setManaging] = useState<{ service: ServiceRow; tab?: ManageTab; date?: string } | null>(null);
 
   const services = useQuery({ queryKey: ['services'], queryFn: schedulingApi.listServices });
   const routes = useQuery({ queryKey: ['routes', 'published'], queryFn: () => masterDataApi.listRoutes('published') });
@@ -90,6 +93,7 @@ function ServicesTab() {
     {
       key: 'actions', header: '', render: (r) => (
         <div className="flex justify-end gap-2">
+          <Button size="sm" variant="ghost" leftIcon={<Settings2 className="h-4 w-4" />} onClick={() => setManaging({ service: r })}>Manage</Button>
           {r.status !== 'active' ? (
             r.status !== 'ended' && <Button size="sm" variant="outline" leftIcon={<PlayCircle className="h-4 w-4" />} loading={activate.isPending && activate.variables === r.id} disabled={activate.isPending} onClick={() => activate.mutate(r.id)}>Activate</Button>
           ) : (
@@ -121,9 +125,15 @@ function ServicesTab() {
   return (
     <>
       <div className="mb-4 flex justify-end"><Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setAdding(true)}>New service</Button></div>
+      <div className="mb-4 flex flex-col gap-4">
+        <ExtraTripSuggestions onAdd={(s) => { const svc = services.data?.services.find((x) => x.id === s.serviceId); if (svc) setManaging({ service: svc, tab: 'extra', date: s.journeyDate }); }} />
+      </div>
 
       {services.isLoading ? <PageLoader /> : services.isError ? <ErrorState error={services.error} onRetry={services.refetch} /> :
         (services.data?.services.length ? <Table columns={columns} rows={services.data.services} /> : <EmptyState title="No services yet" description="Publish a route first, then schedule a service on it." icon={<Calendar className="h-10 w-10" />} />)}
+
+      <div className="mt-4"><RouteBlackouts /></div>
+      {managing && <ServiceManageModal service={managing.service} routeName={routeName(managing.service.routeId)} initialTab={managing.tab} initialDate={managing.date} onClose={() => setManaging(null)} />}
 
       <Modal open={adding} onClose={() => setAdding(false)} title="Create a recurring service" size="lg"
         footer={<><Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button><Button loading={create.isPending} disabled={create.isPending} onClick={() => { setTried(true); if (canCreate) create.mutate(); }}>Create</Button></>}>
