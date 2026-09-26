@@ -14,8 +14,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Backend status | Count |
 |---|---|
 | OPEN | 2711 |
-| DONE | 955 |
-| GAP | 310 |
+| DONE | 961 |
+| GAP | 304 |
 | CONFLICT | 76 |
 | INFRA | 20 |
 | DUP | 9 |
@@ -23,15 +23,15 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 | Frontend status | Count |
 |---|---|
-| — | 3123 |
-| TODO | 888 |
-| DONE | 67 |
+| — | 3117 |
+| TODO | 879 |
+| DONE | 82 |
 | DUP | 9 |
 
 
 ## #1–#500
 
-CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -162,7 +162,7 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 125 | Enter branch name and code | DONE | TODO | verified manually: existing module/API |
 | 126 | Enter branch full address | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
 | 127 | Enter branch phone numbers | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
-| 128 | Assign branch manager | DONE | TODO | verified manually: existing module/API |
+| 128 | Assign branch manager | DONE | DONE | verified manually: existing module/API · UI: Branches page (manager) |
 | 129 | Set branch working hours | DONE | DONE | branches.working_hours via POST/PATCH /branches · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
 | 130 | Deactivate branch temporarily | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
 | 131 | Reactivate branch | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
@@ -225,9 +225,9 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 188 | Temporarily block agent | DONE | TODO | verified manually: existing module/API |
 | 189 | Set block reason | DONE | TODO | verified manually: existing module/API |
 | 190 | Unblock agent | DONE | TODO | verified manually: existing module/API |
-| 191 | Create new staff user | DONE | TODO | verified manually: existing module/API |
-| 192 | Assign staff name, mobile, email | DONE | TODO | verified manually: existing module/API |
-| 193 | Assign staff to one or more branches | GAP | — | verified manually: not built yet |
+| 191 | Create new staff user | DONE | DONE | verified manually: existing module/API · UI: Staff page |
+| 192 | Assign staff name, mobile, email | DONE | DONE | verified manually: existing module/API · UI: Staff page |
+| 193 | Assign staff to one or more branches | DONE | DONE | PUT /users/:id/branch (one home branch per person; active branches of this operator only) · UI: Staff page |
 | 194 | Create custom role named Branch Manager | DONE | TODO | verified manually: existing module/API |
 | 195 | Create custom role named Dispatch Manager | DONE | TODO | verified manually: existing module/API |
 | 196 | Create custom role named Finance Executive | DONE | TODO | verified manually: existing module/API |
@@ -241,16 +241,16 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 204 | View complete permission matrix | DONE | TODO | verified manually: existing module/API |
 | 205 | Set branch-level permission override | GAP | — | verified manually: not built yet |
 | 206 | Give temporary permission with end date | DONE | TODO | PUT /users/:id/roles/:roleId {expiresAt} |
-| 207 | View staff activity logs | DONE | TODO | verified manually: existing module/API |
-| 208 | Force logout a staff session | DONE | TODO | POST /users/:id/force-logout (tokens_valid_after) |
+| 207 | View staff activity logs | DONE | DONE | verified manually: existing module/API · UI: Staff page |
+| 208 | Force logout a staff session | DONE | DONE | POST /users/:id/force-logout (tokens_valid_after) · UI: Staff page |
 | 209 | Reset staff password | DONE | TODO | verified manually: existing module/API |
-| 210 | Deactivate staff account | DONE | TODO | verified manually: existing module/API |
-| 211 | Reactivate staff account | DONE | TODO | verified manually: existing module/API |
+| 210 | Deactivate staff account | DONE | DONE | verified manually: existing module/API · UI: Staff page |
+| 211 | Reactivate staff account | DONE | DONE | verified manually: existing module/API · UI: Staff page |
 | 212 | Bulk upload staff using Excel template | GAP | — | verified manually: not built yet |
 | 213 | Download staff upload template | GAP | — | verified manually: not built yet |
-| 214 | Export complete staff directory | GAP | — | verified manually: not built yet |
+| 214 | Export complete staff directory | DONE | DONE | GET /users/export.csv · UI: Staff page |
 | 215 | Set allowed login time window for staff | DONE | TODO | PUT /users/:id/access {loginWindow} (overnight-safe) |
-| 216 | View staff last login date and time | DONE | TODO | verified manually: existing module/API |
+| 216 | View staff last login date and time | DONE | DONE | verified manually: existing module/API · UI: Staff page |
 | 217 | Set reporting manager for staff | DONE | TODO | PUT /users/:id/access {managerId} (no loops) |
 | 218 | Create temporary contractor staff with expiry | DONE | TODO | PUT /users/:id/access {accessExpiresAt} |
 | 219 | System auto-deactivates expired staff | DONE | TODO | auth guard refuses expired access on next request |
@@ -356,7 +356,7 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 319 | Set monthly targets for each branch | GAP | — | verified manually: not built yet |
 | 320 | View branch expense versus collection | GAP | — | verified manually: not built yet |
 | 321 | Approve or reject branch expense claims | GAP | — | verified manually: not built yet |
-| 322 | Transfer staff from one branch to another | DONE | TODO | verified manually: existing module/API |
+| 322 | Transfer staff from one branch to another | DONE | DONE | verified manually: existing module/API · UI: Staff page |
 | 323 | Temporarily close a branch | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
 | 324 | Reopen a closed branch | DONE | DONE | verified manually: existing module/API · UI: Branches: add/edit with name (unique, any case), address, phone checks, per-day opening hours incl. past midnight; deactivate (confirm) / activate |
 | 325 | View complete financial dashboard | DONE | TODO | verified manually: existing module/API |
@@ -391,8 +391,8 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 354 | Apply special discount on low occupancy service | DONE | TODO | PUT /pricing/trips/:id/adjustment (−%) |
 | 355 | Temporarily increase fare on high demand service | DONE | TODO | PUT /pricing/trips/:id/adjustment (+%) |
 | 356 | Assign daily booking targets to staff members | GAP | — | verified manually: not built yet |
-| 357 | View individual staff booking performance | GAP | — | verified manually: not built yet |
-| 358 | View individual staff cancellation rate | GAP | — | verified manually: not built yet |
+| 357 | View individual staff booking performance | DONE | DONE | GET /users/performance (bookings, seats, sales, cancellations per seller; bookings.booked_by) · UI: Staff page |
+| 358 | View individual staff cancellation rate | DONE | DONE | GET /users/performance (bookings, seats, sales, cancellations per seller; bookings.booked_by) · UI: Staff page |
 | 359 | Hold seats temporarily for walk-in passenger | DONE | TODO | verified manually: existing module/API |
 | 360 | Convert held seats to confirmed booking | DONE | TODO | verified manually: existing module/API |
 | 361 | Confirm booking received on phone | DONE | TODO | verified manually: existing module/API |
@@ -420,8 +420,8 @@ CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
 | 383 | View branch occupancy trend for last 7 days | GAP | — | verified manually: not built yet |
 | 384 | View branch occupancy trend for last 30 days | GAP | — | verified manually: not built yet |
 | 385 | View branch revenue trend | GAP | — | verified manually: not built yet |
-| 386 | Identify top performing staff | GAP | — | verified manually: not built yet |
-| 387 | Identify under-performing staff | GAP | — | verified manually: not built yet |
+| 386 | Identify top performing staff | DONE | DONE | GET /users/performance (bookings, seats, sales, cancellations per seller; bookings.booked_by) · UI: Staff page |
+| 387 | Identify under-performing staff | DONE | DONE | GET /users/performance (bookings, seats, sales, cancellations per seller; bookings.booked_by) · UI: Staff page |
 | 388 | Issue warning to under-performing staff | GAP | — | verified manually: not built yet |
 | 389 | Grant temporary system access to new staff | DONE | TODO | verified manually: existing module/API |
 | 390 | Temporarily block access of a staff member | DONE | TODO | verified manually: existing module/API |
@@ -786,7 +786,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -901,7 +901,7 @@ CONFLICT 11, DONE 251, DUP 2, GAP 72, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1016,7 +1016,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1111,7 +1111,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1226,7 +1226,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1301,7 +1301,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 356, GAP 110, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 362, GAP 104, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|

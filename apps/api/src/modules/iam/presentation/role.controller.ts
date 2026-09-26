@@ -36,6 +36,13 @@ export class RoleController {
     return { items: await this.roles.list() };
   }
 
+  @Get('permissions')
+  @RequirePermission(Permission.ROLE_MANAGE)
+  @ApiOperation({ summary: 'What each permission means, and which ones you may hand out' })
+  permissions() {
+    return { groups: this.access.permissionCatalogue() };
+  }
+
   @Get('templates')
   @RequirePermission(Permission.ROLE_MANAGE)
   @ApiOperation({ summary: "The platform's role templates this operator can apply" })

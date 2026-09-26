@@ -28,6 +28,8 @@ export interface Role {
   isSystem: boolean;
   conditions: Record<string, Json>;
   permissions: string[];
+  /** Staff holding it now (list only). */
+  holders?: number;
 }
 
 /** The system roles every tenant receives at provisioning. */
@@ -237,16 +239,33 @@ export class RoleRepository {
   }
 
   async list(): Promise<Role[]> {
-    const rows = await this.db.query<RoleRow>(
-      `SELECT id, tenant_id, code, name, description, is_system, conditions
+    const rows = await this.db.query<RoleRow & { holders: number }>(
+      `SELECT id, tenant_id, code, name, description, is_system, conditions,
+              (SELECT count(*)::int FROM user_roles ur
+                 WHERE ur.role_id = roles.id AND (ur.expires_at IS NULL OR ur.expires_at > now())) AS holders
          FROM roles WHERE tenant_id IS NOT DISTINCT FROM $1 AND deleted_at IS NULL ORDER BY is_system DESC, code`,
       [this.tenantScope()],
       { name: 'rbac.list' },
     );
     const roles: Role[] = [];
     for (const row of rows)
-      roles.push({ ...mapRole(row), permissions: await this.permissionsOf(row.id) });
+      roles.push({
+        ...mapRole(row),
+        holders: row.holders,
+        permissions: await this.permissionsOf(row.id),
+      });
     return roles;
+  }
+
+  /** Another live role of this operator already has this name (any case). */
+  async nameTaken(name: string, exceptId?: string): Promise<boolean> {
+    const row = await this.db.queryOne(
+      `SELECT 1 FROM roles WHERE tenant_id = $1 AND deleted_at IS NULL
+          AND lower(name) = lower($2) AND ($3::uuid IS NULL OR id <> $3) LIMIT 1`,
+      [requireTenantId(), name.trim(), exceptId ?? null],
+      { name: 'rbac.nameTaken', primary: true },
+    );
+    return !!row;
   }
 
   /** Create a role and its permission grants. Called within a unit of work. */

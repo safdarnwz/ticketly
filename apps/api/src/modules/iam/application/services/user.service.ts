@@ -19,6 +19,7 @@ import { User } from '../../domain/user.entity';
 import { RoleRepository } from '../../infrastructure/persistence/role.repository';
 import { SessionRepository } from '../../infrastructure/persistence/session.repository';
 import { UserRepository } from '../../infrastructure/persistence/user.repository';
+import { StaffAccessRepository } from '../../infrastructure/persistence/staff-access.repository';
 import { StaffDirectoryRepository } from '../../infrastructure/persistence/staff-directory.repository';
 import { PlanQuotaService, QUOTA_KEYS } from '../../../entitlements';
 import { PlatformPoliciesService } from '../../../platform-settings';
@@ -42,6 +43,7 @@ export class UserService {
     private readonly policies: PlatformPoliciesService,
     private readonly planQuotas: PlanQuotaService,
     private readonly staff: StaffDirectoryRepository,
+    private readonly access: StaffAccessRepository,
   ) {}
 
   /** Nobody may take away the operator's last way to manage its staff. */
@@ -135,6 +137,36 @@ export class UserService {
         changes: patch,
       });
     });
+  }
+
+  /**
+   * An admin sets a new password for a staff member who is locked out (209).
+   * Their sessions end at once; your own password is changed from your profile.
+   */
+  async resetPassword(userId: UserId, password: string): Promise<void> {
+    if (userId === getUserId())
+      throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+        message: 'Change your own password from your profile',
+      });
+    await this.policies.assertPasswordAcceptable(password);
+    const hash = await this.hasher.hash(password);
+    await this.uow.run({ name: 'user.resetPassword', tenantId: requireTenantId() }, async () => {
+      const user = await this.users.findById(userId);
+      if (!user || !(await this.staff.find(userId))) throw new NotFoundError('User', userId);
+      user.setPassword(hash);
+      user.unlock();
+      await this.users.update(user, user.version);
+      await this.access.invalidateTokens(userId, requireTenantId());
+      await this.sessions.revokeAllForUser(userId, 'password-reset-by-admin');
+      await this.audit.recordInTx({
+        action: 'user.password_reset',
+        resourceType: 'user',
+        resourceId: userId,
+        changes: {},
+      });
+    });
+    // After commit, so no request re-caches the old sign-in cut-off.
+    await this.roles.invalidateUser(userId);
   }
 
   async assignRoles(userId: UserId, roleCodes: string[]): Promise<void> {

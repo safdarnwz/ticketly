@@ -29,6 +29,7 @@ import {
   AssignRolesSchema,
   GrantRoleSchema,
   InviteUserSchema,
+  ResetStaffPasswordSchema,
   StaffAccessSchema,
   StaffBranchSchema,
   StaffListQuerySchema,
@@ -36,6 +37,7 @@ import {
   type AssignRolesDto,
   type GrantRoleDto,
   type InviteUserDto,
+  type ResetStaffPasswordDto,
   type StaffAccessDto,
   type StaffBranchDto,
   type StaffListQueryDto,
@@ -163,6 +165,19 @@ export class UserController {
     @Body(zodBody(AssignRolesSchema)) dto: AssignRolesDto,
   ) {
     await this.users.assignRoles(id as UserId, dto.roles);
+    return { ok: true };
+  }
+
+  @Put(':id/password')
+  @RequirePermission(Permission.USER_MANAGE)
+  @ApiOperation({
+    summary: 'Set a new password for a staff member (unlocks them, ends their sessions)',
+  })
+  async resetPassword(
+    @UuidParam('id') id: string,
+    @Body(zodBody(ResetStaffPasswordSchema)) dto: ResetStaffPasswordDto,
+  ) {
+    await this.users.resetPassword(id as UserId, dto.password);
     return { ok: true };
   }
 

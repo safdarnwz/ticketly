@@ -308,3 +308,13 @@ an unknown id is now 404 (was 200).
   staff member. Bookings made at the counter now record the seller in `bookings.booked_by` instead of
   `customer_id` (staff sales no longer show up as the staff member's own trips); migration 0094 moves
   existing rows.
+- **Roles & staff access:** `GET /roles` rows carry `holders` (people holding it now). New
+  `GET /roles/permissions` — the permission catalogue grouped with labels, and `grantable` for the caller.
+  Built-in roles can no longer have their permissions changed (422, duplicate instead — the schema always
+  said so, the code did not check). A role needs 1–100 permissions; codes are lower_snake_case 2–40 for
+  create and duplicate alike; a role name already used (any case) is a 409. Removing staff management from
+  a role is refused when nobody else could then manage staff; so is making the last manager's managing role
+  temporary. `PUT /users/:id/access` — no limits on yourself, an end date in the future, and the last staff
+  manager cannot be limited. New `PUT /users/:id/password { password }` (USER_MANAGE): an admin sets a new
+  password for a staff member, lifts a failed-login lock and signs them out everywhere; not for yourself.
+  Directory rows carry `loginWindow`.

@@ -4,8 +4,10 @@ import { UnitOfWork } from '@database';
 
 import {
   AppError,
+  ConflictError,
   ErrorCode,
   NotFoundError,
+  getContext,
   getUserId,
   requireTenantId,
   type Json,
@@ -13,11 +15,21 @@ import {
   type UserId,
 } from '@kernel';
 
+import { PERMISSION_CATALOGUE } from '../../domain/permission-catalogue';
+import { permissionGrantProblems } from '../../domain/permission-grant';
 import { validateWindow, type LoginWindow } from '../../domain/access-policy';
 import { assertGrantable } from './permission-grant';
 import { RoleRepository } from '../../infrastructure/persistence/role.repository';
 import { SessionRepository } from '../../infrastructure/persistence/session.repository';
 import { StaffAccessRepository } from '../../infrastructure/persistence/staff-access.repository';
+import { StaffDirectoryRepository } from '../../infrastructure/persistence/staff-directory.repository';
+
+const MANAGES_STAFF = ['user:manage', '*'];
+const lastManager = () =>
+  new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+    message: 'Nobody else could manage staff then — give someone else that role first',
+  });
+const invalid = (message: string) => new AppError(ErrorCode.COMMON_VALIDATION, 422, { message });
 
 /**
  * Operator-side staff access controls. Every change invalidates the user's
@@ -33,6 +45,7 @@ export class StaffAccessService {
     private readonly roles: RoleRepository,
     private readonly sessions: SessionRepository,
     private readonly uow: UnitOfWork,
+    private readonly directory: StaffDirectoryRepository,
   ) {}
 
   private async assertStaff(userId: string): Promise<void> {
@@ -61,6 +74,18 @@ export class StaffAccessService {
     },
   ): Promise<void> {
     await this.assertStaff(userId);
+    if (userId === getUserId() && (input.accessExpiresAt || input.loginWindow))
+      throw invalid('You cannot limit your own access — ask another admin');
+    if (input.accessExpiresAt && Date.parse(input.accessExpiresAt) <= Date.now())
+      throw invalid('Access must end in the future — disable the account to stop it now');
+    if (
+      (input.accessExpiresAt || input.loginWindow) &&
+      (await this.directory.canManageUsers(userId)) &&
+      (await this.directory.activeUserManagers(userId)) === 0
+    )
+      throw invalid(
+        'This is the last person who can manage staff — their access cannot be limited',
+      );
     if (input.loginWindow) {
       const problem = validateWindow(input.loginWindow);
       if (problem) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: problem });
@@ -90,6 +115,15 @@ export class StaffAccessService {
     const role = await this.roles.findTenantRole(roleId as RoleId);
     if (!role) throw new NotFoundError('Role', roleId);
     assertGrantable(role.permissions);
+    // Making the last staff manager's managing role temporary would lock everyone out later.
+    if (
+      expiresAt &&
+      role.permissions.some((p) => MANAGES_STAFF.includes(p)) &&
+      !(await this.directory.canManageUsers(userId, roleId)) &&
+      (await this.directory.canManageUsers(userId)) &&
+      (await this.directory.activeUserManagers(userId)) === 0
+    )
+      throw lastManager();
     await this.roles.grantToUser(
       userId as UserId,
       roleId as RoleId,
@@ -99,7 +133,12 @@ export class StaffAccessService {
   }
 
   /** A custom role; every permission must be one the caller may hand out. */
-  createRole(input: {
+  private async assertNameFree(name: string, exceptId?: string): Promise<void> {
+    if (await this.roles.nameTaken(name, exceptId))
+      throw new ConflictError('A role with this name already exists');
+  }
+
+  async createRole(input: {
     code: string;
     name: string;
     description?: string;
@@ -108,9 +147,10 @@ export class StaffAccessService {
   }): Promise<RoleId> {
     assertGrantable(input.permissions);
     const tenantId = requireTenantId();
-    return this.uow.run({ name: 'role.create', tenantId }, () =>
-      this.roles.createRole({ tenantId, ...input, isSystem: false }),
-    );
+    return this.uow.run({ name: 'role.create', tenantId }, async () => {
+      await this.assertNameFree(input.name);
+      return this.roles.createRole({ tenantId, ...input, isSystem: false });
+    });
   }
 
   /**
@@ -121,7 +161,15 @@ export class StaffAccessService {
   async setRolePermissions(roleId: string, permissions: string[]): Promise<void> {
     const role = await this.roles.findTenantRole(roleId as RoleId);
     if (!role) throw new NotFoundError('Role', roleId);
+    if (role.isSystem)
+      throw invalid("Built-in roles can't be changed — duplicate it and change the copy");
     assertGrantable([...role.permissions, ...permissions]);
+    if (
+      role.permissions.some((p) => MANAGES_STAFF.includes(p)) &&
+      !permissions.some((p) => MANAGES_STAFF.includes(p)) &&
+      (await this.directory.activeUserManagers(undefined, roleId)) === 0
+    )
+      throw lastManager();
     await this.uow.run({ name: 'role.setPermissions', tenantId: requireTenantId() }, () =>
       this.roles.setPermissions(role.id, permissions),
     );
@@ -131,8 +179,23 @@ export class StaffAccessService {
     const source = await this.roles.findCopyableRole(roleId as RoleId);
     if (!source) throw new NotFoundError('Role', roleId);
     assertGrantable(source.permissions);
-    return this.roles.duplicate(source.id, code, name);
+    return this.uow.run({ name: 'role.duplicate', tenantId: requireTenantId() }, async () => {
+      await this.assertNameFree(name);
+      return this.roles.duplicate(source.id, code, name);
+    });
   }
+  /** The role editor's list: every operator permission, and whether the caller may hand it out. */
+  permissionCatalogue() {
+    const held = getContext()?.permissions ?? new Set<string>();
+    return PERMISSION_CATALOGUE.map((g) => ({
+      group: g.group,
+      items: g.items.map((i) => ({
+        ...i,
+        grantable: permissionGrantProblems([i.code], held).length === 0,
+      })),
+    }));
+  }
+
   deleteRole(roleId: string) {
     return this.roles.softDelete(roleId as RoleId);
   }

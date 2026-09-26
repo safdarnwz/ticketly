@@ -22,6 +22,10 @@ export const UpdateUserSchema = z.object({
 });
 export type UpdateUserDto = z.infer<typeof UpdateUserSchema>;
 
+/** An admin sets a new password for a staff member (they are signed out everywhere). */
+export const ResetStaffPasswordSchema = z.object({ password: z.string().min(8).max(256) });
+export type ResetStaffPasswordDto = z.infer<typeof ResetStaffPasswordSchema>;
+
 export const AssignRolesSchema = z.object({
   roles: z.array(z.string().min(1)),
 });

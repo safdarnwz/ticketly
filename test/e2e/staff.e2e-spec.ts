@@ -133,6 +133,156 @@ describe('staff (e2e)', () => {
     expect(mine.some((a) => a.action === 'user.invited' && a.resourceId === hired)).toBe(true);
   });
 
+  it('roles: catalogue, checked names, built-ins locked, temporary grants', async () => {
+    const cat = await app.get('/roles/permissions', op);
+    expect(cat.status).toBe(200);
+    const codes = cat.body.groups.flatMap((g: { items: { code: string }[] }) =>
+      g.items.map((i) => i.code),
+    );
+    expect(codes).toContain('booking:create');
+    expect(codes).not.toContain('*');
+
+    const create = (body: object) =>
+      app.post(
+        '/roles',
+        { code: `desk_${run}`, name: `Desk ${run}`, permissions: ['booking:read'], ...body },
+        op,
+      );
+    expect((await create({ permissions: [] })).status).toBe(400);
+    expect((await create({ code: 'Bad Code' })).status).toBe(400);
+    expect((await create({ permissions: ['platform:admin'] })).status).toBe(403);
+    const made = await create({});
+    expect(made.status, JSON.stringify(made.body)).toBe(201);
+    const roleId = made.body.id as string;
+    expect((await create({ code: `desk2_${run}`, name: `DESK ${run}` })).status).toBe(409);
+    const sameCode = await create({ name: `Other ${run}` });
+    expect(sameCode.status).toBe(409);
+    expect(
+      (
+        await app.post(
+          `/roles/${roleId}/duplicate`,
+          { code: `desk3_${run}`, name: `desk ${run}` },
+          op,
+        )
+      ).status,
+    ).toBe(409);
+
+    const roles = (await app.get('/roles', op)).body.items as {
+      id: string;
+      isSystem: boolean;
+      holders: number;
+    }[];
+    const builtIn = roles.find((r) => r.isSystem)!;
+    const locked = await app.put(
+      `/roles/${builtIn.id}/permissions`,
+      { permissions: ['booking:read'] },
+      op,
+    );
+    expect(locked.status).toBe(422);
+    expect(locked.body.detail).toMatch(/Built-in/);
+    expect(
+      (
+        await app.put(
+          `/roles/${roleId}/permissions`,
+          { permissions: ['booking:read', 'fare:read'] },
+          op,
+        )
+      ).status,
+    ).toBe(200);
+
+    const past = new Date(Date.now() - 60_000).toISOString();
+    const soon = new Date(Date.now() + 86_400_000).toISOString();
+    expect((await app.put(`/users/${hired}/roles/${roleId}`, { expiresAt: past }, op)).status).toBe(
+      422,
+    );
+    expect((await app.put(`/users/${hired}/roles/${roleId}`, { expiresAt: soon }, op)).status).toBe(
+      200,
+    );
+    const held = (await app.get(`/users/${hired}`, op)).body.roles.find(
+      (r: { id: string }) => r.id === roleId,
+    );
+    expect(held.expiresAt).toBeTruthy();
+    expect(
+      (await app.get('/roles', op)).body.items.find((r: { id: string }) => r.id === roleId).holders,
+    ).toBe(1);
+    expect((await app.del(`/roles/${roleId}`, op)).status).toBe(409); // still assigned
+    expect((await app.del(`/users/${hired}/roles/${roleId}`, op)).status).toBe(200);
+    expect((await app.del(`/roles/${roleId}`, op)).status).toBe(200);
+    expect(
+      (
+        await app.put(
+          `/roles/${roleId}/permissions`,
+          { permissions: ['booking:read'] },
+          { headers: otherOperator },
+        )
+      ).status,
+    ).toBe(404);
+  });
+
+  it('access limits and an admin password reset', async () => {
+    const past = new Date(Date.now() - 60_000).toISOString();
+    expect(
+      (
+        await app.put(
+          `/users/${me}/access`,
+          { accessExpiresAt: new Date(Date.now() + 86_400_000).toISOString() },
+          op,
+        )
+      ).status,
+    ).toBe(422);
+    expect((await app.put(`/users/${hired}/access`, { accessExpiresAt: past }, op)).status).toBe(
+      422,
+    );
+    expect(
+      (
+        await app.put(
+          `/users/${hired}/access`,
+          {
+            loginWindow: { days: [1, 2, 3, 4, 5, 6, 7], startMinute: 0, endMinute: 1439 },
+            managerId: me,
+          },
+          op,
+        )
+      ).status,
+    ).toBe(200);
+    expect((await app.put(`/users/${hired}/access`, { loginWindow: null }, op)).status).toBe(200);
+
+    const signIn = (password: string) =>
+      app.post(
+        '/auth/login',
+        { identifier: `clerk.${run}@demo-travels.example`, password },
+        { headers: { 'x-tenant-slug': app.fixtures.tenantSlug, 'x-debug-surface': 'tenantAdmin' } },
+      );
+    const before = await signIn('Clerk-pass-123');
+    expect(before.status, JSON.stringify(before.body)).toBe(200);
+    const theirs = {
+      headers: {
+        authorization: `Bearer ${before.body.accessToken}`,
+        'x-tenant-slug': app.fixtures.tenantSlug,
+      },
+    };
+    expect((await app.get('/auth/me', theirs)).status).toBe(200);
+
+    expect(
+      (await app.put(`/users/${me}/password`, { password: 'Another-pass-123' }, op)).status,
+    ).toBe(422);
+    expect((await app.put(`/users/${hired}/password`, { password: 'short' }, op)).status).toBe(400);
+    expect(
+      (
+        await app.put(
+          `/users/${hired}/password`,
+          { password: 'Fresh-pass-456' },
+          { headers: otherOperator },
+        )
+      ).status,
+    ).toBe(404);
+    const reset = await app.put(`/users/${hired}/password`, { password: 'Fresh-pass-456' }, op);
+    expect(reset.status, JSON.stringify(reset.body)).toBe(200);
+    expect((await app.get('/auth/me', theirs)).status).toBe(401); // signed out everywhere
+    expect((await signIn('Clerk-pass-123')).status).toBe(401);
+    expect((await signIn('Fresh-pass-456')).status).toBe(200);
+  });
+
   it('a counter sale belongs to the seller, not the customer list', async () => {
     const day = new Date(Date.now() + 5.5 * 3_600_000).toISOString().slice(0, 10);
     const f = app.fixtures;

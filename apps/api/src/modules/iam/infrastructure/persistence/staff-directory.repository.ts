@@ -15,6 +15,7 @@ export interface StaffRow {
   roles: { id: string; code: string; name: string; expiresAt: string | null }[];
   lastLoginAt: string | null;
   accessExpiresAt: string | null;
+  loginWindow: { days: number[]; startMinute: number; endMinute: number } | null;
   managerId: string | null;
   managerName: string | null;
   createdAt: string;
@@ -46,6 +47,7 @@ export class StaffDirectoryRepository {
   private readonly select = `
     SELECT u.id, u.full_name AS "fullName", u.email, u.phone, u.status, u.branch_id AS "branchId",
            br.name AS "branchName", u.last_login_at AS "lastLoginAt", u.access_expires_at AS "accessExpiresAt",
+           u.login_window AS "loginWindow",
            u.manager_id AS "managerId", m.full_name AS "managerName", u.created_at AS "createdAt",
            coalesce((SELECT json_agg(json_build_object('id', r.id, 'code', r.code, 'name', r.name, 'expiresAt', ur.expires_at) ORDER BY r.name)
                        FROM user_roles ur JOIN roles r ON r.id = ur.role_id AND r.deleted_at IS NULL
@@ -98,15 +100,15 @@ export class StaffDirectoryRepository {
   }
 
   /** Active staff who can still manage users — the last one must never lock the operator out. */
-  async activeUserManagers(excluding?: string): Promise<number> {
+  async activeUserManagers(excluding?: string, withoutRoleId?: string): Promise<number> {
     const row = await this.db.queryOne<{ n: number }>(
       `SELECT count(DISTINCT u.id)::int AS n
          FROM users u
          JOIN user_roles ur ON ur.user_id = u.id AND (ur.expires_at IS NULL OR ur.expires_at > now())
          JOIN role_permissions rp ON rp.role_id = ur.role_id AND rp.permission IN ('user:manage', '*')
         WHERE u.tenant_id = $1 AND u.kind = 'staff' AND u.status = 'active' AND u.deleted_at IS NULL
-          AND ($2::uuid IS NULL OR u.id <> $2)`,
-      [requireTenantId(), excluding ?? null],
+          AND ($2::uuid IS NULL OR u.id <> $2) AND ($3::uuid IS NULL OR ur.role_id <> $3)`,
+      [requireTenantId(), excluding ?? null, withoutRoleId ?? null],
       { name: 'staff.activeUserManagers', primary: true },
     );
     return row?.n ?? 0;

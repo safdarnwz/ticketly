@@ -132,6 +132,13 @@ export class User extends AggregateRoot<UserId> {
     }
   }
 
+  /** Lift a failed-login lock (an admin set a new password). A disabled account stays disabled. */
+  unlock(): void {
+    this.props.failedLogins = 0;
+    this.props.lockedUntil = null;
+    if (this.props.status === 'locked') this.props.status = 'active';
+  }
+
   setPassword(hash: string): void {
     this.props.passwordHash = hash;
     this.record(
