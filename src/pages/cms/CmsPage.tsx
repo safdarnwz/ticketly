@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Megaphone, Plus } from 'lucide-react';
-import { fromAppDateTimeInput } from '@/lib/utils';
+import { fromAppDateTimeInput, formatDateLabel, localDateOf } from '@/lib/utils';
 
 import { Button, Card, CardBody, CardHeader, Input, EmptyState, PageLoader, ErrorState, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -45,7 +45,7 @@ export function CmsPage() {
                         <div className="font-medium text-text">{o.title}</div>
                         <div className="text-xs text-text-muted">{o.code}{o.couponCode ? ` · Coupon: ${o.couponCode}` : ''}</div>
                       </div>
-                      <div className="text-xs text-text-muted">{new Date(o.validFrom).toLocaleDateString('en-IN')} – {new Date(o.validTo).toLocaleDateString('en-IN')}</div>
+                      <div className="text-xs text-text-muted">{formatDateLabel(localDateOf(o.validFrom), { day: '2-digit', month: 'short', year: 'numeric' })} – {formatDateLabel(localDateOf(o.validTo), { day: '2-digit', month: 'short', year: 'numeric' })}</div>
                     </div>
                   ))}
                 </div>

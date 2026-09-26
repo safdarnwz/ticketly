@@ -1,4 +1,4 @@
-import { get, post } from './client';
+import { get, post, put } from './client';
 import type { ConnectingJourney } from './storefront';
 
 export interface ConnectingLeg {
@@ -89,4 +89,12 @@ export const connectionsApi = {
 
   cancel: (connectionId: string) =>
     post<{ leg1RefundMinor: number; leg2RefundMinor: number }>(`/v1/connections/${connectionId}/cancel`, {}),
+};
+
+/** An operator's rule for connections that change onto its buses. */
+export interface ConnectionRules { enabled: boolean; minLayoverMin: number; maxLayoverMin: number }
+export const connectionRulesApi = {
+  get: () => get<{ rules: ConnectionRules; isCustom: boolean }>('/v1/operator/connection-rules'),
+  set: (rules: ConnectionRules) => put<{ ok: boolean; rules: ConnectionRules }>('/v1/operator/connection-rules', rules),
+  reset: () => post<{ ok: boolean; rules: ConnectionRules }>('/v1/operator/connection-rules/reset', {}),
 };

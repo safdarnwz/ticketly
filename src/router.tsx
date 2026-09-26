@@ -39,6 +39,7 @@ import { PricingPage } from '@/pages/pricing/PricingPage';
 import { DistributionPage } from '@/pages/distribution/DistributionTabs';
 import { BankDetailsPage } from '@/pages/settings/BankDetailsPage';
 import { RefundPolicyPage } from '@/pages/settings/RefundPolicyPage';
+import { ConnectionsPage } from '@/pages/settings/ConnectionsPage';
 import { TemplatesPage } from '@/pages/settings/TemplatesPage';
 import { BrandingPage } from '@/pages/settings/BrandingPage';
 import { SettingsPage } from '@/pages/settings/SettingsPage';
@@ -127,6 +128,7 @@ const tenantAdminRouter = createBrowserRouter([
               { path: 'bills', element: <PlatformBillsPage /> },
               { path: 'bank-details', element: <BankDetailsPage /> },
               { path: 'refund-policy', element: <RefundPolicyPage /> },
+              { path: 'connections', element: <ConnectionsPage /> },
               { path: 'templates', element: <TemplatesPage /> },
               { path: 'branding', element: <BrandingPage /> },
             ],

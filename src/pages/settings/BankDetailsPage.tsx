@@ -6,6 +6,7 @@ import { Button, Card, CardBody, Input, PageLoader, ErrorState, useToast } from 
 import { ApiError } from '@/lib/api/client';
 import { PageHeader } from '@/components/common/PageHeader';
 import { bankDetailsApi } from '@/lib/api/payouts';
+import { formatDateLabel, localDateOf } from '@/lib/utils';
 
 export function BankDetailsPage() {
   const qc = useQueryClient();
@@ -65,7 +66,7 @@ export function BankDetailsPage() {
             <Clock className="h-5 w-5 text-warning" />
             <div>
               <div className="text-sm font-semibold text-text">Under review: {pending.accountHolder} — {pending.accountNumberMasked}</div>
-              <div className="text-xs text-text-muted">Submitted {new Date(pending.submittedAt).toLocaleDateString()} — your CURRENT account above still receives payouts until the platform approves this.</div>
+              <div className="text-xs text-text-muted">Submitted {formatDateLabel(localDateOf(pending.submittedAt), { day: '2-digit', month: 'short', year: 'numeric' })} — your CURRENT account above still receives payouts until the platform approves this.</div>
             </div>
             <Button className="ml-auto" size="sm" variant="ghost" loading={withdraw.isPending} onClick={() => withdraw.mutate()}>Withdraw</Button>
           </CardBody>

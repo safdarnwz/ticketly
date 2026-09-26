@@ -4,6 +4,7 @@ import { Navigation, Clock, RefreshCw } from 'lucide-react';
 
 import { Card, CardBody, Badge } from '@/components/ui';
 import { trackingApi } from '@/lib/api/tracking';
+import { formatTime } from '@/lib/utils';
 
 /**
  * Text-based live status (ETA, delay, last-ping time) rather than an actual
@@ -43,13 +44,13 @@ export function LiveTrackingCard({ tripId }: { tripId: string }) {
               <div className="flex items-center gap-1.5 text-warning"><Clock className="h-4 w-4" /> Running {live.data.delayMinutes} min late</div>
             )}
             {live.data.nextStopEtaAt && (
-              <div className="flex justify-between"><span className="text-text-muted">Next stop ETA</span><span className="font-medium">{new Date(live.data.nextStopEtaAt).toLocaleTimeString()}</span></div>
+              <div className="flex justify-between"><span className="text-text-muted">Next stop ETA</span><span className="font-medium">{formatTime(live.data.nextStopEtaAt)}</span></div>
             )}
             {live.data.speedKmph !== null && (
               <div className="flex justify-between"><span className="text-text-muted">Speed</span><span className="font-medium">{live.data.speedKmph} km/h</span></div>
             )}
             {live.data.lastPingAt && (
-              <p className="text-[11px] text-text-muted">Updated {new Date(live.data.lastPingAt).toLocaleTimeString()}</p>
+              <p className="text-[11px] text-text-muted">Updated {formatTime(live.data.lastPingAt)}</p>
             )}
           </div>
         )}

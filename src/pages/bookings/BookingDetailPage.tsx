@@ -14,7 +14,7 @@ import { ApiError } from '@/lib/api/client';
 import { openRazorpayCheckout, paymentsApi } from '@/lib/api/payments';
 import { refundsApi } from '@/lib/api/ops';
 import { isEmail } from '@/lib/checkout';
-import { formatMoney, formatTime } from '@/lib/utils';
+import { formatMoney, formatTime, formatDateLabel, localDateOf } from '@/lib/utils';
 
 const CHANNEL_LABEL: Record<string, string> = { direct_web: 'Website', direct_app: 'Mobile app', ota: 'OTA partner', backoffice: 'Counter', phone: 'Phone booking', agent: 'Travel agent' };
 const dt = (iso: string) =>
@@ -212,7 +212,7 @@ export function BookingDetailPage() {
                       <span className="font-mono text-xs">{inv.invoiceNumber}</span>
                       <span className="text-xs text-text-muted">{inv.kind === 'credit' ? 'Credit note' : 'Tax invoice'}</span>
                       <span>{formatMoney(inv.totalMinor, booking.currency)}</span>
-                      <span className="text-xs text-text-muted">{new Date(inv.issuedAt).toLocaleDateString('en-IN')}</span>
+                      <span className="text-xs text-text-muted">{formatDateLabel(localDateOf(inv.issuedAt), { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                     </div>
                   ))}
                 </div>

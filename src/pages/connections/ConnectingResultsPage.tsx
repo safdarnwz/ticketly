@@ -6,11 +6,10 @@ import { Button, Card, CardBody, Badge, PageLoader, ErrorState, EmptyState } fro
 import { PageHeader } from '@/components/common/PageHeader';
 import { connectionsApi, type ConnectingOption } from '@/lib/api/connections';
 import { flowApi } from '@/lib/api/booking-flow';
-import { formatMoney } from '@/lib/utils';
+import { formatMoney, formatTime } from '@/lib/utils';
 
-function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-}
+/** In the operator's time zone (IST), not the browser's. */
+const fmtTime = formatTime;
 function fmtLayover(minutes: number) {
   const h = Math.floor(minutes / 60); const m = minutes % 60;
   return `${h}h ${m > 0 ? `${m}m ` : ''}layover`;

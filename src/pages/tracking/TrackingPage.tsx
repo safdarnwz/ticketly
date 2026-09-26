@@ -5,6 +5,7 @@ import { Navigation, Clock, MapPin } from 'lucide-react';
 
 import { PageLoader, ErrorState } from '@/components/ui';
 import { trackingApi } from '@/lib/api/tracking';
+import { formatTime } from '@/lib/utils';
 
 // Leaflet is loaded from CDN, not npm — this environment has no network
 // access to install packages, and a single free/open-source map library
@@ -117,7 +118,7 @@ export function TrackingPage() {
 
       <p className="text-center text-xs text-text-muted">
         Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="underline">OpenStreetMap</a> contributors.
-        {data.lastPingAt && ` Last updated ${new Date(data.lastPingAt).toLocaleTimeString('en-IN')}.`}
+        {data.lastPingAt && ` Last updated ${formatTime(data.lastPingAt)}.`}
       </p>
     </div>
   );

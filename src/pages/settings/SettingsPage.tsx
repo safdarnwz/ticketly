@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Building2, Landmark, Receipt, RotateCcw, MessageSquare, Image as ImageIcon } from 'lucide-react';
+import { Building2, Landmark, Receipt, RotateCcw, MessageSquare, Image as ImageIcon, Shuffle } from 'lucide-react';
 
 import { PageHeader } from '@/components/common/PageHeader';
 import { cn } from '@/lib/utils';
@@ -8,6 +8,7 @@ const SECTIONS = [
   { to: '/settings/profile', label: 'Company Profile', icon: Building2, description: 'Name, contacts and registered address' },
   { to: '/settings/bank-details', label: 'Bank Details', icon: Landmark, description: 'Where your payouts are sent' },
   { to: '/settings/refund-policy', label: 'Cancellation Policy', icon: RotateCcw, description: 'Your own cancellation/refund tiers' },
+  { to: '/settings/connections', label: 'Connections', icon: Shuffle, description: 'Two-bus journeys: taking part and change times' },
   { to: '/settings/templates', label: 'Message Templates', icon: MessageSquare, description: 'SMS, WhatsApp and email content' },
   { to: '/settings/branding', label: 'Branding', icon: ImageIcon, description: 'Your logo on tickets and invoices' },
   { to: '/settings/bills', label: 'Ticketly Bills', icon: Receipt, description: 'Invoices Ticketly issued to you' },
