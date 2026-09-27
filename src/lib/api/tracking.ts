@@ -11,8 +11,29 @@ export interface LiveTripState {
   lastPingAt: string | null;
 }
 
+/**
+ * When the link shows the bus: from one hour before departure until the trip
+ * is over. Outside that the API says why (`message`) — never a bare error.
+ */
+export type TrackingPhase = 'too_early' | 'live' | 'ended' | 'cancelled' | 'booking_cancelled';
+
+export interface CrewContact {
+  role: 'driver' | 'conductor' | 'attendant' | string;
+  name: string;
+  phone: string | null;
+}
+
 export interface LiveLocation {
-  status: 'not_started' | 'running' | 'arrived' | 'completed';
+  phase: TrackingPhase;
+  message: string;
+  trackingStartsAt: string;
+  departsAt: string;
+  arrivesAt: string;
+  endedAt: string | null;
+  busNumber: string | null;
+  /** Every driver (one to three) and the conductor / attendants; empty once the journey is over. */
+  crew: CrewContact[];
+  status: string;
   lat: number | null;
   lng: number | null;
   speedKmph: number;

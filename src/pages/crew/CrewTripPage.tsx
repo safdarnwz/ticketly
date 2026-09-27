@@ -97,7 +97,7 @@ export function CrewTripPage() {
             <Button variant="outline" leftIcon={<Luggage className="h-4 w-4" />} onClick={() => setDialog('lost')}>Item left behind</Button>
             <Button variant="danger" leftIcon={<AlertOctagon className="h-4 w-4" />} onClick={() => setDialog('sos')}>Emergency</Button>
           </div>
-          <GpsSharing tripId={tripId} active={departed} />
+          <GpsSharing tripId={tripId} departsAt={duty?.departsAt ?? null} over={closed || duty?.tripStatus === 'cancelled'} />
         </CardBody>
       </Card>
 
@@ -140,8 +140,16 @@ export function CrewTripPage() {
 }
 
 /** While the bus is on the road, the phone sends its position every 30 s for live tracking. */
-function GpsSharing({ tripId, active }: { tripId: string; active: boolean }) {
-  const [on, setOn] = useState(false);
+/** The crew phone shares GPS from one hour before departure (as the API allows) until the trip is closed. */
+const GPS_LEAD_MS = 60 * 60_000;
+
+function GpsSharing({ tripId, departsAt, over }: { tripId: string; departsAt: string | null; over: boolean }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(t); }, []);
+  const startsAt = departsAt ? Date.parse(departsAt) - GPS_LEAD_MS : null;
+  const active = !over && startsAt != null && now >= startsAt;
+  // On by default inside the window — the crew need not remember to start it.
+  const [on, setOn] = useState(true);
   const [last, setLast] = useState<string | null>(null);
   const [err, setErr] = useState('');
   const pos = useRef<{ lat: number; lng: number; speed: number; heading?: number } | null>(null);
@@ -162,11 +170,12 @@ function GpsSharing({ tripId, active }: { tripId: string; active: boolean }) {
     setTimeout(send, 3000);
     return () => { navigator.geolocation.clearWatch(watch); clearInterval(t); };
   }, [on, active, tripId]);
-  if (!active) return <p className="flex items-center gap-1 text-xs text-text-muted"><Navigation className="h-3.5 w-3.5" /> Live tracking starts once the bus is marked departed.</p>;
+  if (over) return <p className="flex items-center gap-1 text-xs text-text-muted"><Navigation className="h-3.5 w-3.5" /> The trip is over — live location sharing is off.</p>;
+  if (!active) return <p className="flex items-center gap-1 text-xs text-text-muted"><Navigation className="h-3.5 w-3.5" /> Live location sharing starts {startsAt ? `at ${formatDateTime(new Date(startsAt).toISOString())}, ` : ''}one hour before departure.</p>;
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
       <label className="flex items-center gap-1"><input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} aria-label="Share live location" /> Share live location</label>
-      {on && <span className={err ? 'text-danger' : 'text-text-muted'}>{err || (last ? `last sent ${formatTime(last)}` : 'waiting for GPS…')}</span>}
+      {on ? <span className={err ? 'text-danger' : 'text-text-muted'}>{err || (last ? `last sent ${formatTime(last)}` : 'waiting for GPS…')}</span> : <span className="text-warning">Passengers cannot see the bus while this is off</span>}
     </div>
   );
 }
