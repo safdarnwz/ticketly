@@ -125,6 +125,15 @@ describe('platform boundary (e2e)', () => {
     expect((await app.get(`/admin/tenants/${tenantId}`, sa)).body.apiRateLimit).toBe(600);
   });
 
+  it('platform numbers: active buses and this month’s revenue (Indian days)', async () => {
+    const r = await app.get('/admin/tenants/analytics', { as: 'platformAdmin' });
+    expect(r.status).toBe(200);
+    expect(r.body.activeBuses).toBeGreaterThan(0);
+    expect(r.body.monthRevenueMinor).toBeGreaterThanOrEqual(0);
+    expect(r.body.monthRevenueMinor).toBeLessThanOrEqual(r.body.totalRevenueMinor);
+    expect((await app.get('/admin/tenants/analytics', { headers: owner })).status).toBe(403);
+  });
+
   it('integrations describe their own form fields; secrets never come back', async () => {
     const r = await app.get('/admin/integrations', { as: 'platformAdmin' });
     expect(r.status).toBe(200);

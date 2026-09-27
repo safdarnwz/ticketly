@@ -486,3 +486,6 @@ an unknown id is now 404 (was 200).
 - **Platform admin — integrations:** `GET /admin/integrations` items add `fields {config, secrets}` — each
   setting's key, type (text / number / boolean / choice with options), whether it is required and its default,
   read from the same schemas that validate a save.
+- **Platform numbers:** `GET /admin/tenants/analytics` adds `activeBuses` (approved, running buses of active
+  operators) and `monthRevenueMinor`; "today" and the 14-day trend are Indian calendar days (were the database
+  server's UTC days).

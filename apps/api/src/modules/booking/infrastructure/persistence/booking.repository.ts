@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { currentTransaction, DatabaseService, UnitOfWork } from '@database';
 import {
+  DEFAULT_TIMEZONE,
   newId,
   NotFoundError,
   requireTenantId,
@@ -982,8 +983,12 @@ export class BookingRepository {
     totalCancelled: number;
     todayCancelled: number;
     totalRevenueMinor: number;
+    monthRevenueMinor: number;
+    activeBuses: number;
     trend: { date: string; bookings: number; revenueMinor: number }[];
   }> {
+    // "Today" and "this month" are Indian days — the platform's calendar — not the database server's.
+    const tz = DEFAULT_TIMEZONE;
     return this.uow.run({ name: 'booking.platformStats', bypassRls: true }, async (scope) => {
       const totals = await scope.client.query<{
         total_bookings: string;
@@ -991,24 +996,34 @@ export class BookingRepository {
         total_cancelled: string;
         today_cancelled: string;
         total_revenue_minor: string;
+        month_revenue_minor: string;
+        active_buses: string;
       }>(
         `SELECT
            count(*) FILTER (WHERE confirmed_at IS NOT NULL) AS total_bookings,
-           count(*) FILTER (WHERE confirmed_at IS NOT NULL AND confirmed_at::date = current_date) AS today_bookings,
+           count(*) FILTER (WHERE confirmed_at IS NOT NULL AND (confirmed_at AT TIME ZONE $1)::date = (now() AT TIME ZONE $1)::date) AS today_bookings,
            count(*) FILTER (WHERE cancelled_at IS NOT NULL) AS total_cancelled,
-           count(*) FILTER (WHERE cancelled_at IS NOT NULL AND cancelled_at::date = current_date) AS today_cancelled,
-           coalesce(sum(paid_minor) FILTER (WHERE status IN ('confirmed','completed')), 0) AS total_revenue_minor
+           count(*) FILTER (WHERE cancelled_at IS NOT NULL AND (cancelled_at AT TIME ZONE $1)::date = (now() AT TIME ZONE $1)::date) AS today_cancelled,
+           coalesce(sum(paid_minor) FILTER (WHERE status IN ('confirmed','completed')), 0) AS total_revenue_minor,
+           coalesce(sum(paid_minor) FILTER (WHERE status IN ('confirmed','completed')
+             AND date_trunc('month', confirmed_at AT TIME ZONE $1) = date_trunc('month', now() AT TIME ZONE $1)), 0) AS month_revenue_minor,
+           (SELECT count(*) FROM vehicles v JOIN tenants t ON t.id = v.tenant_id
+             WHERE v.deleted_at IS NULL AND v.status = 'active' AND v.verification_status = 'approved'
+               AND t.status = 'active' AND t.deleted_at IS NULL) AS active_buses
          FROM bookings`,
+        [tz],
       );
       const trendRows = await scope.client.query<{
         d: string;
         bookings: string;
         revenue_minor: string;
       }>(
-        `SELECT confirmed_at::date::text AS d, count(*) AS bookings, coalesce(sum(paid_minor), 0) AS revenue_minor
+        `SELECT (confirmed_at AT TIME ZONE $1)::date::text AS d, count(*) AS bookings, coalesce(sum(paid_minor), 0) AS revenue_minor
            FROM bookings
-          WHERE confirmed_at IS NOT NULL AND confirmed_at >= current_date - interval '13 days'
+          WHERE confirmed_at IS NOT NULL
+            AND (confirmed_at AT TIME ZONE $1)::date >= (now() AT TIME ZONE $1)::date - 13
           GROUP BY 1 ORDER BY 1`,
+        [tz],
       );
       const r = totals.rows[0];
       return {
@@ -1017,6 +1032,8 @@ export class BookingRepository {
         totalCancelled: Number(r?.total_cancelled ?? 0),
         todayCancelled: Number(r?.today_cancelled ?? 0),
         totalRevenueMinor: Number(r?.total_revenue_minor ?? 0),
+        monthRevenueMinor: Number(r?.month_revenue_minor ?? 0),
+        activeBuses: Number(r?.active_buses ?? 0),
         trend: trendRows.rows.map((row) => ({
           date: row.d,
           bookings: Number(row.bookings),

@@ -14,8 +14,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Backend status | Count |
 |---|---|
 | OPEN | 2711 |
-| DONE | 975 |
-| GAP | 290 |
+| DONE | 973 |
+| GAP | 292 |
 | CONFLICT | 76 |
 | INFRA | 20 |
 | DUP | 9 |
@@ -23,15 +23,15 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 | Frontend status | Count |
 |---|---|
-| — | 3103 |
-| DONE | 587 |
-| TODO | 388 |
+| — | 3105 |
+| DONE | 597 |
+| TODO | 376 |
 | DUP | 9 |
 
 
 ## #1–#500
 
-CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 365, GAP 101, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -65,12 +65,12 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 28 | Set password complexity rules | DONE | DONE | PUT /admin/policies/password (enforced wherever a password is set; expiry at login) · UI: Super admin → Settings → Security: password rules, admin sign-in IP list, suspicious sign-in alerts, encryption keys |
 | 29 | Set password expiry days | DONE | DONE | PUT /admin/policies/password (enforced wherever a password is set; expiry at login) · UI: Super admin → Settings → Security: password rules, admin sign-in IP list, suspicious sign-in alerts, encryption keys |
 | 30 | Set maximum failed login attempts | DONE | DONE | verified manually: existing module/API · UI: Super admin → Settings → Security: password rules, admin sign-in IP list, suspicious sign-in alerts, encryption keys |
-| 31 | Lock operator account on suspicious activity | DONE | TODO | verified manually: existing module/API |
-| 32 | Unlock operator account | DONE | TODO | verified manually: existing module/API |
+| 31 | Lock operator account on suspicious activity | DONE | DONE | verified manually: existing module/API · UI: Super admin → Operators: suspend with a reason (staff can no longer sign in), re-activate |
+| 32 | Unlock operator account | DONE | DONE | verified manually: existing module/API · UI: Super admin → Operators: suspend with a reason (staff can no longer sign in), re-activate |
 | 33 | Define global GST tax slabs | DONE | DONE | PUT /admin/policies/gst-slabs · UI: Super admin → Settings → Business rules: GST slabs, agent credit default/cap, OTA release default, data retention (server minimums) |
 | 34 | Create cancellation policy templates | DONE | DONE | verified manually: existing module/API · UI: Settings › Cancellation Policy: tiers with checks, preview, reset to default |
 | 35 | Create refund policy templates | DONE | DONE | verified manually: existing module/API · UI: Settings › Cancellation Policy: tiers with checks, preview, reset to default |
-| 36 | Enable dynamic pricing engine globally | DONE | TODO | verified manually: existing module/API |
+| 36 | Enable dynamic pricing engine globally | DONE | DONE | verified manually: existing module/API · UI: Super admin → Plans (feature dynamic_pricing) and Operators → Settings → Features (per operator) |
 | 37 | Enable redBus integration | DONE | DONE | verified manually: existing module/API · UI: Super admin → OTA partners: add, activate/suspend, terms, prepaid top-ups, API keys (shown once, revoke), webhook + test |
 | 38 | Enable AbhiBus integration | DONE | DONE | verified manually: existing module/API · UI: Super admin → OTA partners: add, activate/suspend, terms, prepaid top-ups, API keys (shown once, revoke), webhook + test |
 | 39 | Enable MakeMyTrip integration | DONE | DONE | verified manually: existing module/API · UI: Super admin → OTA partners: add, activate/suspend, terms, prepaid top-ups, API keys (shown once, revoke), webhook + test |
@@ -99,8 +99,8 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 62 | Set per-operator API rate limits | DONE | DONE | PUT /admin/tenants/:id/rate-limit (RateLimitGuard reads it, cached) · UI: Super admin → Operators → Settings: custom domain, favicon, API rate limit, per-operator feature flags + roll back everywhere |
 | 63 | Configure webhook endpoints for events | DONE | DONE | POST/GET/DELETE /webhooks, POST /webhooks/:id/test — public https URLs only (no localhost / private / metadata addresses, re-checked per send, no redirects), one registration per URL, 10 per operator, 404 across operators · UI: Distribution: register with event choice + URL checks, secret shown once, send test (status/latency), deliveries, revoke with confirm |
 | 64 | Test webhook delivery | DONE | DONE | POST/GET/DELETE /webhooks, POST /webhooks/:id/test — public https URLs only (no localhost / private / metadata addresses, re-checked per send, no redirects), one registration per URL, 10 per operator, 404 across operators · UI: Distribution: register with event choice + URL checks, secret shown once, send test (status/latency), deliveries, revoke with confirm |
-| 65 | Set white-label primary color for operator | DONE | TODO | verified manually: existing module/API |
-| 66 | Set white-label secondary color for operator | DONE | TODO | verified manually: existing module/API |
+| 65 | Set white-label primary color for operator | GAP | — | not built: per-operator colours (only the platform / per-role theme exists) |
+| 66 | Set white-label secondary color for operator | GAP | — | not built: per-operator colours (only the platform / per-role theme exists) |
 | 67 | Set white-label favicon for operator | DONE | DONE | PUT /admin/tenants/:id/favicon; GET /operator/branding (public) · UI: Super admin → Operators → Settings: custom domain, favicon, API rate limit, per-operator feature flags + roll back everywhere |
 | 68 | Define offline booking sync rules | GAP | — | verified manually: not built yet |
 | 69 | Manage global seat layout templates library | DONE | TODO | verified manually: existing module/API |
@@ -117,19 +117,19 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 80 | Run smoke tests on staging | INFRA | — | DevOps/monitoring runbook (not an app feature) |
 | 81 | Approve production release | INFRA | — | DevOps/monitoring runbook (not an app feature) |
 | 82 | Rollback to previous production version | INFRA | — | DevOps/monitoring runbook (not an app feature) |
-| 83 | Enable multi-currency support | DONE | TODO | verified manually: existing module/API |
-| 84 | Add new currency | DONE | TODO | verified manually: existing module/API |
-| 85 | Set currency conversion source | DONE | TODO | verified manually: existing module/API |
-| 86 | Enable multi-language support | DONE | TODO | verified manually: existing module/API |
-| 87 | Add new language pack | DONE | TODO | verified manually: existing module/API |
+| 83 | Enable multi-currency support | DONE | DONE | verified manually: existing module/API · UI: Super admin → Settings → i18n & Currency: publish exchange rates (new currency on first rate, source noted), language pack strings, converter |
+| 84 | Add new currency | DONE | DONE | verified manually: existing module/API · UI: Super admin → Settings → i18n & Currency: publish exchange rates (new currency on first rate, source noted), language pack strings, converter |
+| 85 | Set currency conversion source | DONE | DONE | verified manually: existing module/API · UI: Super admin → Settings → i18n & Currency: publish exchange rates (new currency on first rate, source noted), language pack strings, converter |
+| 86 | Enable multi-language support | DONE | DONE | verified manually: existing module/API · UI: Super admin → Settings → i18n & Currency: publish exchange rates (new currency on first rate, source noted), language pack strings, converter |
+| 87 | Add new language pack | DONE | DONE | verified manually: existing module/API · UI: Super admin → Settings → i18n & Currency: publish exchange rates (new currency on first rate, source noted), language pack strings, converter |
 | 88 | Monitor platform health dashboard | INFRA | — | DevOps/monitoring runbook (not an app feature) |
 | 89 | View current uptime percentage | INFRA | — | DevOps/monitoring runbook (not an app feature) |
 | 90 | View booking success rate | DONE | DONE | verified manually: existing module/API · UI: Super admin → Platform health: payment success per gateway, error rate, SMS/WhatsApp/email delivery, operator ranking |
 | 91 | View overall error rate | DONE | DONE | verified manually: existing module/API · UI: Super admin → Platform health: payment success per gateway, error rate, SMS/WhatsApp/email delivery, operator ranking |
 | 92 | View total active operators | DONE | DONE | verified manually: existing module/API · UI: Super admin → Analytics & Plans: active operators / total |
-| 93 | View total active buses across platform | DONE | TODO | verified manually: existing module/API |
+| 93 | View total active buses across platform | DONE | DONE | verified manually: existing module/API · UI: Super admin → Analytics & Plans: active buses, revenue this month (Indian calendar) |
 | 94 | View platform-wide daily booking volume | DONE | DONE | GET /admin/monitoring/bookings/activity (per operator, today by default) + GET /admin/monitoring/bookings (feed, live holds) · UI: super admin › Live bookings |
-| 95 | View platform-wide monthly revenue | DONE | TODO | verified manually: existing module/API |
+| 95 | View platform-wide monthly revenue | DONE | DONE | verified manually: existing module/API · UI: Super admin → Analytics & Plans: active buses, revenue this month (Indian calendar) |
 | 96 | Suspend non-paying operator | DONE | DONE | verified manually: existing module/API · UI: Super admin → Operators: provision (legal name, code, contact), suspend with reason, re-activate, change plan, Export CSV, Message all |
 | 97 | Set suspension reason | DONE | DONE | verified manually: existing module/API · UI: Super admin → Operators: provision (legal name, code, contact), suspend with reason, re-activate, change plan, Export CSV, Message all |
 | 98 | Reactivate suspended operator | DONE | DONE | verified manually: existing module/API · UI: Super admin → Operators: provision (legal name, code, contact), suspend with reason, re-activate, change plan, Export CSV, Message all |
@@ -786,7 +786,7 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 365, GAP 101, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -901,7 +901,7 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 365, GAP 101, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1016,7 +1016,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 365, GAP 101, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1111,7 +1111,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 365, GAP 101, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1226,7 +1226,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 365, GAP 101, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1301,7 +1301,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 365, GAP 101, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
