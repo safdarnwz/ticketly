@@ -521,7 +521,7 @@ async function sellOne(
     customerN !== undefined
       ? h.customers[customerN].mobile
       : `9${String(Math.floor(rnd() * 1e9)).padStart(9, '0')}`;
-  const key = `h-${day}-${t.id.slice(-12)}-${seats.join('.')}`;
+  const key = `h-${day}-${t.id.slice(-12)}-${seats.join('.')}-${Math.floor(rnd() * 1e9)}`;
   const rec: BookingRec = {
     id: '',
     pnr: '',
@@ -1214,18 +1214,28 @@ async function ops(day: string) {
         speedKmph: 60 + Math.floor(rnd() * 20),
       });
     if (rnd() < 0.003) {
-      const inc = await cr('POST', `/crew/trips/${t.id}/incidents`, {
-        type: 'breakdown',
-        description: 'Tyre puncture near the toll plaza, changed in 40 minutes',
-        delayMinutes: 40,
-      });
+      const inc = await cr(
+        'POST',
+        `/crew/trips/${t.id}/incidents`,
+        {
+          type: 'breakdown',
+          description: 'Tyre puncture near the toll plaza, changed in 40 minutes',
+          delayMinutes: 40,
+        },
+        `inc-${t.id}`,
+      );
       stat(h, inc.status < 300 ? 'incident' : `incident-${inc.status}`);
     }
     if (rnd() < 0.004) {
-      const lf = await cr('POST', `/crew/trips/${t.id}/lost-found`, {
-        description: 'Black backpack left on the rack',
-        seatNumber: '1',
-      });
+      const lf = await cr(
+        'POST',
+        `/crew/trips/${t.id}/lost-found`,
+        {
+          description: 'Black backpack left on the rack',
+          seatNumber: '1',
+        },
+        `lf-${t.id}`,
+      );
       stat(h, lf.status < 300 ? 'lost-found' : `lost-found-${lf.status}`);
     }
   });
