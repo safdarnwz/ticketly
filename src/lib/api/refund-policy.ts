@@ -13,6 +13,8 @@ export interface RefundPolicy {
   partialCancellation?: boolean;
   /** Minutes after departure before a passenger can be marked a no-show (0–240). */
   noShowGraceMinutes?: number;
+  /** Full refund when cancelled within this many hours of paying (0 = no free window, max 72). */
+  freeCancellationHours?: number;
 }
 
 export const refundPolicyApi = {

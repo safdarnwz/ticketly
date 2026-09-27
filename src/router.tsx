@@ -29,6 +29,7 @@ import { VehicleApprovalsPage } from '@/pages/admin/VehicleApprovalsPage';
 import { PartnersPage } from '@/pages/admin/PartnersPage';
 import { BillingPage } from '@/pages/admin/BillingPage';
 import { HealthPage } from '@/pages/admin/HealthPage';
+import { WaitlistRulesPage } from '@/pages/settings/WaitlistRulesPage';
 import { ManageBookingPage } from '@/pages/customer/ManageBookingPage';
 import { AccountPage } from '@/pages/customer/AccountPage';
 
@@ -147,6 +148,7 @@ const tenantAdminRouter = createBrowserRouter([
               { path: 'bank-details', element: <BankDetailsPage /> },
               { path: 'refund-policy', element: <RefundPolicyPage /> },
               { path: 'connections', element: <ConnectionsPage /> },
+              { path: 'waitlist', element: <WaitlistRulesPage /> },
               { path: 'templates', element: <TemplatesPage /> },
               { path: 'branding', element: <BrandingPage /> },
             ],

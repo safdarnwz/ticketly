@@ -17,7 +17,7 @@ export function WaitlistModal({ trip, onClose }: { trip: SearchResult; onClose: 
   const n = Number(count);
   const mobile = normalizeMobile(phone);
   const errors: Record<string, string> = {};
-  if (!Number.isInteger(n) || n < 1 || n > 6) errors.count = '1 to 6 seats';
+  if (!Number.isInteger(n) || n < 1 || n > 10) errors.count = '1 to 10 seats';
   if (!mobile) errors.phone = 'Enter a 10-digit mobile';
   const join = useMutation({
     mutationFn: () => tripOpsExtraApi.joinWaitlist(trip.tripId, { fromStopId: trip.boardingStop.id, toStopId: trip.droppingStop.id, seatCount: n, contactPhone: mobile! }, key, trip.tenantId),
@@ -30,7 +30,7 @@ export function WaitlistModal({ trip, onClose }: { trip: SearchResult; onClose: 
       <div className="flex flex-col gap-3 text-sm">
         <p className="text-text-muted">{trip.operatorName} · {trip.boardingStop.name} → {trip.droppingStop.name} · {formatDateTime(trip.departsAt)} is full.</p>
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Seats needed" type="number" min={1} max={6} value={count} onChange={(e) => setCount(e.target.value)} error={tried ? errors.count : undefined} />
+          <Input label="Seats needed" type="number" min={1} max={10} value={count} onChange={(e) => setCount(e.target.value)} error={tried ? errors.count : undefined} />
           <Input label="Passenger mobile" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} error={tried ? errors.phone : undefined} />
         </div>
       </div>

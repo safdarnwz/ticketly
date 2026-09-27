@@ -16,6 +16,7 @@ export function RefundPolicyPage() {
   const [cutoffHours, setCutoffHours] = useState('0');
   const [partial, setPartial] = useState(true);
   const [grace, setGrace] = useState('0');
+  const [freeHours, setFreeHours] = useState('0');
   const [confirmReset, setConfirmReset] = useState(false);
 
   // Load the current policy (custom or platform default) into the editable
@@ -27,6 +28,7 @@ export function RefundPolicyPage() {
     setCutoffHours(String(data.data.policy.cutoffHours ?? 0));
     setPartial(data.data.policy.partialCancellation !== false);
     setGrace(String(data.data.policy.noShowGraceMinutes ?? 0));
+    setFreeHours(String(data.data.policy.freeCancellationHours ?? 0));
   }, [data.data]);
 
   const save = useMutation({
@@ -36,6 +38,7 @@ export function RefundPolicyPage() {
       cutoffHours: Number(cutoffHours) || 0,
       partialCancellation: partial,
       noShowGraceMinutes: Number(grace) || 0,
+      freeCancellationHours: Number(freeHours) || 0,
     }),
     onSuccess: () => {
       toast.success('Cancellation policy updated — applies to any cancellation from now on, never retroactively');
@@ -80,7 +83,9 @@ export function RefundPolicyPage() {
     : !(fee >= 0 && fee <= 10_000) ? 'The flat fee is ₹0 to ₹10,000'
     : !(Number.isInteger(cutoff) && cutoff >= 0 && cutoff <= 720) ? 'The cutoff is whole hours, 0–720'
     : undefined;
-  const canSave = !formError && !graceError && tierErrors.every((e) => !e.hours && !e.pct);
+  const free = Number(freeHours);
+  const freeError = !(free >= 0 && free <= 72) ? '0 to 72 hours' : undefined;
+  const canSave = !formError && !graceError && !freeError && tierErrors.every((e) => !e.hours && !e.pct);
   const example = (h: number) => {
     if (h < cutoff) return 'not allowed';
     const tier = sorted.find((t) => h >= t.minHoursBeforeDeparture);
@@ -137,6 +142,8 @@ export function RefundPolicyPage() {
             </label>
             <Input label="No-show grace (minutes after departure)" type="number" min={0} max={240} value={grace} onChange={(e) => setGrace(e.target.value)} error={graceError}
               hint="Staff can mark a passenger a no-show only this long after the departure time (a late passenger may still be picked up on the way)" />
+            <Input label="Free cancellation window (hours after booking)" type="number" min={0} max={72} step="0.5" value={freeHours} onChange={(e) => setFreeHours(e.target.value)} error={freeError}
+              hint="Cancelled within this long of paying: the whole amount back, no fee (the hard cutoff still applies). 0 = none" />
           </div>
 
           <div className="rounded-md bg-surface-muted p-3 text-sm">
