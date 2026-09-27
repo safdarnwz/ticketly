@@ -6,6 +6,7 @@ import { Flag, MessageSquareReply, Star } from 'lucide-react';
 import { Badge, Button, Card, CardBody, EmptyState, ErrorState, Modal, PageLoader, Select, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { REPORT_REASONS, reviewsApi, type OperatorReview, type ReviewFilter } from '@/lib/api/content';
+import { fleetApi } from '@/lib/api/fleet';
 import { masterDataApi } from '@/lib/api/masterData';
 import { cn, formatDateLabel, formatDateTime } from '@/lib/utils';
 
@@ -33,14 +34,17 @@ export function ReviewsPage() {
   const qc = useQueryClient();
   const [filter, setFilter] = useState<ReviewFilter>('all');
   const [routeId, setRouteId] = useState('');
+  // Reviews belong to the bus that ran the trip, so each bus has its own stars.
+  const [vehicleId, setVehicleId] = useState('');
   const [rating, setRating] = useState('');
   const [replying, setReplying] = useState<OperatorReview | null>(null);
   const [reporting, setReporting] = useState<OperatorReview | null>(null);
 
   const routes = useQuery({ queryKey: ['routes'], queryFn: () => masterDataApi.listRoutes() });
+  const buses = useQuery({ queryKey: ['vehicles', 'review-filter'], queryFn: () => fleetApi.listVehicles({ pageSize: 100 }) });
   const list = useInfiniteQuery({
-    queryKey: ['operator-reviews', filter, routeId, rating],
-    queryFn: ({ pageParam }) => reviewsApi.list({ filter, routeId: routeId || undefined, rating: rating ? Number(rating) : undefined, cursor: pageParam }),
+    queryKey: ['operator-reviews', filter, routeId, vehicleId, rating],
+    queryFn: ({ pageParam }) => reviewsApi.list({ filter, routeId: routeId || undefined, vehicleId: vehicleId || undefined, rating: rating ? Number(rating) : undefined, cursor: pageParam }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     placeholderData: keepPreviousData,
@@ -60,7 +64,7 @@ export function ReviewsPage() {
             <div className="text-4xl font-semibold text-text">{summary ? summary.average.toFixed(1) : '–'}</div>
             <div>
               <Stars value={summary?.average ?? 0} />
-              <div className="text-sm text-text-muted">{total} review{total === 1 ? '' : 's'}{routeId ? ' on this route' : ''}</div>
+              <div className="text-sm text-text-muted">{total} review{total === 1 ? '' : 's'}{vehicleId ? ' for this bus' : routeId ? ' on this route' : ''}</div>
             </div>
           </CardBody>
         </Card>
@@ -96,6 +100,10 @@ export function ReviewsPage() {
           </div>
           <div className="w-64"><Select label="Route" value={routeId} onChange={(e) => setRouteId(e.target.value)}
             options={[{ label: 'All routes', value: '' }, ...(routes.data?.items ?? []).map((r) => ({ label: r.name, value: r.id }))]} /></div>
+          <div className="w-56"><Select label="Bus" value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}
+            options={[{ label: 'All buses', value: '' }, ...(buses.data?.items ?? []).map((v) => ({ label: v.registrationNo, value: v.id })),
+              // a bus picked from a review below that is beyond the first 100 in the list
+              ...(vehicleId && !(buses.data?.items ?? []).some((v) => v.id === vehicleId) ? [{ label: items.find((r) => r.vehicleId === vehicleId)?.busNumber ?? 'This bus', value: vehicleId }] : [])]} /></div>
           {rating && <Button variant="ghost" size="sm" onClick={() => setRating('')}>Clear {rating}-star filter</Button>}
         </CardBody>
       </Card>
@@ -115,7 +123,7 @@ export function ReviewsPage() {
                     {r.reportedAt && <Badge tone="warning">Reported</Badge>}
                   </div>
                   <div className="text-xs text-text-muted">
-                    {r.routeName ?? 'Route'}{r.journeyDate ? ` · travelled ${formatDateLabel(r.journeyDate, { day: '2-digit', month: 'short' })}` : ''} · <Link className="font-mono text-primary hover:underline" to={`/bookings/${r.pnr}`}>{r.pnr}</Link> · {formatDateTime(r.createdAt)}
+                    {r.busNumber && r.vehicleId ? <><button type="button" title="Only this bus's reviews" className="font-mono font-semibold text-text hover:underline" onClick={() => setVehicleId(r.vehicleId!)}>{r.busNumber}</button> · </> : null}{r.routeName ?? 'Route'}{r.journeyDate ? ` · travelled ${formatDateLabel(r.journeyDate, { day: '2-digit', month: 'short' })}` : ''} · <Link className="font-mono text-primary hover:underline" to={`/bookings/${r.pnr}`}>{r.pnr}</Link> · {formatDateTime(r.createdAt)}
                   </div>
                 </div>
                 {r.body ? <p className="whitespace-pre-line text-sm text-text">{r.body}</p> : <p className="text-sm italic text-text-muted">Stars only, no comment.</p>}

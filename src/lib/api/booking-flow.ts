@@ -113,7 +113,35 @@ export interface Quote {
 /** A call about a specific operator's trip (connecting legs belong to different operators). */
 const forTenant = (tenantId?: string) => (tenantId ? { headers: { 'X-Tenant-Id': tenantId } } : undefined);
 
+export interface BusReview { id: string; rating: number; title: string | null; body: string | null; createdAt: string; reply: string | null; liked: string[]; reviewer: string | null; travelledOn: string | null }
+export interface BusReviews {
+  average: number | null; count: number;
+  distribution: Record<'1' | '2' | '3' | '4' | '5', number>;
+  liked: { aspect: string; count: number; label?: string }[];
+  items: BusReview[];
+}
+export interface TripBusDetails {
+  tripId: string;
+  operatorName: string;
+  bus: { id: string; name: string | null; type: string | null; ac: boolean; year: number | null; seatTypes: string[]; decks: number; seats: number; photos: { url: string; caption: string | null }[] } | null;
+  highlights: { key: string; title: string; detail: string }[];
+  cancellation: { rows: { from: string | null; until: string; refundPct: number }[]; flatFeeMinor: number; cutoffHours: number; freeCancellationHours: number; partialCancellation: boolean };
+  route: { stops: { name: string; city: string | null; at: string; boardHere: boolean; dropHere: boolean }[]; distanceKm: number; durationMin: number };
+  boardingPoints: { stopId: string; name: string; city: string | null; landmark: string | null; address: string | null; at: string }[];
+  droppingPoints: { stopId: string; name: string; city: string | null; landmark: string | null; address: string | null; at: string }[];
+  amenities: { code: string; name: string; icon: string | null }[];
+  reviews: (BusReviews & { liked: { aspect: string; count: number; label: string }[] }) | null;
+  safety: { key: string; label: string; ok: boolean; detail: string }[];
+  policies: { key: string; title: string; text: string }[];
+}
+
 export const flowApi = {
+  /** Everything under the seat map for this trip's bus (tabs): policies, route, points, features, the bus's own reviews, safety, photos. */
+  busDetails: (tripId: string, fromStopId?: string, toStopId?: string, tenantId?: string) =>
+    get<TripBusDetails>(`/v1/search/trips/${tripId}/details${fromStopId && toStopId ? `?from=${fromStopId}&to=${toStopId}` : ''}`, forTenant(tenantId)),
+  /** A bus's reviews, page by page — they stay with the bus that ran the trip. */
+  busReviews: (vehicleId: string, offset = 0, tenantId?: string) =>
+    get<BusReviews>(`/v1/buses/${vehicleId}/reviews?limit=10&offset=${offset}`, forTenant(tenantId)),
   searchCities: (q: string) => get<{ items: City[] }>(`/v1/master-data/cities/search?q=${encodeURIComponent(q)}`),
   cityBySlug: (slug: string) => get<City>(`/v1/master-data/cities/by-slug/${encodeURIComponent(slug)}`),
   stopsInCity: (cityId: string) => get<{ items: Stop[] }>(`/v1/master-data/cities/${cityId}/stops`),

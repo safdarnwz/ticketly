@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { BusDetails } from '@/components/customer/BusDetails';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Clock, Star } from 'lucide-react';
@@ -124,6 +125,9 @@ export function TripPage() {
               />
             </CardBody>
           </Card>
+          <div className="mt-6">
+            <BusDetails tripId={trip.tripId} tenantId={trip.tenantId} fromStopId={sel.fromStop?.stopId ?? b.fromStopId ?? trip.boardingStop.id} toStopId={sel.toStop?.stopId ?? b.toStopId ?? trip.droppingStop.id} />
+          </div>
         </div>
 
         <div>

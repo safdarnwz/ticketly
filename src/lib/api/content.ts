@@ -5,6 +5,8 @@ export interface PublicReview { id: string; rating: number; title: string | null
 export interface OperatorReview extends PublicReview {
   routeId: string | null; routeName: string | null; pnr: string; journeyDate: string | null; status: string;
   reportReason: string | null; reportedAt: string | null;
+  /** The bus the review is about — the one that ran the trip. */
+  vehicleId?: string | null; busNumber?: string | null; liked?: string[];
 }
 export interface ReviewSummary { count: number; average: number; bayesian: number; distribution?: Record<string, number>; counts: Record<string, number>; unanswered: number; reported: number }
 export type ReviewFilter = 'all' | 'unanswered' | 'low' | 'reported';
@@ -16,15 +18,28 @@ export const REPORT_REASONS = [
   { value: 'other', label: 'Something else' },
 ] as const;
 
+/** What a traveller can say they liked about the bus (summed into "loved by travellers"). */
+export const REVIEW_ASPECTS: { value: string; label: string }[] = [
+  { value: 'cleanliness', label: 'Cleanliness' },
+  { value: 'punctuality', label: 'Punctuality' },
+  { value: 'comfort', label: 'Seat / sleep comfort' },
+  { value: 'staff', label: 'Staff behaviour' },
+  { value: 'ac', label: 'AC' },
+  { value: 'driving', label: 'Driving' },
+  { value: 'tracking', label: 'Live tracking' },
+  { value: 'rest_stops', label: 'Rest-stop hygiene' },
+];
+
 export const reviewsApi = {
   forRoute: (routeId: string) =>
     get<{ summary: { count: number; average: number; bayesian: number; distribution: Record<string, number> }; reviews: PublicReview[] }>(`/v1/routes/${routeId}/reviews`),
-  create: (bookingId: string, rating: number, title?: string, body?: string) =>
-    post<{ reviewId: string }>('/v1/reviews', { bookingId, rating, title, body }, withIdempotency(`review-${bookingId}`)),
+  create: (bookingId: string, rating: number, title?: string, body?: string, liked: string[] = []) =>
+    post<{ reviewId: string }>('/v1/reviews', { bookingId, rating, title, body, liked }, withIdempotency(`review-${bookingId}`)),
   /** The operator's own reviews, with a summary. */
-  list: (opts: { filter: ReviewFilter; routeId?: string; rating?: number; cursor?: string }) => {
+  list: (opts: { filter: ReviewFilter; routeId?: string; vehicleId?: string; rating?: number; cursor?: string }) => {
     const q = new URLSearchParams({ filter: opts.filter });
     if (opts.routeId) q.set('routeId', opts.routeId);
+    if (opts.vehicleId) q.set('vehicleId', opts.vehicleId);
     if (opts.rating) q.set('rating', String(opts.rating));
     if (opts.cursor) q.set('cursor', opts.cursor);
     return get<{ summary: ReviewSummary; items: OperatorReview[]; hasMore: boolean; nextCursor: string | null }>(`/v1/reviews?${q}`);

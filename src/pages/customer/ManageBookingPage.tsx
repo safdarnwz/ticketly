@@ -10,7 +10,7 @@ import { LuggageNote } from '@/components/customer/LuggageNote';
 import { PrintTicketButton } from '@/components/customer/PrintTicketButton';
 import { BookingChangeModal, type ChangeKind } from '@/pages/bookings/BookingChanges';
 import { bookingsApi, type ManagedBooking } from '@/lib/api/bookings';
-import { reviewsApi, supportApi } from '@/lib/api/content';
+import { REVIEW_ASPECTS, reviewsApi, supportApi } from '@/lib/api/content';
 import { useAuth } from '@/stores/auth';
 import { useBooking } from '@/stores/booking';
 import { formatDateTime, formatMoney } from '@/lib/utils';
@@ -164,9 +164,10 @@ function ReviewModal({ booking, onClose }: { booking: ManagedBooking; onClose: (
   const [rating, setRating] = useState(0);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [liked, setLiked] = useState<string[]>([]);
   const [tried, setTried] = useState(false);
   const go = useMutation({
-    mutationFn: () => reviewsApi.create(booking.id, rating, title.trim() || undefined, body.trim() || undefined),
+    mutationFn: () => reviewsApi.create(booking.id, rating, title.trim() || undefined, body.trim() || undefined, liked),
     onSuccess: () => { toast.success('Thanks — your review is published'); onClose(); },
     onError: (e) => toast.error(errText(e, 'Could not save your review')),
   });
@@ -182,6 +183,18 @@ function ReviewModal({ booking, onClose }: { booking: ManagedBooking; onClose: (
           ))}
         </div>
         {tried && !rating && <p role="alert" className="text-xs text-danger">Choose 1 to 5 stars</p>}
+        <div>
+          <div className="mb-1.5 font-medium text-text">What did you like about this bus? <span className="font-normal text-text-muted">(optional)</span></div>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="What you liked">
+            {REVIEW_ASPECTS.map((a) => {
+              const on = liked.includes(a.value);
+              return (
+                <button key={a.value} type="button" aria-pressed={on} onClick={() => setLiked(on ? liked.filter((x) => x !== a.value) : [...liked, a.value])}
+                  className={`rounded-pill border px-3 py-1 text-xs font-medium ${on ? 'border-success bg-success/10 text-success' : 'border-border text-text'}`}>{a.label}</button>
+              );
+            })}
+          </div>
+        </div>
         <Input label="Title (optional)" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />
         <Input label="Your experience (optional)" value={body} maxLength={2000} onChange={(e) => setBody(e.target.value)} placeholder="Bus, staff, punctuality…" />
       </div>

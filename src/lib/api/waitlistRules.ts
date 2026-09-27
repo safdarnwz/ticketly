@@ -18,6 +18,20 @@ export const luggagePolicyApi = {
   reset: () => post<{ ok: boolean; policy: null }>('/v1/operator/luggage-policy/reset', {}),
 };
 
+/** Pets, liquor, smoking, how long the bus waits, own notes — "Other policies" under every trip. */
+export interface TravelPolicies {
+  pets: 'not_allowed' | 'small_in_carrier' | 'allowed';
+  liquor: 'prohibited' | 'sealed_in_luggage';
+  smoking: 'prohibited' | 'at_stops_only';
+  pickupWaitMinutes: number;
+  notes: string[];
+}
+export const travelPoliciesApi = {
+  get: () => get<{ policies: TravelPolicies | null }>('/v1/operator/travel-policies'),
+  set: (p: TravelPolicies) => put<{ ok: boolean; policies: TravelPolicies }>('/v1/operator/travel-policies', p),
+  reset: () => post<{ ok: boolean; policies: null }>('/v1/operator/travel-policies/reset', {}),
+};
+
 /** One add-on the operator sells at checkout (insurance, meal, extra bag…). */
 export interface AddOn { id: string; code: string; name: string; kind: 'insurance' | 'meal' | 'luggage' | 'priority' | 'other'; priceMinor: number; perPassenger: boolean; active: boolean }
 
