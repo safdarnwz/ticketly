@@ -16,4 +16,10 @@ export const onboardingApi = {
   get: (id: string) => get<Record<string, unknown>>(`/v1/admin/operator-applications/${id}`),
   approve: (id: string) => post<{ tenantId: string; operatorUserId: string; slug: string; consoleUrl: string }>(`/v1/admin/operator-applications/${id}/approve`, {}),
   reject: (id: string, reason: string) => post<{ ok: boolean }>(`/v1/admin/operator-applications/${id}/reject`, { reason }),
+  /** Keep it pending with a reason (e.g. documents needed) — emailed to the applicant. */
+  hold: (id: string, reason: string) => post<{ ok: boolean }>(`/v1/admin/operator-applications/${id}/hold`, { reason }),
+  /** A rejected application back to pending, with a reason. */
+  reopen: (id: string, reason: string) => post<{ ok: boolean }>(`/v1/admin/operator-applications/${id}/reopen`, { reason }),
+  /** A short-lived link to one uploaded document. */
+  documentUrl: (id: string, docType: string) => get<{ url: string | null; fileName: string }>(`/v1/admin/operator-applications/${id}/documents/${encodeURIComponent(docType)}`),
 };

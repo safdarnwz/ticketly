@@ -17,7 +17,7 @@ export function AnalyticsPage() {
   const [tab, setTab] = useState<Tab>('analytics');
   return (
     <>
-      <PageHeader title="Analytics & Billing" subtitle="Platform-wide numbers across every operator, the plan catalogue, and the audit trail" />
+      <PageHeader title="Analytics & Plans" subtitle="Platform-wide numbers, the plan catalogue, platform fees, payouts and the audit trail" />
       <div className="mb-6 flex gap-2 border-b border-border">
         {([
           { key: 'analytics', label: 'Analytics', icon: TrendingUp },
@@ -89,51 +89,100 @@ function AnalyticsTab() {
   );
 }
 
+const QUOTAS: { key: string; label: string }[] = [
+  { key: 'max_vehicles', label: 'Buses' },
+  { key: 'max_branches', label: 'Branches' },
+  { key: 'max_agents', label: 'Agents' },
+  { key: 'max_users', label: 'Staff logins' },
+  { key: 'max_routes', label: 'Routes' },
+];
+const limitText = (v: unknown) => (typeof v === 'number' && v >= 0 ? String(v) : '∞');
+
+/** The plan catalogue (#99, #102–#104): price, what each plan includes and how many buses, branches, agents… it allows. Saving an existing code updates that plan. */
 function PlansTab() {
   const qc = useQueryClient();
   const toast = useToast();
-  const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ code: '', name: '', monthlyPrice: 0 });
-
+  const [editing, setEditing] = useState<Plan | 'new' | null>(null);
   const plans = useQuery({ queryKey: ['all-plans'], queryFn: tenantsApi.plans });
-
-  const create = useMutation({
-    mutationFn: () => tenantsApi.createPlan({ code: form.code, name: form.name, monthlyPrice: Math.round(form.monthlyPrice * 100) }),
-    onSuccess: () => { toast.success('Plan saved'); setAdding(false); setForm({ code: '', name: '', monthlyPrice: 0 }); void qc.invalidateQueries({ queryKey: ['all-plans'] }); },
-    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
-  });
   const toggle = useMutation({
     mutationFn: (p: Plan) => tenantsApi.togglePlanActive(p.id, !p.isActive),
     onSuccess: () => { toast.success('Plan updated'); void qc.invalidateQueries({ queryKey: ['all-plans'] }); },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
   });
+  const featureKeys = [...new Set((plans.data?.items ?? []).flatMap((p) => Object.keys(p.features ?? {})))].sort();
 
   const columns: Column<Plan>[] = [
-    { key: 'name', header: 'Plan', render: (p) => <span className="font-medium text-text">{p.name}</span> },
-    { key: 'code', header: 'Code', render: (p) => <span className="font-mono text-xs">{p.code}</span> },
+    { key: 'name', header: 'Plan', render: (p) => <span className="font-medium text-text">{p.name} <span className="font-mono text-xs text-text-muted">{p.code}</span></span> },
     { key: 'price', header: 'Price / month', render: (p) => formatMoney(p.monthlyPrice, p.currency) },
+    { key: 'limits', header: 'Allows', render: (p) => <span className="text-xs text-text-muted">{QUOTAS.map((q) => `${q.label} ${limitText(p.quotas?.[q.key])}`).join(' · ')}</span> },
+    { key: 'features', header: 'Includes', render: (p) => <span className="text-xs text-text-muted">{Object.entries(p.features ?? {}).filter(([, v]) => v).map(([k]) => k).join(', ') || '—'}</span> },
     { key: 'status', header: 'Status', render: (p) => <Badge tone={p.isActive ? 'success' : 'neutral'}>{p.isActive ? 'Active' : 'Retired'}</Badge> },
     {
       key: 'actions', header: '', render: (p) => (
-        <Button size="sm" variant="ghost" onClick={() => toggle.mutate(p)}>{p.isActive ? 'Retire' : 'Reactivate'}</Button>
+        <div className="flex justify-end gap-1">
+          <Button size="sm" variant="ghost" onClick={() => setEditing(p)}>Edit</Button>
+          <Button size="sm" variant="ghost" loading={toggle.isPending && toggle.variables?.id === p.id} disabled={toggle.isPending} onClick={() => toggle.mutate(p)}>{p.isActive ? 'Retire' : 'Reactivate'}</Button>
+        </div>
       ),
     },
   ];
 
   return (
     <>
-      <div className="mb-4 flex justify-end"><Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setAdding(true)}>New plan</Button></div>
+      <div className="mb-4 flex justify-end"><Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setEditing('new')}>New plan</Button></div>
       {plans.isLoading ? <PageLoader /> : plans.isError ? <ErrorState error={plans.error} onRetry={plans.refetch} /> : <Table columns={columns} rows={plans.data?.items ?? []} />}
-
-      <Modal open={adding} onClose={() => setAdding(false)} title="Create a plan"
-        footer={<><Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button><Button loading={create.isPending} disabled={!form.code || !form.name} onClick={() => create.mutate()}>Create</Button></>}>
-        <div className="flex flex-col gap-3">
-          <Input label="Code" placeholder="growth" value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toLowerCase() }))} />
-          <Input label="Name" placeholder="Growth" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-          <Input label="Monthly price (₹)" type="number" value={form.monthlyPrice} onChange={(e) => setForm((f) => ({ ...f, monthlyPrice: Number(e.target.value) || 0 }))} />
-        </div>
-      </Modal>
+      {editing && <PlanModal plan={editing === 'new' ? null : editing} featureKeys={featureKeys} onClose={() => setEditing(null)} />}
     </>
+  );
+}
+
+function PlanModal({ plan, featureKeys, onClose }: { plan: Plan | null; featureKeys: string[]; onClose: () => void }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [f, setF] = useState({ code: plan?.code ?? '', name: plan?.name ?? '', price: plan ? String(plan.monthlyPrice / 100) : '0' });
+  const [quotas, setQuotas] = useState<Record<string, string>>(() => Object.fromEntries(QUOTAS.map((q) => { const v = plan?.quotas?.[q.key]; return [q.key, typeof v === 'number' && v >= 0 ? String(v) : '']; })));
+  const [features, setFeatures] = useState<Record<string, boolean>>(() => Object.fromEntries(featureKeys.map((k) => [k, Boolean(plan?.features?.[k])])));
+  const [newFeature, setNewFeature] = useState('');
+  const [tried, setTried] = useState(false);
+  const e = {
+    code: !/^[a-z0-9][a-z0-9-]{1,30}$/.test(f.code.trim()) ? 'Lower-case letters, digits and -' : undefined,
+    name: f.name.trim().length < 2 ? 'Name it' : undefined,
+    price: !(Number(f.price) >= 0) ? '₹0 or more' : undefined,
+    quota: QUOTAS.find((q) => quotas[q.key].trim() !== '' && !(Number.isInteger(Number(quotas[q.key])) && Number(quotas[q.key]) >= 0)) ? 'Whole numbers, or empty for no limit' : undefined,
+  };
+  const save = useMutation({
+    mutationFn: () => tenantsApi.createPlan({
+      code: f.code.trim(), name: f.name.trim(), monthlyPrice: Math.round(Number(f.price) * 100), features,
+      quotas: Object.fromEntries(QUOTAS.map((q) => [q.key, quotas[q.key].trim() === '' ? null : Number(quotas[q.key])])),
+    }),
+    onSuccess: () => { toast.success(plan ? 'Plan saved — operators on it get the new limits now' : 'Plan created'); void qc.invalidateQueries({ queryKey: ['all-plans'] }); void qc.invalidateQueries({ queryKey: ['tenant-plans'] }); onClose(); },
+    onError: (x) => toast.error(x instanceof Error ? x.message : 'Failed'),
+  });
+  const addFeature = () => { const k = newFeature.trim(); if (/^[a-zA-Z][a-zA-Z0-9_]{1,40}$/.test(k)) { setFeatures({ ...features, [k]: true }); setNewFeature(''); } };
+  return (
+    <Modal open onClose={onClose} size="lg" title={plan ? `Edit ${plan.name}` : 'Create a plan'}
+      footer={<><Button variant="ghost" onClick={onClose} disabled={save.isPending}>Cancel</Button><Button loading={save.isPending} disabled={save.isPending} onClick={() => { setTried(true); if (!Object.values(e).some(Boolean)) save.mutate(); }}>{plan ? 'Save' : 'Create'}</Button></>}>
+      <div className="flex flex-col gap-3 text-sm">
+        <div className="grid grid-cols-3 gap-3">
+          <Input label="Code" placeholder="growth" value={f.code} disabled={!!plan} error={tried ? e.code : undefined} onChange={(x) => setF({ ...f, code: x.target.value.toLowerCase() })} />
+          <Input label="Name" placeholder="Growth" value={f.name} error={tried ? e.name : undefined} onChange={(x) => setF({ ...f, name: x.target.value })} />
+          <Input label="Monthly price (₹)" type="number" value={f.price} error={tried ? e.price : undefined} onChange={(x) => setF({ ...f, price: x.target.value })} />
+        </div>
+        <div className="font-medium text-text">Allows at most <span className="font-normal text-text-muted">(empty = no limit)</span></div>
+        <div className="grid grid-cols-5 gap-2">
+          {QUOTAS.map((q) => <Input key={q.key} label={q.label} type="number" min={0} value={quotas[q.key]} onChange={(x) => setQuotas({ ...quotas, [q.key]: x.target.value })} />)}
+        </div>
+        {tried && e.quota && <p role="alert" className="text-xs text-danger">{e.quota}</p>}
+        <div className="font-medium text-text">Includes</div>
+        <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
+          {Object.keys(features).sort().map((k) => <label key={k} className="flex items-center gap-2 font-mono text-xs"><input type="checkbox" checked={features[k]} onChange={(x) => setFeatures({ ...features, [k]: x.target.checked })} /> {k}</label>)}
+        </div>
+        <div className="flex items-end gap-2">
+          <div className="w-56"><Input label="Add a feature" placeholder="e.g. whatsapp_tickets" value={newFeature} onChange={(x) => setNewFeature(x.target.value)} /></div>
+          <Button size="sm" variant="outline" disabled={!/^[a-zA-Z][a-zA-Z0-9_]{1,40}$/.test(newFeature.trim())} onClick={addFeature}>Add</Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

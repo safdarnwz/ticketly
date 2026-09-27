@@ -13,13 +13,13 @@ export function AnnouncementsPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ title: '', body: '', severity: 'info' as const, audience: 'operators' as const, endsAt: '' });
+  const [form, setForm] = useState({ title: '', body: '', severity: 'info' as const, audience: 'operators' as const, startsAt: '', endsAt: '' });
 
   const list = useQuery({ queryKey: ['announcements'], queryFn: announcementsApi.listAll });
 
   const create = useMutation({
-    mutationFn: () => announcementsApi.create({ ...form, endsAt: form.endsAt ? new Date(fromAppDateTimeInput(form.endsAt)).toISOString() : undefined }),
-    onSuccess: () => { toast.success('Announcement published'); setAdding(false); setForm({ title: '', body: '', severity: 'info', audience: 'operators', endsAt: '' }); void qc.invalidateQueries({ queryKey: ['announcements'] }); },
+    mutationFn: () => announcementsApi.create({ ...form, startsAt: form.startsAt ? new Date(fromAppDateTimeInput(form.startsAt)).toISOString() : undefined, endsAt: form.endsAt ? new Date(fromAppDateTimeInput(form.endsAt)).toISOString() : undefined }),
+    onSuccess: () => { toast.success('Announcement published'); setAdding(false); setForm({ title: '', body: '', severity: 'info', audience: 'operators', startsAt: '', endsAt: '' }); void qc.invalidateQueries({ queryKey: ['announcements'] }); },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
   });
   const remove = useMutation({
@@ -58,7 +58,7 @@ export function AnnouncementsPage() {
       ) : <EmptyState title="No announcements yet" icon={<Megaphone className="h-10 w-10" />} />}
 
       <Modal open={adding} onClose={() => setAdding(false)} title="New announcement"
-        footer={<><Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button><Button loading={create.isPending} disabled={!form.title || !form.body} onClick={() => create.mutate()}>Publish</Button></>}>
+        footer={<><Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button><Button loading={create.isPending} disabled={!form.title || !form.body || create.isPending || (!!form.startsAt && !!form.endsAt && fromAppDateTimeInput(form.endsAt) <= fromAppDateTimeInput(form.startsAt))} onClick={() => create.mutate()}>Publish</Button></>}>
         <div className="flex flex-col gap-3">
           <Input label="Title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Scheduled maintenance tonight" />
           <Input label="Body" value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="Booking will be briefly unavailable between 2-3 AM IST." />
@@ -68,7 +68,8 @@ export function AnnouncementsPage() {
             <Select label="Audience" value={form.audience} onChange={(e) => setForm((f) => ({ ...f, audience: e.target.value as never }))}
               options={[{ label: 'Operators', value: 'operators' }, { label: 'Customers', value: 'customers' }, { label: 'Everyone', value: 'all' }]} />
           </div>
-          <Input label="Ends at (optional)" type="datetime-local" value={form.endsAt} onChange={(e) => setForm((f) => ({ ...f, endsAt: e.target.value }))} />
+          <Input label="Starts at (optional — now if empty)" type="datetime-local" value={form.startsAt} onChange={(e) => setForm((f) => ({ ...f, startsAt: e.target.value }))} />
+          <Input label="Ends at (optional)" type="datetime-local" value={form.endsAt} error={form.startsAt && form.endsAt && fromAppDateTimeInput(form.endsAt) <= fromAppDateTimeInput(form.startsAt) ? 'Must be after the start' : undefined} onChange={(e) => setForm((f) => ({ ...f, endsAt: e.target.value }))} />
         </div>
       </Modal>
     </>

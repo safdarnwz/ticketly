@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Building2, Plus, PauseCircle, PlayCircle, Copy, ExternalLink, BarChart3, Ticket, XCircle, IndianRupee, Percent } from 'lucide-react';
+import { Building2, Plus, PauseCircle, PlayCircle, Copy, ExternalLink, BarChart3, Ticket, XCircle, IndianRupee, Percent, SlidersHorizontal, Download, Mail } from 'lucide-react';
 
 import { Button, Card, CardBody, Badge, statusTone, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { tenantsApi, type TenantRow, type Plan } from '@/lib/api/tenants';
 import { formatMoney } from '@/lib/utils';
+import { platformAdminApi } from '@/lib/api/platformAdmin';
+import { BroadcastModal, OperatorSettingsModal } from './OperatorSettings';
 
 export function TenantsPage() {
   const qc = useQueryClient();
@@ -17,6 +19,9 @@ export function TenantsPage() {
   const [settingCommission, setSettingCommission] = useState<TenantRow | null>(null);
   const [commissionPercent, setCommissionPercent] = useState('');
   const [reason, setReason] = useState('');
+  const [settingsFor, setSettingsFor] = useState<TenantRow | null>(null);
+  const [broadcasting, setBroadcasting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   // Surfaced right after provisioning — same reason as the operator-approval
   // flow: this is the ONLY host that operator's staff can sign in on.
   const [justCreated, setJustCreated] = useState<{ displayName: string; consoleUrl: string } | null>(null);
@@ -88,6 +93,7 @@ export function TenantsPage() {
       key: 'actions', header: '', render: (r) => (
         <div className="flex justify-end gap-2">
           <Button size="sm" variant="ghost" leftIcon={<BarChart3 className="h-4 w-4" />} onClick={() => setViewingStats(r)}>Stats</Button>
+          <Button size="sm" variant="ghost" leftIcon={<SlidersHorizontal className="h-4 w-4" />} onClick={() => setSettingsFor(r)}>Settings</Button>
           <Button size="sm" variant="ghost" onClick={() => setChangingPlan(r)}>Plan</Button>
           <Button size="sm" variant="ghost" leftIcon={<Percent className="h-4 w-4" />} onClick={() => { setSettingCommission(r); setCommissionPercent(''); }}>Commission</Button>
           {r.status === 'suspended' ? (
@@ -103,7 +109,16 @@ export function TenantsPage() {
   return (
     <>
       <PageHeader title="Operators" subtitle="Every operator on the platform — provision, suspend, or re-activate"
-        action={<Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setAdding(true)}>New operator</Button>} />
+        action={(
+          <div className="flex gap-2">
+            <Button variant="outline" leftIcon={<Download className="h-4 w-4" />} loading={exporting} disabled={exporting}
+              onClick={() => { setExporting(true); platformAdminApi.exportOperators().catch((e: unknown) => toast.error(e instanceof Error ? e.message : 'Export failed')).finally(() => setExporting(false)); }}>Export CSV</Button>
+            <Button variant="outline" leftIcon={<Mail className="h-4 w-4" />} onClick={() => setBroadcasting(true)}>Message all</Button>
+            <Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setAdding(true)}>New operator</Button>
+          </div>
+        )} />
+      {settingsFor && <OperatorSettingsModal tenantId={settingsFor.id} name={settingsFor.displayName} onClose={() => setSettingsFor(null)} />}
+      {broadcasting && <BroadcastModal onClose={() => setBroadcasting(false)} />}
 
       {justCreated && (
         <Card className="mb-4 border-success/30 bg-success/5">

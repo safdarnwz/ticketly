@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Building2, Check, X, Copy, ExternalLink } from 'lucide-react';
+import { Building2, Check, X, Copy, ExternalLink, PauseCircle, RotateCcw, FileText } from 'lucide-react';
 
-import { Button, Card, CardBody, Badge, statusTone, Select, Table, type Column, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
+import { Button, Card, CardBody, Badge, statusTone, Select, Table, type Column, PageLoader, ErrorState, EmptyState, Modal, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { onboardingApi } from '@/lib/api/onboarding';
 import { kycApi } from '@/lib/api/kyc';
@@ -35,8 +35,8 @@ export function OperatorsPage() {
   const qc = useQueryClient();
   const toast = useToast();
   const [status, setStatus] = useState('pending');
-  const [rejecting, setRejecting] = useState<string | null>(null);
-  const [reason, setReason] = useState('');
+  const [acting, setActing] = useState<{ id: string; kind: 'reject' | 'hold' | 'reopen'; company: string } | null>(null);
+  const [viewing, setViewing] = useState<Row | null>(null);
   // The operator's own login URL, surfaced right after approval — this is the
   // ONLY host that operator's staff can sign in on, so it needs to be handed
   // to them (or copied into your own notes) immediately.
@@ -54,12 +54,6 @@ export function OperatorsPage() {
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Approve failed'),
   });
-  const reject = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) => onboardingApi.reject(id, reason),
-    onSuccess: () => { toast.success('Application rejected'); setRejecting(null); setReason(''); void qc.invalidateQueries({ queryKey: ['operator-apps'] }); },
-    onError: (e) => toast.error(e instanceof Error ? e.message : 'Reject failed'),
-  });
-
   const columns: Column<Row>[] = [
     { key: 'company', header: 'Company', render: (r) => <span className="font-medium text-text">{r.companyName}</span> },
     { key: 'applicant', header: 'Applicant', render: (r) => <span>{r.firstName} {r.lastName}<div className="text-xs text-text-muted">{r.email}</div></span> },
@@ -72,12 +66,17 @@ export function OperatorsPage() {
       ) : <span className="text-text-muted">—</span>,
     },
     {
-      key: 'actions', header: '', render: (r) => r.status === 'pending' ? (
+      key: 'actions', header: '', render: (r) => (
         <div className="flex justify-end gap-2">
-          <Button size="sm" variant="outline" onClick={() => setRejecting(r.id)} leftIcon={<X className="h-4 w-4" />}>Reject</Button>
-          <Button size="sm" onClick={() => approve.mutate(r.id)} loading={approve.isPending} leftIcon={<Check className="h-4 w-4" />}>Approve</Button>
+          <Button size="sm" variant="ghost" leftIcon={<FileText className="h-4 w-4" />} onClick={() => setViewing(r)}>Details</Button>
+          {r.status === 'pending' && <>
+            <Button size="sm" variant="ghost" leftIcon={<PauseCircle className="h-4 w-4" />} onClick={() => setActing({ id: r.id, kind: 'hold', company: r.companyName })}>Hold</Button>
+            <Button size="sm" variant="outline" onClick={() => setActing({ id: r.id, kind: 'reject', company: r.companyName })} leftIcon={<X className="h-4 w-4" />}>Reject</Button>
+            <Button size="sm" onClick={() => approve.mutate(r.id)} loading={approve.isPending && approve.variables === r.id} disabled={approve.isPending} leftIcon={<Check className="h-4 w-4" />}>Approve</Button>
+          </>}
+          {r.status === 'rejected' && <Button size="sm" variant="outline" leftIcon={<RotateCcw className="h-4 w-4" />} onClick={() => setActing({ id: r.id, kind: 'reopen', company: r.companyName })}>Reopen</Button>}
         </div>
-      ) : null,
+      ),
     },
   ];
 
@@ -120,19 +119,86 @@ export function OperatorsPage() {
           <Table columns={columns} rows={list.data!.applications as Row[]} />
         ) : <EmptyState title="No applications" icon={<Building2 className="h-10 w-10" />} />)}
 
-      {rejecting && (
-        <Card className="mt-4 border-danger/30">
-          <CardBody className="flex flex-col gap-3">
-            <div className="text-sm font-semibold text-text">Reject application</div>
-            <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="Reason for rejection (emailed to the applicant)"
-              className="rounded-input border border-border bg-surface px-3 py-2 text-sm focus-ring" />
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => { setRejecting(null); setReason(''); }}>Cancel</Button>
-              <Button variant="danger" disabled={!reason.trim()} loading={reject.isPending} onClick={() => reject.mutate({ id: rejecting, reason })}>Confirm rejection</Button>
-            </div>
-          </CardBody>
-        </Card>
-      )}
+      {acting && <ReasonModal {...acting} onClose={() => setActing(null)} onDone={() => { setActing(null); void qc.invalidateQueries({ queryKey: ['operator-apps'] }); }} />}
+      {viewing && <ApplicationModal row={viewing} onClose={() => setViewing(null)} />}
     </>
+  );
+}
+
+const ACTIONS = {
+  reject: { title: 'Reject application', button: 'Reject', ok: 'Application rejected — the applicant is emailed', placeholder: 'Why it is rejected (emailed to the applicant)' },
+  hold: { title: 'Put on hold', button: 'Hold', ok: 'On hold — the applicant is emailed what is needed', placeholder: 'What is needed, e.g. a clear copy of the GST certificate' },
+  reopen: { title: 'Reopen application', button: 'Reopen', ok: 'Back to pending', placeholder: 'Why it is reopened, e.g. the applicant sent the missing documents' },
+} as const;
+
+/** Reject, hold or reopen — each needs a reason the applicant (or the audit trail) sees. */
+function ReasonModal({ id, kind, company, onClose, onDone }: { id: string; kind: keyof typeof ACTIONS; company: string; onClose: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const [reason, setReason] = useState('');
+  const [tried, setTried] = useState(false);
+  const a = ACTIONS[kind];
+  const err = reason.trim().length < 10 ? 'At least 10 characters' : undefined;
+  const go = useMutation({
+    mutationFn: () => (kind === 'reject' ? onboardingApi.reject(id, reason.trim()) : kind === 'hold' ? onboardingApi.hold(id, reason.trim()) : onboardingApi.reopen(id, reason.trim())),
+    onSuccess: () => { toast.success(a.ok); onDone(); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+  });
+  return (
+    <Modal open onClose={onClose} title={`${a.title} — ${company}`}
+      footer={<><Button variant="ghost" onClick={onClose} disabled={go.isPending}>Cancel</Button><Button variant={kind === 'reject' ? 'danger' : 'primary'} loading={go.isPending} disabled={go.isPending} onClick={() => { setTried(true); if (!err) go.mutate(); }}>{a.button}</Button></>}>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-medium text-text">Reason</span>
+        <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} maxLength={1000} placeholder={a.placeholder} aria-invalid={tried && !!err}
+          className="rounded-input border border-border bg-surface px-3 py-2 text-sm focus-ring" />
+        {tried && err && <span role="alert" className="text-xs text-danger">{err}</span>}
+      </label>
+    </Modal>
+  );
+}
+
+const FIELDS: [string, string][] = [
+  ['company_name', 'Company'], ['company_type', 'Type'], ['gst_number', 'GSTIN'], ['pan_number', 'PAN'], ['registration_number', 'Registration no.'],
+  ['official_email', 'Official email'], ['company_mobile', 'Company mobile'], ['website', 'Website'], ['address_line1', 'Address'], ['city', 'City'], ['state', 'State'], ['pin_code', 'PIN'],
+  ['bank_account_holder', 'Account holder'], ['bank_name', 'Bank'], ['bank_ifsc', 'IFSC'],
+];
+
+/** The whole application: company, bank, business, what blocks approval, and the uploaded documents. */
+function ApplicationModal({ row, onClose }: { row: Row; onClose: () => void }) {
+  const toast = useToast();
+  const q = useQuery({ queryKey: ['operator-app', row.id], queryFn: () => onboardingApi.get(row.id) });
+  const [opening, setOpening] = useState<string | null>(null);
+  const a = q.data as Record<string, unknown> | undefined;
+  const docs = Object.keys((a?.documents as Record<string, string> | undefined) ?? {});
+  const blockers = (a?.approvalBlockers as string[] | undefined) ?? [];
+  const business = (a?.business as Record<string, unknown> | undefined) ?? {};
+  const open = async (docType: string) => {
+    const win = window.open('', '_blank');
+    setOpening(docType);
+    try {
+      const r = await onboardingApi.documentUrl(row.id, docType);
+      if (!r.url) throw new Error('This file cannot be opened from here');
+      if (win) win.location.href = r.url; else window.open(r.url, '_blank');
+    } catch (e) { win?.close(); toast.error(e instanceof Error ? e.message : 'Could not open the document'); } finally { setOpening(null); }
+  };
+  return (
+    <Modal open onClose={onClose} size="lg" title={row.companyName} footer={<Button variant="ghost" onClick={onClose}>Close</Button>}>
+      {q.isLoading ? <PageLoader /> : q.isError ? <ErrorState error={q.error} onRetry={q.refetch} /> : a && (
+        <div className="flex flex-col gap-3 text-sm">
+          <div className="text-text-muted">{String(a.first_name ?? '')} {String(a.last_name ?? '')} · {String(a.email ?? '')} · {String(a.mobile ?? '')} <Badge tone={statusTone(String(a.status))}>{String(a.status)}</Badge></div>
+          {blockers.length > 0 && <p role="alert" className="rounded-md bg-warning/10 px-3 py-2 text-warning">Before approving: {blockers.join(' · ')}</p>}
+          {Boolean(a.rejection_reason || a.review_note) && <p className="text-text-muted">Last note: {String(a.review_note ?? a.rejection_reason)}</p>}
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-1">
+            {FIELDS.filter(([k]) => a[k]).map(([k, label]) => <div key={k} className="flex justify-between gap-2 border-b border-border py-1"><dt className="text-text-muted">{label}</dt><dd className="text-right">{String(a[k])}</dd></div>)}
+            {Object.entries(business).map(([k, v]) => <div key={k} className="flex justify-between gap-2 border-b border-border py-1"><dt className="text-text-muted">{k.replace(/([A-Z])/g, ' $1').toLowerCase()}</dt><dd className="text-right">{Array.isArray(v) ? v.join(', ') : String(v)}</dd></div>)}
+          </dl>
+          <div>
+            <div className="mb-1 font-medium text-text">Documents</div>
+            {docs.length === 0 ? <p className="text-text-muted">No documents uploaded.</p> : (
+              <div className="flex flex-wrap gap-2">{docs.map((d) => <Button key={d} size="sm" variant="outline" leftIcon={<ExternalLink className="h-3.5 w-3.5" />} loading={opening === d} disabled={opening !== null} onClick={() => void open(d)}>{d.replace(/_/g, ' ')}</Button>)}</div>
+            )}
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }

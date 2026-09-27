@@ -20,6 +20,15 @@ import { ResultsPage } from '@/pages/customer/ResultsPage';
 import { TripPage } from '@/pages/customer/TripPage';
 import { CheckoutPage } from '@/pages/customer/CheckoutPage';
 import { ConfirmationPage } from '@/pages/customer/ConfirmationPage';
+import { IntegrationsPage } from '@/pages/settings/IntegrationsPage';
+import { SecurityPage } from '@/pages/settings/SecurityPage';
+import { BusinessRulesPage } from '@/pages/settings/BusinessRulesPage';
+import { RoleTemplatesPage } from '@/pages/settings/RoleTemplatesPage';
+import { SystemPage } from '@/pages/settings/SystemPage';
+import { VehicleApprovalsPage } from '@/pages/admin/VehicleApprovalsPage';
+import { PartnersPage } from '@/pages/admin/PartnersPage';
+import { BillingPage } from '@/pages/admin/BillingPage';
+import { HealthPage } from '@/pages/admin/HealthPage';
 import { ManageBookingPage } from '@/pages/customer/ManageBookingPage';
 import { AccountPage } from '@/pages/customer/AccountPage';
 
@@ -189,10 +198,19 @@ const superAdminRouter = createBrowserRouter([
           { path: '/admin/analytics', element: <AnalyticsPage /> },
           { path: '/admin/bookings', element: <LiveBookingsPage /> },
           { path: '/admin/escalations', element: <EscalationsPage /> },
+          { path: '/admin/vehicles', element: <VehicleApprovalsPage /> },
+          { path: '/admin/partners', element: <PartnersPage /> },
+          { path: '/admin/billing', element: <BillingPage /> },
+          { path: '/admin/health', element: <HealthPage /> },
           { path: '/cms', element: <CmsPage /> },
           { path: '/fraud', element: <FraudPage /> },
           {
             path: '/settings', element: <PlatformSettingsPage />, children: [
+              { path: 'integrations', element: <IntegrationsPage /> },
+              { path: 'security', element: <SecurityPage /> },
+              { path: 'business-rules', element: <BusinessRulesPage /> },
+              { path: 'role-templates', element: <RoleTemplatesPage /> },
+              { path: 'system', element: <SystemPage /> },
               { path: 'appearance', element: <AppearancePage /> },
               { path: 'i18n', element: <I18nPage /> },
               { path: 'privacy', element: <PrivacyPage /> },

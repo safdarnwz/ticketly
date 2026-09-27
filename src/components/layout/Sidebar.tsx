@@ -4,7 +4,7 @@ import {
   Activity,
   LayoutDashboard, Search, Ticket, RotateCcw, Star, LifeBuoy,
   Megaphone, ShieldAlert, Bus, Building2, ClipboardList, Settings as SettingsIcon,
-  Route as RouteIcon, Truck, Calendar, IndianRupee, TrendingUp, Radio, Users, BarChart3, UserCog, Wallet, FileText,
+  Route as RouteIcon, BusFront, Network, Receipt, HeartPulse, Truck, Calendar, IndianRupee, TrendingUp, Radio, Users, BarChart3, UserCog, Wallet, FileText,
 } from 'lucide-react';
 
 import { authApi } from '@/lib/api/auth';
@@ -46,7 +46,11 @@ const superAdminNav = [
   { to: '/admin/operators', label: 'Applications', icon: ClipboardList },
   { to: '/admin/bookings', label: 'Live bookings', icon: Activity },
   { to: '/admin/escalations', label: 'Support escalations', icon: LifeBuoy },
-  { to: '/admin/analytics', label: 'Analytics & Billing', icon: TrendingUp },
+  { to: '/admin/vehicles', label: 'Bus approvals', icon: BusFront },
+  { to: '/admin/partners', label: 'OTA partners', icon: Network },
+  { to: '/admin/analytics', label: 'Analytics & Plans', icon: TrendingUp },
+  { to: '/admin/billing', label: 'Billing', icon: Receipt },
+  { to: '/admin/health', label: 'Platform health', icon: HeartPulse },
   { to: '/cms', label: 'CMS & Offers', icon: Megaphone },
   { to: '/fraud', label: 'Risk & Fraud', icon: ShieldAlert },
   { to: '/announcements', label: 'Announcements', icon: Megaphone },

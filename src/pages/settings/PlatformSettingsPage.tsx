@@ -1,10 +1,15 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Palette, Languages, UserRound } from 'lucide-react';
+import { Palette, Languages, UserRound, Plug, ShieldCheck, Scale, UsersRound, Server } from 'lucide-react';
 
 import { PageHeader } from '@/components/common/PageHeader';
 import { cn } from '@/lib/utils';
 
 const SECTIONS = [
+  { to: '/settings/integrations', label: 'Integrations', icon: Plug, description: 'Payment gateways, SMS, WhatsApp and email credentials' },
+  { to: '/settings/security', label: 'Security', icon: ShieldCheck, description: 'Password rules, admin sign-in addresses, alerts, encryption' },
+  { to: '/settings/business-rules', label: 'Business rules', icon: Scale, description: 'GST slabs, agent credit, OTA release, data retention' },
+  { to: '/settings/role-templates', label: 'Role templates', icon: UsersRound, description: 'Ready-made staff roles operators copy' },
+  { to: '/settings/system', label: 'System', icon: Server, description: 'Maintenance mode and windows, caches, audit log' },
   { to: '/settings/appearance', label: 'Appearance', icon: Palette, description: 'The design system for the WHOLE platform' },
   { to: '/settings/i18n', label: 'i18n & Currency', icon: Languages, description: 'Shared translation and FX-rate catalog' },
   { to: '/settings/privacy', label: 'Privacy (DPDP)', icon: UserRound, description: 'Data-subject access/erasure requests' },
@@ -17,7 +22,7 @@ export function PlatformSettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" subtitle="Platform-wide configuration — appearance, localization, and privacy" />
+      <PageHeader title="Settings" subtitle="Platform-wide configuration — integrations, security, rules, appearance and localization" />
       <div className="grid grid-cols-1 gap-6 md:grid-cols-[220px_1fr]">
         <nav className="flex flex-col gap-1">
           {SECTIONS.map((s) => (
