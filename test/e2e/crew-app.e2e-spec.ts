@@ -155,8 +155,8 @@ describe('crew app (e2e)', () => {
     // A second passenger: a tag already on the first one's bag is refused; checkout needs boarding.
     const freeSeat = await sqlOne<{ seat_number: string }>(
       app,
-      `SELECT seat_number FROM trip_seats ts WHERE trip_id = $1 AND is_bookable AND NOT ladies_only
-          AND occupied_legs = 0 AND blocked_legs = 0
+      `SELECT seat_number FROM trip_seats ts WHERE trip_id = $1 AND is_bookable AND NOT ladies_only AND NOT accessible
+          AND seat_type = 'seater' AND occupied_legs = 0 AND blocked_legs = 0
           AND NOT EXISTS (SELECT 1 FROM booking_seats bs JOIN bookings b ON b.id = bs.booking_id
                            WHERE bs.trip_id = ts.trip_id AND bs.seat_number = ts.seat_number AND b.status = 'held')
         ORDER BY random() LIMIT 1`,
@@ -222,15 +222,14 @@ describe('crew app (e2e)', () => {
         )
       ).status,
     ).toBe(201);
-    expect(
-      (
-        await app.post(
-          `/crew/trips/${f.tripId}/ping`,
-          { lat: 27.2, lng: 75.8, speedKmph: 42 },
-          crew,
-        )
-      ).status,
-    ).toBe(202);
+    // Days before departure the phone does not share GPS yet (from 1 h before).
+    const gps = await app.post(
+      `/crew/trips/${f.tripId}/ping`,
+      { lat: 27.2, lng: 75.8, speedKmph: 42 },
+      crew,
+    );
+    expect(gps.status).toBe(422);
+    expect(gps.body.detail).toMatch(/GPS sharing starts at/);
     const sos = await app.post(
       `/crew/trips/${f.tripId}/sos`,
       { kind: 'medical', description: 'Passenger fainted' },

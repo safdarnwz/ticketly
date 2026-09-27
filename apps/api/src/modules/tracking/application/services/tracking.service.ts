@@ -1,7 +1,15 @@
 import { Injectable } from '@nestjs/common';
 
 import { AppConfig } from '@config';
-import { AppError, ErrorCode, requireTenantId, runInNewContext, type TripId } from '@kernel';
+import { UnitOfWork } from '@database';
+import {
+  AppError,
+  DomainError,
+  ErrorCode,
+  requireTenantId,
+  runInNewContext,
+  type TripId,
+} from '@kernel';
 import { EventBus } from '@messaging';
 import { hmacSha256 } from '@security';
 
@@ -13,7 +21,35 @@ import {
   verifyTrackingTokenSignatureOnly,
   type TrackingTokenPayload,
 } from '../../domain/tracking-token';
-import { TrackingRepository } from '../../infrastructure/persistence/tracking.repository';
+import {
+  gpsProblem,
+  trackingMessage,
+  trackingPhase,
+  trackingStartsAt,
+  type TrackingPhase,
+} from '../../domain/tracking-window';
+import {
+  TrackingRepository,
+  type CrewOnDuty,
+  type TripClockRow,
+} from '../../infrastructure/persistence/tracking.repository';
+
+/** A delay alert goes out at 15+ minutes late, and again at each further 15 minutes. */
+const DELAY_ALERT_STEP_MINUTES = 15;
+
+/** "30 Sep, 8:30 pm" in the operator's own timezone. */
+export function formatLocalTime(d: Date, timeZone: string): string {
+  return d
+    .toLocaleString('en-IN', {
+      timeZone,
+      day: 'numeric',
+      month: 'short',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+    .replace(/\s?(AM|PM)$/i, (m) => m.toLowerCase());
+}
 
 /**
  * GPS ingestion & live trip state.
@@ -34,6 +70,7 @@ export class TrackingService {
     private readonly tracking: TrackingRepository,
     private readonly events: EventBus,
     private readonly config: AppConfig,
+    private readonly uow: UnitOfWork,
   ) {}
 
   async ingestPing(input: {
@@ -48,6 +85,14 @@ export class TrackingService {
   }): Promise<{ nextStopId: string | null; etaSeconds: number; delayMinutes: number }> {
     const tenantId = requireTenantId();
     const recordedAt = input.recordedAt ?? new Date();
+
+    // The crew phone shares GPS only from one hour before departure until the
+    // trip is over — never a bus parked at the depot the night before, never
+    // after the passengers got off.
+    const clock = await this.tracking.tripClock(input.tripId);
+    if (!clock) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Trip not found' });
+    const problem = gpsProblem(clock, new Date(), (d) => formatLocalTime(d, clock.timezone));
+    if (problem) throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, { message: problem });
 
     // Append the raw ping (routes to the day partition automatically).
     await this.tracking.insertPing({
@@ -73,35 +118,55 @@ export class TrackingService {
     // Delay: compare projected arrival at the next stop to its scheduled time.
     let delayMinutes = 0;
     const nextScheduled = stops.find((s) => s.stopId === eta.nextStopId);
-    if (nextScheduled) {
+    if (clock.status !== 'departed') {
+      // Still at the boarding point (the hour before departure): it is late
+      // only once its departure time has passed — a parked bus is not
+      // "hours behind" for the next stop.
+      delayMinutes = Math.max(
+        0,
+        Math.round((recordedAt.getTime() - clock.departsAt.getTime()) / 60000),
+      );
+    } else if (nextScheduled) {
       const projectedArrival = new Date(recordedAt.getTime() + eta.etaSeconds * 1000);
       delayMinutes = Math.round(
         (projectedArrival.getTime() - new Date(nextScheduled.departsAt).getTime()) / 60000,
       );
     }
 
-    await this.tracking.upsertLive({
-      tripId: input.tripId,
-      tenantId,
-      lat: input.lat,
-      lng: input.lng,
-      speedKmph: input.speedKmph,
-      distanceCoveredM: input.distanceCoveredM,
-      nextStopId: eta.nextStopId,
-      nextStopEtaAt: eta.nextStopId ? new Date(recordedAt.getTime() + eta.etaSeconds * 1000) : null,
-      delayMinutes,
-      lastPingAt: recordedAt,
-    });
-
-    // Alert on a material delay (>15 min), throttled by the notification dedupe.
-    if (delayMinutes > 15) {
-      this.events.publish({
-        type: 'trip.delayed',
-        aggregateType: 'trip',
-        aggregateId: input.tripId,
-        payload: { delay: delayMinutes, nextStopId: eta.nextStopId },
+    // The live row and any delay alert commit together (an event is only
+    // ever written inside the transaction of the change it describes).
+    await this.uow.run({ name: 'tracking.ping', tenantId }, async () => {
+      const before = await this.tracking.live(input.tripId);
+      await this.tracking.upsertLive({
+        tripId: input.tripId,
+        tenantId,
+        lat: input.lat,
+        lng: input.lng,
+        speedKmph: input.speedKmph,
+        distanceCoveredM: input.distanceCoveredM,
+        nextStopId: eta.nextStopId,
+        nextStopEtaAt: eta.nextStopId
+          ? new Date(recordedAt.getTime() + eta.etaSeconds * 1000)
+          : null,
+        delayMinutes,
+        lastPingAt: recordedAt,
       });
-    }
+
+      // Passengers hear of a material delay (>15 min) once per further
+      // 15 minutes of lateness — not on every ping the phone sends.
+      const band = (m: number) => Math.floor(m / DELAY_ALERT_STEP_MINUTES);
+      if (
+        delayMinutes > DELAY_ALERT_STEP_MINUTES &&
+        band(delayMinutes) > band(before?.delayMinutes ?? 0)
+      ) {
+        this.events.publish({
+          type: 'trip.delayed',
+          aggregateType: 'trip',
+          aggregateId: input.tripId,
+          payload: { delayMinutes, nextStopId: eta.nextStopId },
+        });
+      }
+    });
 
     return { nextStopId: eta.nextStopId, etaSeconds: eta.etaSeconds, delayMinutes };
   }
@@ -166,8 +231,28 @@ export class TrackingService {
     return `${this.config.app.publicWebUrl}/track/${token}`;
   }
 
-  /** PUBLIC — no ambient tenant context. Resolves the tenant from the trip embedded in the token, then reads within that tenant's own RLS scope. */
+  /** Drivers (one to three) and the conductor / attendants on duty, with their phones. */
+  tripCrew(tripId: string): Promise<CrewOnDuty[]> {
+    return this.tracking.tripCrew(tripId);
+  }
+
+  /**
+   * PUBLIC — no ambient tenant context. Resolves the tenant from the trip
+   * embedded in the token, then reads within that tenant's own RLS scope.
+   *
+   * The link works for the whole life of the booking but shows the bus only
+   * while it can be tracked (from an hour before departure until the trip is
+   * over); before and after, it says why and when — never a bare error.
+   */
   async getLiveLocationByToken(token: string): Promise<{
+    phase: TrackingPhase | 'booking_cancelled';
+    message: string;
+    trackingStartsAt: string;
+    departsAt: string;
+    arrivesAt: string;
+    endedAt: string | null;
+    busNumber: string | null;
+    crew: CrewOnDuty[];
     status: string;
     lat: number | null;
     lng: number | null;
@@ -181,40 +266,86 @@ export class TrackingService {
   }> {
     const payloadPart = token.split('.')[0] ?? '';
     const sig = this.signTracking(payloadPart);
-    let payload;
+    // A forged or garbled link is refused outright. An expired one (its
+    // fixed expiry is scheduled arrival + 12 h) is still a genuine link: it
+    // gets the "journey ended" answer below — or the map, if a very late
+    // bus is somehow still on the road.
+    let payload: TrackingTokenPayload;
     try {
-      payload = verifyTrackingToken(token, sig, Date.now());
+      payload = verifyTrackingTokenSignatureOnly(token, sig);
     } catch (err) {
-      // The fixed expiry (scheduled-arrival + 12h) doesn't know about a
-      // real-world delay — check the trip's own live status before
-      // actually rejecting. Re-decoding needs the tripId even to check
-      // this, which only signature-verified data can be trusted to
-      // contain — never skip straight to a live-status check without it.
-      const sigOnly = verifyTrackingTokenSignatureOnly(token, sig);
-      if ((await this.tracking.liveStatusPublic(sigOnly.tripId)) === 'running') {
-        payload = sigOnly; // genuinely still en route — extend past the fixed expiry
-      } else {
-        throw err; // actually expired (trip completed, or never had live data) — the original error stands
-      }
+      const forged = err instanceof DomainError && err.code === ErrorCode.COMMON_FORBIDDEN;
+      throw new AppError(
+        forged ? ErrorCode.COMMON_FORBIDDEN : ErrorCode.COMMON_VALIDATION,
+        forged ? 403 : 400,
+        {
+          message:
+            'This tracking link is not valid. Please use the link from your ticket or reminder message.',
+        },
+      );
     }
+    const expired = (() => {
+      try {
+        verifyTrackingToken(token, sig, Date.now());
+        return false;
+      } catch {
+        return true;
+      }
+    })();
 
     const tenantId = await this.tracking.tenantOfTripPublic(payload.tripId);
     if (!tenantId)
       throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Trip not found' });
 
     return runInNewContext({ tenantId, actorType: 'system' }, async () => {
-      const [live, stops, pings] = await Promise.all([
-        this.tracking.live(payload.tripId),
+      const [clock, stops] = await Promise.all([
+        this.tracking.tripClock(payload.tripId),
         this.tracking.bookingStopNames(tenantId, payload.bookingId),
-        this.tracking.recentPings(payload.tripId, 20),
+      ]);
+      if (!clock)
+        throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Trip not found' });
+
+      const now = new Date();
+      let phase: TrackingPhase | 'booking_cancelled' = trackingPhase(clock, now);
+      if (phase === 'live' && expired) phase = 'ended';
+      if (stops && stops.status === 'cancelled' && phase !== 'cancelled')
+        phase = 'booking_cancelled';
+
+      const fmt = (d: Date) => formatLocalTime(d, clock.timezone);
+      const endedAt = this.endedAt(clock);
+      const message =
+        phase === 'booking_cancelled'
+          ? 'This booking was cancelled, so its tracking link no longer shows the bus.'
+          : trackingMessage(phase, {
+              startsAt: fmt(trackingStartsAt(clock)),
+              departsAt: fmt(clock.departsAt),
+              endedAt: endedAt ? fmt(endedAt) : null,
+            });
+
+      const live = phase === 'live';
+      const [position, pings, crew] = await Promise.all([
+        live ? this.tracking.live(payload.tripId) : null,
+        live ? this.tracking.recentPings(payload.tripId, 20) : [],
+        // Who to call: shown while the journey is ahead or under way.
+        phase === 'live' || phase === 'too_early'
+          ? this.tracking.tripCrew(payload.tripId)
+          : ([] as CrewOnDuty[]),
       ]);
       return {
-        status: live?.status ?? 'not_started',
-        lat: live?.lat ?? null,
-        lng: live?.lng ?? null,
-        speedKmph: live?.speedKmph ?? 0,
-        delayMinutes: live?.delayMinutes ?? 0,
-        lastPingAt: live?.lastPingAt ? live.lastPingAt.toISOString() : null,
+        phase,
+        message,
+        trackingStartsAt: trackingStartsAt(clock).toISOString(),
+        departsAt: clock.departsAt.toISOString(),
+        arrivesAt: clock.arrivesAt.toISOString(),
+        endedAt: endedAt ? endedAt.toISOString() : null,
+        busNumber: clock.busNumber,
+        crew,
+        status: live ? (position?.status ?? 'not_started') : phase,
+        lat: position?.lat ?? null,
+        lng: position?.lng ?? null,
+        speedKmph: position?.speedKmph ?? 0,
+        delayMinutes: position?.delayMinutes ?? 0,
+        lastPingAt: position?.lastPingAt ? position.lastPingAt.toISOString() : null,
         pnr: payload.pnr,
         fromStopName: stops?.fromStopName ?? 'Boarding point',
         toStopName: stops?.toStopName ?? 'Dropping point',
@@ -225,5 +356,11 @@ export class TrackingService {
         })),
       };
     });
+  }
+
+  /** When the journey finished: the crew's arrival, else the scheduled arrival. */
+  private endedAt(clock: TripClockRow): Date | null {
+    if (clock.status === 'cancelled') return null;
+    return clock.actualArrivedAt ?? clock.arrivesAt;
   }
 }

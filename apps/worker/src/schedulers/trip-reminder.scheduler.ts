@@ -5,11 +5,11 @@ import { EventBus } from '@messaging';
 import { runInNewContext, requireTenantId, type Json, type TenantId } from '@kernel';
 import { Logger } from '@observability';
 
-import { TrackingService } from '@api/modules/tracking/application/services/tracking.service';
+import { TrackingService, formatLocalTime, trackingStartsAt } from '@api/modules/tracking';
 
 /**
  * ============================================================================
- *  Two-stage PER-PASSENGER trip reminders — 12h and 4h before boarding
+ *  Three PER-PASSENGER journey reminders — 8h, 4h and 1h before boarding
  * ============================================================================
  *
  * Runs every 10 minutes (see SchedulerService), sweeping BOOKINGS (not
@@ -22,16 +22,46 @@ import { TrackingService } from '@api/modules/tracking/application/services/trac
  * depart_offset_min` (route_stops stores every stop's offset already
  * relative to the route's origin).
  *
- * The two reminders carry DIFFERENT content and fire independently (a
- * booking can be due for one without the other) — hence two idempotency
- * columns (migration 0039):
- *   - 12h: passenger names, PNR, seats, boarding/dropping point NAMES and
- *     times — no live-tracking link, since the bus isn't running yet.
- *   - 4h: the operational details needed to physically board — exact
- *     pickup location (landmark/address/coordinates), the assigned
- *     driver's and attendant's names + phone numbers, and the bus's
- *     registration number.
+ * Each goes out by SMS, WhatsApp and email and fires independently (a
+ * booking made five hours ahead gets only the 4h and 1h ones) — hence one
+ * idempotency column per stage (migrations 0039, 0106):
+ *   - 8h: passenger names, PNR, seats, boarding/dropping point names and
+ *     times — no tracking link yet; it says the link comes at 4h.
+ *   - 4h: the details needed to physically board — exact pickup location,
+ *     bus number, EVERY driver on duty (a long run has two or three, a
+ *     short one a single driver) and the conductor / attendants, each with
+ *     name and mobile — plus the live-tracking link (the bus shows on it
+ *     from an hour before departure).
+ *   - 1h: the last reminder, same details — the bus is now live on the map.
  */
+export type ReminderStage = '8h' | '4h' | '1h';
+
+const STAGES: {
+  stage: ReminderStage;
+  column: 'reminder_8h_sent_at' | 'reminder_4h_sent_at' | 'reminder_1h_sent_at';
+  windowStart: string;
+  windowEnd: string;
+}[] = [
+  {
+    stage: '8h',
+    column: 'reminder_8h_sent_at',
+    windowStart: '7 hours 50 minutes',
+    windowEnd: '8 hours 10 minutes',
+  },
+  {
+    stage: '4h',
+    column: 'reminder_4h_sent_at',
+    windowStart: '3 hours 50 minutes',
+    windowEnd: '4 hours 10 minutes',
+  },
+  {
+    stage: '1h',
+    column: 'reminder_1h_sent_at',
+    windowStart: '50 minutes',
+    windowEnd: '1 hour 10 minutes',
+  },
+];
+
 @Injectable()
 export class TripReminderScheduler {
   private readonly log: Logger;
@@ -46,24 +76,22 @@ export class TripReminderScheduler {
     this.log = logger.forContext('TripReminderScheduler');
   }
 
-  async run(): Promise<{ twelveHour: number; fourHour: number }> {
-    const twelveHour = await this.sweep({
-      column: 'reminder_12h_sent_at',
-      windowStart: '11 hours 50 minutes',
-      windowEnd: '12 hours 10 minutes',
-      build: (ctx) => this.buildTwelveHourPayload(ctx.bookingId),
-    });
-    const fourHour = await this.sweep({
-      column: 'reminder_4h_sent_at',
-      windowStart: '3 hours 50 minutes',
-      windowEnd: '4 hours 10 minutes',
-      build: (ctx) => this.buildFourHourPayload(ctx.bookingId),
-    });
-    return { twelveHour, fourHour };
+  async run(): Promise<Record<ReminderStage, number>> {
+    const sent = { '8h': 0, '4h': 0, '1h': 0 };
+    for (const st of STAGES) {
+      sent[st.stage] = await this.sweep({
+        ...st,
+        build: (ctx) =>
+          st.stage === '8h'
+            ? this.buildTripPayload(ctx.bookingId)
+            : this.buildBoardingPayload(ctx.bookingId, st.stage),
+      });
+    }
+    return sent;
   }
 
   private async sweep(opts: {
-    column: 'reminder_12h_sent_at' | 'reminder_4h_sent_at';
+    column: (typeof STAGES)[number]['column'];
     windowStart: string;
     windowEnd: string;
     build: (ctx: { bookingId: string }) => Promise<Record<string, unknown> | null>;
@@ -85,7 +113,9 @@ export class TripReminderScheduler {
                                      AND board_rs.route_id = b.route_id
                                      AND board_rs.sequence = b.from_seq
           WHERE b.status = 'confirmed' AND b.${opts.column} IS NULL
-            AND t.status IN ('open','closed')
+            -- Not cancelled and not already over (a passenger boarding
+            -- mid-route may be reminded while the bus is on its way).
+            AND t.status <> 'cancelled' AND t.actual_arrived_at IS NULL
             AND (t.departs_at + (board_rs.depart_offset_min || ' minutes')::interval)
                 BETWEEN now() + interval '${opts.windowStart}' AND now() + interval '${opts.windowEnd}'`,
         ),
@@ -134,8 +164,8 @@ export class TripReminderScheduler {
     return notified;
   }
 
-  /** 12h: the full "here's your trip" picture — no live-tracking link, the bus isn't running yet. */
-  private async buildTwelveHourPayload(bookingId: string): Promise<Record<string, unknown> | null> {
+  /** 8h: the full "here's your trip" picture — no tracking link yet, that comes at 4h. */
+  private async buildTripPayload(bookingId: string): Promise<Record<string, unknown> | null> {
     const booking = await this.db.queryOne<{
       pnr: string;
       trip_id: string;
@@ -145,51 +175,56 @@ export class TripReminderScheduler {
       to_stop_name: string;
       boarding_at: Date;
       dropping_at: Date;
+      timezone: string;
     }>(
       `SELECT b.pnr, b.trip_id, b.contact_phone, b.contact_email,
               fs.name AS from_stop_name, ts.name AS to_stop_name,
               t.departs_at + (frs.depart_offset_min || ' minutes')::interval AS boarding_at,
-              t.departs_at + (trs.depart_offset_min || ' minutes')::interval AS dropping_at
+              t.departs_at + (trs.depart_offset_min || ' minutes')::interval AS dropping_at,
+              te.timezone
          FROM bookings b
          JOIN trips t ON t.tenant_id = b.tenant_id AND t.id = b.trip_id
+         JOIN tenants te ON te.id = b.tenant_id
          JOIN route_stops frs ON frs.tenant_id = b.tenant_id AND frs.route_id = b.route_id AND frs.sequence = b.from_seq
          JOIN route_stops trs ON trs.tenant_id = b.tenant_id AND trs.route_id = b.route_id AND trs.sequence = b.to_seq
          JOIN stops fs ON fs.id = frs.stop_id
          JOIN stops ts ON ts.id = trs.stop_id
         WHERE b.tenant_id = $1 AND b.id = $2`,
       [requireTenantId(), bookingId],
-      { name: 'tripReminder.twelveHour.booking' },
+      { name: 'tripReminder.trip.booking' },
     );
     if (!booking) return null;
 
-    const passengers = await this.db.query<{ seat_number: string; full_name: string }>(
-      `SELECT seat_number, full_name FROM passengers WHERE tenant_id = $1 AND booking_id = $2 ORDER BY seat_number`,
-      [requireTenantId(), bookingId],
-      { name: 'tripReminder.twelveHour.passengers' },
-    );
-
     return {
-      stage: '12h',
+      stage: '8h',
       pnr: booking.pnr,
       tripId: booking.trip_id,
       contactPhone: booking.contact_phone,
       contactEmail: booking.contact_email,
-      passengers: passengers.map((p) => ({ seat: p.seat_number, name: p.full_name })),
+      passengers: await this.passengers(bookingId),
       fromStopName: booking.from_stop_name,
       toStopName: booking.to_stop_name,
-      boardingAt: booking.boarding_at,
-      droppingAt: booking.dropping_at,
+      boardingAt: formatLocalTime(booking.boarding_at, booking.timezone),
+      droppingAt: formatLocalTime(booking.dropping_at, booking.timezone),
     };
   }
 
-  /** 4h: the operational details needed to physically board — pickup location, driver/attendant, bus number. NO GPS link, per spec. */
-  private async buildFourHourPayload(bookingId: string): Promise<Record<string, unknown> | null> {
+  /**
+   * 4h and 1h: what is needed to physically board — pickup point, bus
+   * number, every driver and conductor / attendant with their mobile, and
+   * the live-tracking link.
+   */
+  private async buildBoardingPayload(
+    bookingId: string,
+    stage: '4h' | '1h',
+  ): Promise<Record<string, unknown> | null> {
     const booking = await this.db.queryOne<{
       pnr: string;
       trip_id: string;
       contact_phone: string | null;
       contact_email: string | null;
       from_stop_name: string;
+      to_stop_name: string;
       landmark: string | null;
       address: string | null;
       latitude: number | null;
@@ -197,29 +232,33 @@ export class TripReminderScheduler {
       stop_contact_phone: string | null;
       registration_no: string | null;
       boarding_at: Date;
+      departs_at: Date;
       arrives_at: Date;
+      timezone: string;
     }>(
       `SELECT b.pnr, b.trip_id, b.contact_phone, b.contact_email,
-              fs.name AS from_stop_name, fs.landmark, fs.address, fs.latitude, fs.longitude, fs.contact_phone AS stop_contact_phone,
+              fs.name AS from_stop_name, ts.name AS to_stop_name,
+              fs.landmark, fs.address, fs.latitude, fs.longitude, fs.contact_phone AS stop_contact_phone,
               v.registration_no,
               t.departs_at + (frs.depart_offset_min || ' minutes')::interval AS boarding_at,
-              t.arrives_at
+              t.departs_at, t.arrives_at, te.timezone
          FROM bookings b
          JOIN trips t ON t.tenant_id = b.tenant_id AND t.id = b.trip_id
+         JOIN tenants te ON te.id = b.tenant_id
          JOIN route_stops frs ON frs.tenant_id = b.tenant_id AND frs.route_id = b.route_id AND frs.sequence = b.from_seq
+         JOIN route_stops trs ON trs.tenant_id = b.tenant_id AND trs.route_id = b.route_id AND trs.sequence = b.to_seq
          JOIN stops fs ON fs.id = frs.stop_id
+         JOIN stops ts ON ts.id = trs.stop_id
          LEFT JOIN vehicles v ON v.id = t.vehicle_id
         WHERE b.tenant_id = $1 AND b.id = $2`,
       [requireTenantId(), bookingId],
-      { name: 'tripReminder.fourHour.booking' },
+      { name: 'tripReminder.boarding.booking' },
     );
     if (!booking) return null;
 
-    // Same live-tracking link the e-ticket carries (TicketService.issueForBooking)
-    // — repeated here as its OWN, standalone message, matching how real
-    // operator platforms send it: a short, dedicated "track your bus"
-    // text a passenger can tap right when they need it, not buried inside
-    // a longer ticket message they may have archived hours ago.
+    // Same live-tracking link the e-ticket carries (TicketService.issueForBooking),
+    // repeated as its own short "track your bus" message a passenger can tap
+    // when they need it.
     const trackingToken = this.tracking.issueTrackingToken(
       bookingId,
       booking.trip_id,
@@ -228,35 +267,27 @@ export class TripReminderScheduler {
     );
     const trackingUrl = this.tracking.buildTrackingUrl(trackingToken);
 
-    // ALL drivers + attendants on duty for this trip — a long overnight
-    // route commonly has 2-3 drivers on shift-rotation (and sometimes more
-    // than one attendant), not just one of each. Collecting only the FIRST
-    // match here would silently drop every co-driver from the passenger's
-    // notification — exactly the kind of thing that looks fine on a short
-    // route (where there's only ever one) and quietly breaks on a long one.
-    // A duty may not have been assigned yet at all (a real roster sometimes
-    // fills in late), so this can legitimately be an empty list.
-    const crewRows = await this.db.query<{ role: string; full_name: string; phone: string | null }>(
-      `SELECT c.role, c.full_name, c.phone
-         FROM crew_duties cd JOIN crew c ON c.id = cd.crew_id
-        WHERE cd.tenant_id = $1 AND cd.trip_id = $2 AND cd.status = 'assigned'
-        ORDER BY cd.starts_at`,
-      [requireTenantId(), booking.trip_id],
-      { name: 'tripReminder.fourHour.crew' },
-    );
-    const drivers = crewRows.filter((c) => c.role === 'driver');
-    const attendants = crewRows.filter((c) => c.role === 'conductor' || c.role === 'attendant');
-    const fmtCrew = (list: typeof crewRows) =>
-      list.length > 0
-        ? list.map((c) => `${c.full_name} (${c.phone ?? 'no phone on file'})`).join(', ')
-        : 'Not yet assigned';
+    // EVERY driver and conductor / attendant on duty — a long overnight run
+    // has two or three drivers taking turns, a short one a single driver.
+    // The roster may still be empty (it sometimes fills in late).
+    const crew = await this.tracking.tripCrew(booking.trip_id);
+    const drivers = crew.filter((c) => c.role === 'driver');
+    const attendants = crew.filter((c) => c.role !== 'driver');
+    const person = (c: { name: string; phone: string | null }) =>
+      `${c.name} (${c.phone ?? 'no phone on file'})`;
+    const list = (people: typeof crew) =>
+      people.length > 0 ? people.map(person).join(', ') : 'Not yet assigned';
+    const fmt = (d: Date) => formatLocalTime(d, booking.timezone);
 
     return {
-      stage: '4h',
+      stage,
       pnr: booking.pnr,
       tripId: booking.trip_id,
       contactPhone: booking.contact_phone,
       contactEmail: booking.contact_email,
+      passengers: await this.passengers(bookingId),
+      fromStopName: booking.from_stop_name,
+      toStopName: booking.to_stop_name,
       pickup: {
         stopName: booking.from_stop_name,
         landmark: booking.landmark,
@@ -265,18 +296,38 @@ export class TripReminderScheduler {
         longitude: booking.longitude,
         stopContactPhone: booking.stop_contact_phone,
       },
-      boardingAt: booking.boarding_at,
+      boardingAt: fmt(booking.boarding_at),
       busNumber: booking.registration_no,
-      // Kept for any template still using the OLD singular fields (the
-      // FIRST driver/attendant, if any) — new templates should prefer
-      // driversList/attendantsList below, which never drop a co-driver.
-      driver: drivers[0] ? { name: drivers[0].full_name, phone: drivers[0].phone } : null,
-      attendant: attendants[0]
-        ? { name: attendants[0].full_name, phone: attendants[0].phone }
-        : null,
-      driversList: fmtCrew(drivers),
-      attendantsList: fmtCrew(attendants),
+      // The first driver / attendant, for templates still using the older
+      // singular fields; new ones use the lists, which never drop a co-driver.
+      driver: drivers[0] ? { name: drivers[0].name, phone: drivers[0].phone } : null,
+      attendant: attendants[0] ? { name: attendants[0].name, phone: attendants[0].phone } : null,
+      drivers: drivers.map((d) => ({ name: d.name, phone: d.phone })),
+      attendants: attendants.map((a) => ({ role: a.role, name: a.name, phone: a.phone })),
+      driversList: list(drivers),
+      attendantsList: list(attendants),
+      // One line per person for WhatsApp / email: "Driver 1: Ramesh (98…)".
+      crewList:
+        crew.length > 0
+          ? crew.map((c) => `${this.roleLabel(c, drivers)}: ${person(c)}`).join('\n')
+          : 'Crew not yet assigned — the operator will share it before departure',
       trackingUrl,
+      trackingStartsAt: fmt(trackingStartsAt({ departsAt: booking.departs_at })),
     };
+  }
+
+  /** "Driver 1" / "Driver 2" when several take turns; "Conductor", "Attendant". */
+  private roleLabel(c: { role: string }, drivers: { role: string }[]): string {
+    if (c.role === 'driver' && drivers.length > 1) return `Driver ${drivers.indexOf(c) + 1}`;
+    return `${c.role[0].toUpperCase()}${c.role.slice(1)}`;
+  }
+
+  private async passengers(bookingId: string): Promise<{ seat: string; name: string }[]> {
+    const rows = await this.db.query<{ seat_number: string; full_name: string }>(
+      `SELECT seat_number, full_name FROM passengers WHERE tenant_id = $1 AND booking_id = $2 ORDER BY seat_number`,
+      [requireTenantId(), bookingId],
+      { name: 'tripReminder.passengers' },
+    );
+    return rows.map((p) => ({ seat: p.seat_number, name: p.full_name }));
   }
 }

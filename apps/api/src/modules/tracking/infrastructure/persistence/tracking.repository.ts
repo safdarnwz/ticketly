@@ -12,6 +12,22 @@ export interface LiveRow {
   lastPingAt: Date | null;
 }
 
+export interface TripClockRow {
+  departsAt: Date;
+  arrivesAt: Date;
+  status: string;
+  actualDepartedAt: Date | null;
+  actualArrivedAt: Date | null;
+  timezone: string;
+  busNumber: string | null;
+}
+
+export interface CrewOnDuty {
+  role: string;
+  name: string;
+  phone: string | null;
+}
+
 /**
  * gps_pings (append-only, day-partitioned) and trip_live (one row per trip,
  * the live map's cheap read). Reads marked "public" run without a tenant:
@@ -133,17 +149,6 @@ export class TrackingRepository {
     });
   }
 
-  /** Public: the trip's live status ('running', …), or null without live data. */
-  liveStatusPublic(tripId: string): Promise<string | null> {
-    return this.uow.run({ name: 'tracking.liveStatus', bypassRls: true }, async (scope) => {
-      const r = await scope.client.query<{ status: string | null }>(
-        `SELECT status FROM trip_live WHERE trip_id = $1`,
-        [tripId],
-      );
-      return r.rows[0]?.status ?? null;
-    });
-  }
-
   /** Public: which operator runs the trip. */
   tenantOfTripPublic(tripId: string): Promise<TenantId | null> {
     return this.uow.run({ name: 'tracking.resolveTenant', bypassRls: true }, async (scope) => {
@@ -165,13 +170,44 @@ export class TrackingRepository {
     );
   }
 
+  /** When the trip runs and where it is in its life — decides whether it can be tracked. */
+  tripClock(tripId: string): Promise<TripClockRow | null> {
+    return this.db.queryOne<TripClockRow>(
+      `SELECT t.departs_at AS "departsAt", t.arrives_at AS "arrivesAt", t.status,
+              t.actual_departed_at AS "actualDepartedAt", t.actual_arrived_at AS "actualArrivedAt",
+              te.timezone, v.registration_no AS "busNumber"
+         FROM trips t
+         JOIN tenants te ON te.id = t.tenant_id
+         LEFT JOIN vehicles v ON v.id = t.vehicle_id
+        WHERE t.tenant_id = $1 AND t.id = $2`,
+      [requireTenantId(), tripId],
+      { name: 'tracking.tripClock' },
+    );
+  }
+
+  /**
+   * Everyone on duty for the trip — a long overnight run has two or three
+   * drivers taking turns, a short one a single driver; plus the conductor /
+   * attendants. Drivers first, then in shift order.
+   */
+  tripCrew(tripId: string): Promise<CrewOnDuty[]> {
+    return this.db.query<CrewOnDuty>(
+      `SELECT c.role::text AS role, c.full_name AS name, c.phone
+         FROM crew_duties cd JOIN crew c ON c.id = cd.crew_id
+        WHERE cd.tenant_id = $1 AND cd.trip_id = $2 AND cd.status <> 'cancelled'
+        ORDER BY (c.role = 'driver') DESC, cd.starts_at, c.full_name`,
+      [requireTenantId(), tripId],
+      { name: 'tracking.tripCrew' },
+    );
+  }
+
   /** The booking's boarding and dropping stop names. */
   bookingStopNames(
     tenantId: string,
     bookingId: string,
-  ): Promise<{ fromStopName: string; toStopName: string } | null> {
+  ): Promise<{ fromStopName: string; toStopName: string; status: string } | null> {
     return this.db.queryOne(
-      `SELECT fs.name AS "fromStopName", ts.name AS "toStopName"
+      `SELECT fs.name AS "fromStopName", ts.name AS "toStopName", b.status
          FROM bookings b
          JOIN route_stops frs ON frs.route_id = b.route_id AND frs.sequence = b.from_seq
          JOIN route_stops trs ON trs.route_id = b.route_id AND trs.sequence = b.to_seq

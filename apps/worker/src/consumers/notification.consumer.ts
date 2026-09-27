@@ -36,23 +36,12 @@ export class NotificationConsumer implements OnModuleInit {
     }
     for (const type of ['trip.delayed', 'trip.retimed', 'trip.diverted'])
       this.dispatcher.register(this.tripPassengersHandler(type));
-    this.dispatcher.register(this.twelveHourReminderHandler());
+    for (const stage of ['8h', '4h', '1h'] as const)
+      this.dispatcher.register(this.tripReminderHandler(stage));
     this.dispatcher.register(this.waitlistHandler());
     this.dispatcher.register(this.criticalIncidentHandler());
-    this.dispatcher.register(this.fourHourReminderHandler());
   }
 
-  /**
-   * The two trip-reminder stages carry rich, DIFFERENT payload shapes (see
-   * TripReminderScheduler's own doc comment) that the generic handlerFor()
-   * below never extracts — it only ever pulls {pnr, refund, seats}. Each
-   * gets its own handler that flattens its payload into exactly the
-   * placeholder names the seeded templates use. renderTemplate()'s
-   * placeholder regex allows dots WITHIN a single key name (it does flat
-   * lookup, not nested property access) — so `data['pickup.stopName']` as
-   * a literal string key is what makes `{{pickup.stopName}}` in a template
-   * resolve, not actual nested-object traversal.
-   */
   /** SOS / medical / security / accident → the operator's emergency contacts, immediately. */
   private criticalIncidentHandler(): EventHandler {
     return {
@@ -126,9 +115,19 @@ export class NotificationConsumer implements OnModuleInit {
     };
   }
 
-  private twelveHourReminderHandler(): EventHandler {
+  /**
+   * The journey reminders (8h, 4h, 1h — see TripReminderScheduler) carry a
+   * richer payload than the generic handlerFor() below extracts, so they get
+   * their own handler that flattens it into exactly the placeholder names the
+   * templates use, and send it by SMS, WhatsApp and email. renderTemplate()'s
+   * placeholder regex allows dots WITHIN a single key name (flat lookup, not
+   * nested property access) — so `data['pickup.stopName']` as a literal key
+   * is what makes `{{pickup.stopName}}` resolve.
+   */
+  private tripReminderHandler(stage: '8h' | '4h' | '1h'): EventHandler {
+    const eventType = `trip.reminder.${stage}`;
     return {
-      eventType: 'trip.reminder.12h',
+      eventType,
       handle: async (event: DomainEvent) => {
         if (!event.tenantId) return;
         const p = event.payload as Record<string, unknown>;
@@ -141,50 +140,20 @@ export class NotificationConsumer implements OnModuleInit {
         const passengers = Array.isArray(p.passengers)
           ? (p.passengers as { seat: string; name: string }[])
           : [];
-        await this.notifications.notify({
-          tenantId: event.tenantId,
-          eventId: event.eventId,
-          eventType: 'trip.reminder.12h',
-          recipients,
-          data: {
-            pnr: p.pnr as string,
-            fromStopName: p.fromStopName as string,
-            toStopName: p.toStopName as string,
-            boardingAt: p.boardingAt
-              ? new Date(p.boardingAt as string).toLocaleString('en-IN')
-              : undefined,
-            droppingAt: p.droppingAt
-              ? new Date(p.droppingAt as string).toLocaleString('en-IN')
-              : undefined,
-            passengerNames: passengers.map((x) => `${x.name} (${x.seat})`).join(', '),
-          },
-        });
-      },
-    };
-  }
-
-  private fourHourReminderHandler(): EventHandler {
-    return {
-      eventType: 'trip.reminder.4h',
-      handle: async (event: DomainEvent) => {
-        if (!event.tenantId) return;
-        const p = event.payload as Record<string, unknown>;
-        const recipients = {
-          sms: (p.contactPhone as string) ?? undefined,
-          whatsapp: (p.contactPhone as string) ?? undefined,
-          email: (p.contactEmail as string) ?? undefined,
+        const data: Record<string, string | undefined> = {
+          pnr: p.pnr as string,
+          fromStopName: p.fromStopName as string,
+          toStopName: p.toStopName as string,
+          // Already in the operator's timezone ("30 Sep, 9:30 pm").
+          boardingAt: p.boardingAt as string | undefined,
+          droppingAt: p.droppingAt as string | undefined,
+          passengerNames: passengers.map((x) => `${x.name} (${x.seat})`).join(', '),
         };
-        if (!recipients.sms && !recipients.email) return;
-        const pickup = (p.pickup as Record<string, unknown>) ?? {};
-        const driver = p.driver as { name: string; phone: string | null } | null;
-        const attendant = p.attendant as { name: string; phone: string | null } | null;
-        await this.notifications.notify({
-          tenantId: event.tenantId,
-          eventId: event.eventId,
-          eventType: 'trip.reminder.4h',
-          recipients,
-          data: {
-            pnr: p.pnr as string,
+        if (stage !== '8h') {
+          const pickup = (p.pickup as Record<string, unknown>) ?? {};
+          const driver = p.driver as { name: string; phone: string | null } | null;
+          const attendant = p.attendant as { name: string; phone: string | null } | null;
+          Object.assign(data, {
             busNumber: (p.busNumber as string) ?? 'TBA',
             'pickup.stopName': pickup.stopName as string,
             'pickup.landmark': (pickup.landmark as string) ?? '',
@@ -195,8 +164,17 @@ export class NotificationConsumer implements OnModuleInit {
             'attendant.phone': attendant?.phone ?? 'N/A',
             driversList: (p.driversList as string) ?? 'Not yet assigned',
             attendantsList: (p.attendantsList as string) ?? 'Not yet assigned',
+            crewList: (p.crewList as string) ?? 'Not yet assigned',
             trackingUrl: (p.trackingUrl as string) ?? '',
-          },
+            trackingStartsAt: (p.trackingStartsAt as string) ?? '',
+          });
+        }
+        await this.notifications.notify({
+          tenantId: event.tenantId,
+          eventId: event.eventId,
+          eventType,
+          recipients,
+          data,
         });
       },
     };

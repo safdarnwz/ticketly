@@ -167,49 +167,15 @@ BEGIN
       (uuid_generate_v7(), v_tenant_id, 'trip.delayed', 'sms', NULL, 'Your trip (PNR {{pnr}}) is delayed. New departure: {{newTime}}.'),
       (uuid_generate_v7(), v_tenant_id, 'trip.retimed', 'sms', NULL, 'Schedule change for PNR {{pnr}}: your bus now departs at {{newTime}} (was {{oldTime}}). {{reason}}'),
       (uuid_generate_v7(), v_tenant_id, 'trip.diverted', 'sms', NULL, 'Route change for PNR {{pnr}}: your bus is taking a diversion. {{reason}} We will keep you updated.'),
-      (uuid_generate_v7(), v_tenant_id, 'trip.reminder.12h', 'sms', NULL, 'Reminder: your trip {{pnr}} boards at {{fromStopName}} around {{boardingAt}}, alights at {{toStopName}}. Have a safe journey!'),
-      (uuid_generate_v7(), v_tenant_id, 'trip.reminder.12h', 'whatsapp', NULL, 'Hi! Your trip {{pnr}} is coming up.
-
-Boarding: {{fromStopName}}, around {{boardingAt}}
-Alighting: {{toStopName}}, around {{droppingAt}}
-Passenger(s): {{passengerNames}}
-
-We will send your exact pickup point and bus details 4 hours before boarding.'),
-      (uuid_generate_v7(), v_tenant_id, 'trip.reminder.12h', 'email', 'Your upcoming trip — PNR {{pnr}}', 'Your trip is coming up.
-
-PNR: {{pnr}}
-Boarding: {{fromStopName}} (around {{boardingAt}})
-Alighting: {{toStopName}} (around {{droppingAt}})
-Passenger(s): {{passengerNames}}
-
-We will send your exact pickup point, driver and bus details 4 hours before boarding.'),
-      (uuid_generate_v7(), v_tenant_id, 'trip.reminder.4h', 'sms', NULL, 'Boarding in 4h — PNR {{pnr}}. Pickup: {{pickup.stopName}} ({{pickup.landmark}}). Bus {{busNumber}}. Driver(s): {{driversList}}. Track live: {{trackingUrl}}'),
-      (uuid_generate_v7(), v_tenant_id, 'trip.reminder.4h', 'whatsapp', NULL, 'Your bus boards in 4 hours! PNR {{pnr}}
-
-Pickup: {{pickup.stopName}}
-{{pickup.landmark}}
-{{pickup.address}}
-
-Bus number: {{busNumber}}
-Driver(s): {{driversList}}
-Attendant(s): {{attendantsList}}
-
-Track live location: {{trackingUrl}}
-
-Please reach 15 minutes early.'),
-      (uuid_generate_v7(), v_tenant_id, 'trip.reminder.4h', 'email', 'Boarding in 4 hours — PNR {{pnr}}', 'Your bus boards in 4 hours.
-
-Pickup point: {{pickup.stopName}}
-Landmark: {{pickup.landmark}}
-Address: {{pickup.address}}
-
-Bus number: {{busNumber}}
-Driver(s): {{driversList}}
-Attendant(s): {{attendantsList}}
-
-Track live location: {{trackingUrl}}
-
-Please reach your pickup point 15 minutes early.'),
+      (uuid_generate_v7(), v_tenant_id, 'trip.reminder.8h', 'sms', NULL, 'Reminder: your trip {{pnr}} boards at {{fromStopName}} around {{boardingAt}}, alights at {{toStopName}}. Live tracking link with driver details comes 4 hours before boarding.'),
+      (uuid_generate_v7(), v_tenant_id, 'trip.reminder.8h', 'whatsapp', NULL, 'Hi! Your trip *{{pnr}}* is today.' || E'\n' || '' || E'\n' || 'Boarding: *{{fromStopName}}*, around {{boardingAt}}' || E'\n' || 'Alighting: *{{toStopName}}*, around {{droppingAt}}' || E'\n' || 'Passenger(s): {{passengerNames}}' || E'\n' || '' || E'\n' || 'We will send your pickup point, bus number, driver and crew details and the live-tracking link 4 hours before boarding.'),
+      (uuid_generate_v7(), v_tenant_id, 'trip.reminder.8h', 'email', 'Your journey today — PNR {{pnr}}', 'Your journey is today.' || E'\n' || '' || E'\n' || 'PNR: {{pnr}}' || E'\n' || 'Boarding: {{fromStopName}} (around {{boardingAt}})' || E'\n' || 'Alighting: {{toStopName}} (around {{droppingAt}})' || E'\n' || 'Passenger(s): {{passengerNames}}' || E'\n' || '' || E'\n' || 'We will send your exact pickup point, bus number, driver and crew details and the live-tracking link 4 hours before boarding.'),
+      (uuid_generate_v7(), v_tenant_id, 'trip.reminder.4h', 'sms', NULL, 'Boarding in 4h — PNR {{pnr}}, {{boardingAt}}. Pickup: {{pickup.stopName}} ({{pickup.landmark}}). Bus {{busNumber}}. Driver(s): {{driversList}}. Crew: {{attendantsList}}. Track (live from {{trackingStartsAt}}): {{trackingUrl}}'),
+      (uuid_generate_v7(), v_tenant_id, 'trip.reminder.4h', 'whatsapp', NULL, 'Your bus boards in 4 hours! *{{pnr}}*' || E'\n' || '' || E'\n' || '📍 Pickup: *{{pickup.stopName}}*, {{boardingAt}}' || E'\n' || '{{pickup.landmark}}' || E'\n' || '{{pickup.address}}' || E'\n' || '' || E'\n' || '🚌 Bus number: *{{busNumber}}*' || E'\n' || '👨‍✈️ Driver(s): {{driversList}}' || E'\n' || '🧑‍💼 Conductor / attendant(s): {{attendantsList}}' || E'\n' || '' || E'\n' || '📍 Track your bus: {{trackingUrl}}' || E'\n' || '(The bus shows on the map from {{trackingStartsAt}}.)' || E'\n' || '' || E'\n' || 'Please reach 15 minutes early.'),
+      (uuid_generate_v7(), v_tenant_id, 'trip.reminder.4h', 'email', 'Boarding in 4 hours — PNR {{pnr}}', 'Your bus boards in 4 hours, at {{boardingAt}}.' || E'\n' || '' || E'\n' || 'Pickup point: {{pickup.stopName}}' || E'\n' || 'Landmark: {{pickup.landmark}}' || E'\n' || 'Address: {{pickup.address}}' || E'\n' || '' || E'\n' || 'Bus number: {{busNumber}}' || E'\n' || 'Your crew:' || E'\n' || '{{crewList}}' || E'\n' || '' || E'\n' || 'Track your bus: {{trackingUrl}}' || E'\n' || 'The bus shows on the map from {{trackingStartsAt}}, one hour before departure.' || E'\n' || '' || E'\n' || 'Please reach your pickup point 15 minutes early.'),
+      (uuid_generate_v7(), v_tenant_id, 'trip.reminder.1h', 'sms', NULL, 'Last reminder: PNR {{pnr}} boards at {{boardingAt}} from {{pickup.stopName}}. Bus {{busNumber}}. Driver(s): {{driversList}}. Crew: {{attendantsList}}. Track live now: {{trackingUrl}}'),
+      (uuid_generate_v7(), v_tenant_id, 'trip.reminder.1h', 'whatsapp', NULL, 'Last reminder — your bus boards in 1 hour! *{{pnr}}*' || E'\n' || '' || E'\n' || '📍 Pickup: *{{pickup.stopName}}*, {{boardingAt}}' || E'\n' || '{{pickup.landmark}}' || E'\n' || '' || E'\n' || '🚌 Bus number: *{{busNumber}}*' || E'\n' || '👨‍✈️ Driver(s): {{driversList}}' || E'\n' || '🧑‍💼 Conductor / attendant(s): {{attendantsList}}' || E'\n' || '' || E'\n' || '📍 Your bus is live now: {{trackingUrl}}' || E'\n' || '' || E'\n' || 'Please be at the pickup point 15 minutes early.'),
+      (uuid_generate_v7(), v_tenant_id, 'trip.reminder.1h', 'email', 'Last reminder: boarding in 1 hour — PNR {{pnr}}', 'Your bus boards in 1 hour, at {{boardingAt}}.' || E'\n' || '' || E'\n' || 'Pickup point: {{pickup.stopName}}' || E'\n' || 'Landmark: {{pickup.landmark}}' || E'\n' || 'Address: {{pickup.address}}' || E'\n' || '' || E'\n' || 'Bus number: {{busNumber}}' || E'\n' || 'Your crew:' || E'\n' || '{{crewList}}' || E'\n' || '' || E'\n' || 'Your bus is live on the map now: {{trackingUrl}}' || E'\n' || '' || E'\n' || 'Please be at your pickup point 15 minutes early.'),
       (uuid_generate_v7(), v_tenant_id, 'connection.at_risk', 'sms', NULL, 'Your connecting bus (PNR {{pnr}}) is running {{delayMinutes}} min late. Only {{marginMinutes}} min margin left for your next bus. We are monitoring this for you.'),
       (uuid_generate_v7(), v_tenant_id, 'connection.broken', 'sms', NULL, 'Your connecting bus (PNR {{pnr}}) is delayed by {{delayMinutes}} min and may miss your next connection. Please contact support for help rebooking.'),
       (uuid_generate_v7(), v_tenant_id, 'incident.critical', 'sms', NULL, 'EMERGENCY ({{type}}) reported on trip {{tripId}} at {{time}}. Location: {{location}}. {{description}} — acknowledge in the Ticketly console now.'),

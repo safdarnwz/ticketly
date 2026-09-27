@@ -101,7 +101,7 @@ async function build(app: NestFastifyApplication): Promise<E2eFixtures> {
           -- side, so each picks at random among trips with 20+ free seats (else the emptiest)
           -- (seats a customer is still holding from an earlier run are not free either)
           ORDER BY LEAST(20, (SELECT count(*) FROM trip_seats ts WHERE ts.trip_id = t.id AND ts.is_bookable
-                      AND NOT ts.ladies_only AND ts.occupied_legs = 0 AND ts.blocked_legs = 0
+                      AND NOT ts.ladies_only AND NOT ts.accessible AND ts.seat_type = 'seater' AND ts.occupied_legs = 0 AND ts.blocked_legs = 0
                       AND NOT EXISTS (SELECT 1 FROM booking_seats bs JOIN bookings b ON b.id = bs.booking_id
                                        WHERE bs.trip_id = ts.trip_id AND bs.seat_number = ts.seat_number
                                          AND b.status = 'held' AND b.hold_expires_at > now()))) DESC, random()
@@ -112,7 +112,7 @@ async function build(app: NestFastifyApplication): Promise<E2eFixtures> {
       if (!row) throw new Error(`No open demo trip from ${earliest}`);
       const seats = await s.client.query<{ seat_number: string }>(
         `SELECT ts.seat_number FROM trip_seats ts
-          WHERE ts.trip_id = $1 AND ts.is_bookable AND NOT ts.ladies_only
+          WHERE ts.trip_id = $1 AND ts.is_bookable AND NOT ts.ladies_only AND NOT ts.accessible AND ts.seat_type = 'seater'
             AND ts.occupied_legs = 0 AND ts.blocked_legs = 0
             AND NOT EXISTS (SELECT 1 FROM booking_seats bs JOIN bookings b ON b.id = bs.booking_id
                              WHERE bs.trip_id = ts.trip_id AND bs.seat_number = ts.seat_number
