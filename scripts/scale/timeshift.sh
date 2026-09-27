@@ -15,10 +15,10 @@ PGCONF=/etc/postgresql/16/main/postgresql.conf
 for f in api worker; do
   [ -f "$API_DIR/$f.pid" ] && { pkill -P "$(cat "$API_DIR/$f.pid")" 2>/dev/null || true; kill "$(cat "$API_DIR/$f.pid")" 2>/dev/null || true; }
 done
-pkill -f "apps/(api|worker)/src/main.ts" 2>/dev/null || true
+pkill -f " apps/(api|worker)/src/main.ts" 2>/dev/null || true
 # A graceful shutdown drains requests first: wait for both to be gone before starting again.
-for i in $(seq 1 60); do pgrep -f "apps/(api|worker)/src/main.ts" >/dev/null || break; sleep 0.5; done
-pkill -9 -f "apps/(api|worker)/src/main.ts" 2>/dev/null || true
+for i in $(seq 1 60); do pgrep -f " apps/(api|worker)/src/main.ts" >/dev/null || break; sleep 0.5; done
+pkill -9 -f " apps/(api|worker)/src/main.ts" 2>/dev/null || true
 su postgres -c "$PGBIN/pg_ctl -D $PGDATA -m fast stop" >/dev/null 2>&1 || true
 
 if [ "$1" = "real" ]; then
