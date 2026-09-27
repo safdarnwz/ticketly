@@ -77,7 +77,7 @@ async function build(app: NestFastifyApplication): Promise<E2eFixtures> {
         ).rows,
     );
     for (const svc of services)
-      await app.get(MaterializationService).materialiseService(svc.id, 14);
+      await app.get(MaterializationService).materialiseService(svc.id, 40);
     return uow.run({ name: 'e2e.trip', readOnly: true }, async (s) => {
       const r = await s.client.query<{
         id: string;
@@ -91,16 +91,20 @@ async function build(app: NestFastifyApplication): Promise<E2eFixtures> {
                 (SELECT stop_id FROM route_stops WHERE route_id = r.id ORDER BY sequence ASC LIMIT 1) AS from_stop,
                 (SELECT stop_id FROM route_stops WHERE route_id = r.id ORDER BY sequence DESC LIMIT 1) AS to_stop
            FROM trips t JOIN routes r ON r.id = t.route_id
-          WHERE t.tenant_id = $2 AND t.journey_date BETWEEN $1::date AND $1::date + 9 AND t.status = 'open'
+          WHERE t.tenant_id = $2 AND t.journey_date BETWEEN $1::date + 1 AND $1::date + 20 AND t.status = 'open'
+            -- (the first of those days is left alone for the search tests, which search it)
+            -- the demo's Delhi → Jaipur bus (the way back, JAI-DEL-01, is for round-trip tests)
+            AND r.code = 'DEL-JAI-01'
             -- a route that is priced (a new route may still have no fares)
             AND EXISTS (SELECT 1 FROM fare_plans fp WHERE fp.route_id = r.id AND fp.status = 'active' AND fp.deleted_at IS NULL)
-          -- the emptiest trip of the next days: every run books seats, so one trip fills up
+          -- a roomy trip of the next weeks: every run books seats, and the suites run side by
+          -- side, so each picks at random among trips with 20+ free seats (else the emptiest)
           -- (seats a customer is still holding from an earlier run are not free either)
-          ORDER BY (SELECT count(*) FROM trip_seats ts WHERE ts.trip_id = t.id AND ts.is_bookable
+          ORDER BY LEAST(20, (SELECT count(*) FROM trip_seats ts WHERE ts.trip_id = t.id AND ts.is_bookable
                       AND NOT ts.ladies_only AND ts.occupied_legs = 0 AND ts.blocked_legs = 0
                       AND NOT EXISTS (SELECT 1 FROM booking_seats bs JOIN bookings b ON b.id = bs.booking_id
                                        WHERE bs.trip_id = ts.trip_id AND bs.seat_number = ts.seat_number
-                                         AND b.status = 'held' AND b.hold_expires_at > now())) DESC, t.departs_at
+                                         AND b.status = 'held' AND b.hold_expires_at > now()))) DESC, random()
           LIMIT 1`,
         [earliest, tenantId],
       );

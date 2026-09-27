@@ -8,12 +8,14 @@ import { sqlOne } from './support/flows';
  * for boarding at, or getting off at, a particular stop. The charge is part of
  * the taxable fare, never discounted by a coupon, shown with the trip's stops,
  * and copied when the route is duplicated. The demo route is shared with other
- * suites, so its charges go back to 0 at the end.
+ * suites (and may carry demo charges), so the fixture's two stops start at 0
+ * and every stop gets its own charges back at the end.
  */
 describe('pickup / drop point charges (e2e)', () => {
   let app: TestApp;
   let routeId: string;
   let otherOperator: Record<string, string>;
+  let original: { stopId: string; boardChargeMinor: number; dropChargeMinor: number }[];
   let stops: {
     stopId: string;
     name: string;
@@ -57,10 +59,23 @@ describe('pickup / drop point charges (e2e)', () => {
     };
     const list = await app.get(`/master-data/routes/${routeId}/point-charges`, op);
     expect(list.status, JSON.stringify(list.body)).toBe(200);
-    stops = list.body.items;
+    original = list.body.items;
+    // The fixture's boarding and dropping stops start without a charge.
+    const reset = await put([
+      { stopId: app.fixtures.fromStopId, boardChargeMinor: 0, dropChargeMinor: 0 },
+      { stopId: app.fixtures.toStopId, boardChargeMinor: 0, dropChargeMinor: 0 },
+    ]);
+    expect(reset.status, JSON.stringify(reset.body)).toBe(200);
+    stops = reset.body.items;
   });
   afterAll(async () => {
-    await put(stops.map((s) => ({ stopId: s.stopId, boardChargeMinor: 0, dropChargeMinor: 0 })));
+    await put(
+      original.map((s) => ({
+        stopId: s.stopId,
+        boardChargeMinor: s.boardChargeMinor,
+        dropChargeMinor: s.dropChargeMinor,
+      })),
+    );
     await app.close();
   });
 
@@ -104,12 +119,7 @@ describe('pickup / drop point charges (e2e)', () => {
     expect(twice.body.detail).toMatch(/listed twice/);
     // Nothing was saved by the refused calls.
     const after = await app.get(`/master-data/routes/${routeId}/point-charges`, op);
-    expect(
-      after.body.items.every(
-        (s: { boardChargeMinor: number; dropChargeMinor: number }) =>
-          s.boardChargeMinor === 0 && s.dropChargeMinor === 0,
-      ),
-    ).toBe(true);
+    expect(after.body.items).toEqual(stops);
   });
 
   it('adds the pickup and drop charges to the fare before GST and shows them on the trip', async () => {

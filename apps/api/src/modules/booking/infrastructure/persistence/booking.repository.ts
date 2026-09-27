@@ -154,6 +154,42 @@ export class BookingRepository {
   ) {}
 
   /** Insert a held booking with its seats and passengers. Returns the id. */
+  /** The onward booking of a round trip, as the return's discount check needs it (this operator only). */
+  async onwardLeg(bookingId: string): Promise<{
+    status: string;
+    customerId: string | null;
+    contactPhone: string | null;
+    fromCityId: string;
+    toCityId: string;
+    departsAt: Date;
+  } | null> {
+    return this.db.queryOne(
+      `SELECT b.status, b.customer_id AS "customerId", b.contact_phone AS "contactPhone",
+              fs.city_id AS "fromCityId", ts.city_id AS "toCityId", t.departs_at AS "departsAt"
+         FROM bookings b
+         JOIN stops fs ON fs.id = b.from_stop_id
+         JOIN stops ts ON ts.id = b.to_stop_id
+         JOIN trips t ON t.id = b.trip_id
+        WHERE b.tenant_id = $1 AND b.id = $2`,
+      [requireTenantId(), bookingId],
+      { name: 'booking.onwardLeg', primary: true },
+    );
+  }
+
+  /** The cities of two stops (a journey's start and end). */
+  async stopCities(
+    fromStopId: StopId,
+    toStopId: StopId,
+  ): Promise<{ fromCityId: string; toCityId: string }> {
+    const r = await this.db.queryOne<{ fromCityId: string; toCityId: string }>(
+      `SELECT (SELECT city_id FROM stops WHERE id = $1) AS "fromCityId",
+              (SELECT city_id FROM stops WHERE id = $2) AS "toCityId"`,
+      [fromStopId, toStopId],
+      { name: 'booking.stopCities', primary: true },
+    );
+    return r ?? { fromCityId: '', toCityId: '' };
+  }
+
   async insertHeld(input: {
     pnr: string;
     tripId: TripId;
@@ -187,6 +223,8 @@ export class BookingRepository {
       idProof?: string;
     }[];
     infants?: { fullName: string; age: number; guardianSeat: string; feeMinor: number }[];
+    /** The onward booking this one is the discounted return of (#283). */
+    returnOf?: string | null;
   }): Promise<BookingId> {
     const tx = currentTransaction();
     if (!tx) throw new Error('insertHeld requires a transaction');
@@ -198,8 +236,8 @@ export class BookingRepository {
          (id, tenant_id, pnr, trip_id, route_id, from_seq, to_seq, from_stop_id, to_stop_id,
           channel, status, customer_id, contact_email, contact_phone, seat_count, currency,
           base_minor, discount_minor, tax_minor, total_minor, coupon_code, quote_id,
-          fare_breakup, hold_expires_at, booked_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'held',$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
+          fare_breakup, hold_expires_at, booked_by, return_of)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'held',$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
       [
         id,
         tenantId,
@@ -225,6 +263,7 @@ export class BookingRepository {
         JSON.stringify(input.fareBreakup),
         input.holdExpiresAt,
         input.bookedBy ?? null,
+        input.returnOf ?? null,
       ],
     );
 

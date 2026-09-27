@@ -20,6 +20,8 @@ import {
   type PassengerPolicyDto,
   CheckoutConcessionQuerySchema,
   type CheckoutConcessionQueryDto,
+  RoundTripRuleSchema,
+  type RoundTripRuleDto,
 } from './dto/concession.dto';
 
 /** Operator: passenger concessions (senior, student, defence, child, disabled) and passenger policy (infants, minors). */
@@ -43,7 +45,11 @@ export class ConcessionController {
   @RateLimit(60, 60_000, 'ip')
   @ApiOperation({ summary: 'Concessions and passenger age rules a customer can use at checkout' })
   async checkout(@Query(zodQuery(CheckoutConcessionQuerySchema)) q: CheckoutConcessionQueryDto) {
-    const [rules, policy] = await Promise.all([this.repo.rules(), this.repo.policy()]);
+    const [rules, policy, roundTripDiscountPct] = await Promise.all([
+      this.repo.rules(),
+      this.repo.policy(),
+      this.repo.roundTripDiscountPct(),
+    ]);
     return {
       concessions: rules
         .filter(
@@ -62,6 +68,8 @@ export class ConcessionController {
           maxPerBooking: r.maxPerBooking,
         })),
       policy,
+      /** % off a return booked against an onward booking with this operator (0 = none). */
+      roundTripDiscountPct,
     };
   }
 
@@ -73,7 +81,16 @@ export class ConcessionController {
       policy: await this.repo.policy(),
       bookingWindow: await this.repo.bookingWindow(),
       accessibleSeats: { releaseHours: await this.repo.accessibleReleaseHours() },
+      roundTrip: { discountPct: await this.repo.roundTripDiscountPct() },
     };
+  }
+
+  @Put('round-trip')
+  @RequirePermission(Permission.FARE_MANAGE)
+  @ApiOperation({ summary: 'Discount (%) on the return journey of a round trip, 0–50 (0 = none)' })
+  async roundTrip(@Body(zodBody(RoundTripRuleSchema)) dto: RoundTripRuleDto) {
+    await this.repo.setRoundTripDiscountPct(dto.discountPct);
+    return { ok: true, discountPct: dto.discountPct };
   }
 
   @Put('rules')

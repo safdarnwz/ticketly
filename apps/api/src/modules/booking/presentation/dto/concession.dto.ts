@@ -47,6 +47,12 @@ export const AccessibleSeatRuleSchema = z.object({
 });
 export type AccessibleSeatRuleDto = z.infer<typeof AccessibleSeatRuleSchema>;
 
+/** Round-trip discount (#283): % off the return journey, 0–50 (0 = none). */
+export const RoundTripRuleSchema = z.object({
+  discountPct: z.number().int().min(0).max(50),
+});
+export type RoundTripRuleDto = z.infer<typeof RoundTripRuleSchema>;
+
 /** Checkout: the journey date decides which dated concessions apply. */
 export const CheckoutConcessionQuerySchema = z.object({
   journeyDate: z

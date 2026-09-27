@@ -104,6 +104,25 @@ export class ConcessionRepository {
     return r ? r.accessible_release_hours : 24;
   }
 
+  /** Discount (%) on the return journey of a round trip (#283); 0 = none. */
+  async roundTripDiscountPct(): Promise<number> {
+    const r = await this.db.queryOne<{ round_trip_discount_pct: number }>(
+      `SELECT round_trip_discount_pct FROM passenger_policies WHERE tenant_id = $1`,
+      [requireTenantId()],
+      { name: 'policy.roundTripDiscountPct' },
+    );
+    return r?.round_trip_discount_pct ?? 0;
+  }
+
+  async setRoundTripDiscountPct(pct: number): Promise<void> {
+    await this.db.execute_(
+      `INSERT INTO passenger_policies (tenant_id, round_trip_discount_pct) VALUES ($1, $2)
+       ON CONFLICT (tenant_id) DO UPDATE SET round_trip_discount_pct = EXCLUDED.round_trip_discount_pct, updated_at = now()`,
+      [requireTenantId(), pct],
+      { name: 'policy.setRoundTripDiscountPct', primary: true },
+    );
+  }
+
   async setAccessibleReleaseHours(hours: number | null): Promise<void> {
     await this.db.execute_(
       `INSERT INTO passenger_policies (tenant_id, accessible_release_hours) VALUES ($1, $2)

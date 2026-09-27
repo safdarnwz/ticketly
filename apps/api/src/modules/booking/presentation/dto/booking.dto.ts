@@ -33,6 +33,8 @@ export const HoldSchema = z.object({
   contactPhone: z.string().max(20).optional(),
   /** Staff only (#421): put a passenger who is not female on a ladies-only seat, with the reason. */
   ladiesSeatOverrideReason: z.string().trim().min(5).max(300).optional(),
+  /** Book this as the return of a round trip: the onward booking's id (#283). */
+  returnOf: z.string().uuid().optional(),
 });
 export type HoldDto = z.infer<typeof HoldSchema>;
 

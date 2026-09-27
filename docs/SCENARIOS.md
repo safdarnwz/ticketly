@@ -14,8 +14,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Backend status | Count |
 |---|---|
 | OPEN | 2711 |
-| DONE | 980 |
-| GAP | 285 |
+| DONE | 981 |
+| GAP | 284 |
 | CONFLICT | 76 |
 | INFRA | 20 |
 | DUP | 9 |
@@ -23,15 +23,15 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 | Frontend status | Count |
 |---|---|
-| — | 3098 |
-| DONE | 604 |
+| — | 3097 |
+| DONE | 605 |
 | TODO | 376 |
 | DUP | 9 |
 
 
 ## #1–#500
 
-CONFLICT 20, DONE 372, GAP 94, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 373, GAP 93, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -317,7 +317,7 @@ CONFLICT 20, DONE 372, GAP 94, INFRA 17, PROCESS 3
 | 280 | Reject AI suggestion for cancelling service | DONE | DONE | GET /reports/cancel-suggestions; POST /trips/:tripId/cancel-suggestion/decision · UI: Reports → Forecast: Keep running / Plan to cancel |
 | 281 | Set minimum fare floor value | DONE | DONE | route floor (engine, after yield) · UI: Pricing → Route limits & peak times |
 | 282 | Set maximum fare ceiling value | DONE | DONE | route ceiling (engine, after yield) · UI: Pricing → Route limits & peak times |
-| 283 | Configure round-trip discount percentage | GAP | — | verified manually: not built yet |
+| 283 | Configure round-trip discount percentage | DONE | DONE | PUT /concessions/round-trip (0–50%); hold returnOf=onward booking applies it after concessions when it qualifies (confirmed, same passenger, back the way, later bus, once — unique live return) · UI: Pricing → Concessions: Round trip; confirmation 'X% off your way back'; checkout shows the discount; falls back to full price with the reason |
 | 284 | Manage master list of boarding points | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops → stops with km, running time, boarding/dropping points |
 | 285 | Manage master list of drop points | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops → stops with km, running time, boarding/dropping points |
 | 286 | Set additional charges for specific pickup points | DONE | DONE | GET/PUT /master-data/routes/:id/point-charges; quote adds per-seat charge before GST, after coupon; trip stops show charges · UI: Routes → Point charges; seat page +₹ per point and in the estimate; checkout summary |
@@ -786,7 +786,7 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 372, GAP 94, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 373, GAP 93, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -901,7 +901,7 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 372, GAP 94, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 373, GAP 93, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1016,7 +1016,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 372, GAP 94, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 373, GAP 93, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1111,7 +1111,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 372, GAP 94, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 373, GAP 93, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1226,7 +1226,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 372, GAP 94, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 373, GAP 93, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1301,7 +1301,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 372, GAP 94, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 373, GAP 93, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|

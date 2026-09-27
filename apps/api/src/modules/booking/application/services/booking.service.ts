@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { AppConfig } from '@config';
 import { Permission, type SalesChannelFamily } from '@contracts';
 import { isUniqueViolation, UnitOfWork } from '@database';
+import { applyRoundTripDiscount, roundTripProblem } from '../../domain/round-trip';
 import {
   AppError,
   ErrorCode,
@@ -11,6 +12,7 @@ import {
   hasPermission,
   requireTenantId,
   type BookingId,
+  type StopId,
   type TripId,
 } from '@kernel';
 import { EventBus } from '@messaging';
@@ -77,6 +79,8 @@ export interface HoldRequest {
    * seat, with the reason. Recorded on the booking's event trail.
    */
   ladiesSeatOverrideReason?: string;
+  /** The onward booking this is the return of — gets the operator's round-trip discount (#283). */
+  returnOf?: string;
 }
 
 /**
@@ -146,7 +150,13 @@ export class BookingService {
   async hold(
     req: HoldRequest,
     opts: HoldOptions = {},
-  ): Promise<{ bookingId: BookingId; pnr: string; holdExpiresAt: string; totalMinor: number }> {
+  ): Promise<{
+    bookingId: BookingId;
+    pnr: string;
+    holdExpiresAt: string;
+    totalMinor: number;
+    roundTripDiscountMinor: number;
+  }> {
     // Independent reads in parallel: one round-trip of latency, not two.
     const [blocked, cachedQuote] = await Promise.all([
       // Blocked by this operator — by the signed-in account or the booking mobile.
@@ -200,7 +210,7 @@ export class BookingService {
         throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: e.message });
       throw e;
     }
-    const priced = applyConcessions({
+    const concessionPriced = applyConcessions({
       fareBySeat: fareBySeat.fareBySeat,
       passengers: req.passengers,
       rules: concessionRules,
@@ -213,6 +223,12 @@ export class BookingService {
         totalMinor: quote.totalMinor,
       },
     });
+    // Round trip (#283): the return of an onward booking gets the operator's discount.
+    const returnOf = await this.roundTripFor(req, quote, trip.departsAt);
+    const roundTrip = returnOf
+      ? applyRoundTripDiscount(concessionPriced, returnOf.pct)
+      : { ...concessionPriced, roundTripMinor: 0 };
+    const priced = roundTrip;
     // Channel-wise sales control: e.g. OTA sales stopped for a trip while
     // the operator's own website keeps selling.
     const family = channelFamily(req.channel);
@@ -304,8 +320,15 @@ export class BookingService {
               ...i,
               feeMinor: passengerPolicy.infantFeeMinor,
             })),
+            returnOf: returnOf?.bookingId ?? null,
           }),
-        );
+        ).catch((e: unknown) => {
+          if (isUniqueViolation(e, 'bookings_return_of_live_uq'))
+            throw new AppError(ErrorCode.COMMON_CONFLICT, 409, {
+              message: 'A return journey is already booked on the onward booking',
+            });
+          throw e;
+        });
 
         if (req.ladiesSeatOverrideReason)
           this.events.publish({
@@ -333,9 +356,37 @@ export class BookingService {
           pnr: pnr.pnr,
           holdExpiresAt: holdExpiresAt.toISOString(),
           totalMinor: priced.totals.totalMinor,
+          roundTripDiscountMinor: roundTrip.roundTripMinor,
         };
       },
     );
+  }
+
+  /**
+   * The onward booking and discount a return journey is booked against, or
+   * null when none is asked for or the operator gives no round-trip discount.
+   * A return that does not qualify is refused (422) rather than charged full
+   * price behind the customer's back.
+   */
+  private async roundTripFor(
+    req: HoldRequest,
+    quote: { fromStopId: StopId; toStopId: StopId },
+    departsAt: Date,
+  ): Promise<{ bookingId: string; pct: number } | null> {
+    if (!req.returnOf) return null;
+    const pct = await this.concessions.roundTripDiscountPct();
+    if (pct <= 0) return null;
+    const [onward, cities] = await Promise.all([
+      this.bookings.onwardLeg(req.returnOf),
+      this.bookings.stopCities(quote.fromStopId, quote.toStopId),
+    ]);
+    const problem = roundTripProblem(
+      onward,
+      { ...cities, departsAt },
+      { userId: getUserId() ?? null, contactPhone: req.contactPhone },
+    );
+    if (problem) throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: problem });
+    return { bookingId: req.returnOf, pct };
   }
 
   /**

@@ -513,3 +513,12 @@ an unknown id is now 404 (was 200).
   the first stop); 404 for another operator's route. A duplicated route keeps the charges. `POST /pricing/quote` adds
   them per seat after any coupon and before GST (fare lines "Pickup point charge" / "Drop point charge") and returns
   `pointCharges {boardMinor, dropMinor}`; `GET /scheduling/trips/:id` stops add `boardChargeMinor`, `dropChargeMinor`.
+- **Round-trip discount:** new `PUT /concessions/round-trip {discountPct 0–50}`; `GET /concessions` adds
+  `roundTrip {discountPct}` and `GET /concessions/checkout` adds `roundTripDiscountPct`. `POST /bookings/hold` takes
+  `returnOf` (the onward booking id): when the operator gives a discount, the return must be the same passenger's
+  (account or booking mobile) confirmed onward booking with this operator, going back the other way on a later bus —
+  otherwise 422 with the reason; a second live return on the same onward booking is 409. The discount comes off every
+  seat after concessions (GST in proportion); the hold returns `roundTripDiscountMinor`. With no discount set,
+  `returnOf` is ignored.
+- **Demo data:** `npm run db:seed:demo` also seeds Demo Travels' way back, JAI-DEL-01 (08:00 daily,
+  `db/seeds/demo-return-route.seed.sql`, safe to re-run) — materialise its service like the onward one.

@@ -32,7 +32,7 @@
     "db:new": "tsx scripts/new-migration.ts",
     "db:seed": "tsx scripts/seed.ts",
     "db:seed:geography": "tsx scripts/run-sql.ts db/seeds/geography.seed.sql",
-    "db:seed:demo": "tsx scripts/run-sql.ts db/seeds/demo-operator.seed.sql && tsx scripts/seed-demo-admin.ts",
+    "db:seed:demo": "tsx scripts/run-sql.ts db/seeds/demo-operator.seed.sql && tsx scripts/run-sql.ts db/seeds/demo-return-route.seed.sql && tsx scripts/seed-demo-admin.ts",
     "db:seed:multi-operator": "tsx scripts/run-sql.ts db/seeds/multi-operator.seed.sql && tsx scripts/seed-operator-admins.ts",
     "generate:bookings": "node -r @swc-node/register -r tsconfig-paths/register scripts/generate-bookings.ts",
     "db:refresh-reports": "tsx scripts/refresh-reports.ts",
