@@ -502,3 +502,6 @@ an unknown id is now 404 (was 200).
 - **Add-ons:** new `GET /me/ancillaries/catalogue` (every add-on, stopped ones too, with `active`); saving an
   add-on takes `active` (default true) to stop or resume selling it. Codes are `a-z 0-9 _ -` (lower-cased, ≤40),
   names at least 2 characters, price at most ₹10,000.
+- **Default look:** `GET /v1/appearance` returns the new default theme when no platform or role theme is saved —
+  slate-navy primary `#3F5475`, pink accent `#F0628F`, purple secondary `#7B4FB3`, sky-blue info `#2BA8F0`,
+  background `#F4F6FB`, Nunito Sans, rounder corners (12 / 18 / 24) and soft shadows. Email colours follow.
