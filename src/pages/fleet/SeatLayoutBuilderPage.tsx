@@ -493,7 +493,7 @@ function DeckEditor({ deck, draft, grid, title, problems, sel, drag, hover, onRe
           return (
             <div key={`s${i}`} title={bad ?? `${TYPE_LABEL[s.type]} ${s.number} — drag to move`} role="button" aria-label={`Seat ${s.number || 'without number'} — drag to move`}
               {...pickProps({ kind: 'seat', index: i }, s.row, s.column)}
-              className={cn('flex cursor-grab flex-col active:cursor-grabbing items-center justify-center rounded-md border-2 text-[10px] font-semibold leading-tight',
+              className={cn('flex cursor-grab flex-col active:cursor-grabbing items-center justify-center rounded-[4px] border-2 text-[10px] font-semibold leading-tight',
                 SEAT_TILE[s.type], bad && 'border-danger bg-danger/10 text-danger', s.bookable === false && s.type !== 'crew' && 'opacity-50', isSel && 'ring-2 ring-primary ring-offset-1')}
               style={{ gridColumn: `${s.column + 2} / span ${s.colSpan ?? 1}`, gridRow: `${s.row + 2} / span ${s.rowSpan ?? 1}` }}>
               <span>{s.number || '?'}</span>

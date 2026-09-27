@@ -68,7 +68,7 @@ export function FixtureTile({ kind, small }: { kind: LayoutFixture['kind']; smal
     <span className="text-[8px] font-bold leading-none sm:text-[9px]">EXIT</span>;
   const tone = kind === 'emergency_exit' ? 'border-[#fca5a5] bg-[#fef2f2] text-[#dc2626]' : kind === 'washroom' ? 'border-[#bae6fd] bg-[#f0f9ff] text-[#0369a1]' : 'border-[#e5e7eb] bg-[#f8fafc] text-[#64748b]';
   return (
-    <span className={cn('flex h-full w-full flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed', tone)} title={FIXTURE_LABEL[kind]}>
+    <span className={cn('flex h-full w-full flex-col items-center justify-center gap-0.5 rounded-[5px] border border-dashed', tone)} title={FIXTURE_LABEL[kind]}>
       {body}
       {!small && kind !== 'driver' && kind !== 'emergency_exit' && <span className="hidden text-[8px] font-medium leading-none sm:block">{kind === 'washroom' ? 'WC' : FIXTURE_LABEL[kind]}</span>}
     </span>
@@ -82,14 +82,14 @@ function Chair({ tone, semi }: { tone: SeatTone; semi?: boolean }) {
   return (
     <svg viewBox="0 0 32 32" className={cn('h-full w-full', filled ? 'text-[#1f9d55]' : t.text)} aria-hidden>
       <path
-        d={semi ? 'M8 2h16a3 3 0 0 1 3 3v16H5V5a3 3 0 0 1 3-3z' : 'M8 5h16a3 3 0 0 1 3 3v13H5V8a3 3 0 0 1 3-3z'}
+        d={semi ? 'M6.5 2h19A1.5 1.5 0 0 1 27 3.5V21H5V3.5A1.5 1.5 0 0 1 6.5 2z' : 'M6.5 5h19A1.5 1.5 0 0 1 27 6.5V21H5V6.5A1.5 1.5 0 0 1 6.5 5z'}
         fill={filled ? 'currentColor' : tone === 'booked' || tone === 'bookedFemale' || tone === 'checkedOut' ? 'currentColor' : 'white'}
         fillOpacity={filled ? 1 : tone === 'booked' || tone === 'bookedFemale' || tone === 'checkedOut' ? 0.35 : 1}
         stroke="currentColor"
         strokeWidth={2}
       />
       <path
-        d="M3 14a2 2 0 0 1 4 0v7h18v-7a2 2 0 0 1 4 0v11a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"
+        d="M3 15a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v6h18v-6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v11.5a1.5 1.5 0 0 1-1.5 1.5H4.5A1.5 1.5 0 0 1 3 26.5z"
         fill={filled ? 'currentColor' : 'white'}
         stroke="currentColor"
         strokeWidth={2}
@@ -199,7 +199,7 @@ export function SeatMap({
                     + (s.ladiesOnly ? ', ladies seat' : '') + (s.accessible ? ', accessible' : '')
                     + (price !== undefined && s.available ? `, ${rupees(price)}` : '') + (view?.caption ? `, ${view.caption}` : '');
                   const body: ReactNode = sleeper ? (
-                    <span className={cn('relative block h-full w-full rounded-lg border-2', t.box)}>
+                    <span className={cn('relative block h-full w-full rounded-[5px] border-2', t.box)}>
                       <span className={cn('absolute rounded-full', t.pillow, horizontal ? 'left-1 top-1/2 h-2/3 w-1.5 -translate-y-1/2' : 'bottom-1 left-1/2 h-1.5 w-2/3 -translate-x-1/2')} />
                       <span className={cn('absolute inset-x-0 top-1 text-center text-[9px] font-semibold leading-none sm:text-[10px]', t.text, horizontal && 'top-1/2 -translate-y-1/2')}>{s.seatNumber}</span>
                       {caption && <span className={cn('absolute inset-x-0 text-center text-[9px] font-semibold leading-none sm:text-[10px]', t.text, horizontal ? 'bottom-0.5 left-3' : 'top-1/2 -translate-y-1/2')}>{caption}</span>}
@@ -224,7 +224,7 @@ export function SeatMap({
                       onClick={() => (view ? onSeatClick?.(s) : onToggle?.(s))}
                       style={{ gridColumn: `${s.column + 1} / span ${s.colSpan}`, gridRow: `${s.row + 1} / span ${s.rowSpan}` }}
                       className={cn(
-                        'relative rounded-lg p-0 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e8508a]',
+                        'relative rounded-[5px] p-0 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e8508a]',
                         clickable ? 'cursor-pointer hover:-translate-y-px' : 'cursor-default',
                         dimmed && 'opacity-25',
                       )}
@@ -262,7 +262,7 @@ export function SeatLegend({ kind, rule }: { kind: 'booking' | 'crew'; rule?: st
         </span>
       ))}
       {kind === 'booking' && (
-        <span className="flex items-center gap-1.5"><span className={cn('relative block h-5 w-3 rounded border-2', TONE.available.box)} /> Sleeper</span>
+        <span className="flex items-center gap-1.5"><span className={cn('relative block h-5 w-3 rounded-[3px] border-2', TONE.available.box)} /> Sleeper</span>
       )}
       {kind === 'booking' && <span className="flex items-center gap-1.5"><Accessibility className="h-3.5 w-3.5 text-[#3b82f6]" /> Accessible</span>}
     </div>
