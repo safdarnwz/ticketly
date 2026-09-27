@@ -53,14 +53,17 @@ export class SchedulingService {
   /** A trip and its stop timetable, each stop with its name (the passenger picks boarding / dropping from these). */
   async tripDetail(tripId: TripId) {
     const trip = await this.trips.getById(tripId);
-    const [stops, names] = await Promise.all([
+    const [stops, names, luggage] = await Promise.all([
       this.trips.loadStops(tripId),
       this.routes.stopsWithNames(trip.routeId),
+      this.trips.luggagePolicy(tripId),
     ]);
     const nameOf = new Map(names.map((n) => [n.id, n.name]));
     return {
       trip,
       stops: stops.map((s) => ({ ...s, name: nameOf.get(s.stopId) ?? null })),
+      /** What the operator lets a passenger carry free, and what more costs (null = not published). */
+      luggage,
     };
   }
 

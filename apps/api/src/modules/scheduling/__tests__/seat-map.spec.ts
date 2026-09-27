@@ -5,6 +5,7 @@ import { SchedulingService } from '../application/services/scheduling.service';
 function service(opts: { segment?: { fromSeq: number; toSeq: number } | null } = {}) {
   const trips = {
     getById: async () => ({ id: 't1', routeId: 'r1', seatLayoutId: 'l1', status: 'open' }),
+    luggagePolicy: async () => null,
     loadStops: async () => [
       { sequence: 0, stopId: 's0', canBoard: true, canAlight: false },
       { sequence: 1, stopId: 's1', canBoard: false, canAlight: true },
@@ -107,5 +108,6 @@ describe('SchedulingService.tripDetail', () => {
   it('names each stop; a stop missing from the route gets null, not a crash', async () => {
     const d = await service().tripDetail('t1' as never);
     expect(d.stops.map((s) => s.name)).toEqual(['Kashmere Gate', null]);
+    expect(d.luggage).toBeNull();
   });
 });

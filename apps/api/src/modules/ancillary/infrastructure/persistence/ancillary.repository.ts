@@ -17,18 +17,36 @@ export class AncillaryRepository {
     );
   }
 
+  /** Every add-on of the operator, on sale or not (its own catalogue screen). */
+  listAll(tenantId: TenantId): Promise<unknown[]> {
+    return this.db.query(
+      `SELECT id, code, name, kind, price_minor AS "priceMinor", per_passenger AS "perPassenger", is_active AS active
+         FROM ancillary_services WHERE tenant_id = $1 ORDER BY is_active DESC, name`,
+      [tenantId],
+      { name: 'ancillary.listAll' },
+    );
+  }
+
   /** Create, or update by code; returns the id of the row written. */
   async upsert(
     tenantId: TenantId,
-    s: { code: string; name: string; kind: string; priceMinor: number; perPassenger: boolean },
+    s: {
+      code: string;
+      name: string;
+      kind: string;
+      priceMinor: number;
+      perPassenger: boolean;
+      active: boolean;
+    },
   ): Promise<string> {
     const row = await this.db.queryOne<{ id: string }>(
-      `INSERT INTO ancillary_services (id, tenant_id, code, name, kind, price_minor, per_passenger)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
+      `INSERT INTO ancillary_services (id, tenant_id, code, name, kind, price_minor, per_passenger, is_active)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
        ON CONFLICT (tenant_id, code) DO UPDATE SET name=EXCLUDED.name, kind=EXCLUDED.kind,
-         price_minor=EXCLUDED.price_minor, per_passenger=EXCLUDED.per_passenger, updated_at=now()
+         price_minor=EXCLUDED.price_minor, per_passenger=EXCLUDED.per_passenger,
+         is_active=EXCLUDED.is_active, updated_at=now()
        RETURNING id`,
-      [newId(), tenantId, s.code, s.name, s.kind, s.priceMinor, s.perPassenger],
+      [newId(), tenantId, s.code, s.name, s.kind, s.priceMinor, s.perPassenger, s.active],
       { name: 'ancillary.upsert', primary: true },
     );
     return row!.id;

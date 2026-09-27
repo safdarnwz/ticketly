@@ -496,3 +496,9 @@ an unknown id is now 404 (was 200).
   `{maxPerTrip 1–500, maxSeatsPerEntry 1–10, closeMinutesBefore 0–1440, entryExpiryHours 1–720 | null}`
   (default 100 / 6 / 60 / null). Joining, the list and seat notices follow them; waiting entries past the expiry
   lapse.
+- **Luggage policy:** new `GET/PUT /operator/luggage-policy` and `POST /operator/luggage-policy/reset`
+  `{freeKg 0–100, freePieces 0–10, extraPerKgMinor 100–100000 | null, note ≤300}`. `GET /trips/:id` (public trip
+  detail) adds `luggage` — the operator's published allowance, or `null`.
+- **Add-ons:** new `GET /me/ancillaries/catalogue` (every add-on, stopped ones too, with `active`); saving an
+  add-on takes `active` (default true) to stop or resume selling it. Codes are `a-z 0-9 _ -` (lower-cased, ≤40),
+  names at least 2 characters, price at most ₹10,000.

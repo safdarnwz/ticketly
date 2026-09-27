@@ -158,6 +158,34 @@ describe('operator settings (e2e)', () => {
     }
   });
 
+  it('luggage policy: bounded, shown with every trip, withdrawn on reset', async () => {
+    const before = (await app.get('/operator/luggage-policy', op)).body.policy;
+    const put = (body: object, who: object = op) => app.put('/operator/luggage-policy', body, who);
+    const good = { freeKg: 15, freePieces: 2, extraPerKgMinor: 2000, note: 'One cabin bag free' };
+    try {
+      for (const bad of [
+        { ...good, freeKg: 101 },
+        { ...good, freePieces: -1 },
+        { ...good, extraPerKgMinor: 50 },
+        { ...good, note: 'x'.repeat(301) },
+      ])
+        expect((await put(bad)).status).toBe(400);
+      expect((await put(good, { as: 'customer' })).status).toBe(403);
+      expect((await put(good)).status).toBe(200);
+      const trip = await app.get(`/scheduling/trips/${app.fixtures.tripId}`, { as: 'anonymous' });
+      expect(trip.status).toBe(200);
+      expect(trip.body.luggage).toEqual(good);
+      await app.post('/operator/luggage-policy/reset', {}, op);
+      expect(
+        (await app.get(`/scheduling/trips/${app.fixtures.tripId}`, { as: 'anonymous' })).body
+          .luggage,
+      ).toBeNull();
+    } finally {
+      if (before) await put(before);
+      else await app.post('/operator/luggage-policy/reset', {}, op);
+    }
+  });
+
   it('connection rules: a sane layover window, back to the default on reset', async () => {
     const before = (await app.get('/operator/connection-rules', op)).body;
     expect(before.rules).toMatchObject({ enabled: expect.any(Boolean) });

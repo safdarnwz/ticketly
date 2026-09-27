@@ -26,12 +26,18 @@ export class AncillaryService {
     return this.ancillaries.listActive(requireTenantId());
   }
 
+  /** The operator's own view: every add-on, on sale or stopped. */
+  listAll(): Promise<unknown[]> {
+    return this.ancillaries.listAll(requireTenantId());
+  }
+
   upsert(input: {
     code: string;
     name: string;
     kind: string;
     priceMinor: number;
     perPassenger: boolean;
+    active: boolean;
   }): Promise<string> {
     return this.ancillaries.upsert(requireTenantId(), input);
   }

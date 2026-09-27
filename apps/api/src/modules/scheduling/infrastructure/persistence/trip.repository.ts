@@ -339,6 +339,16 @@ export class TripRepository {
     );
   }
 
+  /** The luggage policy the trip's operator publishes (tenants.settings.luggage), or null. */
+  async luggagePolicy(id: TripId): Promise<unknown> {
+    const row = await this.db.queryOne<{ v: unknown }>(
+      `SELECT t.settings->'luggage' AS v FROM trips tr JOIN tenants t ON t.id = tr.tenant_id WHERE tr.id = $1`,
+      [id],
+      { name: 'trip.luggagePolicy' },
+    );
+    return row?.v ?? null;
+  }
+
   async getById(id: TripId): Promise<TripRecord> {
     const row = await this.db.queryOne<Row>(
       `SELECT id, service_id, route_id, vehicle_id, seat_layout_id, journey_date,

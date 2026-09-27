@@ -29,6 +29,8 @@ import {
   ConnectionRulesSchema,
   WaitlistRulesSchema,
   type WaitlistRulesDto,
+  LuggagePolicySchema,
+  type LuggagePolicyDto,
   type ConnectionRulesDto,
 } from './dto/tenant.dto';
 import { DEFAULT_WAITLIST_RULES, waitlistRules } from '../../demand';
@@ -358,5 +360,31 @@ export class TenantController {
   async resetWaitlistRules() {
     await this.tenants.setWaitlistRules(null);
     return { ok: true, rules: DEFAULT_WAITLIST_RULES };
+  }
+
+  @Get('luggage-policy')
+  @RequirePermission(Permission.TENANT_READ)
+  @ApiOperation({
+    summary: 'What a passenger may carry free and what more costs (null until published)',
+  })
+  async getLuggagePolicy() {
+    return { policy: await this.tenants.getLuggagePolicy() };
+  }
+
+  @Put('luggage-policy')
+  @RequirePermission(Permission.TENANT_MANAGE)
+  @ApiOperation({ summary: 'Publish the luggage policy — shown to passengers with every trip' })
+  async setLuggagePolicy(@Body(zodBody(LuggagePolicySchema)) dto: LuggagePolicyDto) {
+    await this.tenants.setLuggagePolicy(dto);
+    return { ok: true, policy: dto };
+  }
+
+  @Post('luggage-policy/reset')
+  @HttpCode(200)
+  @RequirePermission(Permission.TENANT_MANAGE)
+  @ApiOperation({ summary: 'Withdraw the published luggage policy' })
+  async resetLuggagePolicy() {
+    await this.tenants.setLuggagePolicy(null);
+    return { ok: true, policy: null };
   }
 }

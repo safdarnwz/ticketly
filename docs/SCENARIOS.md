@@ -14,8 +14,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Backend status | Count |
 |---|---|
 | OPEN | 2711 |
-| DONE | 976 |
-| GAP | 289 |
+| DONE | 978 |
+| GAP | 287 |
 | CONFLICT | 76 |
 | INFRA | 20 |
 | DUP | 9 |
@@ -23,15 +23,15 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 | Frontend status | Count |
 |---|---|
-| — | 3102 |
-| DONE | 600 |
+| — | 3100 |
+| DONE | 602 |
 | TODO | 376 |
 | DUP | 9 |
 
 
 ## #1–#500
 
-CONFLICT 20, DONE 368, GAP 98, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 370, GAP 96, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -286,8 +286,8 @@ CONFLICT 20, DONE 368, GAP 98, INFRA 17, PROCESS 3
 | 249 | Configure preferred seat assignment logic | GAP | — | verified manually: not built yet |
 | 250 | Set group booking minimum seats for discount | GAP | — | verified manually: not built yet |
 | 251 | Configure corporate booking credit terms | GAP | — | verified manually: not built yet |
-| 252 | Set standard luggage allowance | GAP | — | verified manually: not built yet |
-| 253 | Configure extra luggage charge per kg or piece | GAP | — | verified manually: not built yet |
+| 252 | Set standard luggage allowance | DONE | DONE | PUT /operator/luggage-policy; trip detail luggage; add-ons active/stop · UI: Settings → Luggage / Add-ons; trip & manage booking show allowance |
+| 253 | Configure extra luggage charge per kg or piece | DONE | DONE | PUT /operator/luggage-policy; trip detail luggage; add-ons active/stop · UI: Settings → Luggage / Add-ons; trip & manage booking show allowance |
 | 254 | View all live running services | DONE | DONE | verified manually: existing module/API · UI: Trips (On the road / Cancelled filter) → chart: Mark departed / arrived, Change bus |
 | 255 | View currently delayed services | DONE | DONE | verified manually: existing module/API · UI: Operations → Incidents (report delay/diversion/breakdown/emergency, acknowledge, resolve, close) |
 | 256 | View today’s cancelled services | DONE | DONE | verified manually: existing module/API · UI: Trips (On the road / Cancelled filter) → chart: Mark departed / arrived, Change bus |
@@ -786,7 +786,7 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 368, GAP 98, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 370, GAP 96, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -901,7 +901,7 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 368, GAP 98, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 370, GAP 96, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1016,7 +1016,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 368, GAP 98, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 370, GAP 96, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1111,7 +1111,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 368, GAP 98, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 370, GAP 96, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1226,7 +1226,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 368, GAP 98, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 370, GAP 96, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1301,7 +1301,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 368, GAP 98, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 370, GAP 96, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|

@@ -50,6 +50,36 @@ describe('ancillaries (e2e)', () => {
     expect(again.body.id).toBe(first.body.id);
   });
 
+  it('an add-on can be stopped: gone from checkout, still on the operator’s list', async () => {
+    const op = { as: 'operator' as const };
+    const code = `insure-${Date.now()}`;
+    const item = { code, name: 'Travel insurance', kind: 'insurance', priceMinor: 4_900 };
+    for (const bad of [
+      { ...item, code: 'bad code!' },
+      { ...item, name: 'x' },
+      { ...item, priceMinor: 2_000_000 },
+    ])
+      expect((await app.post('/me/ancillaries/catalogue', bad, op)).status).toBe(400);
+    expect((await app.post('/me/ancillaries/catalogue', item, { as: 'customer' })).status).toBe(
+      403,
+    );
+    const made = await app.post('/me/ancillaries/catalogue', item, op);
+    const onSale = (await app.get('/me/ancillaries', { as: 'anonymous' })).body.items as {
+      id: string;
+    }[];
+    expect(onSale.some((i) => i.id === made.body.id)).toBe(true);
+    await app.post('/me/ancillaries/catalogue', { ...item, active: false }, op);
+    const after = (await app.get('/me/ancillaries', { as: 'anonymous' })).body.items as {
+      id: string;
+    }[];
+    expect(after.some((i) => i.id === made.body.id)).toBe(false);
+    const all = await app.get('/me/ancillaries/catalogue', op);
+    expect(all.body.items).toContainEqual(
+      expect.objectContaining({ id: made.body.id, active: false }),
+    );
+    expect((await app.get('/me/ancillaries/catalogue', { as: 'customer' })).status).toBe(403);
+  });
+
   it('attaching add-ons to a held booking adds their price and GST to it', async () => {
     const code = `luggage-${Date.now()}`;
     const created = await app.post(

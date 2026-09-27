@@ -200,3 +200,13 @@ export const WaitlistRulesSchema = z.object({
   entryExpiryHours: z.number().int().min(1).max(720).nullable(),
 });
 export type WaitlistRulesDto = z.infer<typeof WaitlistRulesSchema>;
+
+/** What a passenger may carry free, and what more costs (#252, #253). */
+export const LuggagePolicySchema = z.object({
+  freeKg: z.number().int().min(0).max(100),
+  freePieces: z.number().int().min(0).max(10),
+  /** Charged per kg over the free weight, in paise; null = extra luggage is sold as an add-on per piece. */
+  extraPerKgMinor: z.number().int().min(100).max(100_000).nullable(),
+  note: z.string().trim().max(300).default(''),
+});
+export type LuggagePolicyDto = z.infer<typeof LuggagePolicySchema>;

@@ -585,22 +585,41 @@ export class TenantRepository {
   }
 
   /** This operator's waitlist rules, or null (platform default). */
-  async getWaitlistRules(): Promise<unknown> {
-    const row = await this.db.queryOne<{ rules: unknown }>(
-      `SELECT settings->'waitlist' AS rules FROM tenants WHERE id = $1`,
-      [requireTenantId()],
-      { name: 'tenant.getWaitlistRules', primary: true },
-    );
-    return row?.rules ?? null;
+  getWaitlistRules(): Promise<unknown> {
+    return this.getSetting('waitlist');
   }
 
-  async setWaitlistRules(rules: object | null): Promise<void> {
+  setWaitlistRules(rules: object | null): Promise<void> {
+    return this.putSetting('waitlist', rules);
+  }
+
+  /** This operator's luggage policy, or null (not published). */
+  getLuggagePolicy(): Promise<unknown> {
+    return this.getSetting('luggage');
+  }
+
+  setLuggagePolicy(policy: object | null): Promise<void> {
+    return this.putSetting('luggage', policy);
+  }
+
+  /** One key of this operator's settings JSON. */
+  private async getSetting(key: 'waitlist' | 'luggage'): Promise<unknown> {
+    const row = await this.db.queryOne<{ v: unknown }>(
+      `SELECT settings->($2::text) AS v FROM tenants WHERE id = $1`,
+      [requireTenantId(), key],
+      { name: `tenant.get.${key}`, primary: true },
+    );
+    return row?.v ?? null;
+  }
+
+  /** Set (or with null remove) one key of this operator's settings JSON. */
+  private async putSetting(key: 'waitlist' | 'luggage', value: object | null): Promise<void> {
     await this.db.execute_(
-      `UPDATE tenants SET settings = CASE WHEN $2::jsonb IS NULL THEN settings - 'waitlist'
-                                          ELSE jsonb_set(settings, '{waitlist}', $2::jsonb) END,
+      `UPDATE tenants SET settings = CASE WHEN $3::jsonb IS NULL THEN settings - $2::text
+                                          ELSE jsonb_set(settings, ARRAY[$2::text], $3::jsonb) END,
               version = version + 1 WHERE id = $1`,
-      [requireTenantId(), rules ? JSON.stringify(rules) : null],
-      { name: 'tenant.setWaitlistRules', primary: true },
+      [requireTenantId(), key, value ? JSON.stringify(value) : null],
+      { name: `tenant.put.${key}`, primary: true },
     );
   }
 

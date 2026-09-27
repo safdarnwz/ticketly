@@ -52,6 +52,13 @@ export class AncillaryController {
     );
   }
 
+  @Get('catalogue')
+  @RequirePermission(Permission.TENANT_READ)
+  @ApiOperation({ summary: 'Operator: every add-on, on sale or stopped' })
+  async allAncillaries() {
+    return { items: await this.ancillary.listAll() };
+  }
+
   @Post('catalogue')
   @HttpCode(201)
   @RequirePermission(Permission.TENANT_MANAGE)
