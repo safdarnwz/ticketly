@@ -1,9 +1,17 @@
-import { Body, Controller, Delete, Get, Header, Post, Put, HttpCode } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, Post, Put, HttpCode, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
 import { UnitOfWork } from '@database';
-import { ApiStandardErrors, Public, RateLimit, RequirePermission, UuidParam, zodBody } from '@http';
+import {
+  ApiStandardErrors,
+  Public,
+  RateLimit,
+  RequirePermission,
+  UuidParam,
+  zodBody,
+  zodQuery,
+} from '@http';
 import { BadRequestError, getUserId, requireTenantId, type StopId, type TripId } from '@kernel';
 
 import { CouponRepository } from '../infrastructure/persistence/coupon.repository';
@@ -18,6 +26,8 @@ import {
   CreateFarePlanSchema,
   CreatePricingPolicySchema,
   QuoteSchema,
+  SeatFaresQuerySchema,
+  type SeatFaresQueryDto,
   RouteRulesSchema,
   SeatFareOverrideSchema,
   TripFareAdjustmentSchema,
@@ -265,6 +275,17 @@ export class PricingController {
       seatCount: dto.seatCount,
       couponCode: dto.couponCode,
     });
+  }
+
+  @Get('seat-fares')
+  @Public()
+  @RateLimit(240, 60_000, 'ip')
+  @ApiOperation({
+    summary:
+      'What every seat costs on this stretch right now (per seat type and seat fare, with yield, point charges and GST) — for the seat map; book with a quote',
+  })
+  seatFares(@Query(zodQuery(SeatFaresQuerySchema)) q: SeatFaresQueryDto) {
+    return this.pricing.seatFares(q.tripId as TripId, q.from as StopId, q.to as StopId);
   }
 
   @Get('routes/:routeId/rules')

@@ -773,7 +773,9 @@ export class BookingRepository {
               b.pnr, b.contact_phone AS "contactPhone", b.from_stop_id AS "fromStopId", b.to_stop_id AS "toStopId",
               fs.name AS "boardingPoint", ts.name AS "droppingPoint", b.from_seq AS "fromSeq",
               fts.departs_at AS "boardsAt", t.id AS "ticketId", t.status AS "ticketStatus",
-              coalesce(st.ladies_only, false) AS "ladiesSeat"
+              coalesce(st.ladies_only, false) AS "ladiesSeat", p.category,
+              t.boarded_at AS "boardedAt", t.checked_out_at AS "checkedOutAt",
+              coalesce(t.luggage_count, 0) AS "luggageCount", coalesce(t.luggage_tags, '{}') AS "luggageTags"
          FROM passengers p
          JOIN bookings b ON b.id = p.booking_id AND b.status = 'confirmed'
          LEFT JOIN tickets t ON t.booking_id = b.id AND t.seat_number = p.seat_number
@@ -796,10 +798,11 @@ export class BookingRepository {
     status: string;
     bookingStatus: string;
     passengerName: string | null;
+    checkedOutAt?: Date | null;
   } | null> {
     return this.db.queryOne(
       `SELECT tk.id, tk.trip_id AS "tripId", tk.seat_number AS "seatNumber", tk.status,
-              b.status AS "bookingStatus", p.full_name AS "passengerName"
+              b.status AS "bookingStatus", p.full_name AS "passengerName", tk.checked_out_at AS "checkedOutAt"
          FROM tickets tk
          JOIN bookings b ON b.id = tk.booking_id
          LEFT JOIN passengers p ON p.booking_id = b.id AND p.seat_number = tk.seat_number
@@ -857,6 +860,41 @@ export class BookingRepository {
         WHERE tenant_id = $1 AND id = $2`,
       [requireTenantId(), ticketId, status],
       { name: 'booking.setTicketStatus', primary: true },
+    );
+  }
+
+  /** The bags the conductor counted and the tag numbers written on them. */
+  async setTicketLuggage(ticketId: string, count: number, tags: string[]): Promise<void> {
+    await this.db.execute_(
+      `UPDATE tickets SET luggage_count = $3, luggage_tags = $4::text[] WHERE tenant_id = $1 AND id = $2`,
+      [requireTenantId(), ticketId, count, tags],
+      { name: 'booking.setTicketLuggage', primary: true },
+    );
+  }
+
+  /** Luggage tags already on other tickets of this trip (a tag is on one bag only). */
+  async luggageTagsInUse(
+    tripId: string,
+    exceptTicketId: string,
+    tags: string[],
+  ): Promise<{ tag: string; seatNumber: string }[]> {
+    if (tags.length === 0) return [];
+    return this.db.query(
+      `SELECT t.tag, tk.seat_number AS "seatNumber"
+         FROM tickets tk, unnest(tk.luggage_tags) AS t(tag)
+        WHERE tk.tenant_id = $1 AND tk.trip_id = $2 AND tk.id <> $3
+          AND upper(t.tag) = ANY(SELECT upper(x) FROM unnest($4::text[]) x)`,
+      [requireTenantId(), tripId, exceptTicketId, tags],
+      { name: 'booking.luggageTagsInUse', primary: true },
+    );
+  }
+
+  /** The passenger got off: checked out once (kept on a repeat). */
+  async checkOutTicket(ticketId: string): Promise<void> {
+    await this.db.execute_(
+      `UPDATE tickets SET checked_out_at = coalesce(checked_out_at, now()) WHERE tenant_id = $1 AND id = $2`,
+      [requireTenantId(), ticketId],
+      { name: 'booking.checkOutTicket', primary: true },
     );
   }
 

@@ -12,6 +12,8 @@ function service(opts: { segment?: { fromSeq: number; toSeq: number } | null } =
     ],
   };
   const inventory = {
+    seatGenders: async () => new Map([['U1', 'female']]),
+    adjacentSeatRule: async () => 'women',
     resolveSegment: async () =>
       opts.segment === undefined ? { fromSeq: 0, toSeq: 1 } : opts.segment,
     seatAvailability: async () => [
@@ -89,7 +91,14 @@ describe('SchedulingService.seatMap', () => {
       position: 'window',
       ladiesOnly: true,
     });
-    expect(m.seats[1]).toMatchObject({ seatNumber: 'U1', deck: 1, column: 2, available: false });
+    expect(m.seats[1]).toMatchObject({
+      seatNumber: 'U1',
+      deck: 1,
+      column: 2,
+      available: false,
+      bookedGender: 'female',
+    });
+    expect(m.seatRule).toBe('women');
   });
 
   it('does not crash on a seat missing from the layout (placed at the origin)', async () => {

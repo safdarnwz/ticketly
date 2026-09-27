@@ -181,6 +181,58 @@ export class CrewAppService {
     );
   }
 
+  /**
+   * Bags for one passenger of this trip: the count and a tag number on each.
+   * Only for a live ticket (not cancelled, not checked out); a tag already on
+   * another passenger's bag on this trip is refused. Sending it again replaces it.
+   */
+  async setLuggage(tripId: TripId, ticketId: string, count: number, tags: string[]) {
+    await this.assertOnTrip(tripId);
+    return this.uow.run({ name: 'crew.setLuggage', tenantId: requireTenantId() }, async () => {
+      const ticket = await this.liveTicket(tripId, ticketId);
+      if (ticket.checkedOutAt)
+        throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
+          message: 'This passenger has already checked out',
+        });
+      const clash = await this.bookings.luggageTagsInUse(tripId, ticketId, tags);
+      if (clash.length)
+        throw new AppError(ErrorCode.COMMON_CONFLICT, 409, {
+          message: `Tag ${clash[0].tag} is already on a bag of seat ${clash[0].seatNumber}`,
+        });
+      await this.bookings.setTicketLuggage(ticketId, count, tags);
+      return { seatNumber: ticket.seatNumber, luggageCount: count, luggageTags: tags };
+    });
+  }
+
+  /** The passenger got off with their bags. Only after boarding; a repeat is a no-op. */
+  async checkOut(tripId: TripId, ticketId: string) {
+    await this.assertOnTrip(tripId);
+    return this.uow.run({ name: 'crew.checkOut', tenantId: requireTenantId() }, async () => {
+      const ticket = await this.liveTicket(tripId, ticketId);
+      if (ticket.status !== 'boarded')
+        throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, {
+          message: 'Check the passenger in (board) before checking them out',
+        });
+      await this.bookings.checkOutTicket(ticketId);
+      return {
+        seatNumber: ticket.seatNumber,
+        status: ticket.checkedOutAt ? 'already_checked_out' : 'checked_out',
+      };
+    });
+  }
+
+  /** A ticket of this trip, row-locked, of a confirmed booking and not cancelled. */
+  private async liveTicket(tripId: TripId, ticketId: string) {
+    const ticket = await this.bookings.lockTicketById(ticketId);
+    if (!ticket || ticket.tripId !== tripId)
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, {
+        message: 'Ticket not found on this trip',
+      });
+    if (ticket.bookingStatus !== 'confirmed' || ticket.status === 'cancelled')
+      throw new AppError(ErrorCode.BOOKING_INVALID_STATE, 422, { message: 'Ticket is cancelled' });
+    return ticket;
+  }
+
   /** Validate a boarding code and mark boarded. Idempotent + anti-forgery. */
   async scanBoarding(
     tripId: TripId,

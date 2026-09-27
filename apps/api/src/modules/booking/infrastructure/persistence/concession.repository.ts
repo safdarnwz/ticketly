@@ -123,6 +123,25 @@ export class ConcessionRepository {
     );
   }
 
+  /** Who may sit next to whom: 'off', 'women' or 'both'. */
+  async adjacentSeatRule(): Promise<'off' | 'women' | 'both'> {
+    const r = await this.db.queryOne<{ adjacent_seat_rule: 'off' | 'women' | 'both' }>(
+      `SELECT adjacent_seat_rule FROM passenger_policies WHERE tenant_id = $1`,
+      [requireTenantId()],
+      { name: 'policy.adjacentSeatRule' },
+    );
+    return r?.adjacent_seat_rule ?? 'off';
+  }
+
+  async setAdjacentSeatRule(rule: 'off' | 'women' | 'both'): Promise<void> {
+    await this.db.execute_(
+      `INSERT INTO passenger_policies (tenant_id, adjacent_seat_rule) VALUES ($1, $2)
+       ON CONFLICT (tenant_id) DO UPDATE SET adjacent_seat_rule = EXCLUDED.adjacent_seat_rule, updated_at = now()`,
+      [requireTenantId(), rule],
+      { name: 'policy.setAdjacentSeatRule', primary: true },
+    );
+  }
+
   async setAccessibleReleaseHours(hours: number | null): Promise<void> {
     await this.db.execute_(
       `INSERT INTO passenger_policies (tenant_id, accessible_release_hours) VALUES ($1, $2)

@@ -19,7 +19,13 @@ import { EventBus } from '@messaging';
 import { Logger, Metrics } from '@observability';
 
 import { PricingService, CouponRepository } from '../../../pricing';
-import { TripRepository, type ServiceSalesRules } from '../../../scheduling';
+import {
+  InventoryRepository,
+  SchedulingService,
+  TripRepository,
+  neighbourProblems,
+  type ServiceSalesRules,
+} from '../../../scheduling';
 import { CustomerRepository } from '../../../crm';
 import { assertTransition, isCancellable } from '../../domain/booking-state';
 import {
@@ -117,6 +123,8 @@ export class BookingService {
     private readonly concessions: ConcessionRepository,
     private readonly coupons: CouponRepository,
     private readonly trips: TripRepository,
+    private readonly inventory: InventoryRepository,
+    private readonly scheduling: SchedulingService,
     private readonly uow: UnitOfWork,
     private readonly events: EventBus,
     private readonly config: AppConfig,
@@ -197,6 +205,17 @@ export class BookingService {
     const windowProblem = checkBookingWindow(trip.departsAt, bookingWindow);
     if (windowProblem)
       throw new AppError(ErrorCode.INVENTORY_TRIP_CLOSED, 422, { message: windowProblem });
+    // Who sits next to whom (the operator's seat-neighbour rule), on every
+    // channel; staff may override it with a reason, like a ladies-only seat.
+    if (!req.ladiesSeatOverrideReason && (await this.inventory.adjacentSeatRule()) !== 'off') {
+      const map = await this.scheduling.seatMap(trip.id, quote.fromStopId, quote.toStopId);
+      const takenBy = new Map(
+        map.seats.filter((s) => !s.available).map((s) => [s.seatNumber, s.bookedGender]),
+      );
+      const problems = neighbourProblems(map.seatRule, map.seats, takenBy, req.passengers);
+      if (problems.length)
+        throw new AppError(ErrorCode.COMMON_VALIDATION, 422, { message: problems.join('; ') });
+    }
     try {
       validatePassengers({
         passengers: req.passengers,

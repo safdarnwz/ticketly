@@ -13,6 +13,8 @@ import {
   CrewPingSchema,
   CrewReportSchema,
   SosSchema,
+  LuggageSchema,
+  type LuggageDto,
   TicketScanSchema,
   TripStatusSchema,
   type CrewLostItemDto,
@@ -77,6 +79,29 @@ export class CrewAppController {
   })
   board(@UuidParam('id') id: string, @UuidParam('ticketId') ticketId: string) {
     return this.crew.boardTicket(id as TripId, ticketId);
+  }
+
+  @Post('trips/:id/tickets/:ticketId/luggage')
+  @HttpCode(200)
+  @RequirePermission(RUN_TRIP, 'any')
+  @ApiOperation({
+    summary:
+      "Record a passenger's bags: how many and the tag number on each (tags unique on the trip)",
+  })
+  luggage(
+    @UuidParam('id') id: string,
+    @UuidParam('ticketId') ticketId: string,
+    @Body(zodBody(LuggageSchema)) dto: LuggageDto,
+  ) {
+    return this.crew.setLuggage(id as TripId, ticketId, dto.count, dto.tags);
+  }
+
+  @Post('trips/:id/tickets/:ticketId/checkout')
+  @HttpCode(200)
+  @RequirePermission(RUN_TRIP, 'any')
+  @ApiOperation({ summary: 'Check a boarded passenger out at their drop point (bags handed back)' })
+  checkout(@UuidParam('id') id: string, @UuidParam('ticketId') ticketId: string) {
+    return this.crew.checkOut(id as TripId, ticketId);
   }
 
   @Post('trips/:id/status')

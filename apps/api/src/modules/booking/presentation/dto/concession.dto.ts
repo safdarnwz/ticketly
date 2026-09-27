@@ -61,3 +61,7 @@ export const CheckoutConcessionQuerySchema = z.object({
     .optional(),
 });
 export type CheckoutConcessionQueryDto = z.infer<typeof CheckoutConcessionQuerySchema>;
+
+/** Who may sit next to whom: off, the seat beside a woman kept for women, or both ways. */
+export const SeatNeighbourRuleSchema = z.object({ rule: z.enum(['off', 'women', 'both']) });
+export type SeatNeighbourRuleDto = z.infer<typeof SeatNeighbourRuleSchema>;

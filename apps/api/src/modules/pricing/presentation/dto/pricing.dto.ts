@@ -157,6 +157,10 @@ export const QuoteSchema = z
   });
 export type QuoteDto = z.infer<typeof QuoteSchema>;
 
+/** Every seat's price on one stretch of a trip (for the seat map). */
+export const SeatFaresQuerySchema = z.object({ tripId: uuid, from: uuid, to: uuid });
+export type SeatFaresQueryDto = z.infer<typeof SeatFaresQuerySchema>;
+
 /** One seat number's fare on a plan (overrides the seat-type rule for that seat). */
 export const SeatFareOverrideSchema = z.object({
   seatNumber: z.string().trim().min(1).max(10),

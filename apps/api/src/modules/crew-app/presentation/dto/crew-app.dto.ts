@@ -3,6 +3,31 @@ import { z } from 'zod';
 export const TicketScanSchema = z.object({ boardingCode: z.string().min(3).max(40) });
 export type TicketScanDto = z.infer<typeof TicketScanSchema>;
 
+/** Bags counted at check-in and the tag number written on each (a tag is unique on the trip). */
+export const LuggageSchema = z
+  .object({
+    count: z.number().int().min(0).max(20),
+    tags: z
+      .array(
+        z
+          .string()
+          .trim()
+          .toUpperCase()
+          .regex(/^[A-Z0-9][A-Z0-9-]{0,19}$/, 'A tag is 1–20 letters, digits or dashes'),
+      )
+      .max(20)
+      .default([]),
+  })
+  .refine((l) => l.tags.length <= l.count, {
+    message: 'More tag numbers than bags',
+    path: ['tags'],
+  })
+  .refine((l) => new Set(l.tags).size === l.tags.length, {
+    message: 'A tag number is listed twice',
+    path: ['tags'],
+  });
+export type LuggageDto = z.infer<typeof LuggageSchema>;
+
 export const TripStatusSchema = z.object({ status: z.enum(['departed', 'closed']) });
 export type TripStatusDto = z.infer<typeof TripStatusSchema>;
 

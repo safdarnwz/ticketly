@@ -15,6 +15,7 @@ import {
 
 import { expandRecurrence, type RecurrenceRule } from '../../domain/recurrence';
 import { salesRulesErrors, type ServiceSalesRules } from '../../domain/sales-rules';
+import { reservedSeats } from '../../domain/seat-neighbours';
 import { MaterializationService } from './materialization.service';
 import { ServiceRepository } from '../../infrastructure/persistence/service.repository';
 import { TripRepository } from '../../infrastructure/persistence/trip.repository';
@@ -32,6 +33,10 @@ export interface SeatMapSeat extends SeatAvailability {
   rowSpan: number;
   colSpan: number;
   position: 'front' | 'aisle' | 'window' | null;
+  /** A taken seat: the traveller's gender (only that), for "female booked" on the map. */
+  bookedGender: 'female' | 'male' | null;
+  /** A free seat kept for women or men under the operator's seat-neighbour rule. */
+  reservedFor: 'female' | 'male' | null;
 }
 
 /**
@@ -89,9 +94,11 @@ export class SchedulingService {
         ErrorCode.COMMON_VALIDATION,
         'Invalid boarding/dropping combination for this trip',
       );
-    const [seats, layout] = await Promise.all([
+    const [seats, layout, genders, rule] = await Promise.all([
       this.inventory.seatAvailability(tripId, seg.fromSeq, seg.toSeq),
       this.layouts.getById(trip.seatLayoutId),
+      this.inventory.seatGenders(tripId, seg.fromSeq, seg.toSeq),
+      this.inventory.adjacentSeatRule(),
     ]);
     const map = layout.seatMap.toJSON();
     const cellOf = new Map(map.seats.map((c) => [c.number, c]));
@@ -105,10 +112,15 @@ export class SchedulingService {
         rowSpan: c?.rowSpan ?? 1,
         colSpan: c?.colSpan ?? 1,
         position: c?.position ?? null,
+        bookedGender: s.available ? null : (genders.get(s.seatNumber) ?? null),
+        reservedFor: null,
       };
     });
+    const kept = reservedSeats(rule, placed, genders);
+    for (const p of placed) if (p.available) p.reservedFor = kept.get(p.seatNumber) ?? null;
     return {
       tripStatus: trip.status,
+      seatRule: rule,
       available: placed.filter((s) => s.available).length,
       total: placed.length,
       layout: { decks: map.decks, rows: map.rows, columns: map.columns },

@@ -21,6 +21,8 @@ import {
   CheckoutConcessionQuerySchema,
   type CheckoutConcessionQueryDto,
   RoundTripRuleSchema,
+  SeatNeighbourRuleSchema,
+  type SeatNeighbourRuleDto,
   type RoundTripRuleDto,
 } from './dto/concession.dto';
 
@@ -82,6 +84,7 @@ export class ConcessionController {
       bookingWindow: await this.repo.bookingWindow(),
       accessibleSeats: { releaseHours: await this.repo.accessibleReleaseHours() },
       roundTrip: { discountPct: await this.repo.roundTripDiscountPct() },
+      seatNeighbours: { rule: await this.repo.adjacentSeatRule() },
     };
   }
 
@@ -91,6 +94,17 @@ export class ConcessionController {
   async roundTrip(@Body(zodBody(RoundTripRuleSchema)) dto: RoundTripRuleDto) {
     await this.repo.setRoundTripDiscountPct(dto.discountPct);
     return { ok: true, discountPct: dto.discountPct };
+  }
+
+  @Put('seat-neighbours')
+  @RequirePermission(Permission.FARE_MANAGE)
+  @ApiOperation({
+    summary:
+      "Who may sit next to whom: 'off', 'women' (the seat beside a woman is for women) or 'both' (and beside a man, for men) — shown on the seat map and checked at booking",
+  })
+  async seatNeighbours(@Body(zodBody(SeatNeighbourRuleSchema)) dto: SeatNeighbourRuleDto) {
+    await this.repo.setAdjacentSeatRule(dto.rule);
+    return { ok: true, rule: dto.rule };
   }
 
   @Put('rules')

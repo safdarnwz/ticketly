@@ -98,6 +98,48 @@ export class InventoryRepository {
     return result;
   }
 
+  /**
+   * The traveller's gender on every seat taken on this stretch (paid, or being
+   * paid for right now) — only the gender, for the "for women / for men" seat
+   * rule. `excludeBookingId` leaves one booking out (a booking changing seats).
+   */
+  async seatGenders(
+    tripId: TripId,
+    fromSeq: number,
+    toSeq: number,
+    excludeBookingId?: string,
+  ): Promise<Map<string, 'female' | 'male' | null>> {
+    const rows = await this.db.query<{ seat_number: string; gender: string | null }>(
+      `SELECT DISTINCT ON (bs.seat_number) bs.seat_number, p.gender
+         FROM booking_seats bs
+         JOIN bookings b ON b.id = bs.booking_id
+         LEFT JOIN passengers p ON p.booking_id = b.id AND p.seat_number = bs.seat_number
+        WHERE bs.tenant_id = $1 AND bs.trip_id = $2
+          AND (bs.leg_mask & segment_mask($3, $4)) <> 0
+          AND (b.status IN ('confirmed','completed') OR (b.status = 'held' AND b.hold_expires_at > now()))
+          AND ($5::uuid IS NULL OR b.id <> $5)
+        ORDER BY bs.seat_number, b.created_at DESC`,
+      [requireTenantId(), tripId, fromSeq, toSeq, excludeBookingId ?? null],
+      { name: 'inventory.seatGenders' },
+    );
+    return new Map(
+      rows.map((r) => [
+        r.seat_number,
+        r.gender === 'female' || r.gender === 'male' ? r.gender : null,
+      ]),
+    );
+  }
+
+  /** The operator's "who sits next to whom" rule (passenger_policies; 'off' when never set). */
+  async adjacentSeatRule(): Promise<'off' | 'women' | 'both'> {
+    const r = await this.db.queryOne<{ rule: 'off' | 'women' | 'both' }>(
+      `SELECT adjacent_seat_rule AS rule FROM passenger_policies WHERE tenant_id = $1`,
+      [requireTenantId()],
+      { name: 'inventory.adjacentSeatRule' },
+    );
+    return r?.rule ?? 'off';
+  }
+
   /** Per-seat availability for the seat-map render. */
   async seatAvailability(
     tripId: TripId,

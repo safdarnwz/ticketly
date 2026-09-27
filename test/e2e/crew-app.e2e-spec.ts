@@ -124,6 +124,7 @@ describe('crew app (e2e)', () => {
         ticketId: string;
         boardingPoint: string;
         ticketStatus: string;
+        seatNumber?: string;
       }[]
     ).find((p) => p.pnr === pnr)!;
     expect(row).toMatchObject({ boardingPoint: expect.any(String), ticketStatus: 'valid' });
@@ -133,6 +134,69 @@ describe('crew app (e2e)', () => {
     expect((await board(row.ticketId)).body.status).toBe('boarded');
     expect((await board(row.ticketId)).body.status).toBe('already_boarded');
     expect((await board(unknownId)).status).toBe(404);
+
+    // Bags at check-in: the count and a tag on each; the passenger checks out at the drop.
+    const luggage = (ticketId: string, body: object) =>
+      app.post(`/crew/trips/${f.tripId}/tickets/${ticketId}/luggage`, body, crew);
+    const checkout = (ticketId: string) =>
+      app.post(`/crew/trips/${f.tripId}/tickets/${ticketId}/checkout`, {}, crew);
+    const tag = `T${run.slice(-5)}`.toUpperCase();
+    expect((await luggage(row.ticketId, { count: 1, tags: ['A1', 'A2'] })).status).toBe(400); // more tags than bags
+    expect((await luggage(row.ticketId, { count: 2, tags: ['A1', 'a1'] })).status).toBe(400); // same tag twice
+    expect((await luggage(row.ticketId, { count: 21 })).status).toBe(400);
+    expect((await luggage(row.ticketId, { count: 1, tags: ['bad tag!'] })).status).toBe(400);
+    const bags = await luggage(row.ticketId, {
+      count: 2,
+      tags: [`${tag}-1`, `${tag.toLowerCase()}-2`],
+    });
+    expect(bags.status, JSON.stringify(bags.body)).toBe(200);
+    expect(bags.body.luggageTags).toEqual([`${tag}-1`, `${tag}-2`]);
+    expect((await luggage(unknownId, { count: 1 })).status).toBe(404);
+    // A second passenger: a tag already on the first one's bag is refused; checkout needs boarding.
+    const freeSeat = await sqlOne<{ seat_number: string }>(
+      app,
+      `SELECT seat_number FROM trip_seats ts WHERE trip_id = $1 AND is_bookable AND NOT ladies_only
+          AND occupied_legs = 0 AND blocked_legs = 0
+          AND NOT EXISTS (SELECT 1 FROM booking_seats bs JOIN bookings b ON b.id = bs.booking_id
+                           WHERE bs.trip_id = ts.trip_id AND bs.seat_number = ts.seat_number AND b.status = 'held')
+        ORDER BY random() LIMIT 1`,
+      [f.tripId],
+    );
+    const second = await confirmedBooking(app, freeSeat.seat_number, {
+      fullName: 'Bag Owner',
+      age: 41,
+    });
+    const secondRow = (
+      (await app.get(`/crew/trips/${f.tripId}/manifest`, crew)).body.passengers as {
+        pnr: string;
+        ticketId: string;
+      }[]
+    ).find((p) => p.pnr === second.pnr)!;
+    const clash = await luggage(secondRow.ticketId, { count: 1, tags: [`${tag}-2`] });
+    expect(clash.status).toBe(409);
+    expect(clash.body.detail).toMatch(new RegExp(`seat ${row.seatNumber ?? ''}`));
+    expect((await checkout(secondRow.ticketId)).status).toBe(422); // not boarded yet
+    // Check-out: once, then the bags cannot change.
+    expect((await checkout(row.ticketId)).body.status).toBe('checked_out');
+    expect((await checkout(row.ticketId)).body.status).toBe('already_checked_out');
+    expect((await luggage(row.ticketId, { count: 3 })).status).toBe(422);
+    const after = (
+      (await app.get(`/crew/trips/${f.tripId}/manifest`, crew)).body.passengers as {
+        pnr: string;
+        luggageCount: number;
+        luggageTags: string[];
+        checkedOutAt: string | null;
+        boardedAt: string | null;
+      }[]
+    ).find((p) => p.pnr === pnr)!;
+    expect(after).toMatchObject({ luggageCount: 2, luggageTags: [`${tag}-1`, `${tag}-2`] });
+    expect(after.boardedAt).toBeTruthy();
+    expect(after.checkedOutAt).toBeTruthy();
+    await app.post(
+      `/bookings/${second.bookingId}/cancel`,
+      { reason: 'e2e cleanup' },
+      { ...op, idempotencyKey: key() },
+    );
     expect(
       (await app.post(`/crew/trips/${f.tripId}/scan`, { boardingCode: 'NOPE123' }, crew)).status,
     ).toBe(404);

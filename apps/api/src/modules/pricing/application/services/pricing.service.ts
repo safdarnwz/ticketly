@@ -18,6 +18,18 @@ import { InventoryRepository, TripRepository } from '../../../scheduling';
 import { RouteRepository } from '../../../master-data';
 import { adjustmentPct, applyAdjustment } from '../../domain/pricing-rules';
 
+export interface QuoteInput {
+  tripId: TripId;
+  fromStopId: StopId;
+  toStopId: StopId;
+  seatType: string;
+  /** Preferred — specific seats the customer actually picked on the seat map. Enables per-seat-number fare overrides (see FareRepository.seatOverridesFor) and an accurate per-seat price breakdown. */
+  seatNumbers?: string[];
+  /** Fallback for callers with no seat-map (e.g. some OTA integrations quoting before seat selection) — every seat prices identically off the seat-type rule; no per-seat override can apply since we don't know which seats. */
+  seatCount?: number;
+  couponCode?: string;
+}
+
 export interface Quote {
   quoteId: string;
   tripId: TripId;
@@ -60,17 +72,58 @@ export class PricingService {
     private readonly cache: CacheService,
   ) {}
 
-  async quote(input: {
-    tripId: TripId;
-    fromStopId: StopId;
-    toStopId: StopId;
-    seatType: string;
-    /** Preferred — specific seats the customer actually picked on the seat map. Enables per-seat-number fare overrides (see FareRepository.seatOverridesFor) and an accurate per-seat price breakdown. */
-    seatNumbers?: string[];
-    /** Fallback for callers with no seat-map (e.g. some OTA integrations quoting before seat selection) — every seat prices identically off the seat-type rule; no per-seat override can apply since we don't know which seats. */
-    seatCount?: number;
-    couponCode?: string;
-  }): Promise<Quote> {
+  async quote(input: QuoteInput): Promise<Quote> {
+    const p = await this.price(input, { requireAvailable: true });
+    const { trip: _trip, seg, fare, breakups, seatNumbers, seatCount, pointCharges } = p;
+    return this.issueQuote(input, seg, fare, breakups, seatNumbers, seatCount, pointCharges);
+  }
+
+  /**
+   * What each seat of this segment costs right now, for the seat map: every
+   * seat priced as its own type (and its own number, where the operator set a
+   * seat fare), with dynamic yield, peak / trip adjustments, the boarding and
+   * dropping point charges and GST — the same numbers a quote gives, without
+   * issuing one. Seats of a type with no fare on the route carry no price.
+   */
+  async seatFares(
+    tripId: TripId,
+    fromStopId: StopId,
+    toStopId: StopId,
+  ): Promise<{
+    currency: string;
+    seats: { seatNumber: string; seatType: string; fareMinor: number }[];
+  }> {
+    const seg = await this.inventory.resolveSegment(tripId, fromStopId, toStopId);
+    if (!seg)
+      throw new AppError(ErrorCode.INVENTORY_SEGMENT_INVALID, 422, {
+        message: 'Invalid boarding/dropping combination',
+      });
+    const all = await this.inventory.seatAvailability(tripId, seg.fromSeq, seg.toSeq);
+    const byType = new Map<string, string[]>();
+    for (const s of all) byType.set(s.seatType, [...(byType.get(s.seatType) ?? []), s.seatNumber]);
+    const seats: { seatNumber: string; seatType: string; fareMinor: number }[] = [];
+    let currency = 'INR';
+    for (const [seatType, seatNumbers] of byType) {
+      if (seatType === 'crew') continue;
+      try {
+        const p = await this.price(
+          { tripId, fromStopId, toStopId, seatType, seatNumbers },
+          { requireAvailable: false },
+        );
+        currency = p.fare.currency;
+        seatNumbers.forEach((n, i) =>
+          seats.push({ seatNumber: n, seatType, fareMinor: p.breakups[i].total.minor }),
+        );
+      } catch (e) {
+        // No fare for this seat type on this stretch: those seats simply show no price.
+        if (!(e instanceof AppError) || e.code !== ErrorCode.PRICING_NO_FARE_DEFINED) throw e;
+      }
+    }
+    return { currency, seats };
+  }
+
+  /** The shared pricing of a quote: seats checked against their type, every rule applied. */
+  private async price(input: QuoteInput, opts: { requireAvailable: boolean }) {
     const seatNumbers = input.seatNumbers ?? [];
     const seatCount = seatNumbers.length > 0 ? seatNumbers.length : (input.seatCount ?? 0);
     if (seatCount < 1)
@@ -118,7 +171,7 @@ export class PricingService {
     }
 
     const available = await this.inventory.availableCount(input.tripId, seg.fromSeq, seg.toSeq);
-    if (available < seatCount) {
+    if (opts.requireAvailable && available < seatCount) {
       throw new AppError(ErrorCode.INVENTORY_SEAT_UNAVAILABLE, 422, {
         message: `Only ${available} seat(s) available on this segment`,
         details: { available },
@@ -200,7 +253,18 @@ export class PricingService {
       ],
     };
     const breakups = PricingEngine.priceManyDifferent(reqTemplate, adjustedBaseFares);
+    return { trip, seg, fare, breakups, seatNumbers, seatCount, pointCharges };
+  }
 
+  private async issueQuote(
+    input: QuoteInput,
+    seg: { fromSeq: number; toSeq: number },
+    fare: { currency: string },
+    breakups: ReturnType<typeof PricingEngine.priceManyDifferent>,
+    seatNumbers: string[],
+    seatCount: number,
+    pointCharges: { boardMinor: number; dropMinor: number },
+  ): Promise<Quote> {
     const totalMinor = breakups.reduce((sum, b) => sum + b.total.minor, 0);
     // Aggregated across ALL seats (not just breakups[0]) — this is what
     // actually gets persisted on the booking (see BookingService.hold) and
