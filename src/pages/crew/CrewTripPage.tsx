@@ -5,6 +5,9 @@ import { AlertOctagon, CheckCircle2, Luggage, MapPin, Navigation, Phone, Search,
 
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Input, Modal, PageLoader, Select, useToast } from '@/components/ui';
 import { crewAppApi, CREW_REPORT_TYPES, SOS_KINDS, type ManifestRow } from '@/lib/api/crewApp';
+import { flowApi, type SeatCell } from '@/lib/api/booking-flow';
+import { SeatMap } from '@/components/customer/SeatMap';
+import type { SeatView } from '@/lib/seat-tones';
 import { DELAY_CATEGORIES } from '@/lib/api/operations';
 import { cn, formatDateTime, formatTime, idempotencyKey } from '@/lib/utils';
 
@@ -97,6 +100,8 @@ export function CrewTripPage() {
           <GpsSharing tripId={tripId} active={departed} />
         </CardBody>
       </Card>
+
+      <BusLayout tripId={tripId} rows={live} onChanged={refresh} />
 
       <Card>
         <CardHeader title="Boarding" subtitle="Check the PNR or ID, then tap Board — or type the code on the e-ticket" />
@@ -248,5 +253,140 @@ function LostModal({ tripId, seats, onClose }: { tripId: string; seats: string[]
         </div>
       </div>
     </Modal>
+  );
+}
+
+/** How a seat looks to the crew: who is on it and where they are in the journey. */
+function crewView(rows: ManifestRow[] | undefined): SeatView {
+  if (!rows?.length) return { tone: 'empty', clickable: false };
+  const r = rows.find((x) => x.ticketStatus === 'boarded' && !x.checkedOutAt) ?? rows.find((x) => x.ticketStatus === 'valid') ?? rows[0];
+  const bags = rows.reduce((a, x) => a + (x.luggageCount ?? 0), 0);
+  const tone = r.checkedOutAt ? 'checkedOut' : r.ticketStatus === 'boarded' ? 'boarded' : r.ticketStatus === 'no_show' ? 'noShow' : 'pending';
+  return { tone, caption: r.fullName.split(' ')[0].slice(0, 7), badge: bags ? `${bags}🧳` : undefined, clickable: true };
+}
+
+/**
+ * The bus as it is laid out, for the crew: every booked seat shows who is on
+ * it and whether they have checked in or out; tapping a seat opens the
+ * passenger to check in, count and tag their bags, and check out.
+ */
+function BusLayout({ tripId, rows, onChanged }: { tripId: string; rows: ManifestRow[]; onChanged: () => void }) {
+  const trip = useQuery({ queryKey: ['crew-trip-detail', tripId], queryFn: () => flowApi.trip(tripId) });
+  const stops = trip.data?.stops ?? [];
+  const first = stops[0]?.stopId;
+  const last = stops[stops.length - 1]?.stopId;
+  const map = useQuery({
+    queryKey: ['crew-layout', tripId, first, last],
+    queryFn: () => flowApi.availability(tripId, first!, last!),
+    enabled: Boolean(first && last && first !== last),
+    refetchInterval: 30_000,
+  });
+  const bySeat = useMemo(() => {
+    const m = new Map<string, ManifestRow[]>();
+    for (const r of rows) m.set(r.seatNumber, [...(m.get(r.seatNumber) ?? []), r]);
+    return m;
+  }, [rows]);
+  const [open, setOpen] = useState<string | null>(null);
+  const counts = {
+    toBoard: rows.filter((r) => r.ticketStatus === 'valid').length,
+    onBoard: rows.filter((r) => r.ticketStatus === 'boarded' && !r.checkedOutAt).length,
+    out: rows.filter((r) => r.checkedOutAt).length,
+    bags: rows.reduce((a, r) => a + (r.luggageCount ?? 0), 0),
+  };
+  return (
+    <Card>
+      <CardHeader title="Bus layout" subtitle="Tap a seat to check the passenger in, record their bags, or check them out" />
+      <CardBody className="flex flex-col gap-3">
+        <div className="grid grid-cols-4 gap-2 text-center text-xs">
+          {[['To board', counts.toBoard], ['On board', counts.onBoard], ['Checked out', counts.out], ['Bags', counts.bags]].map(([k, v]) => (
+            <div key={k} className="rounded-md border border-border px-2 py-1.5"><div className="text-lg font-semibold text-text">{v}</div><div className="text-text-muted">{k}</div></div>
+          ))}
+        </div>
+        {trip.isLoading || map.isLoading ? <PageLoader /> : map.isError ? <ErrorState error={map.error} onRetry={map.refetch} /> : map.data ? (
+          <SeatMap map={map.data} legend="crew" viewOf={(s: SeatCell) => crewView(bySeat.get(s.seatNumber))} onSeatClick={(s) => setOpen(s.seatNumber)} />
+        ) : null}
+      </CardBody>
+      {open && <SeatPassengers tripId={tripId} seat={open} rows={bySeat.get(open) ?? []} onClose={() => setOpen(null)} onChanged={onChanged} />}
+    </Card>
+  );
+}
+
+/** One seat's passenger(s): details, check-in, bags with tag numbers, check-out. */
+function SeatPassengers({ tripId, seat, rows, onClose, onChanged }: { tripId: string; seat: string; rows: ManifestRow[]; onClose: () => void; onChanged: () => void }) {
+  return (
+    <Modal open onClose={onClose} title={`Seat ${seat}`} size="md">
+      <div className="flex flex-col gap-4">
+        {rows.length === 0 ? <EmptyState title="Nobody booked on this seat" /> : rows.map((r) => <PassengerCard key={`${r.pnr}-${r.ticketId}`} tripId={tripId} row={r} onChanged={onChanged} />)}
+      </div>
+    </Modal>
+  );
+}
+
+function PassengerCard({ tripId, row, onChanged }: { tripId: string; row: ManifestRow; onChanged: () => void }) {
+  const toast = useToast();
+  const [count, setCount] = useState(row.luggageCount ?? 0);
+  const [tags, setTags] = useState<string[]>(row.luggageTags ?? []);
+  const [err, setErr] = useState('');
+  const boarded = row.ticketStatus === 'boarded';
+  const out = Boolean(row.checkedOutAt);
+  const ticketId = row.ticketId ?? '';
+  const done = (m: string) => { toast.success(m); onChanged(); };
+  const board = useMutation({ mutationFn: () => crewAppApi.board(tripId, ticketId), onSuccess: () => done(`${row.fullName} checked in`), onError: (e) => setErr(errText(e, 'Could not check in')) });
+  const bags = useMutation({
+    mutationFn: () => crewAppApi.luggage(tripId, ticketId, count, tags.map((t) => t.trim().toUpperCase()).filter(Boolean)),
+    onSuccess: (r) => done(`${r.luggageCount} bag${r.luggageCount === 1 ? '' : 's'} saved for seat ${r.seatNumber}`),
+    onError: (e) => setErr(errText(e, 'Could not save the bags')),
+  });
+  const checkout = useMutation({ mutationFn: () => crewAppApi.checkout(tripId, ticketId), onSuccess: () => done(`${row.fullName} checked out`), onError: (e) => setErr(errText(e, 'Could not check out')) });
+  const busy = board.isPending || bags.isPending || checkout.isPending;
+  const setCountTo = (n: number) => { const c = Math.max(0, Math.min(20, n)); setCount(c); setTags((t) => t.slice(0, c)); };
+  const tagProblem = tags.filter(Boolean).some((t) => !/^[A-Za-z0-9][A-Za-z0-9-]{0,19}$/.test(t.trim())) ? 'A tag is 1–20 letters, digits or dashes'
+    : new Set(tags.filter(Boolean).map((t) => t.trim().toUpperCase())).size !== tags.filter(Boolean).length ? 'A tag number is listed twice' : '';
+  return (
+    <div className="rounded-lg border border-border p-3 text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <div className="text-base font-semibold text-text">{row.fullName}</div>
+          <div className="text-text-muted">{[row.age != null ? `${row.age} yrs` : null, row.gender, row.category && row.category !== 'adult' ? row.category : null].filter(Boolean).join(' · ')}</div>
+        </div>
+        <Badge tone={out ? 'neutral' : boarded ? 'success' : row.ticketStatus === 'no_show' ? 'danger' : 'warning'}>{out ? 'checked out' : boarded ? 'on board' : row.ticketStatus === 'no_show' ? 'no-show' : 'to board'}</Badge>
+      </div>
+      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+        <dt className="text-text-muted">PNR</dt><dd className="font-mono text-text">{row.pnr}</dd>
+        <dt className="text-text-muted">Mobile</dt><dd><a className="text-primary" href={`tel:${row.contactPhone}`}><Phone className="inline h-3 w-3" /> {row.contactPhone}</a></dd>
+        <dt className="text-text-muted">Boards at</dt><dd className="text-text">{row.boardingPoint ?? '—'}{row.boardsAt ? ` · ${formatTime(row.boardsAt)}` : ''}</dd>
+        <dt className="text-text-muted">Gets off at</dt><dd className="text-text">{row.droppingPoint ?? '—'}</dd>
+        {row.boardedAt && <><dt className="text-text-muted">Checked in</dt><dd className="text-text">{formatTime(row.boardedAt)}</dd></>}
+        {row.checkedOutAt && <><dt className="text-text-muted">Checked out</dt><dd className="text-text">{formatTime(row.checkedOutAt)}</dd></>}
+      </dl>
+      {row.ladiesSeat && row.gender && row.gender !== 'female' && <div className="mt-2 text-xs text-danger">Ladies seat — a man cannot sit here; move him or call the depot.</div>}
+
+      <div className="mt-3 rounded-md bg-surface-muted p-2">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="flex items-center gap-1 font-medium text-text"><Luggage className="h-4 w-4" /> Bags</span>
+          <div className="flex items-center gap-2" role="group" aria-label="Number of bags">
+            <Button size="sm" variant="outline" aria-label="One bag less" disabled={out || busy || count === 0} onClick={() => setCountTo(count - 1)}>−</Button>
+            <span className="w-6 text-center text-base font-semibold text-text" aria-live="polite">{count}</span>
+            <Button size="sm" variant="outline" aria-label="One bag more" disabled={out || busy || count >= 20} onClick={() => setCountTo(count + 1)}>+</Button>
+          </div>
+        </div>
+        {count > 0 && (
+          <div className="grid grid-cols-2 gap-2">
+            {Array.from({ length: count }, (_, i) => (
+              <Input key={i} aria-label={`Tag number of bag ${i + 1}`} placeholder={`Bag ${i + 1} tag`} value={tags[i] ?? ''} disabled={out || busy}
+                onChange={(e) => setTags((t) => { const n = [...t]; n[i] = e.target.value.toUpperCase(); return n; })} />
+            ))}
+          </div>
+        )}
+        {tagProblem && <div className="mt-1 text-xs text-danger">{tagProblem}</div>}
+        {!out && <Button size="sm" className="mt-2" variant="outline" loading={bags.isPending} disabled={busy || Boolean(tagProblem) || !ticketId} onClick={() => { setErr(''); bags.mutate(); }}>Save bags</Button>}
+      </div>
+
+      {err && <div role="alert" className="mt-2 text-xs text-danger">{err}</div>}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {row.ticketStatus === 'valid' && <Button leftIcon={<CheckCircle2 className="h-4 w-4" />} loading={board.isPending} disabled={busy || !ticketId} onClick={() => { setErr(''); board.mutate(); }}>Check in</Button>}
+        {boarded && !out && <Button variant="outline" loading={checkout.isPending} disabled={busy} onClick={() => { if (window.confirm(`Check ${row.fullName} out at ${row.droppingPoint ?? 'the drop point'}? Bags handed back?`)) { setErr(''); checkout.mutate(); } }}>Check out</Button>}
+      </div>
+    </div>
   );
 }

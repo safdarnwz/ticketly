@@ -8,11 +8,13 @@ import { TripOpsSection } from './TripOpsSection';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ApiError } from '@/lib/api/client';
 import { tripOpsApi, type ChartOccupant, type ChartSeat, type TripChart } from '@/lib/api/scheduling';
+import type { SeatCell, SeatMapResponse } from '@/lib/api/booking-flow';
+import { SeatLegendRow, SeatMap } from '@/components/customer/SeatMap';
+import type { SeatTone, SeatView } from '@/lib/seat-tones';
 import { TRIP_STATUS_LABEL } from '@/lib/trip-status';
 import { fleetApi, type Vehicle } from '@/lib/api/fleet';
-import { cn, formatDateLabel, formatDateTime, formatTime, fromAppDateTimeInput, SEAT_TYPE_LABEL, toAppDateTimeInput } from '@/lib/utils';
+import { formatDateLabel, formatDateTime, formatTime, fromAppDateTimeInput, SEAT_TYPE_LABEL, toAppDateTimeInput } from '@/lib/utils';
 
-const CELL_REM = 4.2;
 const errText = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
 const short = (name: string) => (name.length > 11 ? `${name.slice(0, 10)}…` : name);
 
@@ -24,13 +26,6 @@ function seatState(s: ChartSeat): 'booked' | 'hold' | 'blocked' | 'closed' | 'fr
   if (s.blocked) return 'blocked';
   return 'free';
 }
-const STATE_STYLE = {
-  booked: 'border-primary bg-primary/10 text-text',
-  hold: 'border-warning bg-warning/15 text-text',
-  blocked: 'border-border bg-surface-muted text-text-muted [background-image:repeating-linear-gradient(45deg,transparent_0_6px,rgba(0,0,0,.06)_6px_12px)]',
-  closed: 'border-border bg-surface-muted text-text-muted opacity-60',
-  free: 'border-border bg-surface text-text-muted',
-} as const;
 
 /**
  * A bus's reservation chart: the seat layout with who sits where (boarding →
@@ -191,50 +186,39 @@ export function TripChartPage() {
 function ChartGrid({ chart, picked, selection, blockMode, onClick }: {
   chart: TripChart; picked: string | null; selection: string[]; blockMode: boolean; onClick: (s: ChartSeat) => void;
 }) {
-  const decks = Array.from({ length: Math.max(1, chart.layout.decks) }, (_, d) => d);
-  return (
-    <div className="flex flex-wrap justify-center gap-6 overflow-x-auto">
-      {decks.map((deck) => {
-        const seats = chart.seats.filter((s) => s.deck === deck);
-        if (!seats.length) return null;
-        return (
-          <div key={deck} className="rounded-card border border-border bg-surface-muted/40 p-3">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">{chart.layout.decks > 1 ? (deck === 0 ? 'Lower deck' : 'Upper deck') : 'Seats'} · front ↑</div>
-            <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${chart.layout.columns}, ${CELL_REM}rem)`, gridTemplateRows: `repeat(${chart.layout.rows}, ${CELL_REM}rem)` }}>
-              {seats.map((s) => {
-                const st = seatState(s);
-                const lead = s.occupants.find((o) => !o.onHold) ?? s.occupants[0];
-                const sel = selection.includes(s.seatNumber);
-                const label = `Seat ${s.seatNumber}: ${st === 'booked' ? `${lead!.name}, ${lead!.from} to ${lead!.to}` : st === 'hold' ? 'being paid for' : st}`;
-                return (
-                  <button key={s.seatNumber} type="button" aria-label={label} title={label} aria-pressed={blockMode ? sel : picked === s.seatNumber}
-                    onClick={() => onClick(s)}
-                    style={{ gridColumn: `${s.column + 1} / span ${s.colSpan}`, gridRow: `${s.row + 1} / span ${s.rowSpan}` }}
-                    className={cn('flex flex-col items-start overflow-hidden rounded-md border p-1 text-left text-[10px] leading-tight transition focus-ring',
-                      STATE_STYLE[st], s.ladiesOnly && 'ring-1 ring-accent', (picked === s.seatNumber || sel) && 'outline outline-2 outline-offset-1 outline-primary')}>
-                    <span className="font-bold">{s.seatNumber}{s.occupants.length > 1 ? ` ×${s.occupants.length}` : ''}</span>
-                    {lead && <span className="w-full truncate">{short(lead.name)}</span>}
-                    {lead && <span className="w-full truncate text-text-muted">{lead.from?.split(' ')[0]}→{lead.to?.split(' ')[0]}</span>}
-                    {st === 'blocked' && <Lock className="mt-auto h-3 w-3" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+  const bySeat = useMemo(() => new Map(chart.seats.map((s) => [s.seatNumber, s])), [chart.seats]);
+  // The chart on the shared seat map: the same bus the passenger and the crew see.
+  const map: SeatMapResponse = {
+    tripStatus: chart.trip.status,
+    available: chart.totals.free,
+    total: chart.totals.seats,
+    layout: chart.layout,
+    seats: chart.seats.map((s) => ({
+      seatNumber: s.seatNumber, seatType: s.seatType, available: seatState(s) === 'free', ladiesOnly: s.ladiesOnly, accessible: false,
+      deck: s.deck, row: s.row, column: s.column, rowSpan: s.rowSpan, colSpan: s.colSpan, position: null,
+    })),
+  };
+  const viewOf = (cell: SeatCell): SeatView => {
+    const s = bySeat.get(cell.seatNumber)!;
+    const st = seatState(s);
+    const lead = s.occupants.find((o) => !o.onHold) ?? s.occupants[0];
+    const chosen = blockMode ? selection.includes(s.seatNumber) : picked === s.seatNumber;
+    const tone: SeatTone = chosen ? 'selected'
+      : st === 'booked' ? (lead?.ticketStatus === 'boarded' ? 'boarded' : lead?.ticketStatus === 'no_show' ? 'noShow' : lead?.gender === 'female' ? 'bookedFemale' : 'booked')
+      : st === 'hold' ? 'pending' : st === 'free' ? (s.ladiesOnly ? 'forFemale' : 'available') : 'blocked';
+    return {
+      tone,
+      caption: lead ? short(lead.name).split(' ')[0] : st === 'hold' ? 'paying' : undefined,
+      badge: s.occupants.length > 1 ? `×${s.occupants.length}` : undefined,
+      clickable: true,
+    };
+  };
+  return <SeatMap map={map} legend="none" viewOf={viewOf} onSeatClick={(c) => onClick(bySeat.get(c.seatNumber)!)} />;
 }
 
 function Legend() {
-  const items: [keyof typeof STATE_STYLE, string][] = [['booked', 'Booked'], ['hold', 'Paying now'], ['blocked', 'Blocked'], ['free', 'Free'], ['closed', 'Not for sale']];
-  return (
-    <div className="mt-4 flex flex-wrap justify-center gap-3 text-xs text-text-muted">
-      {items.map(([k, l]) => <span key={k} className="flex items-center gap-1"><span className={cn('inline-block h-3 w-3 rounded border', STATE_STYLE[k])} />{l}</span>)}
-      <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded border ring-1 ring-accent" />Ladies</span>
-    </div>
-  );
+  const items: [SeatTone, string][] = [['available', 'Free'], ['booked', 'Booked'], ['bookedFemale', 'Booked · woman'], ['pending', 'Paying now'], ['boarded', 'Boarded'], ['noShow', 'No-show'], ['blocked', 'Blocked / not for sale'], ['forFemale', 'Ladies seat']];
+  return <SeatLegendRow items={items} />;
 }
 
 function OccupantCard({ o }: { o: ChartOccupant }) {

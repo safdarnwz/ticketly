@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LayoutGrid, Copy, Trash2, Wand2, Info, Code2, History, Eye, RotateCcw, Car } from 'lucide-react';
 
 import { Button, Card, CardBody, Badge, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
+import { SeatMap } from '@/components/customer/SeatMap';
 import { masterDataApi, type SeatLayoutRow, type SeatLayoutVersion } from '@/lib/api/masterData';
 import { cn, formatDateTime } from '@/lib/utils';
 
@@ -35,6 +36,12 @@ const TEMPLATES: { label: string; decks: 1 | 2; rows: number; columns: number; b
   { label: '2+1 Seater deluxe (single deck)', decks: 1, rows: 10, columns: 4, build: (_r, c) => (c === 2 ? EMPTY_CELL : { type: 'seater', position: c === 0 || c === 3 ? 'window' : 'aisle' }) },
   { label: '1+1 Luxury (single deck)', decks: 1, rows: 12, columns: 3, build: (_r, c) => (c === 1 ? EMPTY_CELL : { type: 'seater', position: 'window' }) },
   { label: '2+2 Sleeper (lower + upper deck)', decks: 2, rows: 7, columns: 5, build: (_r, c) => (c === 2 ? EMPTY_CELL : { type: 'sleeper', position: c === 0 || c === 4 ? 'window' : 'aisle' }) },
+  // Berths stand two rows tall; the back row has two berths lying across (horizontal).
+  { label: '2+1 Sleeper with back berths (lower + upper deck)', decks: 2, rows: 9, columns: 4, build: (r, c) => {
+    if (r === 8) return c === 0 || c === 2 ? { type: 'sleeper', colSpan: 2 } : EMPTY_CELL;
+    if (c === 1 || r % 2 === 1) return EMPTY_CELL;
+    return { type: 'sleeper', rowSpan: 2, position: c === 2 ? 'aisle' : 'window' };
+  } },
   { label: 'Blank grid', decks: 1, rows: 10, columns: 4, build: () => EMPTY_CELL },
 ];
 
@@ -341,6 +348,8 @@ export function SeatLayoutsTab() {
                 <Button size="sm" variant="outline" onClick={() => applyToSelection({ type: 'seater' })}>Seater</Button>
                 <Button size="sm" variant="outline" onClick={() => applyToSelection({ type: 'sleeper' })}>Sleeper</Button>
                 <Button size="sm" variant="outline" onClick={() => applyToSelection({ type: 'semi_sleeper' })}>Semi-sleeper</Button>
+                <Button size="sm" variant="outline" title="A sleeper berth standing along the bus (two rows tall)" onClick={() => applyToSelection({ type: 'sleeper', rowSpan: 2, colSpan: 1 })}>Berth ↕</Button>
+                <Button size="sm" variant="outline" title="A sleeper berth lying across the bus (two columns wide), e.g. the back row" onClick={() => applyToSelection({ type: 'sleeper', rowSpan: 1, colSpan: 2 })}>Berth ↔ (across)</Button>
                 <Button size="sm" variant="outline" leftIcon={<Car className="h-3.5 w-3.5" />} onClick={() => applyToSelection({ type: 'crew' })}>Driver/crew</Button>
                 <Button size="sm" variant="ghost" onClick={() => applyToSelection('clear')}>Clear (aisle/gap)</Button>
                 <span className="mx-1 h-6 w-px bg-border" />
@@ -375,6 +384,23 @@ export function SeatLayoutsTab() {
               {(['sequential', 'row', 'deck'] as const).map((scheme, i) => (
                 <Button key={scheme} size="sm" variant="outline" title={NUMBERING_SCHEMES[i].describe} onClick={() => applyNumberingScheme(scheme)}>{NUMBERING_SCHEMES[i].label}</Button>
               ))}
+            </CardBody></Card>
+
+            <Card><CardBody>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Preview — as passengers and crew will see it</div>
+              {(() => {
+                const m = buildSeatMap(editing);
+                return m.seats.length ? (
+                  <SeatMap legend="none" compact map={{
+                    tripStatus: 'open', available: m.seats.length, total: m.seats.length,
+                    layout: { decks: m.decks, rows: m.rows, columns: m.columns },
+                    seats: m.seats.filter((x) => x.type !== 'crew').map((x) => ({
+                      seatNumber: x.number, seatType: x.type, available: x.bookable !== false, ladiesOnly: Boolean(x.ladiesOnly), accessible: Boolean(x.accessible),
+                      deck: x.deck, row: x.row, column: x.column, rowSpan: x.rowSpan ?? 1, colSpan: x.colSpan ?? 1, position: x.position || null,
+                    })),
+                  }} />
+                ) : <p className="text-sm text-text-muted">Add seats to see the bus.</p>;
+              })()}
             </CardBody></Card>
 
             {summary && (

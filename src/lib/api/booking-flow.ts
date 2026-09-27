@@ -16,10 +16,18 @@ export interface SeatCell {
   rowSpan: number;
   colSpan: number;
   position: 'front' | 'aisle' | 'window' | null;
+  /** A taken seat: the traveller's gender only ("female booked" on the map). */
+  bookedGender?: 'female' | 'male' | null;
+  /** A free seat kept for women / men under the operator's seat-neighbour rule. */
+  reservedFor?: 'female' | 'male' | null;
 }
+
+/** Who may sit next to whom, as the operator set it. */
+export type SeatNeighbourRule = 'off' | 'women' | 'both';
 
 export interface SeatMapResponse {
   tripStatus: string;
+  seatRule?: SeatNeighbourRule;
   available: number;
   total: number;
   layout: { decks: number; rows: number; columns: number };
@@ -104,6 +112,12 @@ export const flowApi = {
   /** The seat map (layout + seats) for a boarding → dropping segment. */
   availability: (tripId: string, fromStopId: string, toStopId: string, tenantId?: string) =>
     get<SeatMapResponse>(`/v1/scheduling/trips/${tripId}/availability?from=${fromStopId}&to=${toStopId}`, forTenant(tenantId)),
+  /** What every seat costs on this stretch right now (GST and point charges in) — the seat map's prices. */
+  seatFares: (tripId: string, fromStopId: string, toStopId: string, tenantId?: string) =>
+    get<{ currency: string; seats: { seatNumber: string; seatType: string; fareMinor: number }[] }>(
+      `/v1/pricing/seat-fares?tripId=${tripId}&from=${fromStopId}&to=${toStopId}`,
+      forTenant(tenantId),
+    ),
   /** Concessions (senior, student…) and age rules the chosen operator offers on that date. */
   concessions: (journeyDate?: string) =>
     get<{ concessions: CheckoutConcession[]; policy: PassengerPolicy; roundTripDiscountPct?: number }>(

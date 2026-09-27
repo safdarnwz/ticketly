@@ -14,6 +14,8 @@ export interface ManifestRow {
   seatNumber: string; fullName: string; age: number | null; gender: string | null; pnr: string; contactPhone: string;
   boardingPoint: string | null; droppingPoint: string | null; fromSeq: number; boardsAt: string | null;
   ticketId: string | null; ticketStatus: 'valid' | 'boarded' | 'no_show' | 'cancelled' | string; ladiesSeat: boolean;
+  category?: string | null; boardedAt?: string | null; checkedOutAt?: string | null;
+  luggageCount?: number; luggageTags?: string[];
 }
 export const CREW_REPORT_TYPES = [
   { value: 'delay', label: 'Running late (traffic, weather…)' },
@@ -36,6 +38,10 @@ export const crewAppApi = {
   markPresent: (dutyId: string) => post<{ attendance: string }>(`/v1/crew/me/duties/${dutyId}/attendance`, {}),
   manifest: (tripId: string) => get<{ passengers: ManifestRow[] }>(`/v1/crew/trips/${tripId}/manifest`),
   board: (tripId: string, ticketId: string) => post<{ status: string; seatNumber: string; passenger?: string }>(`/v1/crew/trips/${tripId}/tickets/${ticketId}/board`, {}),
+  luggage: (tripId: string, ticketId: string, count: number, tags: string[]) =>
+    post<{ seatNumber: string; luggageCount: number; luggageTags: string[] }>(`/v1/crew/trips/${tripId}/tickets/${ticketId}/luggage`, { count, tags }),
+  checkout: (tripId: string, ticketId: string) =>
+    post<{ seatNumber: string; status: 'checked_out' | 'already_checked_out' }>(`/v1/crew/trips/${tripId}/tickets/${ticketId}/checkout`, {}),
   scan: (tripId: string, boardingCode: string) => post<{ status: string; seatNumber: string; passenger?: string }>(`/v1/crew/trips/${tripId}/scan`, { boardingCode }),
   setStatus: (tripId: string, status: 'departed' | 'closed') => post<{ ok: boolean }>(`/v1/crew/trips/${tripId}/status`, { status }),
   report: (tripId: string, body: { type: string; description?: string; delayCategory?: string; delayMinutes?: number; lat?: number; lng?: number }, key: string) =>

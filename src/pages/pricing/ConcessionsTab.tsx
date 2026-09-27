@@ -105,6 +105,7 @@ function PolicyCard({ s }: { s: ConcessionSettings }) {
   const [p, setP] = useState({ adultAge: String(s.policy.adultAge), infantMaxAge: String(s.policy.infantMaxAge), infantFee: String(s.policy.infantFeeMinor / 100), unaccompanied: s.policy.allowUnaccompaniedMinors });
   const [w, setW] = useState({ maxAdvanceDays: s.bookingWindow.maxAdvanceDays?.toString() ?? '', minMinutes: String(s.bookingWindow.minMinutesBeforeDeparture), accessible: s.accessibleSeats.releaseHours?.toString() ?? '' });
   const [rt, setRt] = useState(String(s.roundTrip?.discountPct ?? 0));
+  const [neigh, setNeigh] = useState<'off' | 'women' | 'both'>(s.seatNeighbours?.rule ?? 'off');
   const rtError = isInt(rt, 0, 50) && rt !== '' ? undefined : 'A whole number from 0 to 50';
   const done = (m: string) => ({ onSuccess: () => { toast.success(m); void qc.invalidateQueries({ queryKey: ['concessions'] }); }, onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed') });
   const pe: Record<string, string> = {};
@@ -126,6 +127,7 @@ function PolicyCard({ s }: { s: ConcessionSettings }) {
     ...done('Booking rules saved'),
   });
   const roundTrip = useMutation({ mutationFn: () => concessionsApi.saveRoundTrip(Number(rt)), ...done('Round-trip discount saved') });
+  const neighbours = useMutation({ mutationFn: () => concessionsApi.saveSeatNeighbours(neigh), ...done('Seat rule saved') });
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Card><CardBody className="grid grid-cols-2 gap-3 text-sm">
@@ -148,6 +150,24 @@ function PolicyCard({ s }: { s: ConcessionSettings }) {
         <Input label="Discount on the way back (%)" type="number" value={rt} error={rtError} hint={Number(rt) > 0 && !rtError ? `${rt}% off the return, when booked against a confirmed onward booking with you` : '0 = no round-trip discount'} onChange={(x) => setRt(x.target.value)} />
         <p className="self-end pb-2 text-xs text-text-muted">Same passenger (account or booking mobile), back the way they came, on a later bus — once per onward booking.</p>
         <div className="col-span-2 flex justify-end"><Button size="sm" loading={roundTrip.isPending} disabled={roundTrip.isPending || Boolean(rtError)} onClick={() => roundTrip.mutate()}>Save round-trip discount</Button></div>
+      </CardBody></Card>
+      <Card><CardBody className="flex flex-col gap-3 text-sm">
+        <div className="font-semibold text-text">Who sits next to whom</div>
+        <fieldset className="flex flex-col gap-2">
+          <legend className="sr-only">Seat-neighbour rule</legend>
+          {([
+            ['off', 'Anyone anywhere', 'No seat is kept for anyone (ladies-only seats still apply).'],
+            ['women', 'Seat beside a woman is for women', 'A free seat next to a woman traveller shows “For women” and only a woman can book it.'],
+            ['both', 'Women beside women, men beside men', 'Also keeps the seat next to a man for men (“For men”).'],
+          ] as const).map(([v, label, hint]) => (
+            <label key={v} className="flex cursor-pointer items-start gap-2 rounded-md border border-border px-3 py-2 hover:bg-surface-muted">
+              <input type="radio" name="seat-neighbours" className="mt-1" checked={neigh === v} onChange={() => setNeigh(v)} />
+              <span><span className="font-medium text-text">{label}</span><span className="block text-xs text-text-muted">{hint}</span></span>
+            </label>
+          ))}
+        </fieldset>
+        <p className="text-xs text-text-muted">Checked on every channel (web, app, agents, OTAs, counter). Staff at the counter can override it with a reason — for a family travelling together.</p>
+        <div className="flex justify-end"><Button size="sm" loading={neighbours.isPending} disabled={neighbours.isPending || neigh === (s.seatNeighbours?.rule ?? 'off')} onClick={() => neighbours.mutate()}>Save seat rule</Button></div>
       </CardBody></Card>
     </div>
   );

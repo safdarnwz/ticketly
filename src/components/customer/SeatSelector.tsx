@@ -95,6 +95,22 @@ export function SeatSelector({ tripId, tenantId, initialFromStopId, initialToSto
     refetchInterval: 15_000,
   });
 
+  // Every seat's own price on this stretch (seat fares, yield, point charges, GST).
+  const fareQuery = useQuery({
+    queryKey: ['seat-fares', tripId, fromId, toId, tenantId],
+    queryFn: () => flowApi.seatFares(tripId, fromId, toId, tenantId),
+    enabled: Boolean(map.data),
+    refetchInterval: 30_000,
+  });
+  const fares = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const f of fareQuery.data?.seats ?? []) m.set(f.seatNumber, f.fareMinor);
+    // Before the per-seat prices arrive (or if they fail), the seat type's price stands in.
+    for (const s of map.data?.seats ?? []) if (!m.has(s.seatNumber)) { const p = priceOf(s.seatType); if (p !== undefined) m.set(s.seatNumber, p); }
+    return m;
+  }, [fareQuery.data, map.data, priceOf]);
+  const [priceFilter, setPriceFilter] = useState<number | null>(null);
+
   // A selected seat that is no longer free (someone else booked it) leaves the selection.
   const lastMap = useRef(map.data);
   useEffect(() => {
@@ -129,6 +145,8 @@ export function SeatSelector({ tripId, tenantId, initialFromStopId, initialToSto
       return;
     }
     setSelected((cur) => [...cur, s.seatNumber]);
+    if (s.ladiesOnly || s.reservedFor === 'female') setNotice(`Seat ${s.seatNumber} is for women — the passenger on it must be a woman.`);
+    else if (s.reservedFor === 'male') setNotice(`Seat ${s.seatNumber} is next to a man and is kept for men.`);
   };
 
   const changeStops = (from: string, to: string) => {
@@ -173,7 +191,13 @@ export function SeatSelector({ tripId, tenantId, initialFromStopId, initialToSto
           <EmptyState title="Sold out for this part of the route" description="Try other boarding or dropping points, or another bus." />
         ) : (
           <>
-            <SeatMap map={map.data} selected={selected} onToggle={toggle} priceOf={priceOf} currency={currency} />
+            <SeatMap map={map.data} fares={fares} selected={selected} onToggle={toggle} priceFilter={priceFilter} onPriceFilter={setPriceFilter} />
+            {selected.length > 0 && (
+              <div className="rounded-xl border border-border bg-surface px-4 py-3 text-sm">
+                <span className="font-semibold text-text">{selected.length} seat{selected.length > 1 ? 's' : ''} · {selected.join(', ')}</span>
+                <span className="float-right font-semibold text-text">{formatMoney(selected.reduce((a, n) => a + (fares.get(n) ?? 0), 0), fareQuery.data?.currency ?? currency)}</span>
+              </div>
+            )}
             <div className="flex items-center justify-center gap-1.5 text-xs text-text-muted">
               <RefreshCw className={cn('h-3 w-3', map.isFetching && 'animate-spin')} /> {map.data.available} of {map.data.total} seats free · updates live
             </div>
