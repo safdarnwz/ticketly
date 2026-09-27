@@ -45,7 +45,10 @@ export function TripsPage() {
 
   const columns: Column<TripRow>[] = [
     { key: 'dep', header: 'Departs', render: (t) => <span className="font-semibold">{formatTime(t.departsAt)}</span> },
+    { key: 'service', header: 'Service', render: (t) => (t.serviceCode ? <span className="whitespace-nowrap font-mono text-xs font-semibold">{t.serviceCode}</span> : <span className="text-text-muted">One-off</span>) },
     { key: 'route', header: 'Route', render: (t) => t.routeName },
+    // The bus is chosen per trip and can change day to day.
+    { key: 'bus', header: 'Bus', render: (t) => (t.busNumber ? <span className="font-mono text-xs">{t.busNumber}</span> : <span className="text-warning">Not assigned</span>) },
     { key: 'arr', header: 'Arrives', render: (t) => <span className="text-text-muted">{formatTime(t.arrivesAt)}{t.arrivesAt.slice(0, 10) !== t.departsAt.slice(0, 10) ? ' +1' : ''}</span> },
     {
       key: 'occ', header: 'Seats', render: (t) => (

@@ -105,7 +105,8 @@ export function TripChartPage() {
     <div className="print:text-black">
       <PageHeader
         title={`${first?.name ?? 'Trip'} → ${last?.name ?? ''}`}
-        subtitle={`${formatDateLabel(t.journeyDate, { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })} · departs ${formatTime(t.departsAt)} · arrives ${formatTime(t.arrivesAt)}`}
+        // The trip is its service on this date: "DEL-JAI-2130 · Tuesday, 30 Sept 2026".
+        subtitle={`${t.serviceCode ? `${t.serviceCode} · ` : ''}${formatDateLabel(t.journeyDate, { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })} · departs ${formatTime(t.departsAt)} · arrives ${formatTime(t.arrivesAt)}`}
         action={<div className="flex items-center gap-2">{t.vehicleId && <span className="font-mono text-sm text-text-muted">{vehicles.data?.items.find((v) => v.id === t.vehicleId)?.registrationNo ?? 'Bus assigned'}</span>}<Badge tone={statusTone(t.status === 'closed' ? 'held' : t.status)}>{t.hasRun && t.status === 'closed' ? 'journey over' : TRIP_STATUS_LABEL[t.status] ?? t.status}</Badge></div>}
       />
 

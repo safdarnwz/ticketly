@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Badge, Button, ErrorState, Input, Modal, PageLoader, useToast } from '@/components/ui';
-import { serviceAdminApi, type CategoryQuota, type Recurrence, type SalesRules, type ServiceRow } from '@/lib/api/scheduling';
+import { normaliseServiceCode, serviceAdminApi, SERVICE_CODE_RE, type CategoryQuota, type Recurrence, type SalesRules, type ServiceRow } from '@/lib/api/scheduling';
 import { addDaysIso, cn, dayDiff, formatDateTime, idempotencyKey, todayLocal } from '@/lib/utils';
 
 export type ManageTab = 'timetable' | 'versions' | 'sales' | 'extra' | 'copy';
@@ -227,18 +227,19 @@ function CopyTab({ service, onDone }: { service: ServiceRow; onDone: () => void 
   const refresh = useRefresh();
   const [key] = useState(() => idempotencyKey('clone'));
   const today = todayLocal();
-  const [f, setF] = useState({ code: `${service.code}-2`.slice(0, 40), startDate: addDaysIso(today, 1), endDate: addDaysIso(today, 60), startTime: '', season: false });
+  // Empty code: the copy is named from the route and its time, like any new service.
+  const [f, setF] = useState({ code: '', startDate: addDaysIso(today, 1), endDate: addDaysIso(today, 60), startTime: '', season: false });
   const [days, setDays] = useState<number[] | null>(null);
   const e: Record<string, string> = {};
-  if (!/^[A-Za-z0-9-]{2,40}$/.test(f.code.trim())) e.code = '2–40 letters, digits or dashes';
-  else if (f.code.trim().toUpperCase() === service.code.toUpperCase()) e.code = 'Give the copy its own code';
+  if (f.code.trim() && !SERVICE_CODE_RE.test(normaliseServiceCode(f.code))) e.code = '2–40 letters, digits and single dashes';
+  else if (f.code.trim() && normaliseServiceCode(f.code) === service.code) e.code = 'Give the copy its own code';
   if (!f.startDate || f.startDate < today) e.startDate = 'From today on';
   if (!f.endDate || f.endDate < f.startDate) e.endDate = 'After the start';
   else if (dayDiff(f.startDate, f.endDate) > 366) e.endDate = 'At most a year';
   if (days && days.length === 0) e.days = 'Pick at least one day';
   const clone = useMutation({
-    mutationFn: () => serviceAdminApi.clone(service.id, { code: f.code.trim().toUpperCase(), startDate: f.startDate, endDate: f.endDate, startTime: f.startTime || undefined, weekdays: days ?? undefined, season: f.season }, key),
-    onSuccess: () => { toast.success(f.season ? 'Season created — the original skips those dates. Activate the copy to sell it.' : 'Copy created as a draft — activate it to sell'); refresh(); onDone(); },
+    mutationFn: () => serviceAdminApi.clone(service.id, { code: f.code.trim() ? normaliseServiceCode(f.code) : undefined, startDate: f.startDate, endDate: f.endDate, startTime: f.startTime || undefined, weekdays: days ?? undefined, season: f.season }, key),
+    onSuccess: (r) => { toast.success(f.season ? `Season ${r.code} created — the original skips those dates. Activate the copy to sell it.` : `Copy ${r.code} created as a draft — activate it to sell`); refresh(); onDone(); },
     onError: (x) => toast.error(errMsg(x)),
   });
   const remove = useMutation({
@@ -249,7 +250,7 @@ function CopyTab({ service, onDone }: { service: ServiceRow; onDone: () => void 
   return (
     <div className="flex flex-col gap-3 text-sm">
       <div className="grid grid-cols-2 gap-3">
-        <Input label="Code of the copy" value={f.code} error={e.code} onChange={(x) => setF({ ...f, code: x.target.value.toUpperCase() })} />
+        <Input label="Code of the copy (optional)" placeholder="From route and time" value={f.code} error={e.code} onChange={(x) => setF({ ...f, code: x.target.value.toUpperCase() })} />
         <Input label="Departs at (optional)" type="time" value={f.startTime} onChange={(x) => setF({ ...f, startTime: x.target.value })} />
         <Input label="From" type="date" min={today} value={f.startDate} error={e.startDate} onChange={(x) => setF({ ...f, startDate: x.target.value })} />
         <Input label="To" type="date" min={f.startDate} value={f.endDate} error={e.endDate} onChange={(x) => setF({ ...f, endDate: x.target.value })} />

@@ -12,7 +12,18 @@ export interface TripRow {
   departsAt: string; arrivesAt: string; totalSeats: number; status: string; occupancyPct: number;
   /** Paid seats, and seats a customer is paying for right now. */
   bookedSeats: number; heldSeats: number;
+  /** The service's name (DEL-PAT-1500) — the trip is that service on this date; null for a one-off. */
+  serviceCode?: string | null;
+  /** The bus on this trip today; it can be a different one tomorrow. */
+  busNumber?: string | null;
 }
+
+/**
+ * How service codes look: letters, digits and single hyphens, 2–40 long —
+ * the same rule the API applies (it upper-cases what is typed).
+ */
+export const SERVICE_CODE_RE = /^[A-Z0-9](?:[A-Z0-9]|-(?=[A-Z0-9])){1,39}$/;
+export const normaliseServiceCode = (c: string) => c.trim().toUpperCase().replace(/\s+/g, '-');
 
 export type Recurrence = NonNullable<ServiceRow['recurrence']> & { exceptions?: string[]; additions?: string[] };
 export interface CategoryQuota { seats?: number; pct?: number; releaseHours: number }
@@ -27,8 +38,8 @@ export const serviceAdminApi = {
     patch<{ version: number }>(`/v1/scheduling/services/${id}`, body),
   versions: (id: string) => get<{ items: ServiceVersion[] }>(`/v1/scheduling/services/${id}/versions`),
   restore: (id: string, versionNumber: number) => post<{ version: number }>(`/v1/scheduling/services/${id}/versions/${versionNumber}/restore`, {}),
-  clone: (id: string, body: { code: string; startDate: string; endDate: string; startTime?: string; weekdays?: number[]; season?: boolean }, key: string) =>
-    post<{ id: string }>(`/v1/scheduling/services/${id}/clone`, body, withIdempotency(key)),
+  clone: (id: string, body: { code?: string; startDate: string; endDate: string; startTime?: string; weekdays?: number[]; season?: boolean }, key: string) =>
+    post<{ id: string; code: string }>(`/v1/scheduling/services/${id}/clone`, body, withIdempotency(key)),
   remove: (id: string) => del<{ tripsDeleted: number }>(`/v1/scheduling/services/${id}`),
   salesRules: (id: string) => get<SalesRules>(`/v1/scheduling/services/${id}/sales-rules`),
   setSalesRules: (id: string, rules: SalesRules) => put<SalesRules>(`/v1/scheduling/services/${id}/sales-rules`, rules),
@@ -44,10 +55,14 @@ export const serviceAdminApi = {
 
 export const schedulingApi = {
   listServices: () => get<{ services: ServiceRow[] }>('/v1/scheduling/services'),
+  /** Without a code the service is named from its route and time: DEL-PAT-1500, or -A / -B when two leave together. */
   createService: (input: {
-    code: string; routeId: string; vehicleTypeId: string; defaultVehicleId?: string; startTime: string;
+    code?: string; routeId: string; vehicleTypeId: string; defaultVehicleId?: string; startTime: string;
     recurrence: { frequency: 'daily' | 'weekly'; weekdays?: number[]; interval?: number; startDate: string; endDate: string };
-  }) => post<{ id: string }>('/v1/scheduling/services', input),
+  }, key: string) => post<{ id: string; code: string; renamed?: { from: string; to: string } }>('/v1/scheduling/services', input, withIdempotency(key)),
+  /** The name a new service on this route at this time would get, before saving. */
+  codePreview: (routeId: string, startTime: string) =>
+    get<{ code: string; renames?: { from: string; to: string } }>(`/v1/scheduling/services/code-preview?routeId=${routeId}&startTime=${encodeURIComponent(startTime)}`),
   activate: (id: string) => post<{ trips: number }>(`/v1/scheduling/services/${id}/activate`, {}),
   pause: (id: string) => post<{ ok: boolean }>(`/v1/scheduling/services/${id}/pause`, {}),
   materialise: (id: string) => post<{ trips: number }>(`/v1/scheduling/services/${id}/materialise`, {}),
@@ -73,7 +88,7 @@ export interface ChartSeat {
   occupants: ChartOccupant[];
 }
 export interface TripChart {
-  trip: { id: string; routeId: string; journeyDate: string; departsAt: string; arrivesAt: string; totalSeats: number; status: string; vehicleId: string | null; hasRun: boolean; closedOnTrip?: string[]; closedByService?: string[] };
+  trip: { id: string; routeId: string; journeyDate: string; departsAt: string; arrivesAt: string; totalSeats: number; status: string; vehicleId: string | null; hasRun: boolean; closedOnTrip?: string[]; closedByService?: string[]; serviceCode?: string | null };
   stops: { sequence: number; stopId: string; name: string | null; arrivesAt: string; departsAt: string; canBoard: boolean; canAlight: boolean }[];
   layout: { decks: number; rows: number; columns: number };
   seats: ChartSeat[];

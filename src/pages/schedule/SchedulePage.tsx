@@ -5,11 +5,11 @@ import { Plus, Calendar, PlayCircle, PauseCircle, RefreshCw, Bus, Settings2 } fr
 
 import { Button, Badge, statusTone, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
-import { schedulingApi, type ServiceRow } from '@/lib/api/scheduling';
+import { normaliseServiceCode, schedulingApi, SERVICE_CODE_RE, type ServiceRow } from '@/lib/api/scheduling';
 import { masterDataApi } from '@/lib/api/masterData';
 import { ExtraTripSuggestions, RouteBlackouts } from './ScheduleExtras';
 import { ServiceManageModal, type ManageTab } from './ServiceManageModal';
-import { addDaysIso, cn, dayDiff, todayLocal } from '@/lib/utils';
+import { addDaysIso, cn, dayDiff, idempotencyKey, todayLocal } from '@/lib/utils';
 
 // ISO weekdays, as the backend's recurrence rule counts them (1 = Monday … 7 = Sunday).
 const WEEKDAYS = [{ v: 1, l: 'Mon' }, { v: 2, l: 'Tue' }, { v: 3, l: 'Wed' }, { v: 4, l: 'Thu' }, { v: 5, l: 'Fri' }, { v: 6, l: 'Sat' }, { v: 7, l: 'Sun' }];
@@ -53,15 +53,34 @@ function ServicesTab() {
   const [startDate, setStartDate] = useState(todayLocal());
   const [endDate, setEndDate] = useState(addDaysIso(todayLocal(), 90));
   const [tried, setTried] = useState(false);
+  // One key per service being created: a double click or a retry makes one service, not -A and -B.
+  const [createKey, setCreateKey] = useState(() => idempotencyKey('service'));
+
+  // With no code typed, the service is named from its route and time (DEL-PAT-1500);
+  // show that name — and any -A / -B it causes — before saving.
+  const autoName = !form.code.trim();
+  const preview = useQuery({
+    queryKey: ['service-code-preview', form.routeId, form.startTime],
+    queryFn: () => schedulingApi.codePreview(form.routeId, form.startTime),
+    enabled: adding && autoName && !!form.routeId && /^\d{2}:\d{2}$/.test(form.startTime),
+    retry: false,
+  });
 
   const toggleWeekday = (v: number) => setWeekdays((arr) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]));
 
   const create = useMutation({
     mutationFn: () => schedulingApi.createService({
       ...form,
+      code: autoName ? undefined : normaliseServiceCode(form.code),
       recurrence: { frequency, weekdays: frequency === 'weekly' ? weekdays : undefined, startDate, endDate },
-    }),
-    onSuccess: () => { toast.success('Service created — activate it to create its trips'); setAdding(false); setTried(false); setForm({ code: '', routeId: '', vehicleTypeId: '', startTime: '06:00' }); void qc.invalidateQueries({ queryKey: ['services'] }); },
+    }, createKey),
+    onSuccess: (res) => {
+      toast.success(`${res.code} created${res.renamed ? ` — ${res.renamed.from} is now ${res.renamed.to}` : ''}. Activate it to create its trips.`);
+      setAdding(false); setTried(false); setCreateKey(idempotencyKey('service'));
+      setForm({ code: '', routeId: '', vehicleTypeId: '', startTime: '06:00' });
+      void qc.invalidateQueries({ queryKey: ['services'] });
+      void qc.invalidateQueries({ queryKey: ['service-code-preview'] });
+    },
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Could not create service'),
   });
 
@@ -84,7 +103,7 @@ function ServicesTab() {
   const routeName = (id: string) => allRoutes.data?.items.find((r) => r.id === id)?.name ?? '—';
   const typeName = (id: string) => types.data?.items.find((t) => t.id === id)?.name ?? '—';
   const columns: Column<ServiceRow>[] = [
-    { key: 'code', header: 'Code', render: (r) => <span className="font-mono text-xs">{r.code}</span> },
+    { key: 'code', header: 'Code', render: (r) => <span className="whitespace-nowrap font-mono text-xs">{r.code}</span> },
     { key: 'route', header: 'Route', render: (r) => <span className="font-medium text-text">{routeName(r.routeId)}</span> },
     { key: 'time', header: 'Departs', render: (r) => hhmm(r.startMinute) },
     { key: 'runs', header: 'Runs', render: (r) => <span className="text-text-muted">{runsOn(r.recurrence)}{r.recurrence ? ` · till ${r.recurrence.endDate}` : ''}</span> },
@@ -109,7 +128,8 @@ function ServicesTab() {
 
   const today = todayLocal();
   const errors: Record<string, string> = {};
-  if (!/^[A-Za-z0-9-]{2,30}$/.test(form.code.trim())) errors.code = 'Use 2–30 letters, digits or dashes';
+  if (!autoName && !SERVICE_CODE_RE.test(normaliseServiceCode(form.code))) errors.code = 'Use 2–40 letters, digits and single dashes, like DEL-PAT-1500';
+  else if (!autoName && services.data?.services.some((x) => x.code === normaliseServiceCode(form.code))) errors.code = 'You already have a service with this code';
   if (!form.routeId) errors.routeId = routes.data?.items.length === 0 ? 'Publish a route first' : 'Choose a route';
   if (!form.vehicleTypeId) errors.vehicleTypeId = 'Choose a bus type';
   if (!/^\d{2}:\d{2}$/.test(form.startTime)) errors.startTime = 'Pick a time';
@@ -139,7 +159,17 @@ function ServicesTab() {
         footer={<><Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button><Button loading={create.isPending} disabled={create.isPending} onClick={() => { setTried(true); if (canCreate) create.mutate(); }}>Create</Button></>}>
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Service code" placeholder="DEL-JAI-0600" value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))} error={err('code')} />
+            <div>
+              <Input label="Service code (optional)" placeholder={preview.data?.code ?? 'Named from route and time'} value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))} error={err('code') ?? (autoName ? undefined : errors.code)} />
+              {autoName && (
+                <p className="mt-1 text-xs text-text-muted" aria-live="polite">
+                  {!form.routeId ? 'Leave empty to name it from the route and time, like DEL-PAT-1500.'
+                    : preview.isFetching ? 'Working out the name…'
+                    : preview.isError ? <span className="text-danger">{preview.error instanceof Error ? preview.error.message : 'Could not work out a name — type one'}</span>
+                    : preview.data ? <>Will be named <b className="font-mono text-text">{preview.data.code}</b>{preview.data.renames && <> — your other {form.startTime} service <span className="font-mono">{preview.data.renames.from}</span> becomes <b className="font-mono text-text">{preview.data.renames.to}</b></>}</> : null}
+                </p>
+              )}
+            </div>
             <Input label="Start time" type="time" value={form.startTime} onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))} error={err('startTime')} />
             <Select label="Route (published only)" error={err('routeId')} value={form.routeId} onChange={(e) => setForm((f) => ({ ...f, routeId: e.target.value }))}
               options={[{ label: 'Select…', value: '' }, ...(routes.data?.items.map((r) => ({ label: r.name, value: r.id })) ?? [])]} />
