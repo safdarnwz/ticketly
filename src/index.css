@@ -4,15 +4,83 @@
 
 /*
  * ============================================================================
- *  Ticketly — soft "journey" design system
+ *  Ticketly — clean, flat, minimal design system
  * ============================================================================
- *  Slate-navy primary, pink accent and purple secondary (the From / To dots),
- *  sky-blue prices, white cards floating on soft shadows over a cool off-white
- *  background, generous rounding, Nunito Sans.
+ *  Near-black primary, a single crimson accent (#CB2957), calm neutral grays
+ *  on white. No gradients, no glass, no gold. Flat surfaces separated by
+ *  hairline borders. Standard system sans (ChatGPT-like), light weights.
  *  These --yb-* tokens mirror the backend DEFAULT_THEME and are overridden at
  *  runtime from GET /v1/appearance.
  */
 :root {
+  --yb-color-primary: #000000;
+  --yb-color-primary-fg: #ffffff;
+  --yb-color-secondary: #000000;
+  --yb-color-secondary-fg: #ffffff;
+  --yb-color-accent: #cb2957;
+  --yb-color-bg: #ffffff;
+  --yb-color-surface: #ffffff;
+  --yb-color-surface-muted: #eeeeee;
+  --yb-color-border: #dddddd;
+  --yb-color-text: #000000;
+  --yb-color-text-muted: #6e6e6e;
+  --yb-color-success: #16a34a;
+  --yb-color-warning: #d97706;
+  --yb-color-danger: #dc2626;
+  --yb-color-info: #3f72af;
+
+  --yb-radius-sm: 6px;
+  --yb-radius-md: 8px;
+  --yb-radius-lg: 12px;
+  --yb-radius-xl: 16px;
+  --yb-radius-pill: 999px;
+
+  --yb-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --yb-shadow-md: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --yb-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  --yb-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --yb-font-family-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --yb-font-size-base: 15px;
+  --yb-font-scale: 1.2;
+  --yb-font-weight-normal: 400;
+  --yb-font-weight-medium: 500;
+  --yb-font-weight-bold: 600;
+
+  --yb-spacing-unit: 4px;
+
+  --yb-btn-height: 44px;
+  --yb-btn-padding-x: 18px;
+  --yb-btn-radius: 8px;
+  --yb-btn-font-weight: 500;
+
+  --yb-input-height: 40px;
+  --yb-input-padding-x: 14px;
+  --yb-input-radius: 8px;
+  --yb-input-border-width: 1px;
+
+  --yb-card-radius: 12px;
+  --yb-card-padding: 20px;
+  --yb-card-shadow: var(--yb-shadow-sm);
+
+  --yb-dropdown-radius: 8px;
+  --yb-dropdown-shadow: var(--yb-shadow-md);
+
+  --yb-modal-radius: 16px;
+  --yb-modal-shadow: var(--yb-shadow-lg);
+  --yb-card-border: var(--yb-color-border);
+  --yb-display-weight: 600;
+}
+
+/*
+ * The customer storefront (people booking tickets) — the soft "journey" look:
+ * slate-navy primary, pink accent and purple secondary (the From / To dots),
+ * sky-blue prices, white cards floating on soft shadows over a cool off-white
+ * background, generous rounding, Nunito Sans. Operator, platform and staff
+ * consoles keep the flat black-and-white look above. Set on <body> for the
+ * customer host (ThemeProvider), so dialogs and toasts get it too.
+ */
+.theme-customer {
   --yb-color-primary: #3f5475;
   --yb-color-primary-fg: #ffffff;
   --yb-color-secondary: #7b4fb3;
@@ -68,6 +136,8 @@
 
   --yb-modal-radius: 24px;
   --yb-modal-shadow: var(--yb-shadow-lg);
+  --yb-card-border: transparent;
+  --yb-display-weight: 800;
 }
 
 html { font-size: var(--yb-font-size-base); }
@@ -83,7 +153,7 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Headings: bold, friendly. */
+/* Headings stay light — standard, not heavy. */
 h1, h2, h3, h4 {
   font-family: var(--yb-font-family-heading);
   font-weight: var(--yb-font-weight-bold);
@@ -118,7 +188,7 @@ a, button, input, select, textarea {
     background: var(--yb-color-primary);
     color: var(--yb-color-primary-fg);
   }
-  .btn-primary-flat:hover { background: color-mix(in srgb, var(--yb-color-primary) 88%, #000); }
+  .btn-primary-flat:hover { background: color-mix(in srgb, var(--yb-color-primary) 88%, #fff); }
   .btn-accent-flat {
     background: var(--yb-color-accent);
     color: #ffffff;
@@ -128,15 +198,17 @@ a, button, input, select, textarea {
 
 @layer utilities {
   /* No serif display face — the same standard sans, medium weight. */
-  .font-display { font-family: var(--yb-font-family-heading); font-weight: 800; letter-spacing: -0.015em; }
+  .font-display { font-family: var(--yb-font-family-heading); font-weight: var(--yb-display-weight, 600); letter-spacing: -0.01em; }
   .hairline { border: 1px solid var(--yb-color-border); }
   .text-accent-c { color: var(--yb-color-accent); }
   .elev-1 { box-shadow: var(--yb-shadow-sm); }
   .elev-2 { box-shadow: var(--yb-shadow-md); }
   .elev-3 { box-shadow: var(--yb-shadow-lg); }
   /* Subtle, flat hover — border emphasis, not lift/shadow theatrics. */
-  .lift { transition: box-shadow .18s ease, transform .18s ease, border-color .14s ease; }
-  .lift:hover { box-shadow: var(--yb-shadow-md); transform: translateY(-1px); }
+  .lift { transition: border-color .14s ease, background-color .14s ease, box-shadow .18s ease, transform .18s ease; }
+  .lift:hover { border-color: var(--yb-color-text-muted); }
+  /* The customer look lifts cards on soft shadows instead. */
+  .theme-customer .lift:hover { border-color: transparent; box-shadow: var(--yb-shadow-md); transform: translateY(-1px); }
   /* Journey pieces from the customer design: a soft floating card, the pink
      "from" and purple "to" ring dots joined by a dotted line, and a sheet that
      rises from the bottom with a big rounded top. */

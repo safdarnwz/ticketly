@@ -48,9 +48,9 @@ export function AppLayout() {
       <Sidebar />
       {drawer && (
         <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label="Menu">
-          <button type="button" aria-label="Close menu" className="absolute inset-0 bg-text/40 backdrop-blur-[2px]" onClick={() => setDrawer(false)} />
-          <aside className="absolute inset-y-0 left-0 flex w-[82%] max-w-[300px] flex-col rounded-r-[28px] bg-primary shadow-lg">
-            <button type="button" onClick={() => setDrawer(false)} aria-label="Close menu" className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/10">
+          <button type="button" aria-label="Close menu" className="absolute inset-0 bg-black/40" onClick={() => setDrawer(false)} />
+          <aside className="absolute inset-y-0 left-0 flex w-[82%] max-w-[300px] flex-col border-r border-border bg-surface shadow-lg">
+            <button type="button" onClick={() => setDrawer(false)} aria-label="Close menu" className="absolute right-3 top-3.5 flex h-9 w-9 items-center justify-center rounded-md text-text-muted hover:bg-surface-muted">
               <X className="h-5 w-5" />
             </button>
             <SidebarContent onNavigate={() => setDrawer(false)} />
@@ -67,13 +67,13 @@ export function AppLayout() {
           </div>
         </main>
         {tabs && (
-          <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(47,62,92,0.08)] backdrop-blur md:hidden">
+          <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden">
             <div className="mx-auto flex h-[64px] max-w-lg">
               {tabs.map(({ to, label, icon: Icon }) => (
-                <NavLink key={to} to={to} end={to === '/agent' || to === '/crew'} className={({ isActive }) => cn('flex flex-1 flex-col items-center justify-center gap-1 text-[10.5px] font-semibold', isActive ? 'text-accent' : 'text-text-muted')}>
+                <NavLink key={to} to={to} end={to === '/agent' || to === '/crew'} className={({ isActive }) => cn('flex flex-1 flex-col items-center justify-center gap-1 text-[10.5px] font-medium', isActive ? 'text-text' : 'text-text-muted')}>
                   {({ isActive }) => (
                     <>
-                      <span className={cn('flex h-7 w-11 items-center justify-center rounded-pill', isActive && 'bg-accent/10')}><Icon className="h-5 w-5" /></span>
+                      <span className={cn('flex h-7 w-11 items-center justify-center rounded-md', isActive && 'bg-surface-muted')}><Icon className={cn('h-5 w-5', isActive && 'text-accent')} /></span>
                       <span className="max-w-full truncate px-1">{label}</span>
                     </>
                   )}

@@ -77,7 +77,7 @@ export function PointChargesModal({ route, onClose }: { route: RouteRow | null; 
         <div className="flex flex-col gap-3">
           <p className="text-xs text-text-muted">Per seat, in rupees, added to the fare before GST. Coupons never discount them. Leave empty for no charge.</p>
           {stops.map((s) => (
-            <div key={s.stopId} className="grid grid-cols-1 items-start gap-2 rounded-2xl bg-surface-muted/60 p-3 sm:grid-cols-[1fr_140px_140px]">
+            <div key={s.stopId} className="grid grid-cols-1 items-start gap-2 rounded-md border border-border p-3 sm:grid-cols-[1fr_140px_140px]">
               <div className="pt-1 text-sm">
                 <div className="font-semibold text-text">{s.sequence + 1}. {s.name}</div>
                 <div className="text-xs text-text-muted">{[canBoard(s) && 'boarding', canDrop(s) && 'getting off'].filter(Boolean).join(' · ') || 'no boarding or getting off'}</div>

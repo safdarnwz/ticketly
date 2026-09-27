@@ -24,7 +24,7 @@ export function Table<T>({ columns, rows, onRowClick, empty }: {
           <thead>
             <tr className="border-b border-border bg-surface-muted/60">
               {columns.map((c) => (
-                <th key={c.key} className={cn('whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted max-sm:px-3', c.className)}>
+                <th key={c.key} className={cn('whitespace-nowrap px-4 py-3 text-left font-semibold text-text-muted max-sm:px-3', c.className)}>
                   {c.header}
                 </th>
               ))}

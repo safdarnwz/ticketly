@@ -98,12 +98,10 @@ function StaffDashboard() {
 
   return (
     <>
-      <div className="relative mb-6 overflow-hidden rounded-[24px] bg-primary p-6 text-primary-fg shadow-md sm:p-8">
-        <span aria-hidden className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-accent/40 blur-2xl" />
-        <span aria-hidden className="absolute -bottom-16 right-24 h-40 w-40 rounded-full bg-secondary/50 blur-2xl" />
-        <p className="relative text-sm font-medium text-white/70">Operator console</p>
-        <h1 className="relative mt-1 font-display text-2xl tracking-tight sm:text-3xl">{greeting()}{name ? `, ${name}` : ''}.</h1>
-        <p className="relative mt-2 max-w-lg text-[15px] text-white/70">Today’s departures, sales and cancellations — updated every 30 seconds.</p>
+      <div className="mb-6 rounded-card bg-primary p-7 text-primary-fg sm:p-8">
+        <p className="text-sm font-medium text-white/60">Operator console</p>
+        <h1 className="mt-1 font-display text-2xl tracking-tight sm:text-3xl">{greeting()}{name ? `, ${name}` : ''}.</h1>
+        <p className="mt-2 max-w-lg text-[15px] text-white/60">Today’s departures, sales and cancellations — updated every 30 seconds.</p>
       </div>
 
       {summary.isError ? <ErrorState error={summary.error} onRetry={summary.refetch} /> : (

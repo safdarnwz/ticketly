@@ -3,11 +3,18 @@ import { useQuery } from '@tanstack/react-query';
 
 import { appearanceApi } from '@/lib/api/platform';
 import { useAuth } from '@/stores/auth';
+import { isCustomer } from '@/lib/host';
 import { DEFAULT_THEME, themeToCssVars } from './defaultTheme';
 import type { Theme } from './types';
 import { ThemeContext } from './theme-context';
 
 
+
+// The customer storefront (people booking tickets) has its own look — the
+// `.theme-customer` tokens in index.css; operator, platform and staff consoles
+// keep the default black-and-white theme. On <body>, so dialogs and toasts
+// rendered outside a page layout get it too.
+if (isCustomer && typeof document !== 'undefined') document.body.classList.add('theme-customer');
 
 function applyVars(theme: Theme): void {
   const vars = themeToCssVars(theme);
