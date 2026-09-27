@@ -25,6 +25,20 @@ export interface RouteStopRef {
   id: StopId;
   name: string;
   sequence: number;
+  /** Extra per seat (paise) for boarding / getting off here; 0 = none. */
+  boardChargeMinor: number;
+  dropChargeMinor: number;
+}
+
+/** One stop's pickup / drop charges on a route, with what the stop allows. */
+export interface PointCharge {
+  stopId: StopId;
+  name: string;
+  sequence: number;
+  canBoard: boolean;
+  canAlight: boolean;
+  boardChargeMinor: number;
+  dropChargeMinor: number;
 }
 
 export interface RouteRecord {
@@ -194,7 +208,8 @@ export class RouteRepository {
       { namespace: CacheNamespace.ROUTE, ttlSeconds: CacheTtl.MASTER_DATA },
       () =>
         this.db.query<RouteStopRef>(
-          `SELECT rs.stop_id AS id, s.name, rs.sequence
+          `SELECT rs.stop_id AS id, s.name, rs.sequence,
+                  rs.board_charge_minor AS "boardChargeMinor", rs.drop_charge_minor AS "dropChargeMinor"
              FROM route_stops rs JOIN stops s ON s.id = rs.stop_id
             WHERE rs.route_id = $1 ORDER BY rs.sequence`,
           [routeId],
@@ -324,6 +339,66 @@ export class RouteRepository {
         return r.rows.map((x) => x.tenant_id);
       },
     );
+  }
+
+  /** Every stop of the route with its pickup / drop charge (the operator's own route only). */
+  async pointCharges(routeId: RouteId): Promise<PointCharge[]> {
+    return this.db.query<PointCharge>(
+      `SELECT rs.stop_id AS "stopId", s.name, rs.sequence, rs.can_board AS "canBoard", rs.can_alight AS "canAlight",
+              rs.board_charge_minor AS "boardChargeMinor", rs.drop_charge_minor AS "dropChargeMinor"
+         FROM route_stops rs JOIN stops s ON s.id = rs.stop_id
+        WHERE rs.tenant_id = $1 AND rs.route_id = $2 ORDER BY rs.sequence`,
+      [requireTenantId(), routeId],
+      { name: 'route.pointCharges', primary: true },
+    );
+  }
+
+  /** Set the charges of the stops given (others unchanged) and drop the cached stop list. */
+  async setPointCharges(
+    routeId: RouteId,
+    items: { stopId: StopId; boardChargeMinor: number; dropChargeMinor: number }[],
+  ): Promise<void> {
+    if (items.length === 0) return;
+    await this.db.execute_(
+      `UPDATE route_stops rs
+          SET board_charge_minor = x.board, drop_charge_minor = x.drop
+         FROM unnest($3::uuid[], $4::int[], $5::int[]) AS x(stop_id, board, drop)
+        WHERE rs.tenant_id = $1 AND rs.route_id = $2 AND rs.stop_id = x.stop_id`,
+      [
+        requireTenantId(),
+        routeId,
+        items.map((i) => i.stopId),
+        items.map((i) => i.boardChargeMinor),
+        items.map((i) => i.dropChargeMinor),
+      ],
+      { name: 'route.setPointCharges', primary: true },
+    );
+    await this.cache.invalidate(`stops:${routeId}`, CacheNamespace.ROUTE);
+  }
+
+  /** A duplicated route starts with the same pickup / drop charges. */
+  async copyPointCharges(fromRouteId: RouteId, toRouteId: RouteId): Promise<void> {
+    await this.db.execute_(
+      `UPDATE route_stops t
+          SET board_charge_minor = f.board_charge_minor, drop_charge_minor = f.drop_charge_minor
+         FROM route_stops f
+        WHERE t.tenant_id = $1 AND t.route_id = $3 AND f.route_id = $2 AND f.stop_id = t.stop_id`,
+      [requireTenantId(), fromRouteId, toRouteId],
+      { name: 'route.copyPointCharges', primary: true },
+    );
+  }
+
+  /** The per-seat charges for boarding at one stop and getting off at another. */
+  async chargesFor(
+    routeId: RouteId,
+    fromStopId: StopId,
+    toStopId: StopId,
+  ): Promise<{ boardMinor: number; dropMinor: number }> {
+    const stops = await this.stopsWithNames(routeId);
+    return {
+      boardMinor: stops.find((s) => s.id === fromStopId)?.boardChargeMinor ?? 0,
+      dropMinor: stops.find((s) => s.id === toStopId)?.dropChargeMinor ?? 0,
+    };
   }
 
   /** The route's stops in order with their timing offset and board/alight rules. */

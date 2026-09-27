@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, HttpCode } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  HttpCode,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 
 import { Permission } from '@contracts';
@@ -24,6 +35,8 @@ import {
   CreateStopSchema,
   CreateVehicleTypeSchema,
   DuplicateRouteSchema,
+  PointChargesSchema,
+  type PointChargesDto,
   ListRoutesQuerySchema,
   SeatMapSchema,
   UpdateStopSchema,
@@ -316,6 +329,25 @@ export class MasterDataController {
       totalDurationMin: route.path.totalDurationMin,
       timetable: route.path.timetable(),
       segments: route.path.segments(),
+    };
+  }
+
+  @Get('routes/:id/point-charges')
+  @RequirePermission(Permission.ROUTE_READ)
+  @ApiOperation({ summary: 'Pickup / drop charges per stop of a route (per seat, paise)' })
+  async pointCharges(@UuidParam('id') id: string) {
+    return { items: await this.routeService.pointCharges(id as RouteId) };
+  }
+
+  @Put('routes/:id/point-charges')
+  @RequirePermission(Permission.ROUTE_MANAGE)
+  @ApiOperation({ summary: 'Set pickup / drop charges for stops of a route (others unchanged)' })
+  async setPointCharges(
+    @UuidParam('id') id: string,
+    @Body(zodBody(PointChargesSchema)) dto: PointChargesDto,
+  ) {
+    return {
+      items: await this.routeService.setPointCharges(id as RouteId, dto.items as never),
     };
   }
 

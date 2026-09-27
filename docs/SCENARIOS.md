@@ -14,8 +14,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Backend status | Count |
 |---|---|
 | OPEN | 2711 |
-| DONE | 978 |
-| GAP | 287 |
+| DONE | 980 |
+| GAP | 285 |
 | CONFLICT | 76 |
 | INFRA | 20 |
 | DUP | 9 |
@@ -23,15 +23,15 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 | Frontend status | Count |
 |---|---|
-| — | 3100 |
-| DONE | 602 |
+| — | 3098 |
+| DONE | 604 |
 | TODO | 376 |
 | DUP | 9 |
 
 
 ## #1–#500
 
-CONFLICT 20, DONE 370, GAP 96, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 372, GAP 94, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -320,8 +320,8 @@ CONFLICT 20, DONE 370, GAP 96, INFRA 17, PROCESS 3
 | 283 | Configure round-trip discount percentage | GAP | — | verified manually: not built yet |
 | 284 | Manage master list of boarding points | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops → stops with km, running time, boarding/dropping points |
 | 285 | Manage master list of drop points | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops → stops with km, running time, boarding/dropping points |
-| 286 | Set additional charges for specific pickup points | GAP | — | verified manually: not built yet |
-| 287 | Set additional charges for specific drop points | GAP | — | verified manually: not built yet |
+| 286 | Set additional charges for specific pickup points | DONE | DONE | GET/PUT /master-data/routes/:id/point-charges; quote adds per-seat charge before GST, after coupon; trip stops show charges · UI: Routes → Point charges; seat page +₹ per point and in the estimate; checkout summary |
+| 287 | Set additional charges for specific drop points | DONE | DONE | GET/PUT /master-data/routes/:id/point-charges; quote adds per-seat charge before GST, after coupon; trip stops show charges · UI: Routes → Point charges; seat page +₹ per point and in the estimate; checkout summary |
 | 288 | Configure complete ladies special service rules | DONE | DONE | verified manually: existing module/API · UI: Schedule → service → Sales: women quota up to 100% (ladies special) |
 | 289 | Configure senior citizen concession percentage | DONE | DONE | verified manually: existing module/API · UI: Pricing → Concessions & booking rules |
 | 290 | Configure student concession percentage | DONE | DONE | verified manually: existing module/API · UI: Pricing → Concessions & booking rules |
@@ -786,7 +786,7 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 370, GAP 96, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 372, GAP 94, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -901,7 +901,7 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 370, GAP 96, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 372, GAP 94, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1016,7 +1016,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 370, GAP 96, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 372, GAP 94, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1111,7 +1111,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 370, GAP 96, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 372, GAP 94, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1226,7 +1226,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 370, GAP 96, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 372, GAP 94, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1301,7 +1301,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 370, GAP 96, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 372, GAP 94, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|

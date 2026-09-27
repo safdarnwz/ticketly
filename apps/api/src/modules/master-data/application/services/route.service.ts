@@ -1,13 +1,23 @@
 import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
-import { DomainError, ErrorCode, requireTenantId, type CityId, type RouteId } from '@kernel';
+import {
+  DomainError,
+  ErrorCode,
+  requireTenantId,
+  type CityId,
+  type RouteId,
+  type StopId,
+} from '@kernel';
 import { PlanQuotaService, QUOTA_KEYS } from '../../../entitlements';
 import { EventBus } from '@messaging';
 
 import { StopRepository } from '../../infrastructure/persistence/stop.repository';
 import type { RouteStopInput } from '../../routes/domain/route-path';
-import { RouteRepository } from '../../infrastructure/persistence/route.repository';
+import {
+  RouteRepository,
+  type PointCharge,
+} from '../../infrastructure/persistence/route.repository';
 
 /**
  * Route lifecycle service.
@@ -88,7 +98,7 @@ export class RouteService {
     const startMinute = source.path.originStartMinute;
     const hh = String(Math.floor(startMinute / 60)).padStart(2, '0');
     const mm = String(startMinute % 60).padStart(2, '0');
-    return this.create({
+    const copy = await this.create({
       code: newCode,
       name: newName,
       originCityId: source.originCityId,
@@ -96,5 +106,67 @@ export class RouteService {
       startTime: `${hh}:${mm}`,
       stops: source.path.toRouteStopInputs(),
     });
+    await this.uow.run({ name: 'route.duplicateCharges', tenantId: requireTenantId() }, () =>
+      this.routes.copyPointCharges(id, copy),
+    );
+    return copy;
+  }
+
+  /** The route's stops with their pickup / drop charges (404 for another operator's route). */
+  async pointCharges(id: RouteId): Promise<PointCharge[]> {
+    await this.routes.getById(id);
+    return this.routes.pointCharges(id);
+  }
+
+  /**
+   * Set pickup / drop charges (per seat, paise) for some stops of a route.
+   * Refused: an archived route, a stop not on the route, a stop named twice, a
+   * boarding charge where nobody can board (incl. the last stop) or a drop
+   * charge where nobody can get off (incl. the first stop).
+   */
+  async setPointCharges(
+    id: RouteId,
+    items: { stopId: StopId; boardChargeMinor: number; dropChargeMinor: number }[],
+  ): Promise<PointCharge[]> {
+    const route = await this.routes.getById(id);
+    if (route.status === 'archived') {
+      throw new DomainError(
+        ErrorCode.COMMON_VALIDATION,
+        'This route is archived — its charges cannot change',
+      );
+    }
+    const stops = await this.routes.pointCharges(id);
+    const byId = new Map(stops.map((s) => [s.stopId, s]));
+    const first = stops[0]?.sequence;
+    const last = stops[stops.length - 1]?.sequence;
+    const seen = new Set<string>();
+    for (const item of items) {
+      const stop = byId.get(item.stopId);
+      if (!stop)
+        throw new DomainError(
+          ErrorCode.COMMON_VALIDATION,
+          'A stop in the list is not on this route',
+        );
+      if (seen.has(item.stopId)) {
+        throw new DomainError(ErrorCode.COMMON_VALIDATION, `${stop.name} is listed twice`);
+      }
+      seen.add(item.stopId);
+      if (item.boardChargeMinor > 0 && (!stop.canBoard || stop.sequence === last)) {
+        throw new DomainError(
+          ErrorCode.COMMON_VALIDATION,
+          `Passengers cannot board at ${stop.name}`,
+        );
+      }
+      if (item.dropChargeMinor > 0 && (!stop.canAlight || stop.sequence === first)) {
+        throw new DomainError(
+          ErrorCode.COMMON_VALIDATION,
+          `Passengers cannot get off at ${stop.name}`,
+        );
+      }
+    }
+    await this.uow.run({ name: 'route.setPointCharges', tenantId: requireTenantId() }, () =>
+      this.routes.setPointCharges(id, items),
+    );
+    return this.routes.pointCharges(id);
   }
 }

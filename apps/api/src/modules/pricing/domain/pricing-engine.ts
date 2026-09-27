@@ -18,6 +18,7 @@ import { FareBreakup, type FareLine, type TaxComponent } from './fare-breakup';
  *   base
  *    → dynamic yield adjustment   (occupancy + advance-purchase multipliers)
  *    → coupon / discount          (percentage or flat, capped)
+ *    → pickup / drop charges      (flat per seat, never discounted)
  *    → GST                        (CGST+SGST intra-state, or IGST inter-state)
  *   = total
  *
@@ -86,6 +87,12 @@ export interface PriceRequest {
    * deliberate promotion). Omitted = no bounds (behaviour unchanged).
    */
   bounds?: { floorMinor?: number | null; ceilingMinor?: number | null };
+  /**
+   * Flat per-seat charges — a far pickup or a door-step drop — added AFTER any
+   * coupon (a coupon never discounts them) and BEFORE GST (they are part of the
+   * taxable fare). Zero amounts are ignored.
+   */
+  extras?: { label: string; amountMinor: number }[];
 }
 
 export class PricingEngine {
@@ -150,6 +157,20 @@ export class PricingEngine {
           kind: 'coupon',
           label: `Coupon ${req.coupon.code}`,
           amount: discount.negate(),
+        });
+      }
+    }
+
+    // ── 2b. pickup / drop charges ──
+    for (const x of req.extras ?? []) {
+      if (x.amountMinor < 0) {
+        throw new DomainError(ErrorCode.COMMON_VALIDATION, 'A charge cannot be negative');
+      }
+      if (x.amountMinor > 0) {
+        lines.push({
+          kind: 'surcharge',
+          label: x.label,
+          amount: Money.of(x.amountMinor, req.currency),
         });
       }
     }

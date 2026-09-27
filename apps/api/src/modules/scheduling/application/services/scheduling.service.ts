@@ -58,10 +58,19 @@ export class SchedulingService {
       this.routes.stopsWithNames(trip.routeId),
       this.trips.luggagePolicy(tripId),
     ]);
-    const nameOf = new Map(names.map((n) => [n.id, n.name]));
+    const byId = new Map(names.map((n) => [n.id, n]));
     return {
       trip,
-      stops: stops.map((s) => ({ ...s, name: nameOf.get(s.stopId) ?? null })),
+      // Each stop with the operator's per-seat pickup / drop charge there (0 = none).
+      stops: stops.map((s) => {
+        const ref = byId.get(s.stopId);
+        return {
+          ...s,
+          name: ref?.name ?? null,
+          boardChargeMinor: ref?.boardChargeMinor ?? 0,
+          dropChargeMinor: ref?.dropChargeMinor ?? 0,
+        };
+      }),
       /** What the operator lets a passenger carry free, and what more costs (null = not published). */
       luggage,
     };

@@ -180,3 +180,49 @@ describe('PricingEngine — negative & edge', () => {
     expect(b.total.minor).toBe(b.netFare.plus(b.taxTotal).minor);
   });
 });
+
+describe('PricingEngine — pickup / drop point charges', () => {
+  it('adds the charge to the taxable fare after the coupon, so the coupon never discounts it', () => {
+    const b = PricingEngine.price(
+      baseReq({
+        coupon: { code: 'TEN', kind: 'percent', value: 10 },
+        extras: [{ label: 'Pickup point charge', amountMinor: 5000 }],
+      }),
+    );
+    // ₹1000 − 10% = ₹900, + ₹50 pickup = ₹950 taxable; 5% GST = ₹47.50
+    expect(b.discountTotal.minor).toBe(10000);
+    expect(b.netFare.minor).toBe(95000);
+    expect(b.taxTotal.minor).toBe(4750);
+    expect(b.total.minor).toBe(99750);
+    expect(b.lines.find((l) => l.kind === 'surcharge')?.label).toBe('Pickup point charge');
+  });
+
+  it('ignores zero charges (no line)', () => {
+    const b = PricingEngine.price(
+      baseReq({ extras: [{ label: 'Drop point charge', amountMinor: 0 }] }),
+    );
+    expect(b.lines).toHaveLength(0);
+    expect(b.total.minor).toBe(105000);
+  });
+
+  it('adds a charge per seat when several seats are priced', () => {
+    const [a, c] = PricingEngine.priceManyDifferent(
+      {
+        currency: INR,
+        occupancyPct: 0,
+        daysToDeparture: 30,
+        tax: { gstRatePct: 5, interState: false },
+        extras: [{ label: 'Drop point charge', amountMinor: 2000 }],
+      },
+      [100000, 50000],
+    );
+    expect(a.netFare.minor).toBe(102000);
+    expect(c.netFare.minor).toBe(52000);
+  });
+
+  it('refuses a negative charge', () => {
+    expect(() =>
+      PricingEngine.price(baseReq({ extras: [{ label: 'x', amountMinor: -1 }] })),
+    ).toThrow(/cannot be negative/);
+  });
+});

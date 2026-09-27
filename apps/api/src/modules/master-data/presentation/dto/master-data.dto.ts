@@ -90,6 +90,22 @@ export const CreateRouteSchema = z.object({
 });
 export type CreateRouteDto = z.infer<typeof CreateRouteSchema>;
 
+/** Pickup / drop charges per seat, in paise (up to ₹1,000). */
+const chargeMinor = z.number().int().min(0).max(100000);
+export const PointChargesSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        stopId: uuid,
+        boardChargeMinor: chargeMinor.default(0),
+        dropChargeMinor: chargeMinor.default(0),
+      }),
+    )
+    .min(1)
+    .max(60),
+});
+export type PointChargesDto = z.infer<typeof PointChargesSchema>;
+
 export const DuplicateRouteSchema = z.object({
   code: z.string().trim().min(2).max(40),
   name: z.string().trim().min(2).max(160),

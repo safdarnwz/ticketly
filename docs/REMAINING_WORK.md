@@ -10,7 +10,7 @@ and the web app are DONE.
 | Backend DONE | 970 |
 | … and the web app DONE too (complete) | 597 |
 | Backend DONE, screen not built or not verified (frontend TODO) | 379 |
-| GAP — in scope, not built | 287 |
+| GAP — in scope, not built | 285 |
 | CONFLICT — contradicts an earlier decision (way-side cash, counter wallets…) | 77 |
 | INFRA / PROCESS — deployment or business practice, not app code | 26 |
 | OPEN — not reviewed yet (rows 1251 onward, mostly strategy and "should" statements) | 2716 |
@@ -37,7 +37,7 @@ and the web app are DONE.
 | Area (rows) | GAPs | Examples |
 |---|---|---|
 | Super admin (1–120) | 5 | per-operator colours (65, 66), offline sync rules (68), report templates / builder (73, 74) |
-| Operator admin settings (121–300) | 15 | surge pricing rule (232), auto seat assignment (248, 249), pickup / drop surcharges (286, 287), Excel schedule upload (268) |
+| Operator admin settings (121–300) | 13 | surge pricing rule (232), auto seat assignment (248, 249), round-trip discount (283), Excel schedule upload (268) |
 | Operator finance & agents (301–350) | 32 | agent ranking / incentives / penalties (302–305), agent tax invoice and TDS (310, 311), branch targets and expense approval (316–321), receivables / OTA payables / settlement matching (326–329), GST and TDS return data (330, 331), cash-flow and budget alerts (342–344), month-end pack (349) |
 | Branch (351–480) | 40 | branch dashboard and day-end report (351, 352, 381, 382), occupancy / revenue trends (383–385), group / corporate booking handling (396, 397, 436–438), watch list (461) |
 | Agent (481–550) | 25 | wallet recharge (484–486), ticket PDF / share (503, 504), date change (512–514), group / quota bookings (523–526), own performance (536–538), saved routes / passengers, profile and bank (542–546) |
@@ -60,6 +60,6 @@ screens.
 1. Decide offline mode and way-side cash (73 GAP + 77 CONFLICT rows hang on it).
 2. Operator finance pack: agent tax invoice / TDS, GST and TDS return data, receivables and OTA
    settlement matching (326–331).
-3. Operator settings still missing: surcharges, surge pricing, round-trip discount,
+3. Operator settings still missing: surge pricing, round-trip discount,
    automatic seat assignment.
 4. Review the OPEN rows (1251+) and mark them DONE / GAP / out of scope.

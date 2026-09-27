@@ -29,6 +29,8 @@ export interface Quote {
   perSeat: Record<string, unknown>;
   /** Per-seat breakdown when seatNumbers were provided — empty when only a seatCount was given (no specific seats known yet, e.g. some OTA integrations). */
   seatFares: { seatNumber: string; totalMinor: number }[];
+  /** Per-seat pickup / drop charges included in the fare (before GST); 0 = none. */
+  pointCharges: { boardMinor: number; dropMinor: number };
   totalMinor: number;
   currency: string;
   expiresAt: string;
@@ -161,6 +163,12 @@ export class PricingService {
     const adjustedBaseFares =
       pct === 0 ? baseFaresMinor : baseFaresMinor.map((f) => applyAdjustment(f, pct));
     const routePricing = await this.fares.routePricing(trip.routeId);
+    // Operator's extra for this boarding / dropping point (per seat, taxed, never discounted).
+    const pointCharges = await this.routes.chargesFor(
+      trip.routeId,
+      input.fromStopId,
+      input.toStopId,
+    );
     const interState = await this.routes.isInterState(trip.routeId);
     const occupancyPct =
       trip.totalSeats > 0 ? Math.round(((trip.totalSeats - available) / trip.totalSeats) * 100) : 0;
@@ -186,6 +194,10 @@ export class PricingService {
         controls.floorMinor !== null || controls.ceilingMinor !== null
           ? { floorMinor: controls.floorMinor, ceilingMinor: controls.ceilingMinor }
           : undefined,
+      extras: [
+        { label: 'Pickup point charge', amountMinor: pointCharges.boardMinor },
+        { label: 'Drop point charge', amountMinor: pointCharges.dropMinor },
+      ],
     };
     const breakups = PricingEngine.priceManyDifferent(reqTemplate, adjustedBaseFares);
 
@@ -213,6 +225,7 @@ export class PricingService {
         seatNumber: s,
         totalMinor: breakups[i].total.minor,
       })),
+      pointCharges,
       totalMinor,
       currency: fare.currency,
       expiresAt: new Date(Date.now() + PricingService.QUOTE_TTL_SECONDS * 1000).toISOString(),

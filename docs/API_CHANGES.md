@@ -506,3 +506,10 @@ an unknown id is now 404 (was 200).
   slate-navy primary `#3F5475`, pink accent `#F0628F`, purple secondary `#7B4FB3`, sky-blue info `#2BA8F0`,
   background `#F4F6FB`, Nunito Sans, rounder corners (12 / 18 / 24) and soft shadows. The e-ticket (page and email),
   the GST invoice (email and PDF) and notification emails use the same colours (`BRAND_PALETTE` in the kernel).
+- **Pickup / drop point charges:** new `GET /master-data/routes/:id/point-charges` and
+  `PUT /master-data/routes/:id/point-charges {items: [{stopId, boardChargeMinor 0–100000, dropChargeMinor 0–100000}]}`
+  (per seat, paise; stops not listed keep theirs). 422 for an archived route, a stop not on the route, a stop listed
+  twice, a pickup charge where nobody can board (incl. the last stop) or a drop charge where nobody can get off (incl.
+  the first stop); 404 for another operator's route. A duplicated route keeps the charges. `POST /pricing/quote` adds
+  them per seat after any coupon and before GST (fare lines "Pickup point charge" / "Drop point charge") and returns
+  `pointCharges {boardMinor, dropMinor}`; `GET /scheduling/trips/:id` stops add `boardChargeMinor`, `dropChargeMinor`.
