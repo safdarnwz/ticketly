@@ -246,19 +246,22 @@ export function CheckoutPage() {
   const discount = b.couponSavingMinor ?? 0;
 
   const summary = (
-    <Card className="sticky top-20">
+    <Card className="lg:sticky lg:top-20">
       <CardHeader title="Booking summary" />
       <CardBody className="flex flex-col gap-3 text-sm">
         <div>
-          <div className="font-semibold text-text">{trip.operatorName}</div>
+          <div className="font-display text-base text-text">{trip.operatorName}</div>
           <div className="text-xs text-text-muted">
             {formatDateLabel(localDateOf(trip.departsAt), { weekday: 'short', day: '2-digit', month: 'short' })} · {SEAT_TYPE_LABEL[b.seatType ?? ''] ?? b.seatType}
           </div>
         </div>
         {b.points && (
-          <div className="rounded-md bg-surface-muted p-3 text-xs">
-            <div><b>{formatTime(b.points.fromAt)}</b> {b.points.from}</div>
-            <div className="mt-1"><b>{formatTime(b.points.toAt)}</b> {b.points.to}</div>
+          <div className="flex gap-3 rounded-2xl bg-surface-muted p-3 text-xs">
+            <div className="flex flex-col items-center py-0.5"><span className="dot-from !h-2.5 !w-2.5" /><span className="dot-line my-0.5 flex-1" /><span className="dot-to !h-2.5 !w-2.5" /></div>
+            <div className="flex flex-col gap-2">
+              <div><b className="text-sm">{formatTime(b.points.fromAt)}</b> <span className="text-text-muted">{b.points.from}</span></div>
+              <div><b className="text-sm">{formatTime(b.points.toAt)}</b> <span className="text-text-muted">{b.points.to}</span></div>
+            </div>
           </div>
         )}
         <div className="flex justify-between"><span className="text-text-muted">Seats</span><span className="font-medium">{b.seatNumbers.join(', ')}</span></div>
@@ -268,9 +271,9 @@ export function CheckoutPage() {
           <div className="flex justify-between text-success"><span>Concessions</span><span>− {formatMoney(quote.totalMinor - hold.totalMinor, currency)}</span></div>
         )}
         {addonTotal > 0 && <div className="flex justify-between"><span className="text-text-muted">Add-ons (incl. GST)</span><span>{formatMoney(addonTotal, currency)}</span></div>}
-        <div className="flex justify-between border-t border-border pt-3 text-base font-semibold">
+        <div className="flex items-baseline justify-between border-t border-border pt-3 text-base font-semibold">
           <span>{hold ? 'Total to pay' : 'Estimated total'}</span>
-          <span>{formatMoney(hold ? payable : quote.totalMinor, currency)}</span>
+          <span className="font-display text-xl text-price">{formatMoney(hold ? payable : quote.totalMinor, currency)}</span>
         </div>
       </CardBody>
     </Card>
@@ -291,13 +294,19 @@ export function CheckoutPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-10 pt-4">
-      <ol className="mb-4 flex items-center gap-2 text-xs font-medium text-text-muted" aria-label="Checkout steps">
+      <ol className="mb-5 grid grid-cols-3 gap-2 text-[11px] font-semibold sm:text-xs" aria-label="Checkout steps">
         <li>
           {/* Going back gives up the hold (the seat page releases it). Not while a payment is in flight. */}
-          <button type="button" onClick={reselect} disabled={paying} className="text-text underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50">1. Seats (change)</button>
-        </li><li>›</li>
-        <li className={cn(!hold && 'text-primary')}>2. Passengers</li><li>›</li>
-        <li className={cn(hold && 'text-primary')}>3. Add-ons & payment</li>
+          <button type="button" onClick={reselect} disabled={paying} className="flex w-full flex-col gap-1.5 text-left text-text-muted hover:text-text disabled:cursor-not-allowed disabled:opacity-50">
+            <span className="h-1.5 rounded-pill bg-accent" />Seats · change
+          </button>
+        </li>
+        <li className={cn('flex flex-col gap-1.5', !hold ? 'text-text' : 'text-text-muted')} aria-current={!hold ? 'step' : undefined}>
+          <span className="h-1.5 rounded-pill bg-accent" />Passengers
+        </li>
+        <li className={cn('flex flex-col gap-1.5', hold ? 'text-text' : 'text-text-muted')} aria-current={hold ? 'step' : undefined}>
+          <span className={cn('h-1.5 rounded-pill', hold ? 'bg-accent' : 'bg-border')} />Add-ons & payment
+        </li>
       </ol>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -310,7 +319,7 @@ export function CheckoutPage() {
                   {rules.isLoading ? <Skeleton className="h-32" /> : passengers.map((p, i) => {
                     const rule = concessions.find((c) => c.category === p.category);
                     return (
-                      <div key={p.seatNumber} className="rounded-md border border-border p-3">
+                      <div key={p.seatNumber} className="rounded-2xl bg-surface-muted/60 p-4">
                         <div className="mb-2 flex items-center justify-between text-sm">
                           <span className="font-semibold text-text">Passenger {i + 1} · Seat {p.seatNumber}</span>
                           {(b.ladiesSeats ?? []).includes(p.seatNumber) && <span className="rounded bg-pink-50 px-1.5 py-0.5 text-xs text-pink-700">Ladies seat</span>}
@@ -404,7 +413,7 @@ export function CheckoutPage() {
                 </div>
               )}
 
-              <Button size="lg" onClick={() => void holdSeats()} loading={holding} disabled={couponBusy || (signingIn && !token)}>
+              <Button size="lg" className="rounded-pill" onClick={() => void holdSeats()} loading={holding} disabled={couponBusy || (signingIn && !token)}>
                 Continue to payment
               </Button>
             </>
@@ -421,7 +430,7 @@ export function CheckoutPage() {
                     const qty = addons[a.id] ?? 0;
                     const max = a.perPassenger ? seatCount : 5;
                     return (
-                      <div key={a.id} className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
+                      <div key={a.id} className="flex items-center justify-between gap-3 rounded-2xl bg-surface-muted/60 px-4 py-3">
                         <div>
                           <div className="text-sm font-medium text-text">{a.name}</div>
                           <div className="text-xs text-text-muted">{formatMoney(a.priceMinor, currency)} {a.perPassenger ? 'per passenger' : 'each'} + GST</div>
@@ -464,6 +473,7 @@ export function CheckoutPage() {
               {payError && <p role="alert" className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{payError}</p>}
               <Button
                 size="lg"
+                className="rounded-pill"
                 onClick={() => void pay()}
                 loading={paying}
                 disabled={!terms || addonBusy || (!realGateway && !instrument)}
@@ -475,7 +485,7 @@ export function CheckoutPage() {
             </>
           )}
         </div>
-        <div>{summary}</div>
+        <div className="order-first lg:order-none">{summary}</div>
       </div>
     </div>
   );

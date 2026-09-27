@@ -6,10 +6,50 @@ import { Search, Ticket, Phone, List, ChevronRight } from 'lucide-react';
 import { Button, Card, CardBody, Input, Badge, statusTone, useToast, EmptyState, ErrorState, PageLoader } from '@/components/ui';
 import { bookingsApi } from '@/lib/api/bookings';
 import { useAuth } from '@/stores/auth';
-import { formatDateTime, formatMoney, cn } from '@/lib/utils';
+import { formatMoney, formatTime, cn } from '@/lib/utils';
+import type { Booking } from '@/lib/api/types';
 import { rememberManageMobile } from '@/lib/manageMobile';
 
 type Mode = 'pnr' | 'mine';
+
+const INACTIVE = new Set(['cancelled', 'expired', 'refunded', 'failed']);
+/** Upcoming trips (soonest first), then past and cancelled ones (latest first). */
+function splitTrips(list: Booking[]): [string, Booking[]][] {
+  const now = Date.now();
+  const at = (b: Booking) => (b.departsAt ? Date.parse(b.departsAt) : 0);
+  const upcoming = list.filter((b) => at(b) >= now && !INACTIVE.has(b.status)).sort((x, y) => at(x) - at(y));
+  const rest = list.filter((b) => !upcoming.includes(b)).sort((x, y) => at(y) - at(x));
+  return [['Upcoming', upcoming], ['Past & cancelled', rest]];
+}
+
+/** One trip: a date block (month, big day) and the journey with its ring dots. */
+function TripRow({ bk, highlight }: { bk: Booking; highlight: boolean }) {
+  const d = bk.departsAt ? new Date(bk.departsAt) : null;
+  const month = d ? new Intl.DateTimeFormat('en-IN', { month: 'short', timeZone: 'Asia/Kolkata' }).format(d) : '';
+  const day = d ? new Intl.DateTimeFormat('en-IN', { day: 'numeric', timeZone: 'Asia/Kolkata' }).format(d) : '—';
+  const [from, to] = bk.fromName && bk.toName ? [bk.fromName, bk.toName] : (bk.routeName ?? '').split(/\s*(?:→|->|-)\s*/);
+  return (
+    <Link to={`/bookings/${bk.id}/manage`} className="block">
+      <div className={cn('flex items-stretch gap-4 rounded-[20px] p-3 pr-4 transition hover:-translate-y-0.5', highlight ? 'bg-surface shadow-md' : 'bg-surface shadow-sm')}>
+        <div className={cn('flex w-[68px] shrink-0 flex-col items-center justify-center rounded-2xl', highlight ? 'bg-accent text-white' : 'bg-surface-muted text-text')}>
+          <span className={cn('text-[11px] font-semibold', !highlight && 'text-text-muted')}>{month}</span>
+          <span className="font-display text-[28px] leading-none">{day}</span>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 py-1">
+          <span className="flex items-center gap-2 text-sm font-semibold text-text"><span className="dot-from !h-2.5 !w-2.5" /><span className="truncate">{from || `PNR ${bk.pnr}`}</span></span>
+          {to && <span className="flex items-center gap-2 text-sm font-semibold text-text"><span className="dot-to !h-2.5 !w-2.5" /><span className="truncate">{to}</span></span>}
+          <span className="truncate text-[11px] text-text-muted">
+            {d ? `${formatTime(bk.departsAt!)} · ` : ''}{bk.operatorName ? `${bk.operatorName} · ` : ''}PNR {bk.pnr} · {bk.seatCount} seat{bk.seatCount === 1 ? '' : 's'}
+          </span>
+        </div>
+        <div className="flex shrink-0 flex-col items-end justify-between py-1">
+          <Badge tone={statusTone(bk.status)}>{bk.status}</Badge>
+          <span className="flex items-center gap-1 font-display text-base text-price">{formatMoney(bk.totalMinor, bk.currency)}<ChevronRight className="h-4 w-4 text-text-muted" /></span>
+        </div>
+      </div>
+    </Link>
+  );
+}
 
 /**
  * "My trips": find one booking by PNR + the mobile it was booked with, or —
@@ -47,17 +87,17 @@ export function AccountPage() {
 
   const tab = (m: Mode, label: string, Icon: typeof Ticket) => (
     <button type="button" onClick={() => setMode(m)} aria-pressed={mode === m}
-      className={cn('flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium', mode === m ? 'border-primary bg-surface-muted text-text' : 'border-border text-text-muted')}>
+      className={cn('flex items-center gap-1.5 rounded-pill px-3.5 py-1.5 text-xs font-semibold transition', mode === m ? 'bg-surface text-text shadow-sm' : 'text-text-muted hover:text-text')}>
       <Icon className="h-3.5 w-3.5" /> {label}
     </button>
   );
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="mb-1 text-2xl font-semibold text-text">My trips</h1>
+    <div className="mx-auto max-w-2xl px-4 py-6 sm:py-10">
+      <h1 className="mb-1 font-display text-3xl text-text">My trips</h1>
       <p className="mb-6 text-sm text-text-muted">Download your ticket, change the date or seats, cancel, track your bus.</p>
 
-      <div className="mb-4 flex gap-2">
+      <div className="mb-5 inline-flex gap-1 rounded-pill bg-surface-muted p-1">
         {tab('mine', 'All my bookings', List)}
         {tab('pnr', 'Find by PNR', Ticket)}
       </div>
@@ -79,21 +119,14 @@ export function AccountPage() {
       ) : mine.isLoading ? <PageLoader /> : mine.isError ? <ErrorState error={mine.error} onRetry={mine.refetch} /> : (mine.data?.bookings.length ?? 0) === 0 ? (
         <EmptyState title="No trips yet" description="Bookings made while signed in show up here." icon={<List className="h-10 w-10" />} action={<Link to="/"><Button>Book a bus</Button></Link>} />
       ) : (
-        <div className="flex flex-col gap-3">
-          {mine.data!.bookings.map((bk) => (
-            <Link key={bk.id} to={`/bookings/${bk.id}/manage`}>
-              <Card className="hover:border-primary/40">
-                <CardBody className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate font-semibold text-text">{bk.routeName ?? `PNR ${bk.pnr}`}</div>
-                    <div className="text-xs text-text-muted">
-                      {bk.departsAt ? `${formatDateTime(bk.departsAt)} · ` : ''}{bk.operatorName ? `${bk.operatorName} · ` : ''}PNR {bk.pnr} · {bk.seatCount} seat{bk.seatCount === 1 ? '' : 's'} · {formatMoney(bk.totalMinor, bk.currency)}
-                    </div>
-                  </div>
-                  <span className="flex items-center gap-2"><Badge tone={statusTone(bk.status)}>{bk.status}</Badge><ChevronRight className="h-4 w-4 text-text-muted" /></span>
-                </CardBody>
-              </Card>
-            </Link>
+        <div className="flex flex-col gap-6">
+          {splitTrips(mine.data!.bookings).map(([title, list]) => list.length > 0 && (
+            <section key={title}>
+              <h2 className="mb-3 font-display text-lg text-text">{title}</h2>
+              <div className="flex flex-col gap-3">
+                {list.map((bk, i) => <TripRow key={bk.id} bk={bk} highlight={title === 'Upcoming' && i === 0} />)}
+              </div>
+            </section>
           ))}
         </div>
       )}

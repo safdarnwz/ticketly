@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Clock, Star } from 'lucide-react';
+import { Clock, Star } from 'lucide-react';
 
 import { Button, Card, CardBody, CardHeader } from '@/components/ui';
 import { LuggageNote } from '@/components/customer/LuggageNote';
@@ -84,28 +84,28 @@ export function TripPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-10 pt-4">
-      <Card className="mb-4">
-        <CardBody className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-lg font-semibold text-text">{trip.operatorName}</div>
-            <div className="text-sm text-text-muted">
-              {trip.seatTypes.map((t) => SEAT_TYPE_LABEL[t] ?? t).join(' · ')} ·{' '}
-              {formatDateLabel(localDateOf(trip.departsAt), { weekday: 'short', day: '2-digit', month: 'short' })}
-            </div>
-          </div>
-          <div className="flex items-center gap-3 text-sm text-text">
-            <b>{formatTime(trip.departsAt)}</b>
-            <span className="flex items-center gap-1 text-xs text-text-muted"><Clock className="h-3 w-3" />{minutesToHm(trip.durationMin)}</span>
-            <ArrowRight className="h-4 w-4 text-text-muted" />
-            <b>{formatTime(trip.arrivesAt)}</b>
+      {/* Trip header: operator, then the journey with ring dots and times. */}
+      <section className="soft-card mb-4 flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="truncate font-display text-xl text-text">{trip.operatorName}</span>
             {trip.rating !== null && (
-              <span className="ml-2 inline-flex items-center gap-1 rounded bg-success px-1.5 py-0.5 text-xs font-semibold text-white">
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-pill bg-success px-2 py-0.5 text-xs font-bold text-white">
                 <Star className="h-3 w-3 fill-current" /> {trip.rating.toFixed(1)}
               </span>
             )}
           </div>
-        </CardBody>
-      </Card>
+          <div className="text-sm text-text-muted">
+            {trip.seatTypes.map((t) => SEAT_TYPE_LABEL[t] ?? t).join(' · ')} ·{' '}
+            {formatDateLabel(localDateOf(trip.departsAt), { weekday: 'long', day: '2-digit', month: 'short' })}
+          </div>
+        </div>
+        <div className="flex items-center gap-3 rounded-2xl bg-surface-muted px-4 py-3 text-text">
+          <span className="flex flex-col"><span className="flex items-center gap-1.5 text-lg font-bold"><span className="dot-from !h-2.5 !w-2.5" />{formatTime(trip.departsAt)}</span><span className="max-w-[120px] truncate text-[11px] text-text-muted">{trip.boardingStop.name}</span></span>
+          <span className="flex flex-col items-center px-1 text-[11px] font-semibold text-secondary"><Clock className="mb-0.5 h-3.5 w-3.5" />{minutesToHm(trip.durationMin)}</span>
+          <span className="flex flex-col"><span className="flex items-center gap-1.5 text-lg font-bold"><span className="dot-to !h-2.5 !w-2.5" />{formatTime(trip.arrivesAt)}</span><span className="max-w-[120px] truncate text-[11px] text-text-muted">{trip.droppingStop.name}</span></span>
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
@@ -125,11 +125,11 @@ export function TripPage() {
         </div>
 
         <div>
-          <Card className="sticky top-20">
+          <Card className="sticky top-20" id="journey-summary">
             <CardHeader title="Your journey" />
             <CardBody className="flex flex-col gap-3 text-sm">
               {sel.fromStop && sel.toStop ? (
-                <div className="rounded-md bg-surface-muted p-3">
+                <div className="rounded-2xl bg-surface-muted p-3">
                   <div className="flex justify-between"><span className="text-text-muted">Boarding</span><span className="text-right font-medium">{sel.fromStop.name}<br /><span className="text-xs text-text-muted">{formatTime(sel.fromStop.departsAt)}</span></span></div>
                   <div className="mt-2 flex justify-between"><span className="text-text-muted">Dropping</span><span className="text-right font-medium">{sel.toStop.name}<br /><span className="text-xs text-text-muted">{formatTime(sel.toStop.arrivesAt)}</span></span></div>
                 </div>
@@ -146,7 +146,7 @@ export function TripPage() {
               )}
               <div className="flex justify-between border-t border-border pt-3 text-base">
                 <span className="font-semibold">Fare</span>
-                <span className="font-semibold">{sel.seats.length ? formatMoney(estimate, trip.currency) : '—'}</span>
+                <span className="font-display text-xl text-price">{sel.seats.length ? formatMoney(estimate, trip.currency) : '—'}</span>
               </div>
               <p className="-mt-2 text-[11px] text-text-muted">Includes GST. Final price is confirmed on the next step.</p>
               <LuggageNote tripId={trip.tripId} />
@@ -154,6 +154,7 @@ export function TripPage() {
               <Button
                 fullWidth
                 size="lg"
+                className="rounded-pill"
                 loading={quote.isPending}
                 disabled={!canContinue}
                 onClick={() => {
@@ -168,6 +169,28 @@ export function TripPage() {
           </Card>
         </div>
       </div>
+      {/* Phones: a bar above the tab bar with the seats, the fare and Continue. */}
+      {sel.seats.length > 0 && (
+        <div className="fixed inset-x-3 bottom-[76px] sm:bottom-4 z-40 flex items-center gap-3 rounded-[24px] bg-primary px-4 py-3 text-primary-fg shadow-lg lg:hidden">
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-xs opacity-80">Seat{sel.seats.length > 1 ? 's' : ''} {sel.seats.map((s) => s.seatNumber).join(', ')}</div>
+            <div className="font-display text-lg">{formatMoney(estimate, trip.currency)}</div>
+          </div>
+          <button
+            type="button"
+            disabled={!canContinue}
+            onClick={() => {
+              if (busy.current) return;
+              busy.current = true;
+              quote.mutate();
+            }}
+            className="rounded-pill bg-accent px-5 py-2.5 text-sm font-bold text-white shadow-md disabled:opacity-60"
+          >
+            {quote.isPending ? 'Pricing…' : 'Continue'}
+          </button>
+        </div>
+      )}
+      {error && sel.seats.length > 0 && <p role="alert" className="fixed inset-x-3 bottom-[148px] sm:bottom-[88px] z-40 rounded-2xl bg-danger px-4 py-2 text-xs text-white shadow-md lg:hidden">{error}</p>}
     </div>
   );
 }

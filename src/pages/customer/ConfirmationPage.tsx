@@ -54,19 +54,35 @@ export function ConfirmationPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 pb-12 pt-6">
-      <div className="mb-6 flex items-center gap-3">
-        <CheckCircle2 className="h-9 w-9 text-success" />
-        <div>
-          <h1 className="text-2xl font-semibold text-text">Booking confirmed</h1>
-          <p className="flex items-center gap-2 text-sm text-text-muted">
-            PNR <b className="text-text">{b.pnr}</b>
-            <button type="button" onClick={() => void copyPnr()} aria-label="Copy PNR" className="rounded p-0.5 hover:bg-surface-muted"><Copy className="h-3.5 w-3.5" /></button>
-          </p>
+      {/* A ticket-like banner: confirmed, the PNR to copy, and the journey. */}
+      <div className="relative mb-6 overflow-hidden rounded-[28px] bg-gradient-to-br from-accent to-secondary p-6 text-white shadow-lg">
+        <div className="flex items-center gap-3">
+          <CheckCircle2 className="h-9 w-9 shrink-0" />
+          <div className="min-w-0">
+            <h1 className="font-display text-2xl">Booking confirmed</h1>
+            <p className="flex items-center gap-2 text-sm text-white/85">
+              PNR <b className="font-mono text-base tracking-wider text-white">{b.pnr}</b>
+              <button type="button" onClick={() => void copyPnr()} aria-label="Copy PNR" className="rounded-full p-1 hover:bg-white/20"><Copy className="h-3.5 w-3.5" /></button>
+            </p>
+          </div>
         </div>
+        {b.points && (
+          <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl bg-white/15 px-4 py-3">
+            <div className="min-w-0"><div className="font-display text-xl">{formatTime(b.points.fromAt)}</div><div className="truncate text-xs text-white/85">{b.points.from}</div></div>
+            <div className="h-px flex-1 border-t border-dashed border-white/60" />
+            <div className="min-w-0 text-right"><div className="font-display text-xl">{formatTime(b.points.toAt)}</div><div className="truncate text-xs text-white/85">{b.points.to}</div></div>
+          </div>
+        )}
+        {b.points && (
+          <>
+            <span aria-hidden className="absolute -left-4 bottom-[74px] h-8 w-8 rounded-full bg-bg" />
+            <span aria-hidden className="absolute -right-4 bottom-[74px] h-8 w-8 rounded-full bg-bg" />
+          </>
+        )}
       </div>
 
       {b.pendingReturn && (
-        <Card className="mb-4 border-primary/40">
+        <Card className="mb-4 ring-2 ring-accent/40">
           <CardBody className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm">
               <div className="font-semibold text-text">Now book your return</div>
@@ -96,9 +112,9 @@ export function ConfirmationPage() {
               ))}
             </div>
             {b.contactEmail ? (
-              <p className="flex items-center gap-2 rounded-md bg-surface-muted px-3 py-2 text-xs text-text-muted"><Mail className="h-3.5 w-3.5" /> Ticket and GST invoice are emailed to {b.contactEmail}</p>
+              <p className="flex items-center gap-2 rounded-2xl bg-surface-muted px-3 py-2 text-xs text-text-muted"><Mail className="h-3.5 w-3.5" /> Ticket and GST invoice are emailed to {b.contactEmail}</p>
             ) : (
-              <p className="rounded-md bg-surface-muted px-3 py-2 text-xs text-text-muted">No email given — save or print your ticket below. Updates come by SMS to {b.contactPhone}.</p>
+              <p className="rounded-2xl bg-surface-muted px-3 py-2 text-xs text-text-muted">No email given — save or print your ticket below. Updates come by SMS to {b.contactPhone}.</p>
             )}
           </CardBody>
         </Card>
@@ -117,8 +133,8 @@ export function ConfirmationPage() {
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">
-        <Button variant="outline" leftIcon={<RotateCcw className="h-4 w-4" />} onClick={bookAnother}>Book another trip</Button>
-        <Button onClick={() => {
+        <Button variant="outline" className="flex-1 rounded-pill sm:flex-none" leftIcon={<RotateCcw className="h-4 w-4" />} onClick={bookAnother}>Book another trip</Button>
+        <Button className="flex-1 rounded-pill sm:flex-none" onClick={() => {
           if (mobile) rememberManageMobile(b.bookingId!, mobile);
           navigate(`/bookings/${b.bookingId}/manage`, { state: { mobile } });
         }}>Manage booking</Button>
