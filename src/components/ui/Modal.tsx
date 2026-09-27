@@ -29,23 +29,25 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+    // Phones: a sheet rising from the bottom; larger screens: a centred dialog.
+    <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center sm:p-4">
+      <div className="absolute inset-0 bg-text/40 backdrop-blur-[2px]" onClick={onClose} />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
-        className={cn('relative w-full bg-surface', sizes[size])}
-        style={{ borderRadius: 'var(--yb-modal-radius)', boxShadow: 'var(--yb-modal-shadow)' }}
+        className={cn('relative w-full rounded-t-[28px] bg-surface pb-[env(safe-area-inset-bottom)] sm:rounded-[var(--yb-modal-radius)] sm:pb-0', sizes[size])}
+        style={{ boxShadow: 'var(--yb-modal-shadow)' }}
       >
+        <span aria-hidden className="mx-auto mt-2 block h-1.5 w-10 rounded-pill bg-border sm:hidden" />
         <div className="flex items-center justify-between border-b border-border p-4">
-          <h3 id={titleId} className="text-base font-semibold text-text">{title}</h3>
+          <h3 id={titleId} className="font-display text-base text-text">{title}</h3>
           <button type="button" aria-label="Close" onClick={onClose} className="rounded-md p-1 text-text-muted hover:bg-surface-muted focus-ring">
             <X className="h-5 w-5" />
           </button>
         </div>
         <div className="max-h-[70vh] overflow-auto p-4">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-border p-4">{footer}</div>}
+        {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-border p-4">{footer}</div>}
       </div>
     </div>
   );

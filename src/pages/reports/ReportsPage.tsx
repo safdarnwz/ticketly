@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { TrendingUp, Download, BarChart3, XCircle, Clock, IndianRupee, Timer, LineChart, BookOpen } from 'lucide-react';
 
-import { Button, Card, CardBody, Input, Table, type Column, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
+import { Button, Card, CardBody, Input, Table, type Column, PageLoader, ErrorState, EmptyState, useToast, TabBar } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { authApi } from '@/lib/api/auth';
 import { reportsApi } from '@/lib/api/reports';
@@ -50,8 +50,7 @@ export function ReportsPage() {
         <span className="ml-auto text-xs text-text-muted">Figures refresh every few minutes</span>
       </div>
 
-      <div className="mb-6 flex flex-wrap gap-2 border-b border-border">
-        {([
+      <TabBar className="mb-6" value={tab} onChange={setTab} items={[
           { key: 'revenue', label: 'Revenue', icon: TrendingUp },
           { key: 'occupancy', label: 'Occupancy', icon: BarChart3 },
           { key: 'routes', label: 'Route Performance', icon: BarChart3 },
@@ -61,13 +60,7 @@ export function ReportsPage() {
           { key: 'dispatch', label: 'Dispatch', icon: Timer },
           { key: 'forecast', label: 'Forecast', icon: LineChart },
           ...(canLedger ? [{ key: 'ledger', label: 'Ledger', icon: BookOpen }] as const : []),
-        ] as const).map(({ key, label, icon: Icon }) => (
-          <button key={key} onClick={() => setTab(key)}
-            className={cn('flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium', tab === key ? 'border-primary text-text' : 'border-transparent text-text-muted hover:text-text')}>
-            <Icon className="h-4 w-4" /> {label}
-          </button>
-        ))}
-      </div>
+        ] as const} />
 
       {rangeError && tab !== 'routes' && tab !== 'forecast' ? <EmptyState title="Pick a valid period" description={rangeError} /> : (
         <>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, MapPin, Route as RouteIcon, Trash2, CheckCircle2, Archive, Copy, PauseCircle, PlayCircle, Upload } from 'lucide-react';
 
-import { Button, Card, CardBody, Badge, statusTone, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
+import { Button, Card, CardBody, Badge, statusTone, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast, TabBar } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { masterDataApi, type RouteRow, type City, type Stop } from '@/lib/api/masterData';
 import { parseCsv } from '@/lib/csv';
@@ -14,14 +14,7 @@ export function RoutesPage() {
   return (
     <>
       <PageHeader title="Routes & Stops" subtitle="Your network — origins, destinations, and boarding/dropping points" />
-      <div className="mb-6 flex gap-2 border-b border-border">
-        {([{ key: 'routes', label: 'Routes', icon: RouteIcon }, { key: 'stops', label: 'Stops', icon: MapPin }] as const).map(({ key, label, icon: Icon }) => (
-          <button key={key} onClick={() => setView(key)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium ${view === key ? 'border-primary text-text' : 'border-transparent text-text-muted hover:text-text'}`}>
-            <Icon className="h-4 w-4" /> {label}
-          </button>
-        ))}
-      </div>
+      <TabBar className="mb-6" value={view} onChange={setView} items={[{ key: 'routes', label: 'Routes', icon: RouteIcon }, { key: 'stops', label: 'Stops', icon: MapPin }] as const} />
       {view === 'routes' ? <RoutesTab /> : <StopsTab />}
     </>
   );

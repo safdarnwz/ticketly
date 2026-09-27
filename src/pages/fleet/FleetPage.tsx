@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Bus, Users, LayoutGrid, Sparkles, Upload, CalendarClock } from 'lucide-react';
 
-import { Button, Card, CardBody, Badge, statusTone, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
+import { Button, Card, CardBody, Badge, statusTone, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast, TabBar } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { masterDataApi, type VehicleType, type Amenity, type SeatLayoutRow } from '@/lib/api/masterData';
 import { fleetApi, type Vehicle } from '@/lib/api/fleet';
@@ -11,7 +11,6 @@ import { SeatLayoutsTab } from './SeatLayoutsTab';
 import { CrewTab } from './CrewTab';
 import { RenewalsTab } from './RenewalsTab';
 import { isRegistration, normReg } from '@/lib/vehicle';
-import { cn } from '@/lib/utils';
 import { parseCsv } from '@/lib/csv';
 
 type Tab = 'vehicles' | 'layouts' | 'setup' | 'crew' | 'renewals';
@@ -29,14 +28,7 @@ export function FleetPage() {
   return (
     <>
       <PageHeader title="Fleet" subtitle="Buses, seat layouts, vehicle classes, and crew" />
-      <div className="mb-6 flex gap-2 border-b border-border">
-        {tabs.map(({ key, label, icon: Icon }) => (
-          <button key={key} onClick={() => setTab(key)}
-            className={cn('flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium', tab === key ? 'border-primary text-text' : 'border-transparent text-text-muted hover:text-text')}>
-            <Icon className="h-4 w-4" /> {label}
-          </button>
-        ))}
-      </div>
+      <TabBar className="mb-6" value={tab} onChange={setTab} items={tabs} />
       {tab === 'vehicles' && <VehiclesTab />}
       {tab === 'layouts' && <SeatLayoutsTab />}
       {tab === 'setup' && <SetupTab />}

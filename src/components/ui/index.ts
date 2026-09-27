@@ -9,3 +9,4 @@ export { Table, type Column } from './Table';
 export { ToastProvider } from './Toast';
 export { useToast } from './toast-context';
 export { Spinner, Skeleton, PageLoader, EmptyState, ErrorState } from './feedback';
+export { TabBar, type TabItem } from './TabBar';

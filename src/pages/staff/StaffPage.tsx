@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, KeyRound, Upload, LogOut, Plus, ShieldCheck, Search, Trophy, UserCog, UserPlus, X } from 'lucide-react';
 
-import { Badge, Button, Card, CardBody, EmptyState, ErrorState, Input, Modal, PageLoader, Select, Table, useToast, type Column } from '@/components/ui';
+import { Badge, Button, Card, CardBody, EmptyState, ErrorState, Input, Modal, PageLoader, Select, Table, useToast, type Column, TabBar } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ApiError } from '@/lib/api/client';
 import { branchesApi } from '@/lib/api/branches';
@@ -24,13 +24,7 @@ export function StaffPage() {
   return (
     <>
       <PageHeader title="Staff" subtitle="Your team — roles, branches, access and counter sales" />
-      <div className="mb-4 flex gap-2 border-b border-border">
-        {([['directory', 'Directory', UserCog], ['roles', 'Roles & permissions', ShieldCheck], ['performance', 'Performance', Trophy]] as const).map(([k, label, Icon]) => (
-          <button key={k} onClick={() => setTab(k)} className={cn('flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium', tab === k ? 'border-primary text-text' : 'border-transparent text-text-muted hover:text-text')}>
-            <Icon className="h-4 w-4" /> {label}
-          </button>
-        ))}
-      </div>
+      <TabBar className="mb-4" value={tab} onChange={setTab} items={[{ key: 'directory', label: 'Directory', icon: UserCog }, { key: 'roles', label: 'Roles & permissions', icon: ShieldCheck }, { key: 'performance', label: 'Performance', icon: Trophy }] as const} />
       {tab === 'directory' ? <Directory /> : tab === 'roles' ? <RolesTab /> : <Performance />}
     </>
   );
@@ -71,11 +65,11 @@ function Directory() {
     <>
       <Card className="mb-4">
         <CardBody className="flex flex-wrap items-end gap-3">
-          <div className="w-64"><Input aria-label="Search staff" placeholder="Name, or exact email / mobile" leftIcon={<Search className="h-4 w-4" />} value={q} onChange={(e) => { setQ(e.target.value); reset(); }} /></div>
-          <div className="w-36"><Select label="Status" value={status} onChange={(e) => { setStatus(e.target.value); reset(); }} options={[{ label: 'Active', value: 'active' }, { label: 'Disabled', value: 'disabled' }, { label: 'All', value: '' }]} /></div>
-          <div className="w-44"><Select label="Branch" value={branchId} onChange={(e) => { setBranchId(e.target.value); reset(); }} options={[{ label: 'Any branch', value: '' }, ...(branches.data?.items ?? []).map((b) => ({ label: b.name, value: b.id }))]} /></div>
-          <div className="w-44"><Select label="Role" value={roleId} onChange={(e) => { setRoleId(e.target.value); reset(); }} options={[{ label: 'Any role', value: '' }, ...(roles.data?.items ?? []).map((r) => ({ label: r.name, value: r.id }))]} /></div>
-          <div className="ml-auto flex gap-2">
+          <div className="w-full sm:w-64"><Input aria-label="Search staff" placeholder="Name, or exact email / mobile" leftIcon={<Search className="h-4 w-4" />} value={q} onChange={(e) => { setQ(e.target.value); reset(); }} /></div>
+          <div className="w-[calc(50%-6px)] sm:w-36"><Select label="Status" value={status} onChange={(e) => { setStatus(e.target.value); reset(); }} options={[{ label: 'Active', value: 'active' }, { label: 'Disabled', value: 'disabled' }, { label: 'All', value: '' }]} /></div>
+          <div className="w-[calc(50%-6px)] sm:w-44"><Select label="Branch" value={branchId} onChange={(e) => { setBranchId(e.target.value); reset(); }} options={[{ label: 'Any branch', value: '' }, ...(branches.data?.items ?? []).map((b) => ({ label: b.name, value: b.id }))]} /></div>
+          <div className="w-[calc(50%-6px)] sm:w-44"><Select label="Role" value={roleId} onChange={(e) => { setRoleId(e.target.value); reset(); }} options={[{ label: 'Any role', value: '' }, ...(roles.data?.items ?? []).map((r) => ({ label: r.name, value: r.id }))]} /></div>
+          <div className="flex flex-wrap gap-2 sm:ml-auto">
             <Button variant="outline" leftIcon={<Download className="h-4 w-4" />} loading={exp.isPending} onClick={() => exp.mutate()}>Export CSV</Button>
             <Button variant="outline" leftIcon={<Upload className="h-4 w-4" />} onClick={() => setUploading(true)}>Upload staff</Button>
             <Button leftIcon={<UserPlus className="h-4 w-4" />} onClick={() => setInviting(true)}>Add staff</Button>

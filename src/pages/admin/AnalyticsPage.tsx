@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Building2, Bus, Ticket, XCircle, IndianRupee, TrendingUp, Plus, Package, ScrollText, Search, Settings, Percent, Landmark, Download, CheckCircle2 } from 'lucide-react';
 
-import { Button, Card, CardBody, Badge, statusTone, Table, type Column, Modal, Input, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
+import { Button, Card, CardBody, Badge, statusTone, Table, type Column, Modal, Input, PageLoader, ErrorState, EmptyState, useToast, TabBar } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { tenantsApi, type Plan } from '@/lib/api/tenants';
 import { auditApi, type AuditEntry } from '@/lib/api/audit';
@@ -18,20 +18,13 @@ export function AnalyticsPage() {
   return (
     <>
       <PageHeader title="Analytics & Plans" subtitle="Platform-wide numbers, the plan catalogue, platform fees, payouts and the audit trail" />
-      <div className="mb-6 flex gap-2 border-b border-border">
-        {([
+      <TabBar className="mb-6" value={tab} onChange={setTab} items={[
           { key: 'analytics', label: 'Analytics', icon: TrendingUp },
           { key: 'payouts', label: 'Payouts', icon: Landmark },
           { key: 'plans', label: 'Plans', icon: Package },
           { key: 'settings', label: 'Platform Settings', icon: Settings },
           { key: 'audit', label: 'Audit Log', icon: ScrollText },
-        ] as const).map(({ key, label, icon: Icon }) => (
-          <button key={key} onClick={() => setTab(key)}
-            className={cn('flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium', tab === key ? 'border-primary text-text' : 'border-transparent text-text-muted hover:text-text')}>
-            <Icon className="h-4 w-4" /> {label}
-          </button>
-        ))}
-      </div>
+        ] as const} />
       {tab === 'analytics' && <AnalyticsTab />}
       {tab === 'payouts' && <PayoutsTab />}
       {tab === 'plans' && <PlansTab />}

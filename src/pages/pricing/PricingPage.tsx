@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, IndianRupee, TrendingUp, Ticket, CheckCircle2, Users, Clock } from 'lucide-react';
 
-import { Button, Badge, statusTone, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
+import { Button, Badge, statusTone, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast, TabBar } from '@/components/ui';
 import { ConcessionsTab } from './ConcessionsTab';
 import { FareBulkTools, RouteRulesTab } from './RouteRulesTab';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -26,14 +26,7 @@ export function PricingPage() {
   return (
     <>
       <PageHeader title="Pricing" subtitle="Fares, dynamic yield, and discount coupons" />
-      <div className="mb-6 flex gap-2 border-b border-border">
-        {tabs.map(({ key, label, icon: Icon }) => (
-          <button key={key} onClick={() => setTab(key)}
-            className={cn('flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium', tab === key ? 'border-primary text-text' : 'border-transparent text-text-muted hover:text-text')}>
-            <Icon className="h-4 w-4" /> {label}
-          </button>
-        ))}
-      </div>
+      <TabBar className="mb-6" value={tab} onChange={setTab} items={tabs} />
       {tab === 'plans' && <PlansTab />}
       {tab === 'routeRules' && <RouteRulesTab />}
       {tab === 'policies' && <PoliciesTab />}

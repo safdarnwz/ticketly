@@ -23,11 +23,11 @@ const shortcuts = [
 function Kpi({ icon, label, value, hint, tone }: { icon: ReactNode; label: string; value: string; hint?: string; tone?: string }) {
   return (
     <Card>
-      <CardBody className="flex items-start gap-3">
-        <div className={cn('rounded-lg bg-surface-muted p-2 text-text-muted', tone)}>{icon}</div>
-        <div className="min-w-0">
+      <CardBody className="flex flex-col items-start gap-2 p-4 sm:flex-row sm:gap-3 sm:p-card">
+        <div className={cn('rounded-xl bg-surface-muted p-2 text-text-muted', tone)}>{icon}</div>
+        <div className="min-w-0 max-w-full">
           <div className="text-xs text-text-muted">{label}</div>
-          <div className="break-words font-display text-xl text-text sm:text-2xl">{value}</div>
+          <div className="truncate font-display text-lg text-text sm:text-2xl" title={value}>{value}</div>
           {hint && <div className="text-xs text-text-muted">{hint}</div>}
         </div>
       </CardBody>
@@ -98,14 +98,16 @@ function StaffDashboard() {
 
   return (
     <>
-      <div className="mb-6 rounded-card bg-primary p-7 text-primary-fg sm:p-8">
-        <p className="text-sm font-medium text-white/60">Operator console</p>
-        <h1 className="mt-1 font-display text-3xl tracking-tight">{greeting()}{name ? `, ${name}` : ''}.</h1>
-        <p className="mt-2 max-w-lg text-[15px] text-white/60">Today’s departures, sales and cancellations — updated every 30 seconds.</p>
+      <div className="relative mb-6 overflow-hidden rounded-[24px] bg-primary p-6 text-primary-fg shadow-md sm:p-8">
+        <span aria-hidden className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-accent/40 blur-2xl" />
+        <span aria-hidden className="absolute -bottom-16 right-24 h-40 w-40 rounded-full bg-secondary/50 blur-2xl" />
+        <p className="relative text-sm font-medium text-white/70">Operator console</p>
+        <h1 className="relative mt-1 font-display text-2xl tracking-tight sm:text-3xl">{greeting()}{name ? `, ${name}` : ''}.</h1>
+        <p className="relative mt-2 max-w-lg text-[15px] text-white/70">Today’s departures, sales and cancellations — updated every 30 seconds.</p>
       </div>
 
       {summary.isError ? <ErrorState error={summary.error} onRetry={summary.refetch} /> : (
-        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3 2xl:grid-cols-6">
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 2xl:grid-cols-6">
           {!s ? Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-24" />) : (
             <>
               <Kpi icon={<CheckCircle2 className="h-5 w-5" />} tone="text-success" label="Booked today" value={String(s.todayBookings)} hint={`${s.todaySeats} seats`} />

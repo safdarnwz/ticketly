@@ -3,13 +3,13 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Archive, ClipboardList, Navigation, PackageSearch, Plus, ShieldAlert } from 'lucide-react';
 
-import { Badge, Button, Card, CardBody, EmptyState, ErrorState, Input, Modal, PageLoader, Select, Table, type Column, useToast } from '@/components/ui';
+import { Badge, Button, Card, CardBody, EmptyState, ErrorState, Input, Modal, PageLoader, Select, Table, type Column, useToast, TabBar } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ApiError } from '@/lib/api/client';
 import { branchesApi } from '@/lib/api/branches';
 import { DELAY_CATEGORIES, INCIDENT_TYPES, operationsApi, type BusOnRoad, type Incident, type LostItem } from '@/lib/api/operations';
 import { schedulingApi } from '@/lib/api/scheduling';
-import { cn, formatDateTime, formatTime, idempotencyKey, todayLocal } from '@/lib/utils';
+import { formatDateTime, formatTime, idempotencyKey, todayLocal } from '@/lib/utils';
 
 const errText = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
 const typeLabel = (t: string) => INCIDENT_TYPES.find((x) => x.value === t)?.label ?? (t === 'sos' ? 'SOS / panic' : t);
@@ -31,14 +31,7 @@ export function OperationsPage() {
   return (
     <>
       <PageHeader title="Operations" subtitle="Incidents on the road, lost & found, and handover between shifts" />
-      <div className="mb-6 flex gap-2 border-b border-border">
-        {tabs.map(({ key, label, icon: Icon }) => (
-          <button key={key} onClick={() => setTab(key)}
-            className={cn('flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium', tab === key ? 'border-primary text-text' : 'border-transparent text-text-muted hover:text-text')}>
-            <Icon className="h-4 w-4" /> {label}
-          </button>
-        ))}
-      </div>
+      <TabBar className="mb-6" value={tab} onChange={setTab} items={tabs} />
       {tab === 'road' && <OnTheRoad />}
       {tab === 'incidents' && <Incidents />}
       {tab === 'lost' && <LostFound />}
