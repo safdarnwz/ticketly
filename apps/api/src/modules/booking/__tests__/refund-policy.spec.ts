@@ -85,4 +85,39 @@ describe('computeRefund — negative & edge', () => {
     const r = computeRefund(99900, DEP, at(10));
     expect(r.refund.minor).toBe(74925);
   });
+
+  describe('free cancellation window', () => {
+    const policy: RefundPolicy = {
+      ...DEFAULT_REFUND_POLICY,
+      flatFeeMinor: 5000,
+      freeCancellationHours: 2,
+      cutoffHours: 1,
+    };
+    const paidAt = at(10); // booked 10 hours before departure
+
+    it('within the window after paying: everything back, no fee', () => {
+      const r = computeRefund(paid, DEP, at(9), policy, 'INR', paidAt);
+      expect(r).toMatchObject({ refundPct: 100, refundable: true });
+      expect(r.refund.minor).toBe(paid);
+      expect(r.fee.minor).toBe(0);
+    });
+
+    it('after the window: the normal tier and fee', () => {
+      const r = computeRefund(paid, DEP, at(7), policy, 'INR', paidAt);
+      expect(r.refundPct).toBe(75);
+      expect(r.refund.minor).toBe(75000 - 5000);
+    });
+
+    it('the cutoff near departure still wins', () => {
+      const late = computeRefund(paid, DEP, at(0.5), policy, 'INR', at(1));
+      expect(late.refundable).toBe(false);
+    });
+
+    it('no paid-at time or no window: tiers apply', () => {
+      expect(computeRefund(paid, DEP, at(9), policy, 'INR', null).refundPct).toBe(75);
+      expect(computeRefund(paid, DEP, at(9), DEFAULT_REFUND_POLICY, 'INR', paidAt).refundPct).toBe(
+        75,
+      );
+    });
+  });
 });

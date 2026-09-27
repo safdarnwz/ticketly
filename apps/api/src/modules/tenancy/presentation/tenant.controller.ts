@@ -27,8 +27,11 @@ import {
   SetInvoicePrefixSchema,
   type SetInvoicePrefixDto,
   ConnectionRulesSchema,
+  WaitlistRulesSchema,
+  type WaitlistRulesDto,
   type ConnectionRulesDto,
 } from './dto/tenant.dto';
+import { DEFAULT_WAITLIST_RULES, waitlistRules } from '../../demand';
 import { TenantBrandingService } from '../application/services/tenant-branding.service';
 import { TenantContextService } from '../application/services/tenant-context.service';
 import { TenantRepository } from '../infrastructure/persistence/tenant.repository';
@@ -325,5 +328,35 @@ export class TenantController {
   async resetConnectionRules() {
     await this.tenants.setConnectionRules(null);
     return { ok: true, rules: { enabled: true, ...DEFAULT_LAYOVER } };
+  }
+
+  @Get('waitlist-rules')
+  @RequirePermission(Permission.TENANT_READ)
+  @ApiOperation({
+    summary:
+      'Waitlist rules: how many may wait per trip, seats per entry, when it closes, when an entry lapses (platform default until set)',
+  })
+  async getWaitlistRules() {
+    const stored = await this.tenants.getWaitlistRules();
+    return { rules: waitlistRules(stored), isCustom: stored !== null };
+  }
+
+  @Put('waitlist-rules')
+  @RequirePermission(Permission.TENANT_MANAGE)
+  @ApiOperation({
+    summary: "Set this operator's waitlist rules (new entries and notices from now on)",
+  })
+  async setWaitlistRules(@Body(zodBody(WaitlistRulesSchema)) dto: WaitlistRulesDto) {
+    await this.tenants.setWaitlistRules(dto);
+    return { ok: true, rules: dto };
+  }
+
+  @Post('waitlist-rules/reset')
+  @HttpCode(200)
+  @RequirePermission(Permission.TENANT_MANAGE)
+  @ApiOperation({ summary: 'Back to the platform default waitlist rules' })
+  async resetWaitlistRules() {
+    await this.tenants.setWaitlistRules(null);
+    return { ok: true, rules: DEFAULT_WAITLIST_RULES };
   }
 }

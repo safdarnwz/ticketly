@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { forecastOccupancy, median } from '../domain/occupancy-forecast';
-import { pickToNotify, validateJoin } from '../domain/waitlist-rules';
+import {
+  pickToNotify,
+  validateJoin,
+  waitlistRules,
+  DEFAULT_WAITLIST_RULES,
+} from '../domain/waitlist-rules';
 
 const NOW = new Date('2026-09-23T10:00:00Z');
 const DEP = new Date('2026-09-25T20:00:00Z');
@@ -104,5 +109,37 @@ describe('occupancy forecast', () => {
     expect(median([3, 1, 2])).toBe(2);
     expect(median([1, 2, 3, 4])).toBe(2.5);
     expect(median([])).toBeNull();
+  });
+});
+
+describe('waitlist: operator rules', () => {
+  const now = new Date('2026-09-23T08:00:00Z');
+  const base = {
+    seatCount: 2,
+    availableSeats: 0,
+    tripStatus: 'open',
+    departsAt: new Date('2026-09-23T12:00:00Z'),
+    waitingCount: 0,
+    now,
+  };
+  it('a smaller list, fewer seats per entry, an earlier close', () => {
+    const rules = waitlistRules({ maxPerTrip: 10, maxSeatsPerEntry: 2, closeMinutesBefore: 180 });
+    expect(() => validateJoin({ ...base, rules })).not.toThrow(); // 4h left, closes 3h before
+    expect(() => validateJoin({ ...base, rules, waitingCount: 10 })).toThrow(/full/);
+    expect(() => validateJoin({ ...base, rules, seatCount: 3 })).toThrow(/1 to 2/);
+    expect(() => validateJoin({ ...base, rules: { ...rules, closeMinutesBefore: 300 } })).toThrow(
+      /closes 5 hours before/,
+    );
+    expect(() => validateJoin({ ...base, rules: { ...rules, closeMinutesBefore: 250 } })).toThrow(
+      /closes 250 minutes before/,
+    );
+  });
+  it('stored rules are checked field by field; bad values keep the default', () => {
+    expect(waitlistRules(null)).toEqual(DEFAULT_WAITLIST_RULES);
+    expect(waitlistRules({ maxPerTrip: -5, maxSeatsPerEntry: 'x', entryExpiryHours: 12 })).toEqual({
+      ...DEFAULT_WAITLIST_RULES,
+      entryExpiryHours: 12,
+    });
+    expect(waitlistRules({ entryExpiryHours: 0 }).entryExpiryHours).toBeNull();
   });
 });

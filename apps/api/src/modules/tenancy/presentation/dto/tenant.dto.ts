@@ -114,6 +114,8 @@ export const RefundPolicySchema = z
     partialCancellation: z.boolean().optional(),
     /** Minutes after departure before a passenger can be marked a no-show (0–4 hours). */
     noShowGraceMinutes: z.number().int().min(0).max(240).optional(),
+    /** Full refund when cancelled within this many hours of paying (0 = none). */
+    freeCancellationHours: z.number().min(0).max(72).optional(),
   })
   .superRefine((p, ctx) => {
     const sorted = [...p.tiers].sort(
@@ -188,3 +190,13 @@ export const ConnectionRulesSchema = z
     path: ['maxLayoverMin'],
   });
 export type ConnectionRulesDto = z.infer<typeof ConnectionRulesSchema>;
+
+/** An operator's waitlist rules (#237, #239). */
+export const WaitlistRulesSchema = z.object({
+  maxPerTrip: z.number().int().min(1).max(500),
+  maxSeatsPerEntry: z.number().int().min(1).max(10),
+  closeMinutesBefore: z.number().int().min(0).max(1440),
+  /** A waiting entry lapses this many hours after joining; null = waits until the list closes. */
+  entryExpiryHours: z.number().int().min(1).max(720).nullable(),
+});
+export type WaitlistRulesDto = z.infer<typeof WaitlistRulesSchema>;

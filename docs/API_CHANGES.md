@@ -489,3 +489,10 @@ an unknown id is now 404 (was 200).
 - **Platform numbers:** `GET /admin/tenants/analytics` adds `activeBuses` (approved, running buses of active
   operators) and `monthRevenueMinor`; "today" and the 14-day trend are Indian calendar days (were the database
   server's UTC days).
+- **Free cancellation window:** `PATCH /operator/refund-policy` takes `freeCancellationHours` (0–72): cancelled
+  within that many hours of paying, the whole amount is refunded with no fee (the cutoff before departure still
+  applies). Refund previews and cancellations use it.
+- **Waitlist rules:** new `GET/PUT /operator/waitlist-rules` and `POST /operator/waitlist-rules/reset`
+  `{maxPerTrip 1–500, maxSeatsPerEntry 1–10, closeMinutesBefore 0–1440, entryExpiryHours 1–720 | null}`
+  (default 100 / 6 / 60 / null). Joining, the list and seat notices follow them; waiting entries past the expiry
+  lapse.

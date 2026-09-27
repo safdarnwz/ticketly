@@ -570,6 +570,7 @@ export class BookingService {
       new Date(),
       refundPolicy,
       booking.currency as never,
+      booking.confirmedAt,
     );
     return { refundMinor: refund.refund.minor, refundPct: refund.refundPct, cancellable: true };
   }
@@ -631,6 +632,7 @@ export class BookingService {
           new Date(),
           refundPolicy,
           booking.currency as never,
+          booking.confirmedAt,
         );
 
         const seats = await this.bookings.loadSeats(bookingId);
@@ -777,6 +779,7 @@ export class BookingService {
           new Date(),
           refundPolicy,
           booking.currency as never,
+          booking.confirmedAt,
         );
 
         await this.seatLock.releaseOccupancy(

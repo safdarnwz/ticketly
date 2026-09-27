@@ -83,6 +83,8 @@ export interface BookingRow {
   version: number;
   contactPhone: string | null;
   contactEmail: string | null;
+  /** When it was paid for (read by findForUpdate). */
+  confirmedAt?: Date | null;
   /** Only populated by cross-tenant reads (`listForCustomer`, `getByPnr`) — not selected elsewhere. */
   tenantId?: string;
   createdAt?: Date;
@@ -432,7 +434,7 @@ export class BookingRepository {
       `SELECT id, pnr, trip_id AS "tripId", route_id AS "routeId", from_seq AS "fromSeq", to_seq AS "toSeq",
               status, seat_count AS "seatCount", customer_id AS "customerId", currency, total_minor AS "totalMinor", paid_minor AS "paidMinor",
               tax_minor AS "taxMinor", coupon_code AS "couponCode", hold_expires_at AS "holdExpiresAt", version,
-              contact_phone AS "contactPhone", contact_email AS "contactEmail"
+              contact_phone AS "contactPhone", contact_email AS "contactEmail", confirmed_at AS "confirmedAt"
          FROM bookings WHERE tenant_id = $1 AND id = $2${lock}`,
       [requireTenantId(), id],
     );

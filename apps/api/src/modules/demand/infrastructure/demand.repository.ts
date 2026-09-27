@@ -35,6 +35,25 @@ export class DemandRepository {
       )?.n ?? 0,
     );
   }
+  /** The operator's stored waitlist rules (tenants.settings.waitlist), or null. */
+  async storedRules(): Promise<unknown> {
+    const row = await this.db.queryOne<{ rules: unknown }>(
+      `SELECT settings->'waitlist' AS rules FROM tenants WHERE id = $1`,
+      [requireTenantId()],
+      { name: 'waitlist.rules' },
+    );
+    return row?.rules ?? null;
+  }
+  /** Waiting entries older than the operator's expiry lapse (they stop holding a place). */
+  async expireStale(tripId: string, hours: number): Promise<void> {
+    await this.db.execute_(
+      `UPDATE trip_waitlist SET status = 'expired'
+        WHERE tenant_id = $1 AND trip_id = $2 AND status = 'waiting'
+          AND created_at < now() - make_interval(hours => $3)`,
+      [requireTenantId(), tripId, hours],
+      { name: 'waitlist.expireStale' },
+    );
+  }
   async waitingCount(tripId: string): Promise<number> {
     return Number(
       (

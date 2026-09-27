@@ -44,6 +44,12 @@ export interface RefundPolicy {
    * no-show (a late passenger may still be picked up on the way). Default 0.
    */
   noShowGraceMinutes?: number;
+  /**
+   * Free cancellation window: cancelled within this many hours of paying, the
+   * whole amount comes back (no tier cut, no fee) — still subject to the
+   * cutoff near departure. 0 / absent = no free window.
+   */
+  freeCancellationHours?: number;
 }
 
 /** A sensible default if an operator hasn't configured one. */
@@ -79,6 +85,8 @@ export function computeRefund(
   now: Date,
   policy: RefundPolicy = DEFAULT_REFUND_POLICY,
   currency: CurrencyCode = 'INR',
+  /** When the booking was paid for — for the free cancellation window. */
+  confirmedAt?: Date | null,
 ): RefundComputation {
   if (paidMinor < 0) {
     throw new DomainError(ErrorCode.COMMON_VALIDATION, 'Paid amount cannot be negative');
@@ -95,6 +103,24 @@ export function computeRefund(
       fee: Money.zero(currency),
       refund: Money.zero(currency),
       reason: `Cancellation not permitted within ${policy.cutoffHours}h of departure`,
+    };
+  }
+
+  // Within the free cancellation window after paying: everything back.
+  const freeHours = policy.freeCancellationHours ?? 0;
+  if (
+    freeHours > 0 &&
+    confirmedAt &&
+    now.getTime() >= confirmedAt.getTime() &&
+    now.getTime() - confirmedAt.getTime() <= freeHours * 3_600_000
+  ) {
+    return {
+      refundable: paid.isPositive(),
+      refundPct: 100,
+      paid,
+      fee: Money.zero(currency),
+      refund: paid,
+      reason: `Free cancellation within ${freeHours}h of booking — full refund`,
     };
   }
 

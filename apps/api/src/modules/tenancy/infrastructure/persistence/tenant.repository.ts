@@ -584,6 +584,26 @@ export class TenantRepository {
     );
   }
 
+  /** This operator's waitlist rules, or null (platform default). */
+  async getWaitlistRules(): Promise<unknown> {
+    const row = await this.db.queryOne<{ rules: unknown }>(
+      `SELECT settings->'waitlist' AS rules FROM tenants WHERE id = $1`,
+      [requireTenantId()],
+      { name: 'tenant.getWaitlistRules', primary: true },
+    );
+    return row?.rules ?? null;
+  }
+
+  async setWaitlistRules(rules: object | null): Promise<void> {
+    await this.db.execute_(
+      `UPDATE tenants SET settings = CASE WHEN $2::jsonb IS NULL THEN settings - 'waitlist'
+                                          ELSE jsonb_set(settings, '{waitlist}', $2::jsonb) END,
+              version = version + 1 WHERE id = $1`,
+      [requireTenantId(), rules ? JSON.stringify(rules) : null],
+      { name: 'tenant.setWaitlistRules', primary: true },
+    );
+  }
+
   async setInvoicePrefix(prefix: string): Promise<void> {
     await this.db.execute_(
       `UPDATE tenants SET settings = jsonb_set(settings, '{invoicePrefix}', to_jsonb($2::text)), version = version + 1 WHERE id = $1`,

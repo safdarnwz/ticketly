@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { bootstrapTestApp, type TestApp } from './support/bootstrap';
+import { confirmedBooking } from './support/flows';
 
 /**
  * Operator settings: the payout account change request, the cancellation
@@ -92,6 +93,68 @@ describe('operator settings (e2e)', () => {
       // Put back what was there so other tests' refunds are unchanged.
       if (before.isCustom) await set(before.policy);
       else await app.post('/operator/refund-policy/reset', {}, op);
+    }
+  });
+
+  it('free cancellation window: a full refund soon after paying, then the tiers', async () => {
+    const before = (await app.get('/operator/refund-policy', op)).body;
+    const set = (body: object) => app.patch('/operator/refund-policy', body, op);
+    const noRefund = { tiers: [{ minHoursBeforeDeparture: 0, refundPct: 0 }], flatFeeMinor: 1000 };
+    try {
+      expect((await set({ ...noRefund, freeCancellationHours: 100 })).status).toBe(400);
+      expect((await set({ ...noRefund, freeCancellationHours: 2 })).status).toBe(200);
+      const { bookingId } = await confirmedBooking(app, app.fixtures.seatNumbers[0], {
+        fullName: 'Free Window',
+        age: 30,
+      });
+      const inWindow = await app.get(`/bookings/${bookingId}/refund-preview`);
+      expect(inWindow.body).toMatchObject({ refundPct: 100, cancellable: true });
+      expect(inWindow.body.refundMinor).toBeGreaterThan(0);
+      // Without the window the same booking gets nothing back.
+      expect((await set(noRefund)).status).toBe(200);
+      const outside = await app.get(`/bookings/${bookingId}/refund-preview`);
+      expect(outside.body).toMatchObject({ refundPct: 0, refundMinor: 0 });
+    } finally {
+      if (before.isCustom) await set(before.policy);
+      else await app.post('/operator/refund-policy/reset', {}, op);
+    }
+  });
+
+  it('waitlist rules: bounded, the operator’s own, back to the default on reset', async () => {
+    const def = await app.get('/operator/waitlist-rules', op);
+    expect(def.status).toBe(200);
+    const put = (body: object, who: object = op) => app.put('/operator/waitlist-rules', body, who);
+    const good = {
+      maxPerTrip: 20,
+      maxSeatsPerEntry: 4,
+      closeMinutesBefore: 120,
+      entryExpiryHours: 24,
+    };
+    try {
+      for (const bad of [
+        { ...good, maxPerTrip: 0 },
+        { ...good, maxSeatsPerEntry: 11 },
+        { ...good, closeMinutesBefore: -1 },
+        { ...good, entryExpiryHours: 0 },
+      ])
+        expect((await put(bad)).status).toBe(400);
+      expect((await put(good, { as: 'customer' })).status).toBe(403);
+      expect((await put(good)).status).toBe(200);
+      expect((await app.get('/operator/waitlist-rules', op)).body).toEqual({
+        rules: good,
+        isCustom: true,
+      });
+      const reset = await app.post('/operator/waitlist-rules/reset', {}, op);
+      expect(reset.body.rules).toEqual({
+        maxPerTrip: 100,
+        maxSeatsPerEntry: 6,
+        closeMinutesBefore: 60,
+        entryExpiryHours: null,
+      });
+      expect((await app.get('/operator/waitlist-rules', op)).body.isCustom).toBe(false);
+    } finally {
+      if (def.body.isCustom) await put(def.body.rules);
+      else await app.post('/operator/waitlist-rules/reset', {}, op);
     }
   });
 

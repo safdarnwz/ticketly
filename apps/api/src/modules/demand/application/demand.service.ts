@@ -15,7 +15,14 @@ import { EventBus } from '@messaging';
 
 import { forecastOccupancy, type Forecast } from '../domain/occupancy-forecast';
 import { DemandRepository } from '../infrastructure/demand.repository';
-import { WaitlistRuleError, pickToNotify, validateJoin } from '../domain/waitlist-rules';
+import {
+  WaitlistRuleError,
+  isWaitlistOpen,
+  pickToNotify,
+  validateJoin,
+  waitlistRules,
+  type WaitlistRules,
+} from '../domain/waitlist-rules';
 
 registerConstraintMessages({
   trip_waitlist_one_live_uq: 'This phone number is already on the waitlist for this trip',
@@ -54,6 +61,7 @@ export class DemandService {
         throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
           message: 'Those stops are not a valid journey on this trip',
         });
+      const rules = await this.rulesFor(tripId);
       const available = await this.repo.availableSeats(tripId, from, to);
       const waiting = await this.repo.waitingCount(tripId);
       try {
@@ -63,6 +71,7 @@ export class DemandService {
           tripStatus: trip.status,
           departsAt: trip.departs_at,
           waitingCount: waiting,
+          rules,
         });
       } catch (e) {
         if (e instanceof WaitlistRuleError)
@@ -98,8 +107,16 @@ export class DemandService {
     });
   }
 
-  listWaitlist(tripId: TripId) {
+  async listWaitlist(tripId: TripId) {
+    await this.rulesFor(tripId);
     return this.repo.listEntries(tripId);
+  }
+
+  /** The operator's rules; entries past its expiry lapse first, so they neither count nor get notified. */
+  private async rulesFor(tripId: TripId): Promise<WaitlistRules> {
+    const rules = waitlistRules(await this.repo.storedRules());
+    if (rules.entryExpiryHours) await this.repo.expireStale(tripId, rules.entryExpiryHours);
+    return rules;
   }
 
   /**
@@ -113,9 +130,10 @@ export class DemandService {
     return this.uow.run({ name: 'waitlist.notify', tenantId }, async () => {
       const trip = await this.repo.tripForNotify(tripId);
       if (!trip) return 0;
+      const rules = await this.rulesFor(tripId);
       if (
         !['scheduled', 'open'].includes(trip.status) ||
-        trip.departs_at.getTime() - Date.now() < 60 * 60_000
+        !isWaitlistOpen(trip.departs_at, new Date(), rules)
       ) {
         await this.repo.expireWaiting(tripId);
         return 0;

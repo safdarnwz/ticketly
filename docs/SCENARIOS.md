@@ -14,8 +14,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Backend status | Count |
 |---|---|
 | OPEN | 2711 |
-| DONE | 973 |
-| GAP | 292 |
+| DONE | 976 |
+| GAP | 289 |
 | CONFLICT | 76 |
 | INFRA | 20 |
 | DUP | 9 |
@@ -23,15 +23,15 @@ Status of every scenario from the product scenario list. Generated from the trac
 
 | Frontend status | Count |
 |---|---|
-| — | 3105 |
-| DONE | 597 |
+| — | 3102 |
+| DONE | 600 |
 | TODO | 376 |
 | DUP | 9 |
 
 
 ## #1–#500
 
-CONFLICT 20, DONE 365, GAP 101, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 368, GAP 98, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -271,15 +271,15 @@ CONFLICT 20, DONE 365, GAP 101, INFRA 17, PROCESS 3
 | 234 | Release previously blocked inventory | DONE | DONE | verified manually: existing module/API · UI: Trip chart → Block / open seats |
 | 235 | Create multi-hop connecting service | DONE | DONE | verified manually: existing module/API · UI: Settings → Connections: take part in two-bus journeys, shortest/longest change; preview your own connections |
 | 236 | Define layover time rules | DONE | DONE | verified manually: existing module/API · UI: Settings → Connections: take part in two-bus journeys, shortest/longest change; preview your own connections |
-| 237 | Configure waitlist maximum size | GAP | — | verified manually: not built yet |
+| 237 | Configure waitlist maximum size | DONE | DONE | GET/PUT /operator/waitlist-rules (+ reset): max per trip, seats per entry, close time, entry expiry; applied on join, list and notify · UI: Settings → Waitlist |
 | 238 | Set waitlist auto-confirm rules | GAP | — | verified manually: not built yet |
-| 239 | Set waitlist entry expiry hours | GAP | — | verified manually: not built yet |
+| 239 | Set waitlist entry expiry hours | DONE | DONE | GET/PUT /operator/waitlist-rules (+ reset): max per trip, seats per entry, close time, entry expiry; applied on join, list and notify · UI: Settings → Waitlist |
 | 240 | Enable way-side booking on service | CONFLICT | — | earlier product decision |
 | 241 | Disable way-side booking on service | CONFLICT | — | earlier product decision |
 | 242 | Set maximum advance booking days allowed | DONE | DONE | PUT /concessions/booking-window {maxAdvanceDays} · UI: Pricing → Concessions & booking rules |
 | 243 | Set minimum hours before departure for booking | DONE | DONE | PUT /concessions/booking-window {minMinutesBeforeDeparture} · UI: Pricing → Concessions & booking rules |
 | 244 | Configure cancellation charge slabs by time | DONE | DONE | verified manually: existing module/API · UI: Settings → Refund policy (time slabs) |
-| 245 | Set free cancellation window in hours | GAP | — | verified manually: not built yet |
+| 245 | Set free cancellation window in hours | DONE | DONE | PATCH /operator/refund-policy freeCancellationHours: full refund within N hours of paying (cutoff still applies) · UI: Settings → Cancellation Policy → Free cancellation window |
 | 246 | Configure rules for partial cancellation | DONE | DONE | verified manually: existing module/API · UI: Settings → Cancellation policy → Allow cancelling some seats (off = whole bookings only for customers/agents/partners) |
 | 247 | Set no-show marking policy | DONE | DONE | verified manually: existing module/API · UI: Settings → Cancellation policy → No-show grace (minutes after departure) |
 | 248 | Enable automatic seat assignment | GAP | — | verified manually: not built yet |
@@ -786,7 +786,7 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 365, GAP 101, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 368, GAP 98, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -901,7 +901,7 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 
 ## #1–#500
 
-CONFLICT 20, DONE 365, GAP 101, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 368, GAP 98, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1016,7 +1016,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 365, GAP 101, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 368, GAP 98, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1111,7 +1111,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 365, GAP 101, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 368, GAP 98, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1226,7 +1226,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 365, GAP 101, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 368, GAP 98, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
@@ -1301,7 +1301,7 @@ CONFLICT 12, DONE 128, DUP 1, GAP 128, OPEN 170, PROCESS 1
 
 ## #1–#500
 
-CONFLICT 20, DONE 365, GAP 101, INFRA 17, PROCESS 3
+CONFLICT 20, DONE 368, GAP 98, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
