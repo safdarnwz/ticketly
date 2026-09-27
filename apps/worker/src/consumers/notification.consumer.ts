@@ -154,11 +154,15 @@ export class NotificationConsumer implements OnModuleInit {
   }
 
   /**
-   * The trip decides its bus and crew, and either can change late (a bus
-   * breaks down and another takes its place; a driver is swapped). Whoever
-   * already got the 4-hour details — or whose seat moved with the new bus —
-   * is sent the new bus, seats, drivers and crew once; the same details are
-   * never sent twice (journey_details_hash).
+   * The trip decides its bus and crew by the 4-hour reminder. Choosing or
+   * swapping them before that is normal planning (the regular bus is at the
+   * mechanic, another runs today): no message — the 4-hour and 1-hour
+   * reminders carry whatever the trip has then. A change is announced only
+   * when it comes after a passenger was told (a bus breaks down after the
+   * 4-hour reminder and another takes its place; a driver is swapped): they
+   * are sent the new bus, seats, drivers and crew at once, and the 1-hour
+   * reminder repeats them. The same details are never sent twice
+   * (journey_details_hash).
    */
   private detailsChangedHandler(eventType: string): EventHandler {
     return {
@@ -184,10 +188,10 @@ export class NotificationConsumer implements OnModuleInit {
         );
         for (const r of rows) {
           await runInNewContext({ tenantId: tenantId, actorType: 'system' }, async () => {
-            // Not told the bus and crew yet: the 4-hour reminder will carry
-            // the new ones — unless their seat number just changed.
+            // Not told the bus and crew yet: normal planning — the 4-hour
+            // reminder will carry the new bus, crew and (moved) seat.
             const told = r.reminded || r.journey_details_hash !== null;
-            if (!told && !r.moved) return;
+            if (!told) return;
             const details = await this.journeys.boarding(r.id, 'update');
             if (!details || details.detailsHash === r.journey_details_hash) return;
             const changeNote =

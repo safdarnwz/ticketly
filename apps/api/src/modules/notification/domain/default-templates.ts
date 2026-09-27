@@ -79,34 +79,34 @@ export const DEFAULT_OPERATOR_TEMPLATES: readonly DefaultTemplate[] = [
   {
     eventType: 'trip.reminder.4h',
     channel: 'sms',
-    body: 'Boarding in 4h — PNR {{pnr}}, {{boardingAt}}. Pickup: {{pickup.stopName}} ({{pickup.landmark}}). Bus {{busNumber}}. Driver(s): {{driversList}}. Crew: {{attendantsList}}. Track (live from {{trackingStartsAt}}): {{trackingUrl}}',
+    body: 'Boarding in 4h — PNR {{pnr}}, {{boardingAt}}. Pickup: {{pickup.stopName}} ({{pickup.landmark}}). Bus {{busNumber}}, seat(s) {{seats}}. Driver(s): {{driversList}}. Crew: {{attendantsList}}. Track (live from {{trackingStartsAt}}): {{trackingUrl}}',
   },
   {
     eventType: 'trip.reminder.4h',
     channel: 'whatsapp',
-    body: 'Your bus boards in 4 hours! *{{pnr}}*\n\n📍 Pickup: *{{pickup.stopName}}*, {{boardingAt}}\n{{pickup.landmark}}\n{{pickup.address}}\n\n🚌 Bus number: *{{busNumber}}*\n👨\u200d✈️ Driver(s): {{driversList}}\n🧑\u200d💼 Conductor / attendant(s): {{attendantsList}}\n\n📍 Track your bus: {{trackingUrl}}\n(The bus shows on the map from {{trackingStartsAt}}.)\n\nPlease reach 15 minutes early.',
+    body: 'Your bus boards in 4 hours! *{{pnr}}*\n\n📍 Pickup: *{{pickup.stopName}}*, {{boardingAt}}\n{{pickup.landmark}}\n{{pickup.address}}\n\n🚌 Bus number: *{{busNumber}}*\n💺 Seat(s): *{{seats}}*\n👨\u200d✈️ Driver(s): {{driversList}}\n🧑\u200d💼 Conductor / attendant(s): {{attendantsList}}\n\n📍 Track your bus: {{trackingUrl}}\n(The bus shows on the map from {{trackingStartsAt}}.)\n\nPlease reach 15 minutes early.',
   },
   {
     eventType: 'trip.reminder.4h',
     channel: 'email',
     subject: 'Boarding in 4 hours — PNR {{pnr}}',
-    body: 'Your bus boards in 4 hours, at {{boardingAt}}.\n\nPickup point: {{pickup.stopName}}\nLandmark: {{pickup.landmark}}\nAddress: {{pickup.address}}\n\nBus number: {{busNumber}}\nYour crew:\n{{crewList}}\n\nTrack your bus: {{trackingUrl}}\nThe bus shows on the map from {{trackingStartsAt}}, one hour before departure.\n\nPlease reach your pickup point 15 minutes early.',
+    body: 'Your bus boards in 4 hours, at {{boardingAt}}.\n\nPickup point: {{pickup.stopName}}\nLandmark: {{pickup.landmark}}\nAddress: {{pickup.address}}\n\nBus number: {{busNumber}}\nSeat(s): {{seats}}\nYour crew:\n{{crewList}}\n\nTrack your bus: {{trackingUrl}}\nThe bus shows on the map from {{trackingStartsAt}}, one hour before departure.\n\nPlease reach your pickup point 15 minutes early.',
   },
   {
     eventType: 'trip.reminder.1h',
     channel: 'sms',
-    body: 'Last reminder: PNR {{pnr}} boards at {{boardingAt}} from {{pickup.stopName}}. Bus {{busNumber}}. Driver(s): {{driversList}}. Crew: {{attendantsList}}. Track live now: {{trackingUrl}}',
+    body: 'Last reminder: PNR {{pnr}} boards at {{boardingAt}} from {{pickup.stopName}}. Bus {{busNumber}}, seat(s) {{seats}}. Driver(s): {{driversList}}. Crew: {{attendantsList}}. Track live now: {{trackingUrl}}',
   },
   {
     eventType: 'trip.reminder.1h',
     channel: 'whatsapp',
-    body: 'Last reminder — your bus boards in 1 hour! *{{pnr}}*\n\n📍 Pickup: *{{pickup.stopName}}*, {{boardingAt}}\n{{pickup.landmark}}\n\n🚌 Bus number: *{{busNumber}}*\n👨\u200d✈️ Driver(s): {{driversList}}\n🧑\u200d💼 Conductor / attendant(s): {{attendantsList}}\n\n📍 Your bus is live now: {{trackingUrl}}\n\nPlease be at the pickup point 15 minutes early.',
+    body: 'Last reminder — your bus boards in 1 hour! *{{pnr}}*\n\n📍 Pickup: *{{pickup.stopName}}*, {{boardingAt}}\n{{pickup.landmark}}\n\n🚌 Bus number: *{{busNumber}}*\n💺 Seat(s): *{{seats}}*\n👨\u200d✈️ Driver(s): {{driversList}}\n🧑\u200d💼 Conductor / attendant(s): {{attendantsList}}\n\n📍 Your bus is live now: {{trackingUrl}}\n\nPlease be at the pickup point 15 minutes early.',
   },
   {
     eventType: 'trip.reminder.1h',
     channel: 'email',
     subject: 'Last reminder: boarding in 1 hour — PNR {{pnr}}',
-    body: 'Your bus boards in 1 hour, at {{boardingAt}}.\n\nPickup point: {{pickup.stopName}}\nLandmark: {{pickup.landmark}}\nAddress: {{pickup.address}}\n\nBus number: {{busNumber}}\nYour crew:\n{{crewList}}\n\nYour bus is live on the map now: {{trackingUrl}}\n\nPlease be at your pickup point 15 minutes early.',
+    body: 'Your bus boards in 1 hour, at {{boardingAt}}.\n\nPickup point: {{pickup.stopName}}\nLandmark: {{pickup.landmark}}\nAddress: {{pickup.address}}\n\nBus number: {{busNumber}}\nSeat(s): {{seats}}\nYour crew:\n{{crewList}}\n\nYour bus is live on the map now: {{trackingUrl}}\n\nPlease be at your pickup point 15 minutes early.',
   },
   {
     eventType: 'trip.details_changed',

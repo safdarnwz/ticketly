@@ -240,6 +240,14 @@ describe('the trip decides its bus and crew; late changes reach passengers (e2e)
     ).toBe(403);
   });
 
+  it('normal planning: the regular bus is at the mechanic, another is put on before the 4-hour reminder — no message', async () => {
+    const planned = await newBus(`RJ${run.slice(0, 2)}ZV${run.slice(2)}`);
+    const put = await changeBus(planned.id, 'Regular bus at the mechanic today');
+    expect(put.status, JSON.stringify(put.body)).toBeLessThan(300);
+    const ev = await deliver('trip.vehicle_changed');
+    expect(Number((await notices(ev, told.pnr)).n)).toBe(0); // told nothing yet — the reminder will carry it
+  });
+
   it('the 4-hour reminder tells a passenger the bus crew; a later change reaches only them, once', async () => {
     await sqlOne(
       app,
