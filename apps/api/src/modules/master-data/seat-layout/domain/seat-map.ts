@@ -23,7 +23,17 @@ import { DomainError, ErrorCode, type Json } from '@kernel';
  *   deck   : 0 = lower, 1 = upper (double-decker / sleeper coaches)
  *   row    : 0-based, front → back
  *   column : 0-based, left → right (aisle is a gap in the column sequence)
- *   A sleeper berth can span two rows (rowSpan = 2); a seat spans one cell.
+ *   A sleeper berth can span two rows (rowSpan = 2) standing along the bus,
+ *   or two columns (colSpan = 2) lying across it; a seat spans one cell.
+ *   Each deck may have its own grid (`deckGrids`): a seater lower deck under
+ *   a sleeper upper deck rarely has the same number of rows or columns.
+ *
+ * FIXTURES
+ *   What is not a seat but takes floor space and helps a passenger find
+ *   their way: the driver, the door(s), a washroom (in the middle of a
+ *   Volvo multi-axle, at the back on the right of another coach, none in
+ *   many), the staircase to the upper deck, an emergency exit, a pantry.
+ *   They are placed on the grid like seats and may not overlap anything.
  *
  * This model is intentionally UI-agnostic: it stores logical grid coordinates,
  * not pixels, so any front-end can render it.
@@ -60,11 +70,42 @@ export interface SeatAttributePatch {
   accessible?: boolean;
 }
 
+export type FixtureKind =
+  'driver' | 'door' | 'washroom' | 'staircase' | 'emergency_exit' | 'pantry';
+
+export const FIXTURE_KINDS: readonly FixtureKind[] = [
+  'driver',
+  'door',
+  'washroom',
+  'staircase',
+  'emergency_exit',
+  'pantry',
+];
+
+export interface Fixture {
+  kind: FixtureKind;
+  deck: SeatDeck;
+  row: number;
+  column: number;
+  rowSpan?: number;
+  colSpan?: number;
+}
+
+export interface DeckGrid {
+  rows: number;
+  columns: number;
+}
+
 export interface SeatMapProps {
   decks: number; // 1 or 2
-  rows: number; // grid height per deck
-  columns: number; // grid width per deck
+  /** Grid height — the largest deck's when `deckGrids` is given. */
+  rows: number;
+  /** Grid width — the largest deck's when `deckGrids` is given. */
+  columns: number;
+  /** Each deck's own grid (lower first); absent = every deck is rows × columns. */
+  deckGrids?: DeckGrid[];
   seats: SeatCell[];
+  fixtures?: Fixture[];
 }
 
 export interface SeatMapSummary {
@@ -80,6 +121,7 @@ export interface SeatMapSummary {
   window: number;
   aisle: number;
   decks: number;
+  washrooms: number;
 }
 
 const MAX_ROWS = 40;
@@ -101,57 +143,114 @@ export class SeatMap {
    * an invalid layout can never be persisted or served.
    */
   static create(props: SeatMapProps): SeatMap {
-    const { decks, rows, columns, seats } = props;
+    const { decks, seats } = props;
+    const fixtures = props.fixtures ?? [];
 
     if (decks < 1 || decks > 2) fail('A bus has 1 or 2 decks');
-    if (rows < 1 || rows > MAX_ROWS) fail(`rows must be between 1 and ${MAX_ROWS}`);
-    if (columns < 1 || columns > MAX_COLUMNS) fail(`columns must be between 1 and ${MAX_COLUMNS}`);
+    if (props.deckGrids && props.deckGrids.length !== decks)
+      fail(`Give a grid for each of the ${decks} deck(s)`);
+    const grids = SeatMap.gridsOf(props);
+    for (const [d, g] of grids.entries()) {
+      const where = decks > 1 ? ` on the ${d === 0 ? 'lower' : 'upper'} deck` : '';
+      if (g.rows < 1 || g.rows > MAX_ROWS) fail(`rows must be between 1 and ${MAX_ROWS}${where}`);
+      if (g.columns < 1 || g.columns > MAX_COLUMNS)
+        fail(`columns must be between 1 and ${MAX_COLUMNS}${where}`);
+    }
+    if (props.deckGrids) {
+      if (props.rows !== Math.max(...grids.map((g) => g.rows)))
+        fail("rows must be the largest deck's row count");
+      if (props.columns !== Math.max(...grids.map((g) => g.columns)))
+        fail("columns must be the largest deck's column count");
+    }
     if (seats.length === 0) fail('A layout must have at least one seat');
 
     const seen = new Set<string>();
-    const occupied = new Set<string>(); // "deck:row:col" cells already taken
+    const occupied = new Map<string, string>(); // "deck:row:col" → what is there
+
+    const place = (
+      what: string,
+      item: { deck: number; row: number; column: number; rowSpan?: number; colSpan?: number },
+    ) => {
+      if (item.deck < 0 || item.deck >= decks)
+        fail(`${what} is on deck ${item.deck}, but the bus has ${decks} deck(s)`);
+      const grid = grids[item.deck];
+      const rowSpan = item.rowSpan ?? 1;
+      const colSpan = item.colSpan ?? 1;
+      if (rowSpan < 1 || colSpan < 1 || rowSpan > 4 || colSpan > 4)
+        fail(`${what} must span 1 to 4 rows and columns`);
+      if (item.row < 0 || item.row + rowSpan > grid.rows)
+        fail(`${what} overflows the grid vertically`);
+      if (item.column < 0 || item.column + colSpan > grid.columns)
+        fail(`${what} overflows the grid horizontally`);
+      // Every cell it covers must be free — nothing overlaps.
+      for (let r = item.row; r < item.row + rowSpan; r += 1) {
+        for (let c = item.column; c < item.column + colSpan; c += 1) {
+          const cell = `${item.deck}:${r}:${c}`;
+          const there = occupied.get(cell);
+          if (there)
+            fail(`${what} overlaps ${there} at cell (deck ${item.deck}, row ${r}, col ${c})`);
+          occupied.set(cell, what[0].toLowerCase() + what.slice(1));
+        }
+      }
+    };
 
     for (const seat of seats) {
       if (!SEAT_NUMBER_RE.test(seat.number)) {
         fail(`Invalid seat number '${seat.number}' (letters, digits, hyphen; max 6 chars)`);
       }
-      if (seen.has(seat.number)) fail(`Duplicate seat number '${seat.number}'`);
-      seen.add(seat.number);
+      const key = seat.number.toUpperCase();
+      if (seen.has(key)) fail(`Duplicate seat number '${seat.number}'`);
+      seen.add(key);
 
       if (seat.type === 'crew' && seat.bookable !== false) {
         fail(
           `Seat '${seat.number}' is a crew/driver cell — it must be marked non-bookable, it can never be sold as a ticket`,
         );
       }
-
-      if (seat.deck < 0 || seat.deck >= decks) {
-        fail(`Seat '${seat.number}' is on deck ${seat.deck}, but the bus has ${decks} deck(s)`);
-      }
-      const rowSpan = seat.rowSpan ?? 1;
-      const colSpan = seat.colSpan ?? 1;
-      if (rowSpan < 1 || colSpan < 1) fail(`Seat '${seat.number}' has a non-positive span`);
-      if (seat.row < 0 || seat.row + rowSpan > rows) {
-        fail(`Seat '${seat.number}' overflows the grid vertically`);
-      }
-      if (seat.column < 0 || seat.column + colSpan > columns) {
-        fail(`Seat '${seat.number}' overflows the grid horizontally`);
-      }
-
-      // Every cell the seat covers must be free — no two seats overlap.
-      for (let r = seat.row; r < seat.row + rowSpan; r += 1) {
-        for (let c = seat.column; c < seat.column + colSpan; c += 1) {
-          const cell = `${seat.deck}:${r}:${c}`;
-          if (occupied.has(cell)) {
-            fail(
-              `Seat '${seat.number}' overlaps another seat at cell (deck ${seat.deck}, row ${r}, col ${c})`,
-            );
-          }
-          occupied.add(cell);
-        }
-      }
+      place(`Seat '${seat.number}'`, seat);
     }
 
+    for (const f of fixtures) {
+      if (!FIXTURE_KINDS.includes(f.kind)) fail(`Unknown fixture '${String(f.kind)}'`);
+      if (f.kind === 'staircase' && decks < 2) fail('A staircase needs an upper deck');
+      place(`The ${f.kind.replace('_', ' ')}`, f);
+    }
+    if (fixtures.filter((f) => f.kind === 'driver').length > 1) fail('A bus has one driver seat');
+
     return new SeatMap(props);
+  }
+
+  /** Each deck's grid — its own, or the shared rows × columns. */
+  static gridsOf(
+    props: Pick<SeatMapProps, 'decks' | 'rows' | 'columns' | 'deckGrids'>,
+  ): DeckGrid[] {
+    return (
+      props.deckGrids ??
+      Array.from({ length: Math.max(1, props.decks) }, () => ({
+        rows: props.rows,
+        columns: props.columns,
+      }))
+    );
+  }
+
+  get grids(): DeckGrid[] {
+    return SeatMap.gridsOf(this.props);
+  }
+
+  get fixtures(): Fixture[] {
+    return this.props.fixtures ?? [];
+  }
+
+  /**
+   * The passenger seats as trips know them — number and type. Moving seats,
+   * doors or the washroom around keeps it; renumbering or changing a seat's
+   * type does not.
+   */
+  seatIdentity(): string[] {
+    return this.props.seats
+      .filter((s) => s.type !== 'crew' && s.bookable !== false)
+      .map((s) => `${s.number}:${s.type}`)
+      .sort();
   }
 
   has(seatNumber: string): boolean {
@@ -297,6 +396,7 @@ export class SeatMap {
       window,
       aisle,
       decks: this.props.decks,
+      washrooms: (this.props.fixtures ?? []).filter((f) => f.kind === 'washroom').length,
     };
   }
 }

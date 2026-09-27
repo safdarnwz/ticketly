@@ -231,6 +231,17 @@ export class SeatLayoutRepository {
     return Number(row?.n ?? 0);
   }
 
+  /** Trips still to run (or on the road) that sell their seats from this layout. */
+  async upcomingTripCount(id: SeatLayoutId): Promise<number> {
+    const row = await this.db.queryOne<{ n: string }>(
+      `SELECT count(*) AS n FROM trips
+        WHERE tenant_id = $1 AND seat_layout_id = $2 AND status IN ('scheduled', 'open', 'departed')`,
+      [requireTenantId(), id],
+      { name: 'layout.upcomingTrips', primary: true },
+    );
+    return Number(row?.n ?? 0);
+  }
+
   /** Soft-delete — refuses if any vehicle still references it (see usageCount), so a layout can never vanish out from under an active bus. */
   async delete(id: SeatLayoutId): Promise<void> {
     const inUse = await this.usageCount(id);

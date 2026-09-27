@@ -123,7 +123,15 @@ export class SchedulingService {
       seatRule: rule,
       available: placed.filter((s) => s.available).length,
       total: placed.length,
-      layout: { decks: map.decks, rows: map.rows, columns: map.columns },
+      layout: {
+        decks: map.decks,
+        rows: map.rows,
+        columns: map.columns,
+        // Each deck's own grid, and the driver / doors / washroom / stairs —
+        // so every screen draws this bus as the operator built it.
+        grids: layout.seatMap.grids,
+        fixtures: layout.seatMap.fixtures,
+      },
       seats: placed,
     };
   }

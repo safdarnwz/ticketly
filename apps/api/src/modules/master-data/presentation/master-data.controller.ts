@@ -255,7 +255,11 @@ export class MasterDataController {
   @RequirePermission(Permission.ROUTE_READ)
   @ApiOperation({ summary: 'How many vehicles currently use this layout (check before deleting)' })
   async layoutUsage(@UuidParam('id') id: string) {
-    return { vehicleCount: await this.layouts.usageCount(id as SeatLayoutId) };
+    const [vehicleCount, upcomingTrips] = await Promise.all([
+      this.layouts.usageCount(id as SeatLayoutId),
+      this.layouts.upcomingTripCount(id as SeatLayoutId),
+    ]);
+    return { vehicleCount, upcomingTrips };
   }
 
   @Delete('seat-layouts/:id')

@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
 
 import { UnitOfWork } from '@database';
-import { NotFoundError, getUserId, requireTenantId, type SeatLayoutId } from '@kernel';
+import {
+  AppError,
+  ErrorCode,
+  NotFoundError,
+  getUserId,
+  requireTenantId,
+  type SeatLayoutId,
+} from '@kernel';
 
 import {
   SeatMap,
@@ -55,6 +62,7 @@ export class SeatLayoutService {
     note?: string,
   ): Promise<{ summary: SeatMap['summary'] }> {
     const seatMap = SeatMap.create(layout); // validates; throws on inconsistency
+    await this.assertTripsKeepTheirSeats(id, seatMap);
     await this.uow.run({ name: 'layout.update', tenantId: requireTenantId() }, async () => {
       await this.layouts.update(id, name, seatMap);
       await this.layouts.snapshotVersion(id, name, seatMap, getUserId() ?? null, note ?? 'Edited');
@@ -74,6 +82,7 @@ export class SeatLayoutService {
     const version = await this.layouts.getVersion(id, versionNumber);
     if (!version) throw new NotFoundError('Layout version', String(versionNumber));
     const seatMap = SeatMap.create(version.layout as SeatMapProps);
+    await this.assertTripsKeepTheirSeats(id, seatMap);
     await this.uow.run({ name: 'layout.restore', tenantId: requireTenantId() }, async () => {
       await this.layouts.update(id, version.name, seatMap);
       await this.layouts.snapshotVersion(
@@ -103,6 +112,24 @@ export class SeatLayoutService {
       layout.seatMap.withAutoPositions().toJSON(),
       'Window / aisle seats derived from the grid',
     );
+  }
+
+  /**
+   * Trips already on sale hold their seats by number and type. Moving seats,
+   * the washroom, doors or the staircase is fine — every screen redraws from
+   * the layout — but renumbering, adding, removing or retyping a seat would
+   * leave sold tickets pointing at seats that no longer exist.
+   */
+  private async assertTripsKeepTheirSeats(id: SeatLayoutId, next: SeatMap): Promise<void> {
+    const current = await this.layouts.getById(id);
+    const before = current.seatMap.seatIdentity();
+    const after = next.seatIdentity();
+    if (before.length === after.length && before.every((x, i) => x === after[i])) return;
+    const trips = await this.layouts.upcomingTripCount(id);
+    if (trips === 0) return;
+    throw new AppError(ErrorCode.COMMON_CONFLICT, 409, {
+      message: `${trips} upcoming trip(s) sell seats from this layout, so its seat numbers and seat types cannot change. You can still move seats, the washroom, doors and stairs. To renumber or change seats, duplicate the layout, edit the copy and give it to the bus.`,
+    });
   }
 
   /** Preview endpoint: validate + summarise without persisting. */

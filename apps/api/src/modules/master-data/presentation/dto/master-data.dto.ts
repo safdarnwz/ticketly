@@ -41,11 +41,33 @@ const SeatCellSchema = z.object({
   accessible: z.boolean().optional(),
 });
 
+const FixtureSchema = z.object({
+  kind: z.enum(['driver', 'door', 'washroom', 'staircase', 'emergency_exit', 'pantry']),
+  deck: z.union([z.literal(0), z.literal(1)]),
+  row: z.number().int().min(0),
+  column: z.number().int().min(0),
+  rowSpan: z.number().int().min(1).max(4).optional(),
+  colSpan: z.number().int().min(1).max(4).optional(),
+});
+
 export const SeatMapSchema = z.object({
   decks: z.number().int().min(1).max(2),
   rows: z.number().int().min(1).max(40),
   columns: z.number().int().min(1).max(12),
+  /** Each deck's own rows × columns (lower first) — a seater lower deck under a sleeper upper deck. */
+  deckGrids: z
+    .array(
+      z.object({
+        rows: z.number().int().min(1).max(40),
+        columns: z.number().int().min(1).max(12),
+      }),
+    )
+    .min(1)
+    .max(2)
+    .optional(),
   seats: z.array(SeatCellSchema).min(1).max(120),
+  /** Driver, doors, washroom, staircase, emergency exit, pantry — placed on the grid. */
+  fixtures: z.array(FixtureSchema).max(40).optional(),
 });
 
 export const CreateSeatLayoutSchema = z.object({
