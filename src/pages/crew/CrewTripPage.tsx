@@ -271,13 +271,15 @@ function crewView(rows: ManifestRow[] | undefined): SeatView {
   const r = rows.find((x) => x.ticketStatus === 'boarded' && !x.checkedOutAt) ?? rows.find((x) => x.ticketStatus === 'valid') ?? rows[0];
   const bags = rows.reduce((a, x) => a + (x.luggageCount ?? 0), 0);
   const tone = r.checkedOutAt ? 'checkedOut' : r.ticketStatus === 'boarded' ? 'boarded' : r.ticketStatus === 'no_show' ? 'noShow' : 'pending';
-  return { tone, caption: r.fullName.split(' ')[0].slice(0, 7), badge: bags ? `${bags}🧳` : undefined, clickable: true };
+  // No names on the seats (other passengers can see the phone) — tap a seat for the ticket.
+  return { tone, badge: bags ? `${bags}🧳` : undefined, clickable: true };
 }
 
 /**
- * The bus as it is laid out, for the crew: every booked seat shows who is on
- * it and whether they have checked in or out; tapping a seat opens the
- * passenger to check in, count and tag their bags, and check out.
+ * The bus as it is laid out, for the crew: every booked seat shows by its
+ * colour whether its passenger is still to board, on board or checked out
+ * (no names on the seat); tapping it opens the ticket to check in, count
+ * and tag bags, and check out.
  */
 function BusLayout({ tripId, rows, onChanged }: { tripId: string; rows: ManifestRow[]; onChanged: () => void }) {
   const trip = useQuery({ queryKey: ['crew-trip-detail', tripId], queryFn: () => flowApi.trip(tripId) });
@@ -315,23 +317,23 @@ function BusLayout({ tripId, rows, onChanged }: { tripId: string; rows: Manifest
           <SeatMap map={map.data} legend="crew" viewOf={(s: SeatCell) => crewView(bySeat.get(s.seatNumber))} onSeatClick={(s) => setOpen(s.seatNumber)} />
         ) : null}
       </CardBody>
-      {open && <SeatPassengers tripId={tripId} seat={open} rows={bySeat.get(open) ?? []} onClose={() => setOpen(null)} onChanged={onChanged} />}
+      {open && <SeatPassengers tripId={tripId} seat={open} rows={bySeat.get(open) ?? []} all={rows} onClose={() => setOpen(null)} onChanged={onChanged} />}
     </Card>
   );
 }
 
 /** One seat's passenger(s): details, check-in, bags with tag numbers, check-out. */
-function SeatPassengers({ tripId, seat, rows, onClose, onChanged }: { tripId: string; seat: string; rows: ManifestRow[]; onClose: () => void; onChanged: () => void }) {
+function SeatPassengers({ tripId, seat, rows, all, onClose, onChanged }: { tripId: string; seat: string; rows: ManifestRow[]; all: ManifestRow[]; onClose: () => void; onChanged: () => void }) {
   return (
     <Modal open onClose={onClose} title={`Seat ${seat}`} size="md">
       <div className="flex flex-col gap-4">
-        {rows.length === 0 ? <EmptyState title="Nobody booked on this seat" /> : rows.map((r) => <PassengerCard key={`${r.pnr}-${r.ticketId}`} tripId={tripId} row={r} onChanged={onChanged} />)}
+        {rows.length === 0 ? <EmptyState title="Nobody booked on this seat" /> : rows.map((r) => <PassengerCard key={`${r.pnr}-${r.ticketId}`} tripId={tripId} row={r} party={all.filter((x) => x.pnr === r.pnr && x.seatNumber !== r.seatNumber && x.ticketStatus !== 'cancelled')} onChanged={onChanged} />)}
       </div>
     </Modal>
   );
 }
 
-function PassengerCard({ tripId, row, onChanged }: { tripId: string; row: ManifestRow; onChanged: () => void }) {
+function PassengerCard({ tripId, row, party, onChanged }: { tripId: string; row: ManifestRow; party: ManifestRow[]; onChanged: () => void }) {
   const toast = useToast();
   const [count, setCount] = useState(row.luggageCount ?? 0);
   const [tags, setTags] = useState<string[]>(row.luggageTags ?? []);
@@ -361,12 +363,14 @@ function PassengerCard({ tripId, row, onChanged }: { tripId: string; row: Manife
         <Badge tone={out ? 'neutral' : boarded ? 'success' : row.ticketStatus === 'no_show' ? 'danger' : 'warning'}>{out ? 'checked out' : boarded ? 'on board' : row.ticketStatus === 'no_show' ? 'no-show' : 'to board'}</Badge>
       </div>
       <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+        <dt className="text-text-muted">Seat</dt><dd className="font-semibold text-text">{row.seatNumber}</dd>
         <dt className="text-text-muted">PNR</dt><dd className="font-mono text-text">{row.pnr}</dd>
         <dt className="text-text-muted">Mobile</dt><dd><a className="text-primary" href={`tel:${row.contactPhone}`}><Phone className="inline h-3 w-3" /> {row.contactPhone}</a></dd>
         <dt className="text-text-muted">Boards at</dt><dd className="text-text">{row.boardingPoint ?? '—'}{row.boardsAt ? ` · ${formatTime(row.boardsAt)}` : ''}</dd>
         <dt className="text-text-muted">Gets off at</dt><dd className="text-text">{row.droppingPoint ?? '—'}</dd>
         {row.boardedAt && <><dt className="text-text-muted">Checked in</dt><dd className="text-text">{formatTime(row.boardedAt)}</dd></>}
         {row.checkedOutAt && <><dt className="text-text-muted">Checked out</dt><dd className="text-text">{formatTime(row.checkedOutAt)}</dd></>}
+        {party.length > 0 && <><dt className="text-text-muted">Travelling with</dt><dd className="text-text">{party.map((p) => `${p.fullName} (${p.seatNumber})`).join(', ')}</dd></>}
       </dl>
       {row.ladiesSeat && row.gender && row.gender !== 'female' && <div className="mt-2 text-xs text-danger">Ladies seat — a man cannot sit here; move him or call the depot.</div>}
 

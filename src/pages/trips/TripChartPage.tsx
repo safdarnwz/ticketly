@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { TripCrewCard } from './TripCrewCard';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ban, Bus as BusIcon, CheckCircle2, Clock, Lock, PauseCircle, PlayCircle, Printer, TimerReset, Unlock, XCircle } from 'lucide-react';
@@ -136,6 +137,8 @@ export function TripChartPage() {
           {locked && <span className="self-center text-sm text-text-muted"><Ban className="mr-1 inline h-4 w-4" />{t.status === 'cancelled' ? 'This trip was cancelled.' : 'This bus has left — the chart is read-only.'}</span>}
         </CardBody>
       </Card>
+
+      <TripCrewCard trip={t} canEdit={!locked || t.status === 'departed'} busLabel={t.vehicleId ? vehicles.data?.items.find((v) => v.id === t.vehicleId)?.registrationNo ?? 'Bus assigned' : null} onChangeBus={() => setDialog('bus')} />
 
       <div className="mb-4 grid grid-cols-3 gap-3 md:grid-cols-6">
         {[

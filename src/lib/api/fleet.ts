@@ -15,7 +15,7 @@ export interface Renewals {
   licences: { crewId: string; fullName: string; licenceNo: string | null; expiresOn: string | null; daysLeft: number | null }[];
 }
 export const MAINTENANCE_KINDS = ['service', 'repair', 'inspection'] as const;
-export interface Duty { id: string; crewId: string; crewName: string; crewRole: string; tripId: string | null; tripLabel: string | null; startsAt: string; endsAt: string; drivingMinutes: number; attendance: 'pending' | 'present' | 'late' | 'absent'; overrideReason: string | null }
+export interface Duty { id: string; crewId: string; crewName: string; crewRole: string; crewPhone?: string | null; tripId: string | null; tripLabel: string | null; startsAt: string; endsAt: string; drivingMinutes: number; attendance: 'pending' | 'present' | 'late' | 'absent'; overrideReason: string | null }
 
 export interface VehicleDocument {
   id: string; docType: string; documentNo: string | null; validFrom: string | null; expiresOn: string | null;
@@ -87,6 +87,8 @@ export const fleetApi = {
 
   /** Upcoming duties, or every duty of one day (its attendance sheet). */
   listDuties: (date?: string) => get<{ duties: Duty[] }>(`/v1/fleet/crew/duties${date ? `?date=${date}` : ''}`),
+  /** Everyone on duty for one trip — its drivers and conductor / attendants. */
+  tripCrew: (tripId: string) => get<{ duties: Duty[] }>(`/v1/fleet/crew/duties?tripId=${tripId}`),
   assignDuty: (input: { crewId: string; tripId?: string; startsAt: string; endsAt: string; drivingMinutes: number; overrideReason?: string }) =>
     post<{ id: string }>('/v1/fleet/crew/duties', input),
   cancelDuty: (id: string) => post<{ ok: boolean }>(`/v1/fleet/crew/duties/${id}/cancel`, {}),
