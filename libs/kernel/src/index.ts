@@ -25,3 +25,4 @@ export * from './domain/value-object';
 export * from './domain/aggregate-root';
 export * from './concurrency';
 export * from './csv';
+export * from './brand-palette';

@@ -1,3 +1,5 @@
+import { BRAND_PALETTE } from '@kernel';
+
 /**
  * ============================================================================
  *  Themed transactional email templates
@@ -22,14 +24,14 @@ export interface EmailPalette {
 }
 
 export const DEFAULT_EMAIL_PALETTE: EmailPalette = {
-  primary: '#3F5475',
-  primaryFg: '#FFFFFF',
-  accent: '#F0628F',
-  bg: '#FFFFFF',
-  surface: '#FFFFFF',
-  text: '#2F3E5C',
-  textMuted: '#8390A8',
-  border: '#E1E6EF',
+  primary: BRAND_PALETTE.primary,
+  primaryFg: BRAND_PALETTE.primaryFg,
+  accent: BRAND_PALETTE.accent,
+  bg: BRAND_PALETTE.bg,
+  surface: BRAND_PALETTE.surface,
+  text: BRAND_PALETTE.text,
+  textMuted: BRAND_PALETTE.textMuted,
+  border: BRAND_PALETTE.border,
 };
 
 function esc(s: string): string {
@@ -59,7 +61,7 @@ export function renderEmail(input: {
     : '';
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width"><title>${esc(input.title)}</title></head>
-<body style="margin:0;background:${p.bg};font-family:Inter,Segoe UI,Arial,sans-serif;color:${p.text}">
+<body style="margin:0;background:${p.bg};font-family:'Nunito Sans',Segoe UI,Arial,sans-serif;color:${p.text}">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${p.bg};padding:24px 0">
     <tr><td align="center">
       <table role="presentation" width="560" cellpadding="0" cellspacing="0"
@@ -131,11 +133,11 @@ export function renderBookingConfirmedEmail(opts: {
     heading: 'Your booking is confirmed ✅',
     bodyHtml: `<p>${opts.name ? `Hi ${esc(opts.name)}, ` : ''}your seats are booked.</p>
       <table role="presentation" style="width:100%;font-size:14px;margin-top:8px">
-        <tr><td style="padding:6px 0;color:#6B7280">PNR</td><td style="padding:6px 0;text-align:right;font-weight:700">${esc(opts.pnr)}</td></tr>
-        <tr><td style="padding:6px 0;color:#6B7280">Route</td><td style="padding:6px 0;text-align:right">${esc(opts.route)}</td></tr>
-        <tr><td style="padding:6px 0;color:#6B7280">Departs</td><td style="padding:6px 0;text-align:right">${esc(opts.departAt)}</td></tr>
-        <tr><td style="padding:6px 0;color:#6B7280">Seats</td><td style="padding:6px 0;text-align:right">${esc(opts.seats)}</td></tr>
-        <tr><td style="padding:6px 0;color:#6B7280">Total paid</td><td style="padding:6px 0;text-align:right;font-weight:700">${esc(opts.totalFormatted)}</td></tr>
+        <tr><td style="padding:6px 0;color:${(opts.palette ?? DEFAULT_EMAIL_PALETTE).textMuted}">PNR</td><td style="padding:6px 0;text-align:right;font-weight:700">${esc(opts.pnr)}</td></tr>
+        <tr><td style="padding:6px 0;color:${(opts.palette ?? DEFAULT_EMAIL_PALETTE).textMuted}">Route</td><td style="padding:6px 0;text-align:right">${esc(opts.route)}</td></tr>
+        <tr><td style="padding:6px 0;color:${(opts.palette ?? DEFAULT_EMAIL_PALETTE).textMuted}">Departs</td><td style="padding:6px 0;text-align:right">${esc(opts.departAt)}</td></tr>
+        <tr><td style="padding:6px 0;color:${(opts.palette ?? DEFAULT_EMAIL_PALETTE).textMuted}">Seats</td><td style="padding:6px 0;text-align:right">${esc(opts.seats)}</td></tr>
+        <tr><td style="padding:6px 0;color:${(opts.palette ?? DEFAULT_EMAIL_PALETTE).textMuted}">Total paid</td><td style="padding:6px 0;text-align:right;font-weight:700">${esc(opts.totalFormatted)}</td></tr>
       </table>`,
     cta: { label: 'View / print ticket', url: 'https://ticketly.com/bookings' },
   });
@@ -150,7 +152,9 @@ export function renderOperatorStatusEmail(opts: {
   /** The operator's OWN console URL (`https://app.<slug>.ticketly.com`) — only set when approved. */
   consoleUrl?: string;
 }): string {
-  const reasonHtml = opts.reason ? `<p style="color:#6B7280">Reason: ${esc(opts.reason)}</p>` : '';
+  const reasonHtml = opts.reason
+    ? `<p style="color:${(opts.palette ?? DEFAULT_EMAIL_PALETTE).textMuted}">Reason: ${esc(opts.reason)}</p>`
+    : '';
   const name = esc(opts.name);
   const variants = {
     approved: {

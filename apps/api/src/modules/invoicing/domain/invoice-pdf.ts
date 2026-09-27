@@ -1,5 +1,7 @@
 import PDFDocument from 'pdfkit';
 
+import { BRAND_PALETTE as P } from '@kernel';
+
 import { amountInWords, formatInvoiceDate, type InvoiceDocument } from './invoice-document';
 
 // The built-in PDF fonts have no rupee glyph.
@@ -32,12 +34,12 @@ export function renderInvoicePdf(doc: InvoiceDocument): Promise<Buffer> {
       }
     }
 
-    pdf.fontSize(18).fillColor('#000').text('TAX INVOICE', left, 50);
-    pdf.fontSize(9).fillColor('#555').text('Issued under Rule 46, CGST Rules, 2017');
+    pdf.fontSize(18).fillColor(P.primary).text('TAX INVOICE', left, 50);
+    pdf.fontSize(9).fillColor(P.textMuted).text('Issued under Rule 46, CGST Rules, 2017');
     pdf.moveDown(1);
 
-    pdf.fontSize(12).fillColor('#000').text(doc.supplier.legalName);
-    pdf.fontSize(9).fillColor('#333');
+    pdf.fontSize(12).fillColor(P.text).text(doc.supplier.legalName);
+    pdf.fontSize(9).fillColor(P.text);
     if (doc.supplier.name !== doc.supplier.legalName) pdf.text(`Trading as ${doc.supplier.name}`);
     if (doc.supplier.gstin) pdf.text(`GSTIN: ${doc.supplier.gstin}`);
     if (doc.supplier.pan) pdf.text(`PAN: ${doc.supplier.pan}`);
@@ -47,10 +49,10 @@ export function renderInvoicePdf(doc: InvoiceDocument): Promise<Buffer> {
     // Two columns of details.
     const top = pdf.y;
     const pair = (k: string, v: string, x: number, y: number) => {
-      pdf.fontSize(8).fillColor('#666').text(k, x, y, { width: 230 });
+      pdf.fontSize(8).fillColor(P.textMuted).text(k, x, y, { width: 230 });
       pdf
         .fontSize(10)
-        .fillColor('#000')
+        .fillColor(P.text)
         .text(v, x, y + 10, { width: 230 });
     };
     pair('Invoice number', doc.invoiceNumber, left, top);
@@ -90,11 +92,11 @@ export function renderInvoicePdf(doc: InvoiceDocument): Promise<Buffer> {
           { t: 'CGST', x: 390, w: 70, a: 'right' as const },
           { t: 'SGST', x: 465, w: 75, a: 'right' as const },
         ];
-    pdf.rect(left, y, width, 20).fill('#1f2937');
+    pdf.rect(left, y, width, 20).fill(P.primary);
     pdf.fontSize(9).fillColor('#fff');
     for (const c of cols) pdf.text(c.t, c.x, y + 6, { width: c.w, align: c.a });
     y += 26;
-    pdf.fillColor('#000');
+    pdf.fillColor(P.text);
     for (const r of doc.rows) {
       const cells = [
         r.description,
@@ -108,14 +110,14 @@ export function renderInvoicePdf(doc: InvoiceDocument): Promise<Buffer> {
       pdf
         .moveTo(left, y - 5)
         .lineTo(left + width, y - 5)
-        .strokeColor('#ddd')
+        .strokeColor(P.border)
         .stroke();
     }
 
     // Totals.
     y += 6;
     const total = (k: string, v: string, bold = false) => {
-      pdf.fontSize(bold ? 11 : 9).fillColor(bold ? '#000' : '#333');
+      pdf.fontSize(bold ? 11 : 9).fillColor(P.text);
       pdf.text(k, 300, y, { width: 140, align: 'right' });
       pdf.text(v, 440, y, { width: 100, align: 'right' });
       y += bold ? 18 : 14;
@@ -127,12 +129,12 @@ export function renderInvoicePdf(doc: InvoiceDocument): Promise<Buffer> {
 
     pdf
       .fontSize(9)
-      .fillColor('#000')
+      .fillColor(P.text)
       .text(`Amount in words: ${amountInWords(doc.totalMinor)}`, left, y + 8, { width });
 
     pdf
       .fontSize(8)
-      .fillColor('#888')
+      .fillColor(P.textMuted)
       .text('This is a computer-generated invoice and does not require a signature.', left, 770, {
         width,
         align: 'center',

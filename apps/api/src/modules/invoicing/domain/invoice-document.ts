@@ -1,3 +1,5 @@
+import { BRAND_PALETTE } from '@kernel';
+
 import { computeGstInvoice } from './gst-invoice';
 
 /**
@@ -209,8 +211,9 @@ export function invoiceText(doc: InvoiceDocument): string {
 
 /** The invoice laid out in the email body (the PDF is attached too). */
 export function renderInvoiceEmail(doc: InvoiceDocument): string {
-  const muted = 'color:#6b7280;font-size:12px';
-  const cell = 'padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:13px';
+  const P = BRAND_PALETTE;
+  const muted = `color:${P.textMuted};font-size:12px`;
+  const cell = `padding:6px 8px;border-bottom:1px solid ${P.border};font-size:13px`;
   const num = `${cell};text-align:right;white-space:nowrap`;
   const kv = (k: string, v: string | null) =>
     v
@@ -230,14 +233,14 @@ export function renderInvoiceEmail(doc: InvoiceDocument): string {
     .join('');
   const span = doc.interState ? 2 : 3;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(invoiceSubject(doc))}</title></head>
-<body style="margin:0;padding:16px;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#111827">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px">
-<tr><td style="padding:18px 20px;border-bottom:1px solid #e5e7eb">
-  <div style="font-size:12px;letter-spacing:1px;color:#6b7280">TAX INVOICE</div>
+<body style="margin:0;padding:16px;background:${P.bg};font-family:Arial,Helvetica,sans-serif;color:${P.text}">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;margin:0 auto;background:${P.surface};border:1px solid ${P.border};border-top:5px solid ${P.primary};border-radius:16px">
+<tr><td style="padding:18px 20px;border-bottom:1px solid ${P.border}">
+  <div style="font-size:12px;letter-spacing:1px;color:${P.accent};font-weight:700">TAX INVOICE</div>
   <div style="font-size:18px;font-weight:700;margin-top:4px">${esc(doc.supplier.name)}</div>
   <div style="${muted}">Invoice ${esc(doc.invoiceNumber)} · ${esc(formatInvoiceDate(doc.invoiceDate, doc.timeZone))}</div>
 </td></tr>
-<tr><td style="padding:14px 20px;border-bottom:1px solid #e5e7eb">
+<tr><td style="padding:14px 20px;border-bottom:1px solid ${P.border}">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
     ${kv('Customer name', doc.recipient.name)}
     ${kv('Customer email', doc.recipient.email)}
@@ -258,10 +261,10 @@ export function renderInvoiceEmail(doc: InvoiceDocument): string {
     <tr><th style="${cell};text-align:left">Description</th><th style="${num}">Taxable value</th>${taxHead}</tr>
     ${rows}
     ${doc.roundOffMinor ? `<tr><td style="${cell}" colspan="${span}">Round off</td><td style="${num}">${rs(doc.roundOffMinor)}</td></tr>` : ''}
-    <tr><td style="${cell};font-weight:700" colspan="${span}">Total (incl. GST)</td><td style="${num};font-weight:700">${rs(doc.totalMinor)}</td></tr>
+    <tr><td style="${cell};font-weight:700" colspan="${span}">Total (incl. GST)</td><td style="${num};font-weight:700;color:${P.info}">${rs(doc.totalMinor)}</td></tr>
   </table>
   <div style="font-size:13px;margin:10px 8px 0"><span style="${muted}">Amount in words:</span> ${esc(amountInWords(doc.totalMinor))}</div>
 </td></tr>
-<tr><td style="padding:12px 20px;border-top:1px solid #e5e7eb;${muted}">The PDF copy is attached. This is a computer-generated invoice and needs no signature. Your e-ticket was sent in a separate email.</td></tr>
+<tr><td style="padding:12px 20px;border-top:1px solid ${P.border};${muted}">The PDF copy is attached. This is a computer-generated invoice and needs no signature. Your e-ticket was sent in a separate email.</td></tr>
 </table></body></html>`;
 }
