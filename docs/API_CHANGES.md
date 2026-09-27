@@ -502,10 +502,10 @@ an unknown id is now 404 (was 200).
 - **Add-ons:** new `GET /me/ancillaries/catalogue` (every add-on, stopped ones too, with `active`); saving an
   add-on takes `active` (default true) to stop or resume selling it. Codes are `a-z 0-9 _ -` (lower-cased, ≤40),
   names at least 2 characters, price at most ₹10,000.
-- **Default look:** `GET /v1/appearance` returns the new default theme when no platform or role theme is saved —
-  slate-navy primary `#3F5475`, pink accent `#F0628F`, purple secondary `#7B4FB3`, sky-blue info `#2BA8F0`,
-  background `#F4F6FB`, Nunito Sans, rounder corners (12 / 18 / 24) and soft shadows. The e-ticket (page and email),
-  the GST invoice (email and PDF) and notification emails use the same colours (`BRAND_PALETTE` in the kernel).
+- **Customer look for documents:** the e-ticket (page and email), the GST invoice (email and PDF) and notification
+  emails use the customer storefront's colours — slate-navy `#3F5475`, pink `#F0628F`, purple `#7B4FB3`, sky-blue
+  `#2BA8F0`, background `#F4F6FB` (`BRAND_PALETTE` in the kernel). `GET /v1/appearance` is unchanged: its default stays
+  the black-and-white console theme; the web storefront applies its customer look on the customer host only.
 - **Pickup / drop point charges:** new `GET /master-data/routes/:id/point-charges` and
   `PUT /master-data/routes/:id/point-charges {items: [{stopId, boardChargeMinor 0–100000, dropChargeMinor 0–100000}]}`
   (per seat, paise; stops not listed keep theirs). 422 for an archived route, a stop not on the route, a stop listed

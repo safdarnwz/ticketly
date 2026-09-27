@@ -1,8 +1,9 @@
 /**
- * Ticketly's default colours for documents made outside the browser — the
- * e-ticket page and email, the GST invoice (HTML and PDF), notification emails.
- * The same values as the default theme (appearance module), so a printed
- * ticket looks like the app.
+ * The customer look for documents made outside the browser — the e-ticket page
+ * and email, the GST invoice (HTML and PDF), notification emails. The same
+ * colours as the web storefront's customer theme, so a printed ticket looks
+ * like the app the passenger booked on. (Operator and platform consoles keep
+ * the default black-and-white theme of the appearance module.)
  */
 export const BRAND_PALETTE = {
   primary: '#3F5475',
