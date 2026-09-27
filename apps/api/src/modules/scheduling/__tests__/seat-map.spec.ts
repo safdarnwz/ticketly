@@ -6,6 +6,7 @@ function service(opts: { segment?: { fromSeq: number; toSeq: number } | null } =
   const trips = {
     getById: async () => ({ id: 't1', routeId: 'r1', seatLayoutId: 'l1', status: 'open' }),
     luggagePolicy: async () => null,
+    serviceCode: async () => 'DEL-JAI-2130',
     loadStops: async () => [
       { sequence: 0, stopId: 's0', canBoard: true, canAlight: false },
       { sequence: 1, stopId: 's1', canBoard: false, canAlight: true },
@@ -72,6 +73,7 @@ function service(opts: { segment?: { fromSeq: number; toSeq: number } | null } =
     trips as never,
     inventory as never,
     layouts as never,
+    {} as never,
   );
 }
 
@@ -118,5 +120,7 @@ describe('SchedulingService.tripDetail', () => {
     const d = await service().tripDetail('t1' as never);
     expect(d.stops.map((s) => s.name)).toEqual(['Kashmere Gate', null]);
     expect(d.luggage).toBeNull();
+    // The trip is its service on a date: DEL-JAI-2130 on that day.
+    expect(d.trip.serviceCode).toBe('DEL-JAI-2130');
   });
 });

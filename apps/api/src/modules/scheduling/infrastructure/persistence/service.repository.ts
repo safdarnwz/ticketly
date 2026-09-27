@@ -76,6 +76,64 @@ export class ServiceRepository {
     return id;
   }
 
+  /** City codes of a route's ends (DEL, PAT) — service codes are built from them. */
+  async routeCityCodes(
+    routeId: RouteId,
+  ): Promise<{ origin: string | null; dest: string | null } | null> {
+    const row = await this.db.queryOne<{ origin: string | null; dest: string | null }>(
+      `SELECT oc.code AS origin, dc.code AS dest
+         FROM routes r
+         JOIN cities oc ON oc.id = r.origin_city_id
+         JOIN cities dc ON dc.id = r.dest_city_id
+        WHERE r.tenant_id = $1 AND r.id = $2`,
+      [requireTenantId(), routeId],
+      { name: 'service.routeCityCodes', primary: true },
+    );
+    return row ?? null;
+  }
+
+  /**
+   * Serialise code picking for one base within the transaction, so two
+   * services created at once at the same time cannot both take DEL-PAT-2130-B.
+   */
+  async lockCode(base: string): Promise<void> {
+    await this.db.execute_(
+      `SELECT pg_advisory_xact_lock(hashtext('service-code:' || $1::text || ':' || $2::text))`,
+      [requireTenantId(), base],
+      { name: 'service.lockCode', primary: true },
+    );
+  }
+
+  /**
+   * This operator's services named `base` or `base-<letter>`: whether each is
+   * still running and whether it leaves the same cities at the same time.
+   */
+  codeHolders(
+    base: string,
+    slot: { originCode: string; destCode: string; startMinute: number },
+  ): Promise<{ id: string; code: string; live: boolean; sameSlot: boolean }[]> {
+    return this.db.query(
+      `SELECT s.id, s.code,
+              (s.deleted_at IS NULL AND s.status <> 'ended') AS live,
+              (oc.code = $3 AND dc.code = $4 AND s.start_minute = $5) AS "sameSlot"
+         FROM services s
+         JOIN routes r ON r.id = s.route_id
+         JOIN cities oc ON oc.id = r.origin_city_id
+         JOIN cities dc ON dc.id = r.dest_city_id
+        WHERE s.tenant_id = $1 AND (s.code = $2 OR s.code ~ ('^' || $2 || '-[A-Z]$'))`,
+      [requireTenantId(), base, slot.originCode, slot.destCode, slot.startMinute],
+      { name: 'service.codeHolders', primary: true },
+    );
+  }
+
+  async renameCode(id: string, code: string): Promise<void> {
+    await this.db.execute_(
+      `UPDATE services SET code = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2`,
+      [requireTenantId(), id, code],
+      { name: 'service.renameCode', primary: true },
+    );
+  }
+
   async getById(id: ServiceId): Promise<ServiceRecord> {
     const row = await this.db.queryOne<Row>(
       `SELECT id, code, route_id, vehicle_type_id, default_vehicle_id, start_minute, recurrence, status

@@ -18,6 +18,8 @@ import {
   BadRequestError,
   getUserId,
   localDate,
+  minuteOfDay,
+  type RouteId,
   type ServiceId,
   type StopId,
   type TripId,
@@ -32,6 +34,8 @@ import {
   ReleaseHoldsSchema,
   TripRemarkSchema,
   TripListQuerySchema,
+  ServiceCodePreviewSchema,
+  type ServiceCodePreviewDto,
   type TripListQuery,
   type BlockSeatsDto,
   type SalesRulesDto,
@@ -44,6 +48,7 @@ import {
 import { InventoryRepository } from '../infrastructure/persistence/inventory.repository';
 import { MaterializationService } from '../application/services/materialization.service';
 import { SchedulingService } from '../application/services/scheduling.service';
+import { ServiceCodes } from '../application/services/service-codes';
 import { ServiceRepository } from '../infrastructure/persistence/service.repository';
 import { TripRepository } from '../infrastructure/persistence/trip.repository';
 
@@ -58,6 +63,7 @@ export class SchedulingController {
     private readonly trips: TripRepository,
     private readonly inventory: InventoryRepository,
     private readonly services: ServiceRepository,
+    private readonly codes: ServiceCodes,
   ) {}
 
   @Get('services')
@@ -67,12 +73,26 @@ export class SchedulingController {
     return { services: await this.services.listAll() };
   }
 
+  @Get('services/code-preview')
+  @RequirePermission(Permission.SERVICE_READ)
+  @ApiOperation({
+    summary:
+      'The code a new service on this route at this time would get (DEL-PAT-1500, or -B when one already leaves then)',
+  })
+  codePreview(@Query(zodQuery(ServiceCodePreviewSchema)) q: ServiceCodePreviewDto) {
+    return this.codes.preview(q.routeId as RouteId, minuteOfDay(q.startTime));
+  }
+
   @Post('services')
   @HttpCode(201)
+  @Idempotent()
   @RequirePermission(Permission.SERVICE_MANAGE)
-  @ApiOperation({ summary: 'Create a recurring service' })
+  @ApiOperation({
+    summary:
+      'Create a recurring service. Without a code it is named from its route and time (DEL-PAT-1500); a second one at that time makes them -A and -B',
+  })
   async createService(@Body(zodBody(CreateServiceSchema)) dto: CreateServiceDto) {
-    return { id: await this.scheduling.createService(dto as never) };
+    return this.scheduling.createService(dto as never);
   }
 
   @Post('services/:id/activate')

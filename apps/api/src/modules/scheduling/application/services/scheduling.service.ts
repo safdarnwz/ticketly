@@ -8,6 +8,7 @@ import {
   getUserId,
   minuteOfDay,
   requireTenantId,
+  type RouteId,
   type ServiceId,
   type StopId,
   type TripId,
@@ -17,6 +18,7 @@ import { expandRecurrence, type RecurrenceRule } from '../../domain/recurrence';
 import { salesRulesErrors, type ServiceSalesRules } from '../../domain/sales-rules';
 import { reservedSeats } from '../../domain/seat-neighbours';
 import { MaterializationService } from './materialization.service';
+import { ServiceCodes } from './service-codes';
 import { ServiceRepository } from '../../infrastructure/persistence/service.repository';
 import { TripRepository } from '../../infrastructure/persistence/trip.repository';
 import {
@@ -53,19 +55,22 @@ export class SchedulingService {
     private readonly trips: TripRepository,
     private readonly inventory: InventoryRepository,
     private readonly layouts: SeatLayoutRepository,
+    private readonly codes: ServiceCodes,
   ) {}
 
   /** A trip and its stop timetable, each stop with its name (the passenger picks boarding / dropping from these). */
   async tripDetail(tripId: TripId) {
     const trip = await this.trips.getById(tripId);
-    const [stops, names, luggage] = await Promise.all([
+    const [stops, names, luggage, serviceCode] = await Promise.all([
       this.trips.loadStops(tripId),
       this.routes.stopsWithNames(trip.routeId),
       this.trips.luggagePolicy(tripId),
+      this.trips.serviceCode(tripId),
     ]);
     const byId = new Map(names.map((n) => [n.id, n]));
     return {
-      trip,
+      // The trip is "DEL-PAT-1500 on 30 Sep": its service's name and its date.
+      trip: { ...trip, serviceCode },
       // Each stop with the operator's per-seat pickup / drop charge there (0 = none).
       stops: stops.map((s) => {
         const ref = byId.get(s.stopId);
@@ -137,13 +142,13 @@ export class SchedulingService {
   }
 
   async createService(input: {
-    code: string;
+    code?: string;
     routeId: string;
     vehicleTypeId: string;
     defaultVehicleId?: string;
     startTime: string;
     recurrence: RecurrenceRule;
-  }): Promise<ServiceId> {
+  }): Promise<{ id: ServiceId; code: string; renamed?: { from: string; to: string } }> {
     // Validate the recurrence rule up front (throws on a bad rule) and confirm
     // the route is published.
     expandRecurrence(input.recurrence, input.recurrence.startDate, input.recurrence.startDate);
@@ -155,18 +160,34 @@ export class SchedulingService {
       );
     }
 
+    const startMinute = minuteOfDay(input.startTime);
     return this.uow.run({ name: 'service.create', tenantId: requireTenantId() }, async () => {
-      const id = await this.services.create({
+      const { code, renamed } = await this.codes.pick({
         code: input.code,
+        routeId: input.routeId as RouteId,
+        startMinute,
+      });
+      const id = await this.services.create({
+        code,
         routeId: input.routeId as never,
         vehicleTypeId: input.vehicleTypeId as never,
         defaultVehicleId: input.defaultVehicleId as never,
-        startMinute: minuteOfDay(input.startTime),
+        startMinute,
         recurrence: input.recurrence,
       });
-      await this.services.snapshotVersion(id, 'Created', getUserId() ?? null);
-      return id;
+      await this.services.snapshotVersion(id, `Created as ${code}`, getUserId() ?? null);
+      if (renamed) await this.recordRename(renamed, code);
+      return { id, code, ...(renamed ? { renamed: { from: renamed.from, to: renamed.to } } : {}) };
     });
+  }
+
+  /** The service that had the plain code is now -A: say so in its history. */
+  private async recordRename(r: { id: ServiceId; from: string; to: string }, joined: string) {
+    await this.services.snapshotVersion(
+      r.id,
+      `Code ${r.from} → ${r.to}: ${joined} now leaves at the same time`,
+      getUserId() ?? null,
+    );
   }
 
   /** OTA release % and women / senior seat quotas of a service (#170, #173, #174). */

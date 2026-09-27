@@ -14,6 +14,7 @@ import { TimetableService } from './application/services/timetable.service';
 import { RouteBlackoutRepository } from './infrastructure/persistence/route-blackout.repository';
 import { TimetableController } from './presentation/timetable.controller';
 import { SchedulingService } from './application/services/scheduling.service';
+import { ServiceCodes } from './application/services/service-codes';
 import { ServiceRepository } from './infrastructure/persistence/service.repository';
 import { TripRepository } from './infrastructure/persistence/trip.repository';
 
@@ -38,6 +39,7 @@ import { TripRepository } from './infrastructure/persistence/trip.repository';
     InventoryRepository,
     MaterializationService,
     SchedulingService,
+    ServiceCodes,
     TimetableService,
     RouteBlackoutRepository,
   ],

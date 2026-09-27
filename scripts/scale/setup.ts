@@ -716,6 +716,7 @@ async function setupNetwork(
               : { frequency: 'daily', startDate: '2026-09-01', endDate: '2026-10-10' },
           },
           own,
+          `service-${r.id}-${start}`,
         ),
         `service ${r.code}`,
       );

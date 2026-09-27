@@ -729,7 +729,7 @@ CONFLICT 11, DONE 260, DUP 2, GAP 63, INFRA 3, PROCESS 2
 | 685 | Map all pickup points for the route | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops → create route, cities, stops, km, running time, boarding/drop points |
 | 686 | Map all drop points for the route | DONE | DONE | verified manually: existing module/API · UI: Routes & Stops → create route, cities, stops, km, running time, boarding/drop points |
 | 687 | Create new service schedule | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
-| 688 | Set service name or number | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
+| 688 | Set service name or number | DONE | DONE | Code from route + time (DEL-PAT-1500), -A/-B when two leave together, per operator; own code optional (POST /scheduling/services, GET …/code-preview) · e2e service-codes · UI: Schedule → New service (name preview), Trips list + chart show code and bus |
 | 689 | Set departure time | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
 | 690 | Set arrival time | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |
 | 691 | Configure daily recurrence | DONE | DONE | verified manually: existing module/API · UI: Schedule → Manage service |

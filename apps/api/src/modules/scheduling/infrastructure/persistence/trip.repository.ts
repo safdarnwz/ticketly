@@ -231,6 +231,17 @@ export class TripRepository {
     return n > 0;
   }
 
+  /** The name of the trip's service (DEL-PAT-1500); null for a one-off trip. */
+  async serviceCode(tripId: TripId): Promise<string | null> {
+    const row = await this.db.queryOne<{ code: string | null }>(
+      `SELECT s.code FROM trips t LEFT JOIN services s ON s.id = t.service_id
+        WHERE t.tenant_id = $1 AND t.id = $2`,
+      [requireTenantId(), tripId],
+      { name: 'trip.serviceCode' },
+    );
+    return row?.code ?? null;
+  }
+
   /** Closed channels split by where they were closed: this trip, or its whole service. */
   async channelState(
     tripId: TripId,
@@ -409,6 +420,10 @@ export class TripRepository {
   ): Promise<
     (TripRecord & {
       routeName: string;
+      /** The service's name (DEL-PAT-1500); null for a one-off trip. */
+      serviceCode: string | null;
+      /** The bus on this trip today — it can differ day to day. */
+      busNumber: string | null;
       occupancyPct: number;
       bookedSeats: number;
       heldSeats: number;
@@ -418,16 +433,24 @@ export class TripRepository {
     // needed), or everything still to leave. Seats: paid, and held by a
     // customer paying right now (an expired hold holds nothing).
     const rows = await this.db.query<
-      Row & { route_name: string; booked_seats: string; held_seats: string }
+      Row & {
+        route_name: string;
+        service_code: string | null;
+        bus_number: string | null;
+        booked_seats: string;
+        held_seats: string;
+      }
     >(
       `SELECT t.id, t.service_id, t.route_id, t.vehicle_id, t.seat_layout_id, t.journey_date,
               t.departs_at, t.arrives_at, t.stop_count, t.total_seats, t.status,
-              r.name AS route_name,
+              r.name AS route_name, s.code AS service_code, v.registration_no AS bus_number,
               coalesce((SELECT sum(b.seat_count) FROM bookings b
                          WHERE b.trip_id = t.id AND b.status IN ('confirmed', 'completed')), 0) AS booked_seats,
               coalesce((SELECT sum(b.seat_count) FROM bookings b
                          WHERE b.trip_id = t.id AND b.status = 'held' AND b.hold_expires_at > now()), 0) AS held_seats
          FROM trips t JOIN routes r ON r.id = t.route_id
+         LEFT JOIN services s ON s.id = t.service_id
+         LEFT JOIN vehicles v ON v.id = t.vehicle_id
         WHERE t.tenant_id = $1
           AND (CASE WHEN $3::date IS NULL THEN t.departs_at > now() AND t.status != 'cancelled'
                     ELSE t.journey_date = $3::date END)
@@ -438,6 +461,8 @@ export class TripRepository {
     return rows.map((r) => ({
       ...map(r),
       routeName: r.route_name,
+      serviceCode: r.service_code,
+      busNumber: r.bus_number,
       bookedSeats: Number(r.booked_seats),
       heldSeats: Number(r.held_seats),
       occupancyPct:

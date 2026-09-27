@@ -23,6 +23,7 @@ import { expandRecurrence, type RecurrenceRule } from '../../domain/recurrence';
 import { RouteBlackoutRepository } from '../../infrastructure/persistence/route-blackout.repository';
 import { ServiceRepository } from '../../infrastructure/persistence/service.repository';
 import { TripRepository } from '../../infrastructure/persistence/trip.repository';
+import { ServiceCodes } from './service-codes';
 
 /** A trip is moved at most this far in one go; beyond that, cancel and run an extra trip. */
 const MAX_SHIFT_MINUTES = 12 * 60;
@@ -46,6 +47,7 @@ export class TimetableService {
     private readonly uow: UnitOfWork,
     private readonly events: EventBus,
     private readonly config: AppConfig,
+    private readonly codes: ServiceCodes,
   ) {}
 
   async updateTimetable(
@@ -125,14 +127,14 @@ export class TimetableService {
   async clone(
     sourceId: ServiceId,
     input: {
-      code: string;
+      code?: string;
       startDate: string;
       endDate: string;
       startTime?: string;
       weekdays?: number[];
       season?: boolean;
     },
-  ): Promise<{ id: ServiceId }> {
+  ): Promise<{ id: ServiceId; code: string }> {
     const source = await this.services.getById(sourceId);
     if (input.startDate < this.today()) throw validation('A copy cannot start in the past');
     const recurrence: RecurrenceRule = {
@@ -144,13 +146,21 @@ export class TimetableService {
       additions: [],
     };
     validateRule(recurrence);
+    const startMinute = input.startTime ? minuteOfDay(input.startTime) : source.startMinute;
     return this.uow.run({ name: 'service.clone', tenantId: requireTenantId() }, async () => {
-      const id = await this.services.clone(sourceId, {
+      const { code, renamed } = await this.codes.pick({
         code: input.code,
-        startMinute: input.startTime ? minuteOfDay(input.startTime) : source.startMinute,
-        recurrence,
+        routeId: source.routeId,
+        startMinute,
       });
+      const id = await this.services.clone(sourceId, { code, startMinute, recurrence });
       await this.services.snapshotVersion(id, `Cloned from ${source.code}`, getUserId() ?? null);
+      if (renamed)
+        await this.services.snapshotVersion(
+          renamed.id,
+          `Code ${renamed.from} → ${renamed.to}: ${code} now leaves at the same time`,
+          getUserId() ?? null,
+        );
       if (input.season) {
         const seasonDates = expandRecurrence(
           recurrence,
@@ -166,11 +176,11 @@ export class TimetableService {
         });
         await this.services.snapshotVersion(
           sourceId,
-          `Season ${input.code} (${input.startDate} – ${input.endDate}) runs instead`,
+          `Season ${code} (${input.startDate} – ${input.endDate}) runs instead`,
           getUserId() ?? null,
         );
       }
-      return { id };
+      return { id, code };
     });
   }
 

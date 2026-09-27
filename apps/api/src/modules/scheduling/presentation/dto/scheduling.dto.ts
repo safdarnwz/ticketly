@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { normaliseServiceCode, SERVICE_CODE_PATTERN } from '../../domain/service-code';
+
 const uuid = z.string().uuid();
 const localDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
 
@@ -13,8 +15,21 @@ export const RecurrenceSchema = z.object({
   additions: z.array(localDate).optional(),
 });
 
+/**
+ * Optional: left empty, the service is named from its route and time —
+ * DEL-PAT-1500, or DEL-PAT-2130-A / -B when two leave together.
+ */
+const serviceCode = z
+  .string()
+  .max(60)
+  .transform(normaliseServiceCode)
+  .refine((c) => c === '' || SERVICE_CODE_PATTERN.test(c), {
+    message: 'Use 2–40 letters, digits and single hyphens, like DEL-PAT-1500',
+  })
+  .optional();
+
 export const CreateServiceSchema = z.object({
-  code: z.string().min(1).max(40),
+  code: serviceCode,
   routeId: uuid,
   vehicleTypeId: uuid,
   defaultVehicleId: uuid.optional(),
@@ -22,6 +37,13 @@ export const CreateServiceSchema = z.object({
   recurrence: RecurrenceSchema,
 });
 export type CreateServiceDto = z.infer<typeof CreateServiceSchema>;
+
+/** GET /scheduling/services/code-preview — the name a new service would get. */
+export const ServiceCodePreviewSchema = z.object({
+  routeId: uuid,
+  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Expected HH:MM'),
+});
+export type ServiceCodePreviewDto = z.infer<typeof ServiceCodePreviewSchema>;
 
 export const PreviewDatesSchema = z.object({
   recurrence: RecurrenceSchema,
@@ -102,7 +124,7 @@ export type UpdateTimetableDto = z.infer<typeof UpdateTimetableSchema>;
 /** #266 / #272 — copy a service to other dates, optionally as a seasonal variant. */
 export const CloneServiceSchema = z
   .object({
-    code: z.string().trim().min(1).max(40),
+    code: serviceCode,
     startDate: localDate,
     endDate: localDate,
     startTime: hhmm.optional(),
