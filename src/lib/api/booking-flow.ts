@@ -34,6 +34,9 @@ export interface TripStop {
   departsAt: string;
   canBoard: boolean;
   canAlight: boolean;
+  /** Operator's extra per seat (paise, before GST) for boarding / getting off here. */
+  boardChargeMinor?: number;
+  dropChargeMinor?: number;
 }
 
 /** What the operator lets a passenger carry free, and what more costs. */
@@ -74,6 +77,8 @@ export interface Ancillary {
 export interface Quote {
   quoteId: string;
   totalMinor: number;
+  /** Per-seat pickup / drop charges included (paise, before GST). */
+  pointCharges?: { boardMinor: number; dropMinor: number };
   currency: string;
   expiresAt: string;
   /** One seat's price breakdown (base, taxes, discount, total). */

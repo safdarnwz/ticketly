@@ -1,4 +1,4 @@
-import { get, post, patch, del } from './client';
+import { get, post, patch, put, del } from './client';
 
 export interface City { id: string; name: string; state?: string }
 export interface Stop { id: string; name: string; kind: string; landmark?: string; address?: string; pincode?: string; isActive?: boolean; cityId?: string }
@@ -8,6 +8,8 @@ export interface RouteDetail extends RouteRow {
   timetable: { stopId: string; sequence: number; arrivesOffsetMin: number; departsOffsetMin: number }[];
   segments: unknown[];
 }
+/** A stop of a route with its per-seat pickup / drop charge (paise). */
+export interface PointCharge { stopId: string; name: string; sequence: number; canBoard: boolean; canAlight: boolean; boardChargeMinor: number; dropChargeMinor: number }
 export interface SeatLayoutRow { id: string; name: string; decks?: number; totalSeats?: number }
 export interface SeatLayoutVersion { versionNumber: number; name: string; changedBy: string | null; changeNote: string | null; createdAt: string; summary: { totalSeats: number; bookableSeats: number; seater: number; sleeper: number; semiSleeper: number; crewSeats: number; ladiesOnly: number; decks: number } }
 export interface VehicleType { id: string; name: string; code: string; isAc: boolean }
@@ -34,6 +36,9 @@ export const masterDataApi = {
   }) => post<{ id: string }>('/v1/master-data/routes', input),
   publishRoute: (id: string) => post<{ ok: boolean }>(`/v1/master-data/routes/${id}/publish`, {}),
   archiveRoute: (id: string) => post<{ ok: boolean }>(`/v1/master-data/routes/${id}/archive`, {}),
+  pointCharges: (id: string) => get<{ items: PointCharge[] }>(`/v1/master-data/routes/${id}/point-charges`),
+  setPointCharges: (id: string, items: { stopId: string; boardChargeMinor: number; dropChargeMinor: number }[]) =>
+    put<{ items: PointCharge[] }>(`/v1/master-data/routes/${id}/point-charges`, { items }),
   duplicateRoute: (id: string, code: string, name: string) => post<{ id: string }>(`/v1/master-data/routes/${id}/duplicate`, { code, name }),
 
   listSeatLayouts: () => get<{ items: SeatLayoutRow[] }>('/v1/master-data/seat-layouts'),

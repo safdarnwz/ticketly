@@ -48,7 +48,9 @@ export function TripPage() {
   const busy = useRef(false);
 
   const priceOf = (seatType: string) => trip?.fares?.find((f) => f.seatType === seatType)?.priceMinor;
-  const estimate = sel.seats.reduce((a, s) => a + (priceOf(s.seatType) ?? 0), 0);
+  // Pickup / drop charges at the chosen points: per seat, before GST.
+  const pointCharge = (sel.fromStop?.boardChargeMinor ?? 0) + (sel.toStop?.dropChargeMinor ?? 0);
+  const estimate = sel.seats.reduce((a, s) => a + (priceOf(s.seatType) ?? 0) + pointCharge, 0);
 
   const quote = useMutation({
     mutationFn: () =>
@@ -143,6 +145,9 @@ export function TripPage() {
               )}
               {sel.seats.some((s) => s.accessible) && (
                 <p className="rounded-md bg-info/10 px-2 py-1.5 text-xs text-info">Accessible seats are kept for passengers with a disability until close to departure.</p>
+              )}
+              {pointCharge > 0 && sel.seats.length > 0 && (
+                <div className="flex justify-between"><span className="text-text-muted">Pickup / drop charges (+ GST)</span><span className="font-medium">{sel.seats.length} × {formatMoney(pointCharge, trip.currency)}</span></div>
               )}
               <div className="flex justify-between border-t border-border pt-3 text-base">
                 <span className="font-semibold">Fare</span>

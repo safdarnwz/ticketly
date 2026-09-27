@@ -5,7 +5,7 @@ import { MapPin, RefreshCw } from 'lucide-react';
 import { EmptyState, ErrorState, Skeleton } from '@/components/ui';
 import { SeatMap } from '@/components/customer/SeatMap';
 import { flowApi, type SeatCell, type TripStop } from '@/lib/api/booking-flow';
-import { SEAT_TYPE_LABEL, cn, formatTime } from '@/lib/utils';
+import { SEAT_TYPE_LABEL, cn, formatMoney, formatTime } from '@/lib/utils';
 
 /** Seats one booking can take (the backend allows up to 10; operators sell up to 6 online). */
 export const MAX_SEATS_PER_BOOKING = 6;
@@ -36,6 +36,10 @@ function StopList({ title, stops, value, onPick }: { title: string; stops: TripS
               <span className="font-semibold text-text">{formatTime(title.startsWith('Boarding') ? s.departsAt : s.arrivesAt)}</span>{' '}
               <span className="text-text">{s.name ?? 'Stop'}</span>
             </span>
+            {(() => {
+              const extra = title.startsWith('Boarding') ? s.boardChargeMinor ?? 0 : s.dropChargeMinor ?? 0;
+              return extra > 0 ? <span className="shrink-0 rounded-pill bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent" title="Extra per seat, plus GST">+{formatMoney(extra)}</span> : null;
+            })()}
           </label>
         ))}
       </div>

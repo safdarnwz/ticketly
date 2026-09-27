@@ -266,6 +266,9 @@ export function CheckoutPage() {
         )}
         <div className="flex justify-between"><span className="text-text-muted">Seats</span><span className="font-medium">{b.seatNumbers.join(', ')}</span></div>
         <div className="flex justify-between"><span className="text-text-muted">Fare ({seatCount} × incl. GST)</span><span>{formatMoney(quote.totalMinor + discount, currency)}</span></div>
+        {(quote.pointCharges?.boardMinor ?? 0) + (quote.pointCharges?.dropMinor ?? 0) > 0 && (
+          <div className="flex justify-between text-xs text-text-muted"><span>incl. pickup / drop charges</span><span>{seatCount} × {formatMoney((quote.pointCharges?.boardMinor ?? 0) + (quote.pointCharges?.dropMinor ?? 0), currency)} + GST</span></div>
+        )}
         {discount > 0 && <div className="flex justify-between text-success"><span>Coupon {quote.couponCode}</span><span>− {formatMoney(discount, currency)}</span></div>}
         {hold && hold.totalMinor !== quote.totalMinor && (
           <div className="flex justify-between text-success"><span>Concessions</span><span>− {formatMoney(quote.totalMinor - hold.totalMinor, currency)}</span></div>
