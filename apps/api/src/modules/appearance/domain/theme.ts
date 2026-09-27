@@ -85,52 +85,50 @@ type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]>
 export const DEFAULT_THEME: Theme = {
   mode: 'light',
   colors: {
-    // Ticketly signature palette — a minimal, "quiet product" system in the spirit
-    // of modern tools: near-black primary, a single crimson accent, and calm
-    // neutral grays on white. No gradients, no glass, no gold — flat surfaces
-    // separated by hairline borders. Light on ink, restrained on colour.
-    primary: '#000000',
+    // Ticketly "journey" palette — soft and friendly: a slate-navy primary, a
+    // pink accent and a purple secondary (the From / To dots), sky blue for
+    // prices, on a cool off-white background with white cards that float on
+    // soft shadows instead of hairline borders.
+    primary: '#3F5475',
     primaryFg: '#FFFFFF',
-    secondary: '#000000',
+    secondary: '#7B4FB3',
     secondaryFg: '#FFFFFF',
-    accent: '#CB2957',
-    bg: '#FFFFFF',
+    accent: '#F0628F',
+    bg: '#F4F6FB',
     surface: '#FFFFFF',
-    surfaceMuted: '#EEEEEE',
-    border: '#DDDDDD',
-    text: '#000000',
-    textMuted: '#6E6E6E',
-    success: '#16A34A',
-    warning: '#D97706',
-    danger: '#DC2626',
-    info: '#3F72AF',
+    surfaceMuted: '#EAEEF5',
+    border: '#E1E6EF',
+    text: '#2F3E5C',
+    textMuted: '#8390A8',
+    success: '#1FA971',
+    warning: '#E39A2D',
+    danger: '#E5484D',
+    info: '#2BA8F0',
   },
-  radius: { sm: 6, md: 8, lg: 12, xl: 16, pill: 999 },
+  radius: { sm: 8, md: 12, lg: 16, xl: 24, pill: 999 },
   shadow: {
-    // Deliberately faint — the design leans on borders, not elevation.
-    sm: '0 1px 2px rgba(0,0,0,0.04)',
-    md: '0 1px 3px rgba(0,0,0,0.06)',
-    lg: '0 4px 16px rgba(0,0,0,0.08)',
+    sm: '0 2px 8px rgba(47,62,92,0.06)',
+    md: '0 8px 24px rgba(47,62,92,0.08)',
+    lg: '0 20px 48px rgba(47,62,92,0.14)',
   },
   font: {
-    // A standard, neutral system sans (ChatGPT-like). Light default weight.
     family:
-      "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+      "'Nunito Sans Variable', 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     familyHeading:
-      "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+      "'Nunito Sans Variable', 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     sizeBase: 15,
     scale: 1.2,
     weightNormal: 400,
-    weightMedium: 500,
-    weightBold: 600,
+    weightMedium: 600,
+    weightBold: 700,
   },
   spacingUnit: 4,
   components: {
-    button: { height: 44, paddingX: 18, radius: 8, fontWeight: 500 },
-    input: { height: 44, paddingX: 14, radius: 8, borderWidth: 1 },
-    card: { radius: 12, padding: 20, shadow: 'sm' },
-    dropdown: { radius: 8, shadow: 'md' },
-    modal: { radius: 16, shadow: 'lg' },
+    button: { height: 44, paddingX: 20, radius: 12, fontWeight: 600 },
+    input: { height: 44, paddingX: 14, radius: 12, borderWidth: 1 },
+    card: { radius: 18, padding: 20, shadow: 'sm' },
+    dropdown: { radius: 12, shadow: 'md' },
+    modal: { radius: 24, shadow: 'lg' },
   },
 };
 

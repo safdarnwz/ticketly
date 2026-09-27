@@ -57,17 +57,17 @@ describe('resolveTheme (default ← tenant ← role)', () => {
 describe('css projection', () => {
   it('happy: flattens tokens into --yb-* variables (kebab-cased)', () => {
     const vars = tokensToCssVars(DEFAULT_THEME);
-    expect(vars['--yb-color-primary']).toBe('#000000');
-    expect(vars['--yb-color-accent']).toBe('#CB2957');
+    expect(vars['--yb-color-primary']).toBe('#3F5475');
+    expect(vars['--yb-color-accent']).toBe('#F0628F');
     expect(vars['--yb-color-primary-fg']).toBe('#FFFFFF'); // camelCase key → kebab var
-    expect(vars['--yb-radius-md']).toBe('8px');
+    expect(vars['--yb-radius-md']).toBe('12px');
     expect(vars['--yb-btn-height']).toBe('44px');
     expect(vars['--yb-card-shadow']).toBe(DEFAULT_THEME.shadow.sm); // resolved reference
   });
   it('positive: themeToCss wraps them in a :root block', () => {
     const css = themeToCss(DEFAULT_THEME);
     expect(css).toContain(':root{');
-    expect(css).toContain('--yb-color-primary: #000000;');
+    expect(css).toContain('--yb-color-primary: #3F5475;');
     expect(css).toContain('}');
   });
 });

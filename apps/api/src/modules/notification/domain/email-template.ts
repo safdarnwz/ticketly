@@ -22,14 +22,14 @@ export interface EmailPalette {
 }
 
 export const DEFAULT_EMAIL_PALETTE: EmailPalette = {
-  primary: '#000000',
+  primary: '#3F5475',
   primaryFg: '#FFFFFF',
-  accent: '#CB2957',
+  accent: '#F0628F',
   bg: '#FFFFFF',
   surface: '#FFFFFF',
-  text: '#000000',
-  textMuted: '#6E6E6E',
-  border: '#DDDDDD',
+  text: '#2F3E5C',
+  textMuted: '#8390A8',
+  border: '#E1E6EF',
 };
 
 function esc(s: string): string {
