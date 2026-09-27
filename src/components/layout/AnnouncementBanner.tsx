@@ -51,7 +51,7 @@ export function AnnouncementBanner({ audience = 'operators', className }: { audi
             <Icon className="mt-0.5 h-4 w-4 shrink-0" />
             <div className="flex-1"><b>{a.title}</b> — {a.body}</div>
             {a.severity !== 'critical' && (
-              <button type="button" onClick={() => dismiss(a.id)} aria-label="Dismiss" className="rounded p-0.5 hover:bg-black/5">
+              <button type="button" onClick={() => dismiss(a.id)} aria-label="Dismiss" className="rounded p-0.5 hover:bg-text/5">
                 <X className="h-3.5 w-3.5" />
               </button>
             )}

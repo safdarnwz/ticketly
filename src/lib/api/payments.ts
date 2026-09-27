@@ -115,7 +115,8 @@ export async function openRazorpayCheckout(payload: RazorpayClientPayload): Prom
       ...payload,
       handler: (response: RazorpaySuccessResponse) => resolve(response),
       modal: { ondismiss: () => reject(new Error('Payment cancelled')) },
-      theme: { color: '#111827' },
+      // The checkout window takes the app's primary colour.
+      theme: { color: getComputedStyle(document.documentElement).getPropertyValue('--yb-color-primary').trim() || '#3F5475' },
     });
     rzp.open();
   });

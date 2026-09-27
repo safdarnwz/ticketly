@@ -139,7 +139,7 @@ export function TripPage() {
                 <span className="font-medium">{sel.seats.map((s) => s.seatNumber).join(', ') || '—'}</span>
               </div>
               {sel.seats.some((s) => s.ladiesOnly) && (
-                <p className="rounded-md bg-pink-50 px-2 py-1.5 text-xs text-pink-700">Ladies-only seats are for female passengers — you will enter this at checkout.</p>
+                <p className="rounded-xl bg-accent/10 px-3 py-2 text-xs text-accent">Ladies-only seats are for female passengers — you will enter this at checkout.</p>
               )}
               {sel.seats.some((s) => s.accessible) && (
                 <p className="rounded-md bg-info/10 px-2 py-1.5 text-xs text-info">Accessible seats are kept for passengers with a disability until close to departure.</p>

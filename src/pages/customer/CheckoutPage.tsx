@@ -322,7 +322,7 @@ export function CheckoutPage() {
                       <div key={p.seatNumber} className="rounded-2xl bg-surface-muted/60 p-4">
                         <div className="mb-2 flex items-center justify-between text-sm">
                           <span className="font-semibold text-text">Passenger {i + 1} · Seat {p.seatNumber}</span>
-                          {(b.ladiesSeats ?? []).includes(p.seatNumber) && <span className="rounded bg-pink-50 px-1.5 py-0.5 text-xs text-pink-700">Ladies seat</span>}
+                          {(b.ladiesSeats ?? []).includes(p.seatNumber) && <span className="rounded-pill bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent">Ladies seat</span>}
                         </div>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-6">
                           <div className="sm:col-span-3">

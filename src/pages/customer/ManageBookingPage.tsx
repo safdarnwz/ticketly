@@ -62,18 +62,24 @@ export function ManageBookingPage() {
           subtitle={<span className="flex flex-wrap items-center gap-2">PNR <b className="font-mono">{b.pnr}</b> · {b.operatorName} <Badge tone={statusTone(b.status)}>{b.status}</Badge></span>}
           action={b.status !== 'cancelled' ? <PrintTicketButton bookingId={b.id} mobile={mobile} label="Download ticket" /> : undefined}
         />
-        <CardBody className="grid gap-4 text-sm sm:grid-cols-2">
-          <div>
-            <div className="flex items-center gap-1 text-text-muted"><MapPin className="h-4 w-4" /> Boarding</div>
-            <div className="font-medium text-text">{b.boardingPoint ?? '—'}</div>
-            <div>{formatDateTime(boardsAt)}</div>
+        <CardBody className="flex flex-col gap-4 text-sm">
+          {/* The journey with the pink "from" and purple "to" ring dots. */}
+          <div className="flex gap-3 rounded-2xl bg-surface-muted p-4">
+            <div className="flex flex-col items-center py-1"><span className="dot-from" /><span className="dot-line my-1 flex-1" /><span className="dot-to" /></div>
+            <div className="flex min-w-0 flex-1 flex-col gap-3">
+              <div>
+                <div className="text-xs text-text-muted">Boarding</div>
+                <div className="font-semibold text-text">{b.boardingPoint ?? '—'}</div>
+                <div className="text-text-muted">{formatDateTime(boardsAt)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-text-muted">Drop</div>
+                <div className="font-semibold text-text">{b.droppingPoint ?? '—'}</div>
+                <div className="text-text-muted">{b.dropsAt ? formatDateTime(b.dropsAt) : formatDateTime(b.arrivesAt)}</div>
+              </div>
+            </div>
           </div>
-          <div>
-            <div className="flex items-center gap-1 text-text-muted"><MapPin className="h-4 w-4" /> Drop</div>
-            <div className="font-medium text-text">{b.droppingPoint ?? '—'}</div>
-            <div>{b.dropsAt ? formatDateTime(b.dropsAt) : formatDateTime(b.arrivesAt)}</div>
-          </div>
-          <div className="flex justify-between sm:col-span-2"><span className="text-text-muted">Fare{b.status === 'cancelled' ? '' : ` · ${b.passengers.length} seat${b.passengers.length === 1 ? '' : 's'}`}</span><span className="font-semibold">{formatMoney(b.totalMinor, b.currency)}</span></div>
+          <div className="flex items-baseline justify-between"><span className="text-text-muted">Fare{b.status === 'cancelled' ? '' : ` · ${b.passengers.length} seat${b.passengers.length === 1 ? '' : 's'}`}</span><span className="font-display text-xl text-price">{formatMoney(b.totalMinor, b.currency)}</span></div>
         </CardBody>
       </Card>
 

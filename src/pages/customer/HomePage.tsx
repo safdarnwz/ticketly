@@ -137,7 +137,7 @@ export function HomePage() {
               <h2 className="mb-3 font-display text-lg text-text">Offers for you</h2>
               <div className="flex flex-col gap-3">
                 {offerItems.map((o) => (
-                  <div key={o.code} className="flex items-center gap-4 rounded-[28px] bg-gradient-to-r from-accent to-[#f48fb1] px-5 py-3.5 text-white shadow-md">
+                  <div key={o.code} className="flex items-center gap-4 rounded-[28px] bg-gradient-to-r from-accent to-accent/70 px-5 py-3.5 text-white shadow-md">
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-display text-[17px]">{o.title}</div>
                       <div className="truncate text-[11px] text-white/85">

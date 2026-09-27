@@ -211,7 +211,7 @@ function ChartGrid({ chart, picked, selection, blockMode, onClick }: {
                     onClick={() => onClick(s)}
                     style={{ gridColumn: `${s.column + 1} / span ${s.colSpan}`, gridRow: `${s.row + 1} / span ${s.rowSpan}` }}
                     className={cn('flex flex-col items-start overflow-hidden rounded-md border p-1 text-left text-[10px] leading-tight transition focus-ring',
-                      STATE_STYLE[st], s.ladiesOnly && 'ring-1 ring-pink-400', (picked === s.seatNumber || sel) && 'outline outline-2 outline-offset-1 outline-primary')}>
+                      STATE_STYLE[st], s.ladiesOnly && 'ring-1 ring-accent', (picked === s.seatNumber || sel) && 'outline outline-2 outline-offset-1 outline-primary')}>
                     <span className="font-bold">{s.seatNumber}{s.occupants.length > 1 ? ` ×${s.occupants.length}` : ''}</span>
                     {lead && <span className="w-full truncate">{short(lead.name)}</span>}
                     {lead && <span className="w-full truncate text-text-muted">{lead.from?.split(' ')[0]}→{lead.to?.split(' ')[0]}</span>}
@@ -232,7 +232,7 @@ function Legend() {
   return (
     <div className="mt-4 flex flex-wrap justify-center gap-3 text-xs text-text-muted">
       {items.map(([k, l]) => <span key={k} className="flex items-center gap-1"><span className={cn('inline-block h-3 w-3 rounded border', STATE_STYLE[k])} />{l}</span>)}
-      <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded border ring-1 ring-pink-400" />Ladies</span>
+      <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded border ring-1 ring-accent" />Ladies</span>
     </div>
   );
 }

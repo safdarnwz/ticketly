@@ -67,7 +67,7 @@ export function SeatMap({ map, selected, onToggle, priceOf, currency = 'INR', di
                           : isSel
                             ? 'border-primary bg-primary text-primary-fg shadow-sm'
                             : s.ladiesOnly
-                              ? 'border-pink-400 bg-pink-50 text-pink-700 hover:bg-pink-100'
+                              ? 'border-accent bg-accent/10 text-accent hover:bg-accent/20'
                               : 'border-success/50 bg-surface text-success hover:bg-success/10',
                       )}
                     >
@@ -86,7 +86,7 @@ export function SeatMap({ map, selected, onToggle, priceOf, currency = 'INR', di
         <span className="flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded border border-success/50 bg-surface" /> Available</span>
         <span className="flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded bg-primary" /> Selected</span>
         <span className="flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded bg-surface-muted ring-1 ring-border" /> Booked</span>
-        <span className="flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded border border-pink-400 bg-pink-50" /> Ladies only</span>
+        <span className="flex items-center gap-1.5"><span className="h-3.5 w-3.5 rounded border border-accent bg-accent/10" /> Ladies only</span>
         <span className="flex items-center gap-1.5"><Accessibility className="h-3.5 w-3.5" /> Accessible</span>
       </div>
     </div>

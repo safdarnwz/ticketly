@@ -74,7 +74,7 @@ function AnalyticsTab() {
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(v: string) => v.slice(5)} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(v: number) => [v, 'Bookings']} labelFormatter={(v: string) => v} />
-                <Line type="monotone" dataKey="bookings" stroke="var(--yb-color-primary, #111827)" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="bookings" stroke="var(--yb-color-primary)" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
