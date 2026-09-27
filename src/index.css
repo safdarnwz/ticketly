@@ -4,69 +4,69 @@
 
 /*
  * ============================================================================
- *  Ticketly — clean, flat, minimal design system
+ *  Ticketly — soft "journey" design system
  * ============================================================================
- *  Near-black primary, a single crimson accent (#CB2957), calm neutral grays
- *  on white. No gradients, no glass, no gold. Flat surfaces separated by
- *  hairline borders. Standard system sans (ChatGPT-like), light weights.
+ *  Slate-navy primary, pink accent and purple secondary (the From / To dots),
+ *  sky-blue prices, white cards floating on soft shadows over a cool off-white
+ *  background, generous rounding, Nunito Sans.
  *  These --yb-* tokens mirror the backend DEFAULT_THEME and are overridden at
  *  runtime from GET /v1/appearance.
  */
 :root {
-  --yb-color-primary: #000000;
+  --yb-color-primary: #3f5475;
   --yb-color-primary-fg: #ffffff;
-  --yb-color-secondary: #000000;
+  --yb-color-secondary: #7b4fb3;
   --yb-color-secondary-fg: #ffffff;
-  --yb-color-accent: #cb2957;
-  --yb-color-bg: #ffffff;
+  --yb-color-accent: #f0628f;
+  --yb-color-bg: #f4f6fb;
   --yb-color-surface: #ffffff;
-  --yb-color-surface-muted: #eeeeee;
-  --yb-color-border: #dddddd;
-  --yb-color-text: #000000;
-  --yb-color-text-muted: #6e6e6e;
-  --yb-color-success: #16a34a;
-  --yb-color-warning: #d97706;
-  --yb-color-danger: #dc2626;
-  --yb-color-info: #3f72af;
+  --yb-color-surface-muted: #eaeef5;
+  --yb-color-border: #e1e6ef;
+  --yb-color-text: #2f3e5c;
+  --yb-color-text-muted: #8390a8;
+  --yb-color-success: #1fa971;
+  --yb-color-warning: #e39a2d;
+  --yb-color-danger: #e5484d;
+  --yb-color-info: #2ba8f0;
 
-  --yb-radius-sm: 6px;
-  --yb-radius-md: 8px;
-  --yb-radius-lg: 12px;
-  --yb-radius-xl: 16px;
+  --yb-radius-sm: 8px;
+  --yb-radius-md: 12px;
+  --yb-radius-lg: 16px;
+  --yb-radius-xl: 24px;
   --yb-radius-pill: 999px;
 
-  --yb-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --yb-shadow-md: 0 1px 3px rgba(0, 0, 0, 0.06);
-  --yb-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --yb-shadow-sm: 0 2px 8px rgba(47, 62, 92, 0.06);
+  --yb-shadow-md: 0 8px 24px rgba(47, 62, 92, 0.08);
+  --yb-shadow-lg: 0 20px 48px rgba(47, 62, 92, 0.14);
 
-  --yb-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --yb-font-family-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --yb-font-family: 'Nunito Sans Variable', 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --yb-font-family-heading: 'Nunito Sans Variable', 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --yb-font-size-base: 15px;
   --yb-font-scale: 1.2;
   --yb-font-weight-normal: 400;
-  --yb-font-weight-medium: 500;
-  --yb-font-weight-bold: 600;
+  --yb-font-weight-medium: 600;
+  --yb-font-weight-bold: 700;
 
   --yb-spacing-unit: 4px;
 
   --yb-btn-height: 44px;
-  --yb-btn-padding-x: 18px;
-  --yb-btn-radius: 8px;
-  --yb-btn-font-weight: 500;
+  --yb-btn-padding-x: 20px;
+  --yb-btn-radius: 12px;
+  --yb-btn-font-weight: 600;
 
-  --yb-input-height: 40px;
+  --yb-input-height: 44px;
   --yb-input-padding-x: 14px;
-  --yb-input-radius: 8px;
+  --yb-input-radius: 12px;
   --yb-input-border-width: 1px;
 
-  --yb-card-radius: 12px;
+  --yb-card-radius: 18px;
   --yb-card-padding: 20px;
   --yb-card-shadow: var(--yb-shadow-sm);
 
-  --yb-dropdown-radius: 8px;
+  --yb-dropdown-radius: 12px;
   --yb-dropdown-shadow: var(--yb-shadow-md);
 
-  --yb-modal-radius: 16px;
+  --yb-modal-radius: 24px;
   --yb-modal-shadow: var(--yb-shadow-lg);
 }
 
@@ -83,10 +83,10 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Headings stay light — standard, not heavy. */
+/* Headings: bold, friendly. */
 h1, h2, h3, h4 {
   font-family: var(--yb-font-family-heading);
-  font-weight: var(--yb-font-weight-bold); /* 600 max */
+  font-weight: var(--yb-font-weight-bold);
   letter-spacing: -0.01em;
   margin: 0;
 }
@@ -118,24 +118,38 @@ a, button, input, select, textarea {
     background: var(--yb-color-primary);
     color: var(--yb-color-primary-fg);
   }
-  .btn-primary-flat:hover { background: #1a1a1a; }
+  .btn-primary-flat:hover { background: color-mix(in srgb, var(--yb-color-primary) 88%, #000); }
   .btn-accent-flat {
     background: var(--yb-color-accent);
     color: #ffffff;
   }
-  .btn-accent-flat:hover { background: #b21f48; }
+  .btn-accent-flat:hover { background: color-mix(in srgb, var(--yb-color-accent) 88%, #000); }
 }
 
 @layer utilities {
   /* No serif display face — the same standard sans, medium weight. */
-  .font-display { font-family: var(--yb-font-family-heading); font-weight: 600; letter-spacing: -0.01em; }
+  .font-display { font-family: var(--yb-font-family-heading); font-weight: 800; letter-spacing: -0.015em; }
   .hairline { border: 1px solid var(--yb-color-border); }
   .text-accent-c { color: var(--yb-color-accent); }
   .elev-1 { box-shadow: var(--yb-shadow-sm); }
   .elev-2 { box-shadow: var(--yb-shadow-md); }
   .elev-3 { box-shadow: var(--yb-shadow-lg); }
   /* Subtle, flat hover — border emphasis, not lift/shadow theatrics. */
-  .lift { transition: border-color .14s ease, background-color .14s ease; }
-  .lift:hover { border-color: var(--yb-color-text-muted); }
+  .lift { transition: box-shadow .18s ease, transform .18s ease, border-color .14s ease; }
+  .lift:hover { box-shadow: var(--yb-shadow-md); transform: translateY(-1px); }
+  /* Journey pieces from the customer design: a soft floating card, the pink
+     "from" and purple "to" ring dots joined by a dotted line, and a sheet that
+     rises from the bottom with a big rounded top. */
+  .soft-card { background: var(--yb-color-surface); border-radius: var(--yb-card-radius); box-shadow: var(--yb-shadow-md); }
+  .soft-muted { background: var(--yb-color-surface-muted); border-radius: var(--yb-card-radius); }
+  .dot-from, .dot-to { display: inline-block; width: 12px; height: 12px; border-radius: 999px; border: 2.5px solid; background: var(--yb-color-surface); flex: none; }
+  .dot-from { border-color: var(--yb-color-accent); }
+  .dot-to { border-color: var(--yb-color-secondary); }
+  .dot-line { width: 0; border-left: 1.5px dashed color-mix(in srgb, var(--yb-color-text-muted) 60%, transparent); }
+  .sheet-top { border-top-left-radius: 40px; border-top-right-radius: 40px; }
+  .text-price { color: var(--yb-color-info); }
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .pb-safe { padding-bottom: calc(env(safe-area-inset-bottom) + 72px); }
   .focus-ring:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--yb-color-primary) 16%, transparent); }
 }

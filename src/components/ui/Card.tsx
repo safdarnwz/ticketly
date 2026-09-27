@@ -13,7 +13,7 @@ export function Card({ className, interactive, accent, ...rest }: CardProps) {
   return (
     <div
       className={cn(
-        'relative rounded-card border border-border bg-surface shadow-card',
+        'relative rounded-card border border-transparent bg-surface shadow-card',
         interactive && 'lift cursor-pointer',
         accent && 'before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:rounded-t-card before:bg-[color:var(--yb-color-accent)]',
         className,

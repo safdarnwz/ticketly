@@ -1,12 +1,13 @@
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Bus, Ticket, UserRound } from 'lucide-react';
+import { Bus, Home, Search, Ticket, UserRound } from 'lucide-react';
 
 import { Button } from '@/components/ui';
 import { BackButton } from '@/components/layout/BackButton';
 import { AnnouncementBanner } from '@/components/layout/AnnouncementBanner';
 import { legalApi } from '@/lib/api/legal';
 import { useAuth } from '@/stores/auth';
+import { cn } from '@/lib/utils';
 
 export function CustomerLayout() {
   const navigate = useNavigate();
@@ -46,29 +47,34 @@ export function CustomerLayout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-bg">
-      <header className="sticky top-0 z-30 border-b border-border bg-surface">
+      <header className="sticky top-0 z-30 bg-bg/90 backdrop-blur supports-[backdrop-filter]:bg-bg/75">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <Link to="/" className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-fg"><Bus className="h-5 w-5" /></div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-secondary text-white shadow-sm"><Bus className="h-5 w-5" /></div>
             <span className="font-display text-xl text-text">Ticketly</span>
           </Link>
-          <nav className="flex items-center gap-2">
+          <nav className="hidden items-center gap-2 sm:flex">
             <Link to="/account"><Button variant="ghost" size="sm" leftIcon={<Ticket className="h-4 w-4" />}>My trips</Button></Link>
             {token && user ? (
               <>
-                <span className="hidden text-sm text-text-muted sm:inline">{user.fullName}</span>
+                <span className="text-sm text-text-muted">{user.fullName}</span>
                 <Button variant="outline" size="sm" onClick={() => { logout(); navigate('/'); }}>Sign out</Button>
               </>
             ) : (
-              <Button size="sm" leftIcon={<UserRound className="h-4 w-4" />} onClick={() => navigate('/login')}>Sign in</Button>
+              <Button size="sm" className="rounded-pill" leftIcon={<UserRound className="h-4 w-4" />} onClick={() => navigate('/login')}>Sign in</Button>
             )}
           </nav>
+          {token && user ? (
+            <button type="button" className="text-sm font-semibold text-text-muted sm:hidden" onClick={() => { logout(); navigate('/'); }}>Sign out</button>
+          ) : (
+            <Link to="/login" className="text-sm font-semibold text-primary sm:hidden">Sign in</Link>
+          )}
         </div>
       </header>
 
       <AnnouncementBanner audience="customers" className="mx-auto w-full max-w-6xl" />
 
-      <main className="flex-1">
+      <main className="flex-1 pb-safe sm:pb-0">
         {showBack && (
           <div className="mx-auto max-w-6xl px-4 pt-3">
             <BackButton to={backTo} />
@@ -77,7 +83,7 @@ export function CustomerLayout() {
         <Outlet />
       </main>
 
-      <footer className="border-t border-border bg-surface">
+      <footer className="mb-[72px] border-t border-border bg-surface sm:mb-0">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-6 text-sm text-text-muted sm:flex-row">
           <span>© Ticketly — book bus tickets across India</span>
           <div className="flex flex-wrap justify-center gap-4">
@@ -88,6 +94,30 @@ export function CustomerLayout() {
           </div>
         </div>
       </footer>
+      {/* Phone tab bar — the three places a traveller goes. */}
+      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(47,62,92,0.08)] backdrop-blur sm:hidden">
+        <div className="mx-auto grid h-[64px] max-w-md grid-cols-3">
+          {[
+            { to: '/', label: 'Home', icon: Home, end: true },
+            { to: '/results', label: 'Search', icon: Search, end: false },
+            { to: '/account', label: 'My trips', icon: Ticket, end: false },
+          ].map(({ to, label, icon: Icon, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={({ isActive }) => cn('flex flex-col items-center justify-center gap-1 text-[11px] font-semibold', isActive ? 'text-accent' : 'text-text-muted')}
+            >
+              {({ isActive }) => (
+                <>
+                  <span className={cn('flex h-8 w-12 items-center justify-center rounded-pill transition', isActive && 'bg-accent/10')}><Icon className="h-5 w-5" /></span>
+                  {label}
+                </>
+              )}
+            </NavLink>
+          ))}
+        </div>
+      </nav>
     </div>
   );
 }

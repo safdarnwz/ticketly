@@ -7,24 +7,27 @@ import type { Config } from 'tailwindcss';
  * with zero rebuild — Tailwind utilities like `bg-primary` or `rounded-card`
  * resolve to the live variable.
  */
+/** A theme colour that also takes Tailwind's opacity modifier (`bg-primary/10`). */
+const c = (v: string) => `color-mix(in srgb, var(${v}) calc(<alpha-value> * 100%), transparent)`;
+
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        primary: { DEFAULT: 'var(--yb-color-primary)', fg: 'var(--yb-color-primary-fg)' },
-        secondary: { DEFAULT: 'var(--yb-color-secondary)', fg: 'var(--yb-color-secondary-fg)' },
-        accent: 'var(--yb-color-accent)',
-        bg: 'var(--yb-color-bg)',
-        surface: 'var(--yb-color-surface)',
-        'surface-muted': 'var(--yb-color-surface-muted)',
-        border: 'var(--yb-color-border)',
-        text: 'var(--yb-color-text)',
-        'text-muted': 'var(--yb-color-text-muted)',
-        success: 'var(--yb-color-success)',
-        warning: 'var(--yb-color-warning)',
-        danger: 'var(--yb-color-danger)',
-        info: 'var(--yb-color-info)',
+        primary: { DEFAULT: c('--yb-color-primary'), fg: c('--yb-color-primary-fg') },
+        secondary: { DEFAULT: c('--yb-color-secondary'), fg: c('--yb-color-secondary-fg') },
+        accent: c('--yb-color-accent'),
+        bg: c('--yb-color-bg'),
+        surface: c('--yb-color-surface'),
+        'surface-muted': c('--yb-color-surface-muted'),
+        border: c('--yb-color-border'),
+        text: c('--yb-color-text'),
+        'text-muted': c('--yb-color-text-muted'),
+        success: c('--yb-color-success'),
+        warning: c('--yb-color-warning'),
+        danger: c('--yb-color-danger'),
+        info: c('--yb-color-info'),
       },
       borderRadius: {
         sm: 'var(--yb-radius-sm)',
