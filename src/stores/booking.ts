@@ -37,6 +37,8 @@ interface BookingState {
     holdExpiresAt: string;
     /** The booking total when held (fare after concessions). */
     totalMinor: number;
+    /** Round-trip discount taken off this (return) booking. */
+    roundTripDiscountMinor?: number;
     /** Add-ons chosen (id → quantity), what they cost with GST, and the total to pay now. */
     addons?: Record<string, number>;
     addonTotalMinor?: number;
@@ -47,6 +49,8 @@ interface BookingState {
   viewedBookingTenantId?: string;
   /** Round trip: the return leg still to book after this one (shown on the confirmation page). */
   pendingReturn?: { date: string; fromLabel: string; toLabel: string };
+  /** Booking the way back of a round trip: the onward booking (its operator gives a return discount). */
+  returnOf?: { bookingId: string; tenantId: string; fromLabel: string; toLabel: string };
 
   setSearch: (p: Partial<Pick<BookingState, 'originCityId' | 'originLabel' | 'destCityId' | 'destLabel' | 'journeyDate'>>) => void;
   selectTrip: (trip: SearchResult, fromStopId: string, toStopId: string) => void;
@@ -59,6 +63,7 @@ interface BookingState {
   setConfirmed: (bookingId: string, pnr: string) => void;
   setViewedBookingTenant: (tenantId: string | undefined) => void;
   setPendingReturn: (r: BookingState['pendingReturn']) => void;
+  setReturnOf: (r: BookingState['returnOf']) => void;
   reset: () => void;
 }
 
@@ -80,6 +85,7 @@ export const useBooking = create<BookingState>()(persist((set) => ({
   setConfirmed: (bookingId, pnr) => set({ bookingId, pnr }),
   setViewedBookingTenant: (viewedBookingTenantId) => set({ viewedBookingTenantId }),
   setPendingReturn: (pendingReturn) => set({ pendingReturn }),
+  setReturnOf: (returnOf) => set({ returnOf }),
   reset: () => set({ trip: undefined, seatNumbers: [], quote: undefined, passengers: [], bookingId: undefined, pnr: undefined, hold: undefined, points: undefined, seatType: undefined }),
 }), {
   name: 'ticketly.booking',

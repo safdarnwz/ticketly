@@ -16,6 +16,8 @@ export interface HoldInput {
   contactPhone?: string;
   /** Staff only: a man on a ladies seat, with the reason (logged). */
   ladiesSeatOverrideReason?: string;
+  /** Book this as the return of a round trip: the onward booking's id (operator's round-trip discount). */
+  returnOf?: string;
   /** 'backoffice' for staff counter sales (needs booking:create); storefront omits it. */
   channel?: 'direct_web' | 'direct_app' | 'backoffice';
 }
@@ -69,7 +71,7 @@ export const bookingsApi = {
     emails: Partial<Record<'eticket' | 'invoice', string>>;
   }>(`/v1/bookings/by-pnr-staff/${encodeURIComponent(pnr)}`),
   hold: (input: HoldInput) =>
-    post<{ bookingId: string; pnr: string; holdExpiresAt: string; totalMinor: number }>(
+    post<{ bookingId: string; pnr: string; holdExpiresAt: string; totalMinor: number; roundTripDiscountMinor?: number }>(
       '/v1/bookings/hold', input, withIdempotency(`hold-${input.quoteId}`),
     ),
   /** Phone booking (staff): keep the seats for a caller until `releaseAt`; they pay later. */

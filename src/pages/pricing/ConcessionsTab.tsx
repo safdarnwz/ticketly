@@ -104,6 +104,8 @@ function PolicyCard({ s }: { s: ConcessionSettings }) {
   const toast = useToast();
   const [p, setP] = useState({ adultAge: String(s.policy.adultAge), infantMaxAge: String(s.policy.infantMaxAge), infantFee: String(s.policy.infantFeeMinor / 100), unaccompanied: s.policy.allowUnaccompaniedMinors });
   const [w, setW] = useState({ maxAdvanceDays: s.bookingWindow.maxAdvanceDays?.toString() ?? '', minMinutes: String(s.bookingWindow.minMinutesBeforeDeparture), accessible: s.accessibleSeats.releaseHours?.toString() ?? '' });
+  const [rt, setRt] = useState(String(s.roundTrip?.discountPct ?? 0));
+  const rtError = isInt(rt, 0, 50) && rt !== '' ? undefined : 'A whole number from 0 to 50';
   const done = (m: string) => ({ onSuccess: () => { toast.success(m); void qc.invalidateQueries({ queryKey: ['concessions'] }); }, onError: (err: unknown) => toast.error(err instanceof Error ? err.message : 'Failed') });
   const pe: Record<string, string> = {};
   if (!isInt(p.adultAge, 12, 21) || !p.adultAge) pe.adultAge = '12 to 21';
@@ -123,6 +125,7 @@ function PolicyCard({ s }: { s: ConcessionSettings }) {
     },
     ...done('Booking rules saved'),
   });
+  const roundTrip = useMutation({ mutationFn: () => concessionsApi.saveRoundTrip(Number(rt)), ...done('Round-trip discount saved') });
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Card><CardBody className="grid grid-cols-2 gap-3 text-sm">
@@ -139,6 +142,12 @@ function PolicyCard({ s }: { s: ConcessionSettings }) {
         <Input label="Sales close (minutes before departure)" type="number" value={w.minMinutes} error={we.minMinutes} onChange={(x) => setW({ ...w, minMinutes: x.target.value })} />
         <Input label="Accessible seats open to all (hours before)" type="number" value={w.accessible} error={we.accessible} hint="Empty = only for passengers with disability" onChange={(x) => setW({ ...w, accessible: x.target.value })} />
         <div className="col-span-2 flex justify-end"><Button size="sm" loading={windowM.isPending} disabled={windowM.isPending || Object.keys(we).length > 0} onClick={() => windowM.mutate()}>Save booking rules</Button></div>
+      </CardBody></Card>
+      <Card><CardBody className="grid grid-cols-2 gap-3 text-sm">
+        <div className="col-span-2 font-semibold text-text">Round trip</div>
+        <Input label="Discount on the way back (%)" type="number" value={rt} error={rtError} hint={Number(rt) > 0 && !rtError ? `${rt}% off the return, when booked against a confirmed onward booking with you` : '0 = no round-trip discount'} onChange={(x) => setRt(x.target.value)} />
+        <p className="self-end pb-2 text-xs text-text-muted">Same passenger (account or booking mobile), back the way they came, on a later bus — once per onward booking.</p>
+        <div className="col-span-2 flex justify-end"><Button size="sm" loading={roundTrip.isPending} disabled={roundTrip.isPending || Boolean(rtError)} onClick={() => roundTrip.mutate()}>Save round-trip discount</Button></div>
       </CardBody></Card>
     </div>
   );

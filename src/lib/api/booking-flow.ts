@@ -106,7 +106,7 @@ export const flowApi = {
     get<SeatMapResponse>(`/v1/scheduling/trips/${tripId}/availability?from=${fromStopId}&to=${toStopId}`, forTenant(tenantId)),
   /** Concessions (senior, student…) and age rules the chosen operator offers on that date. */
   concessions: (journeyDate?: string) =>
-    get<{ concessions: CheckoutConcession[]; policy: PassengerPolicy }>(
+    get<{ concessions: CheckoutConcession[]; policy: PassengerPolicy; roundTripDiscountPct?: number }>(
       `/v1/concessions/checkout${journeyDate ? `?journeyDate=${journeyDate}` : ''}`,
     ),
   /** The operator's add-on catalogue (insurance, meals, luggage…). */

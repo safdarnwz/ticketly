@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, CheckCircle2, Copy, Mail, RotateCcw } from 'lucide-react';
@@ -7,6 +8,7 @@ import { QrCode } from '@/components/common/QrCode';
 import { PrintTicketButton } from '@/components/customer/PrintTicketButton';
 import { rememberManageMobile } from '@/lib/manageMobile';
 import { bookingsApi } from '@/lib/api/bookings';
+import { flowApi } from '@/lib/api/booking-flow';
 import { resultsUrl } from '@/lib/search-filters';
 import { useAuth } from '@/stores/auth';
 import { useBooking } from '@/stores/booking';
@@ -28,6 +30,20 @@ export function ConfirmationPage() {
     retry: 2,
   });
 
+  // The way back of a round trip is booked: its link to the onward booking is used up.
+  const { returnOf, setReturnOf, bookingId } = b;
+  useEffect(() => {
+    if (returnOf && bookingId && returnOf.bookingId !== bookingId) setReturnOf(undefined);
+  }, [returnOf, bookingId, setReturnOf]);
+  // What this operator takes off the way back (shown on "Now book your return").
+  const roundTrip = useQuery({
+    queryKey: ['concessions', b.trip?.tenantId, 'round-trip'],
+    queryFn: () => flowApi.concessions(),
+    enabled: Boolean(b.pendingReturn && b.trip),
+    staleTime: 5 * 60_000,
+  });
+  const returnPct = roundTrip.data?.roundTripDiscountPct ?? 0;
+
   if (!b.bookingId || !b.pnr) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center">
@@ -48,6 +64,8 @@ export function ConfirmationPage() {
   const bookReturn = () => {
     const r = b.pendingReturn!;
     b.setPendingReturn(undefined);
+    // The way back can be booked as this booking's return (the operator's round-trip discount).
+    if (b.bookingId && trip?.tenantId) b.setReturnOf({ bookingId: b.bookingId, tenantId: trip.tenantId, fromLabel: r.fromLabel, toLabel: r.toLabel });
     b.reset();
     navigate(resultsUrl(r.fromLabel, r.toLabel, r.date));
   };
@@ -87,6 +105,7 @@ export function ConfirmationPage() {
             <div className="text-sm">
               <div className="font-semibold text-text">Now book your return</div>
               <div className="text-text-muted">{b.pendingReturn.fromLabel} → {b.pendingReturn.toLabel} · {formatDateLabel(b.pendingReturn.date)}</div>
+              {returnPct > 0 && <div className="mt-1 text-xs font-semibold text-success">{b.trip?.operatorName ?? 'This operator'} takes {returnPct}% off your way back</div>}
             </div>
             <Button onClick={bookReturn} rightIcon={<ArrowRight className="h-4 w-4" />}>Find return buses</Button>
           </CardBody>

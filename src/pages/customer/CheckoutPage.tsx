@@ -41,6 +41,13 @@ export function CheckoutPage() {
   const journeyDate = trip ? localDateOf(trip.departsAt) : undefined;
   const rules = useQuery({ queryKey: ['concessions', trip?.tenantId, journeyDate], queryFn: () => flowApi.concessions(journeyDate), enabled: Boolean(trip) });
   const legal = useQuery({ queryKey: ['legal-pages'], queryFn: legalApi.list, staleTime: 10 * 60_000 });
+  // The way back of a round trip, with the same operator, going back the other way:
+  // booked against the onward booking for the operator's round-trip discount.
+  const same = (x: string, y: string) => x.trim().toLowerCase() === y.trim().toLowerCase();
+  const returnOf = b.returnOf && trip && b.returnOf.tenantId === trip.tenantId
+    && same(b.returnOf.fromLabel, b.originLabel) && same(b.returnOf.toLabel, b.destLabel)
+    ? b.returnOf.bookingId : undefined;
+  const roundTripPct = returnOf ? rules.data?.roundTripDiscountPct ?? 0 : 0;
 
   // ── details ───────────────────────────────────────────────────────────
   const [passengers, setPassengers] = useState<PassengerForm[]>(() =>
@@ -122,6 +129,7 @@ export function CheckoutPage() {
     if (holding) return;
     setHolding(true);
     setHoldError(null);
+    let skipReturn = false;
     const body = (quoteId: string) => ({
       quoteId,
       seatNumbers: b.seatNumbers,
@@ -135,6 +143,7 @@ export function CheckoutPage() {
       })),
       contactPhone: mobileOk!,
       contactEmail: email.trim() || fallbackEmail || undefined,
+      ...(returnOf && roundTripPct > 0 && !skipReturn ? { returnOf } : {}),
     });
     try {
       // A quote lives a few minutes; refresh it rather than fail the hold.
@@ -144,9 +153,16 @@ export function CheckoutPage() {
       try {
         hold = await bookingsApi.hold(body(q.quoteId));
       } catch (e) {
-        if (!(e instanceof ApiError && e.code === 'PRICING.QUOTE_EXPIRED')) throw e;
-        q = await requote(q.couponCode ?? undefined);
-        hold = await bookingsApi.hold(body(q.quoteId));
+        if (e instanceof ApiError && e.code === 'PRICING.QUOTE_EXPIRED') {
+          q = await requote(q.couponCode ?? undefined);
+          hold = await bookingsApi.hold(body(q.quoteId));
+        } else if (e instanceof ApiError && !skipReturn && body(q.quoteId).returnOf
+          && (e.status === 409 || /onward|return journey|return bus/i.test(e.message))) {
+          // Not a qualifying return (or already used): book it at the normal price and say why.
+          skipReturn = true;
+          toast.info(`Round-trip discount not applied — ${e.message}`);
+          hold = await bookingsApi.hold(body(q.quoteId));
+        } else throw e;
       }
       b.setPassengers(passengers.map((p) => ({ seatNumber: p.seatNumber, fullName: p.fullName.trim(), age: Number(p.age), gender: p.gender })));
       b.setContact(email.trim() || fallbackEmail || '', mobileOk!);
@@ -270,8 +286,14 @@ export function CheckoutPage() {
           <div className="flex justify-between text-xs text-text-muted"><span>incl. pickup / drop charges</span><span>{seatCount} × {formatMoney((quote.pointCharges?.boardMinor ?? 0) + (quote.pointCharges?.dropMinor ?? 0), currency)} + GST</span></div>
         )}
         {discount > 0 && <div className="flex justify-between text-success"><span>Coupon {quote.couponCode}</span><span>− {formatMoney(discount, currency)}</span></div>}
-        {hold && hold.totalMinor !== quote.totalMinor && (
-          <div className="flex justify-between text-success"><span>Concessions</span><span>− {formatMoney(quote.totalMinor - hold.totalMinor, currency)}</span></div>
+        {hold && quote.totalMinor - hold.totalMinor - (hold.roundTripDiscountMinor ?? 0) !== 0 && (
+          <div className="flex justify-between text-success"><span>Concessions</span><span>− {formatMoney(quote.totalMinor - hold.totalMinor - (hold.roundTripDiscountMinor ?? 0), currency)}</span></div>
+        )}
+        {(hold?.roundTripDiscountMinor ?? 0) > 0 && (
+          <div className="flex justify-between text-success"><span>Round-trip discount</span><span>− {formatMoney(hold!.roundTripDiscountMinor!, currency)}</span></div>
+        )}
+        {!hold && roundTripPct > 0 && (
+          <p className="rounded-xl bg-success/10 px-3 py-2 text-xs text-success">Your way back: {roundTripPct}% round-trip discount, taken off on the next step.</p>
         )}
         {addonTotal > 0 && <div className="flex justify-between"><span className="text-text-muted">Add-ons (incl. GST)</span><span>{formatMoney(addonTotal, currency)}</span></div>}
         <div className="flex items-baseline justify-between border-t border-border pt-3 text-base font-semibold">
