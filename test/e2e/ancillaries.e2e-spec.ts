@@ -21,6 +21,19 @@ describe('ancillaries (e2e)', () => {
     app = await bootstrapTestApp();
   });
   afterAll(async () => {
+    // Stop the add-ons this suite created (codes end in a timestamp), so the demo
+    // operator's checkout does not collect a copy of each on every run.
+    await runWithContext(createContext({ actorType: 'system' }), () =>
+      runAsTenant(app.fixtures.tenantId as TenantId, () =>
+        app.nest.get(UnitOfWork).run({ name: 'e2e.stopAddons' }, (s) =>
+          s.client.query(
+            `UPDATE ancillary_services SET is_active = false
+              WHERE tenant_id = $1 AND code ~ '^(meal|snack|pillow|insure|insurance|luggage)-[0-9]{10,}$'`,
+            [app.fixtures.tenantId],
+          ),
+        ),
+      ),
+    );
     await app.close();
   });
 
