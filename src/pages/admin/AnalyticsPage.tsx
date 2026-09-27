@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { Building2, Ticket, XCircle, IndianRupee, TrendingUp, Plus, Package, ScrollText, Search, Settings, Percent, Landmark, Download, CheckCircle2 } from 'lucide-react';
+import { Building2, Bus, Ticket, XCircle, IndianRupee, TrendingUp, Plus, Package, ScrollText, Search, Settings, Percent, Landmark, Download, CheckCircle2 } from 'lucide-react';
 
 import { Button, Card, CardBody, Badge, statusTone, Table, type Column, Modal, Input, PageLoader, ErrorState, EmptyState, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -54,11 +54,13 @@ function AnalyticsTab() {
     { label: "Today's bookings", value: d.todayBookings, icon: TrendingUp },
     { label: 'Total cancelled', value: d.totalCancelled, icon: XCircle },
     { label: 'Total revenue', value: formatMoney(d.totalRevenueMinor, 'INR'), icon: IndianRupee },
+    { label: 'Revenue this month', value: formatMoney(d.monthRevenueMinor, 'INR'), icon: IndianRupee },
+    { label: 'Active buses', value: d.activeBuses, icon: Bus },
   ];
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-7">
         {kpis.map((k) => (
           <Card key={k.label}>
             <CardBody>

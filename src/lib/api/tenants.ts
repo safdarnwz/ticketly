@@ -30,6 +30,10 @@ export interface TenantStats {
 export interface PlatformAnalytics extends TenantStats {
   trend: { date: string; bookings: number; revenueMinor: number }[];
   operators: { active: number; suspended: number; total: number };
+  /** Approved, running buses of active operators. */
+  activeBuses: number;
+  /** Revenue confirmed this calendar month (Indian days). */
+  monthRevenueMinor: number;
 }
 export interface CommissionOverride { model: string; percent: number; flatMinor: number; capMinor: number | null }
 export interface PlatformSettings { defaultCommissionPercent: number; perBusFeeMinor: number; gstRatePercent: number; commissionGstRatePercent: number; smsFeeMinor: number; whatsappFeeMinor: number }
