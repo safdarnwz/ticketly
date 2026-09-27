@@ -8,6 +8,7 @@ API_DIR=${API_DIR:-$(pwd)}
 LOGS=${LOGS:-/tmp/scale-logs}
 mkdir -p "$LOGS"
 set +e; set -a; . ./.env 2>/dev/null; set +a
+export LOG_LEVEL=${SCALE_LOG_LEVEL:-warn}
 d="$1"
 while [[ "$d" < "$2" || "$d" == "$2" ]]; do
   prev=$(date -u -d "$d -1 day" +%F)

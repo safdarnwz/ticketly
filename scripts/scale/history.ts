@@ -503,7 +503,7 @@ async function sellOne(
     return {
       seatNumber: s.seatNumber,
       fullName: `${pick(rnd, female ? FIRST_F : FIRST_M)} ${pick(rnd, LAST)}`,
-      age: k > 0 && rnd() < 0.08 ? 8 + Math.floor(rnd() * 8) : age,
+      age: k > 0 && !senior && !student && rnd() < 0.08 ? 8 + Math.floor(rnd() * 8) : age,
       gender: female ? ('female' as const) : ('male' as const),
       ...(channel !== 'agent' && channel !== 'ota' && (senior || student)
         ? {
@@ -1243,6 +1243,7 @@ async function ops(day: string) {
 
   await reviewsAndSupport(h, day, rnd);
   await agentsPayUp(h, day);
+  await platformBilling(h, day);
   if (!h.days.includes(`ops:${day}`)) h.days.push(`ops:${day}`);
   saveHist(h);
   await c.end();
@@ -1346,6 +1347,64 @@ async function agentsPayUp(h: Hist, day: string) {
       stat(h, r.status === 200 ? 'agent-settled' : `agent-settle-${r.status}`);
     }
   });
+}
+
+/**
+ * The platform bills its operators: a launch discount for the big plans (once),
+ * and every Monday a GST invoice to each operator for the week just closed.
+ */
+async function platformBilling(h: Hist, day: string) {
+  const st = state();
+  const ops = Object.values(st.operators);
+  const superH = () => sessions.get('super', superLogin);
+  if (!h.days.includes('billing:discounts')) {
+    for (const o of ops.filter((x) => x.plan === 'enterprise')) {
+      const r = await call(
+        'POST',
+        '/admin/billing/discounts',
+        {
+          tenantId: o.tenantId,
+          kind: 'percent',
+          value: 20,
+          reason: 'Launch offer — 20% off the first month',
+          validFrom: '2026-09-01',
+          validTo: '2026-09-30',
+        },
+        await superH(),
+      );
+      stat(h, r.status < 300 ? 'platform-discount' : `platform-discount-${r.status}`);
+    }
+    const r = await call(
+      'POST',
+      '/admin/billing/discounts',
+      {
+        tenantId: null,
+        kind: 'flat',
+        value: 50_000,
+        reason: 'Festive goodwill credit for every operator',
+        validFrom: '2026-09-14',
+        validTo: '2026-09-20',
+      },
+      await superH(),
+    );
+    stat(h, r.status < 300 ? 'platform-discount' : `platform-discount-${r.status}`);
+    h.days.push('billing:discounts');
+  }
+  if (new Date(`${day}T00:00:00Z`).getUTCDay() !== 1) return;
+  const from = addDays(day, -7) < '2026-09-01' ? '2026-09-01' : addDays(day, -7);
+  const to = addDays(day, -1);
+  await pool(ops, 8, async (o) => {
+    const r = await call(
+      'POST',
+      '/admin/billing/invoices',
+      { tenantId: o.tenantId, from, to },
+      await superH(),
+      `platform-inv-${o.tenantId}-${from}`,
+    );
+    if (r.status === 200) stat(h, 'platform-invoice');
+    else failed(h, 'platform-invoice', r);
+  });
+  log(`${day} platform invoices for ${from} … ${to}`);
 }
 
 /* ───────────── main ───────────── */
