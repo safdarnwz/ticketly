@@ -52,7 +52,7 @@ export interface SearchResult {
   seatTypes: string[];
   /** Price per seat for each seat type that has a fare (the cheapest is `fromPriceMinor`). */
   fares: { seatType: string; priceMinor: number }[];
-  /** Average stars of the route's published reviews (1 dp); null until the first review. */
+  /** Average stars of this bus's published reviews (1 dp) — they stay with the bus that ran, not the route; null until its first review or while no bus is assigned. */
   rating: number | null;
   ratingCount: number;
   /** True when this trip's route currently has an active, paid promotion — the frontend renders the "Prio" badge on these. Never set by anything upstream of promote(). */
@@ -270,12 +270,11 @@ export class SearchService {
     for (const routeId of routeIds) {
       const route = { id: routeId };
       // Three independent reads → one round-trip of latency instead of three.
-      const [trips, routePricing, interState, routeStops, rating] = await Promise.all([
+      const [trips, routePricing, interState, routeStops] = await Promise.all([
         this.trips.findForSearch(route.id, input.journeyDate),
         this.fares.routePricing(route.id),
         this.routes.isInterState(route.id),
         this.routes.stopsWithNames(route.id),
-        this.reviews.ratingSummary(route.id),
       ]);
       if (trips.length === 0 || routeStops.length < 2) continue;
       const stopRef = (id: StopId | undefined, fallback: 'first' | 'last'): StopRef | null => {
@@ -330,7 +329,12 @@ export class SearchService {
       // every major Indian bus platform does, rather than the customer
       // discovering what's on board only after boarding.
       const vehicleIds = trips.map((t) => t.vehicleId).filter((id): id is VehicleId => id !== null);
-      const amenitiesByVehicle = await this.amenities.forVehicleIds(vehicleIds);
+      // Each bus carries its own rating: reviews belong to the bus that ran
+      // the trip, not to the route (one route runs sleepers, seaters…).
+      const [amenitiesByVehicle, busRatings] = await Promise.all([
+        this.amenities.forVehicleIds(vehicleIds),
+        this.reviews.busRatings(vehicleIds),
+      ]);
 
       for (const trip of trips) {
         const seg = segByTrip.get(trip.id);
@@ -381,8 +385,10 @@ export class SearchService {
           amenities: trip.vehicleId ? (amenitiesByVehicle.get(trip.vehicleId) ?? []) : [],
           seatTypes: offered,
           fares,
-          rating: rating.count ? rating.average : null,
-          ratingCount: rating.count,
+          ...(() => {
+            const r = trip.vehicleId ? busRatings.get(trip.vehicleId) : undefined;
+            return { rating: r?.count ? r.average : null, ratingCount: r?.count ?? 0 };
+          })(),
         });
       }
     }

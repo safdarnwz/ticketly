@@ -1,14 +1,17 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
-import { ApiStandardErrors, Public, RateLimit, zodBody } from '@http';
+import { ApiStandardErrors, Public, RateLimit, UuidParam, zodBody, zodQuery } from '@http';
 import { localDate, type CityId, type StopId } from '@kernel';
 
+import { BusDetailsService } from '../application/services/bus-details.service';
 import { JourneySearchService } from '../application/services/journey-search.service';
 import {
   ConnectingSearchSchema,
   RoundTripSchema,
   SearchTripsSchema,
+  TripDetailsQuerySchema,
+  type TripDetailsQueryDto,
   type ConnectingSearchDto,
   type RoundTripDto,
   type SearchTripsDto,
@@ -26,7 +29,24 @@ import {
 @Controller({ path: 'search', version: '1' })
 @ApiStandardErrors()
 export class SearchController {
-  constructor(private readonly journeys: JourneySearchService) {}
+  constructor(
+    private readonly journeys: JourneySearchService,
+    private readonly details: BusDetailsService,
+  ) {}
+
+  @Get('trips/:tripId/details')
+  @Public()
+  @RateLimit(120, 60_000, 'ip')
+  @ApiOperation({
+    summary:
+      "Everything under the seat map for this trip's bus: highlights, cancellation with dates, route, boarding / dropping points, features, the bus's own reviews, safety, photos, other policies",
+  })
+  async tripDetails(
+    @UuidParam('tripId') tripId: string,
+    @Query(zodQuery(TripDetailsQuerySchema)) q: TripDetailsQueryDto,
+  ) {
+    return this.details.forTrip(tripId, q.from, q.to);
+  }
 
   @Post()
   @Public()

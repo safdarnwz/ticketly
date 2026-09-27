@@ -602,8 +602,16 @@ export class TenantRepository {
     return this.putSetting('luggage', policy);
   }
 
+  getTravelPolicies(): Promise<unknown> {
+    return this.getSetting('travelPolicies');
+  }
+
+  setTravelPolicies(policies: object | null): Promise<void> {
+    return this.putSetting('travelPolicies', policies);
+  }
+
   /** One key of this operator's settings JSON. */
-  private async getSetting(key: 'waitlist' | 'luggage'): Promise<unknown> {
+  private async getSetting(key: 'waitlist' | 'luggage' | 'travelPolicies'): Promise<unknown> {
     const row = await this.db.queryOne<{ v: unknown }>(
       `SELECT settings->($2::text) AS v FROM tenants WHERE id = $1`,
       [requireTenantId(), key],
@@ -613,7 +621,10 @@ export class TenantRepository {
   }
 
   /** Set (or with null remove) one key of this operator's settings JSON. */
-  private async putSetting(key: 'waitlist' | 'luggage', value: object | null): Promise<void> {
+  private async putSetting(
+    key: 'waitlist' | 'luggage' | 'travelPolicies',
+    value: object | null,
+  ): Promise<void> {
     await this.db.execute_(
       `UPDATE tenants SET settings = CASE WHEN $3::jsonb IS NULL THEN settings - $2::text
                                           ELSE jsonb_set(settings, ARRAY[$2::text], $3::jsonb) END,

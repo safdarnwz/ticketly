@@ -22,6 +22,8 @@ import {
 
 import { ReviewService } from '../application/services/review.service';
 import {
+  BusReviewsQuerySchema,
+  type BusReviewsQueryDto,
   CreateReviewSchema,
   OperatorReviewsQuerySchema,
   ReportReviewSchema,
@@ -54,7 +56,21 @@ export class ReviewController {
       rating: dto.rating,
       title: dto.title,
       body: dto.body,
+      liked: dto.liked,
     });
+  }
+
+  @Get('buses/:vehicleId/reviews')
+  @Public()
+  @ApiOperation({
+    summary:
+      "A bus's rating and reviews — each review stays with the bus that ran the trip, whatever bus runs the service later",
+  })
+  async forBus(
+    @UuidParam('vehicleId') vehicleId: string,
+    @Query(zodQuery(BusReviewsQuerySchema)) q: BusReviewsQueryDto,
+  ) {
+    return this.reviews.busReviews(vehicleId, q.limit, q.offset);
   }
 
   @Get('routes/:routeId/reviews')
@@ -77,7 +93,7 @@ export class ReviewController {
   @RequirePermission(Permission.TENANT_READ)
   @ApiOperation({
     summary:
-      "This operator's reviews, newest first — by route, stars, unanswered / low / reported — with a summary",
+      "This operator's reviews, newest first — by route, bus, stars, unanswered / low / reported — with a summary",
   })
   async forOperator(@Query(zodQuery(OperatorReviewsQuerySchema)) q: OperatorReviewsQueryDto) {
     let before: { createdAt: string; id: string } | undefined;
@@ -96,12 +112,13 @@ export class ReviewController {
     const [rows, summary] = await Promise.all([
       this.reviews.listForOperator({
         routeId: q.routeId,
+        vehicleId: q.vehicleId,
         rating: q.rating,
         filter: q.filter,
         before,
         limit: q.limit + 1,
       }),
-      this.reviews.operatorSummary(q.routeId),
+      this.reviews.operatorSummary(q.routeId, q.vehicleId),
     ]);
     const hasMore = rows.length > q.limit;
     const items = rows.slice(0, q.limit).map(({ createdAtRaw: _raw, ...r }) => r);

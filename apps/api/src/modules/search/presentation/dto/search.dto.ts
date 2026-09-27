@@ -59,3 +59,10 @@ export const ConnectingSearchSchema = z
     path: ['destCityId'],
   });
 export type ConnectingSearchDto = z.infer<typeof ConnectingSearchSchema>;
+
+/** The passenger's leg, so boarding / dropping points and times fit it (whole trip when absent). */
+export const TripDetailsQuerySchema = z.object({
+  from: z.string().uuid().optional(),
+  to: z.string().uuid().optional(),
+});
+export type TripDetailsQueryDto = z.infer<typeof TripDetailsQuerySchema>;

@@ -9,10 +9,13 @@ import { SchedulingModule } from '../scheduling/scheduling.module';
 import { TenancyModule } from '../tenancy/tenancy.module';
 import { PromotionsModule } from '../promotions/promotions.module';
 import { ReviewModule } from '../reviews/review.module';
+import { FleetModule } from '../fleet/fleet.module';
 import { SearchController } from './presentation/search.controller';
 import { JourneySearchService } from './application/services/journey-search.service';
 import { ConnectionHubRepository } from './infrastructure/connection-hub.repository';
 import { SearchService } from './application/services/search.service';
+import { BusDetailsService } from './application/services/bus-details.service';
+import { BusDetailsRepository } from './infrastructure/bus-details.repository';
 
 /**
  * Search — the sub-10ms hot path. Aggregates across every active tenant (see
@@ -36,9 +39,16 @@ import { SearchService } from './application/services/search.service';
     TenancyModule,
     PromotionsModule,
     ReviewModule,
+    FleetModule,
   ],
   controllers: [SearchController],
-  providers: [SearchService, JourneySearchService, ConnectionHubRepository],
+  providers: [
+    SearchService,
+    JourneySearchService,
+    ConnectionHubRepository,
+    BusDetailsService,
+    BusDetailsRepository,
+  ],
   exports: [SearchService, JourneySearchService],
 })
 export class SearchModule {}

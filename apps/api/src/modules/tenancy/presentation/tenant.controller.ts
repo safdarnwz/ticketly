@@ -30,6 +30,8 @@ import {
   WaitlistRulesSchema,
   type WaitlistRulesDto,
   LuggagePolicySchema,
+  TravelPoliciesSchema,
+  type TravelPoliciesDto,
   type LuggagePolicyDto,
   type ConnectionRulesDto,
 } from './dto/tenant.dto';
@@ -386,5 +388,31 @@ export class TenantController {
   async resetLuggagePolicy() {
     await this.tenants.setLuggagePolicy(null);
     return { ok: true, policy: null };
+  }
+
+  @Get('travel-policies')
+  @RequirePermission(Permission.TENANT_READ)
+  @ApiOperation({
+    summary: 'Pets, liquor, smoking, pickup wait and own notes (null until published)',
+  })
+  async getTravelPolicies() {
+    return { policies: await this.tenants.getTravelPolicies() };
+  }
+
+  @Put('travel-policies')
+  @RequirePermission(Permission.TENANT_MANAGE)
+  @ApiOperation({ summary: 'Publish the travel policies — shown under every trip before booking' })
+  async setTravelPolicies(@Body(zodBody(TravelPoliciesSchema)) dto: TravelPoliciesDto) {
+    await this.tenants.setTravelPolicies(dto);
+    return { ok: true, policies: dto };
+  }
+
+  @Post('travel-policies/reset')
+  @HttpCode(200)
+  @RequirePermission(Permission.TENANT_MANAGE)
+  @ApiOperation({ summary: 'Withdraw the published travel policies' })
+  async resetTravelPolicies() {
+    await this.tenants.setTravelPolicies(null);
+    return { ok: true, policies: null };
   }
 }

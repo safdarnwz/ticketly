@@ -29,6 +29,7 @@ export class ReviewService {
     rating: number;
     title?: string;
     body?: string;
+    liked?: string[];
   }): Promise<{ reviewId: string }> {
     if (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5) {
       throw new AppError(ErrorCode.REVIEW_INVALID_RATING, 422, {
@@ -60,14 +61,18 @@ export class ReviewService {
       });
     }
 
+    // The review is about the bus that ran this trip — it stays with that
+    // bus even if another bus runs the service later.
     const reviewId = await this.reviews.insert({
       bookingId: input.bookingId,
       customerId: (booking.customerId ?? null) as UserId | null,
       routeId: booking.routeId,
       tripId: booking.tripId,
+      vehicleId: await this.reviews.tripVehicle(booking.tripId),
       rating: input.rating,
       title: input.title,
       body: input.body,
+      liked: input.liked,
       verified: true,
     });
     return { reviewId };
@@ -80,15 +85,28 @@ export class ReviewService {
     return { ...agg, bayesian: bayesianRating(agg.count, agg.average) };
   }
 
+  /** One bus's rating: average, stars 1–5, what travellers liked, latest reviews. */
+  async busReviews(vehicleId: string, limit = 10, offset = 0) {
+    if (!(await this.reviews.busExists(vehicleId)))
+      throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Bus not found' });
+    const [ratings, summary, items] = await Promise.all([
+      this.reviews.busRatings([vehicleId]),
+      this.reviews.busSummary(vehicleId),
+      this.reviews.listForBus(vehicleId, limit, offset),
+    ]);
+    const r = ratings.get(vehicleId) ?? { average: 0, count: 0 };
+    return { average: r.count ? r.average : null, count: r.count, ...summary, items };
+  }
+
   async listForRoute(routeId: RouteId, limit = 20): Promise<unknown[]> {
     return this.reviews.listForRoute(routeId, limit);
   }
 
   /** The operator's reviews with a summary: stars, averages, what still needs an answer. */
-  async operatorSummary(routeId?: string) {
+  async operatorSummary(routeId?: string, vehicleId?: string) {
     const [ratings, extra] = await Promise.all([
-      this.reviews.ratingsForOperator(routeId),
-      this.reviews.operatorSummary(routeId),
+      this.reviews.ratingsForOperator(routeId, vehicleId),
+      this.reviews.operatorSummary(routeId, vehicleId),
     ]);
     const agg = aggregateRatings(ratings);
     return { ...agg, bayesian: bayesianRating(agg.count, agg.average), ...extra };

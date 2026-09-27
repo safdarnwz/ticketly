@@ -210,3 +210,19 @@ export const LuggagePolicySchema = z.object({
   note: z.string().trim().max(300).default(''),
 });
 export type LuggagePolicyDto = z.infer<typeof LuggagePolicySchema>;
+
+/**
+ * The other rules a passenger sees before booking (redBus "Other policies"):
+ * pets, liquor, smoking, how long the bus waits at a pickup point, plus any
+ * notes of the operator's own. Child tickets come from the passenger policy
+ * and luggage from the luggage policy.
+ */
+export const TravelPoliciesSchema = z.object({
+  pets: z.enum(['not_allowed', 'small_in_carrier', 'allowed']),
+  liquor: z.enum(['prohibited', 'sealed_in_luggage']),
+  smoking: z.enum(['prohibited', 'at_stops_only']),
+  /** Minutes the bus waits at a boarding point after its time; 0 = leaves on time. */
+  pickupWaitMinutes: z.number().int().min(0).max(30),
+  notes: z.array(z.string().trim().min(3).max(200)).max(8).default([]),
+});
+export type TravelPoliciesDto = z.infer<typeof TravelPoliciesSchema>;

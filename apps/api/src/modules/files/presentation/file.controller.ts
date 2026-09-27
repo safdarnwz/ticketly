@@ -41,6 +41,8 @@ export class FileController {
       ? await runAsTenant(meta.tenantId as TenantId, load)
       : await load();
     void reply.header('Cache-Control', 'public, max-age=86400');
+    // Public by design: the web app, storefronts and emails embed these from another origin.
+    void reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
     sendStoredFile(reply, { fileName: meta.fileName, mimeType: meta.mimeType, content });
   }
 
