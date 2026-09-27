@@ -117,6 +117,38 @@ describe('the trip decides its bus and crew; late changes reach passengers (e2e)
       op,
     );
 
+  /** A verified bus with papers valid on the trip date, on the trip's own seat layout. */
+  const newBus = async (reg: string) => {
+    const { seat_layout_id: layoutId, vehicle_type_id: typeId } = await sqlOne<{
+      seat_layout_id: string;
+      vehicle_type_id: string;
+    }>(
+      app,
+      `SELECT t.seat_layout_id, (SELECT id FROM vehicle_types WHERE tenant_id = t.tenant_id LIMIT 1) AS vehicle_type_id FROM trips t WHERE t.id = $1`,
+      [leg.tripId],
+    );
+    const bus = await sqlOne<{ id: string }>(
+      app,
+      `INSERT INTO vehicles (tenant_id, registration_no, vehicle_type_id, seat_layout_id, status, verification_status)
+       SELECT tenant_id, $1, $2, $3, 'active', 'approved' FROM trips WHERE id = $4 RETURNING id`,
+      [reg, typeId, layoutId, leg.tripId],
+    );
+    for (const doc of ['permit', 'insurance', 'fitness', 'puc'])
+      await sqlOne(
+        app,
+        `INSERT INTO vehicle_documents (tenant_id, vehicle_id, doc_type, document_no, valid_from, expires_on, verification_status)
+         SELECT tenant_id, $1, $2, $3, '2025-01-01', '2031-12-31', 'verified' FROM vehicles WHERE id = $1`,
+        [bus.id, doc, `${doc.toUpperCase()}-${reg}`],
+      );
+    return bus;
+  };
+  const changeBus = (vehicleId: string, reason: string) =>
+    app.post(
+      `/trips/${leg.tripId}/vehicle`,
+      { vehicleId, reason },
+      { ...op, idempotencyKey: `e2e-bus-${vehicleId}` },
+    );
+
   beforeAll(async () => {
     app = await bootstrapTestApp();
     const f = app.fixtures;
@@ -263,28 +295,8 @@ describe('the trip decides its bus and crew; late changes reach passengers (e2e)
   });
 
   it('another bus takes the trip (any verified bus, any route): passengers told get the new bus number', async () => {
-    const { seat_layout_id: layoutId, vehicle_type_id: typeId } = await sqlOne<{
-      seat_layout_id: string;
-      vehicle_type_id: string;
-    }>(
-      app,
-      `SELECT t.seat_layout_id, (SELECT id FROM vehicle_types WHERE tenant_id = t.tenant_id LIMIT 1) AS vehicle_type_id FROM trips t WHERE t.id = $1`,
-      [leg.tripId],
-    );
     const reg = `RJ${run.slice(0, 2)}ZX${run.slice(2)}`;
-    const bus = await sqlOne<{ id: string }>(
-      app,
-      `INSERT INTO vehicles (tenant_id, registration_no, vehicle_type_id, seat_layout_id, status, verification_status)
-       SELECT tenant_id, $1, $2, $3, 'active', 'approved' FROM trips WHERE id = $4 RETURNING id`,
-      [reg, typeId, layoutId, leg.tripId],
-    );
-    for (const doc of ['permit', 'insurance', 'fitness', 'puc'])
-      await sqlOne(
-        app,
-        `INSERT INTO vehicle_documents (tenant_id, vehicle_id, doc_type, document_no, valid_from, expires_on, verification_status)
-         SELECT tenant_id, $1, $2, $3, '2025-01-01', '2031-12-31', 'verified' FROM vehicles WHERE id = $1`,
-        [bus.id, doc, `${doc.toUpperCase()}-${run}`],
-      );
+    const bus = await newBus(reg);
 
     const change = await app.post(
       `/trips/${leg.tripId}/vehicle`,
@@ -307,20 +319,30 @@ describe('the trip decides its bus and crew; late changes reach passengers (e2e)
     expect(next?.busNumber).toBe(reg);
   });
 
-  it('a trip that has run takes no crew', async () => {
+  it('a late bus is replaced after its departure time until the bus has left; then no bus or crew change', async () => {
+    // Twenty minutes past departure, the bus still at the depot, sales stopped.
     await sqlOne(
       app,
-      `UPDATE trips SET departs_at = now() + interval '10 minutes', arrives_at = now() + interval '5 hours' WHERE id = $1`,
+      `UPDATE trips SET departs_at = now() - interval '20 minutes', arrives_at = now() + interval '5 hours', status = 'closed' WHERE id = $1`,
       [leg.tripId],
     );
+    const spareBus = await newBus(`RJ${run.slice(0, 2)}ZY${run.slice(2)}`);
+    const late = await changeBus(spareBus.id, 'Planned bus stuck in traffic, spare sent');
+    expect(late.status, JSON.stringify(late.body)).toBeLessThan(300);
+    expect(late.body.changed).toBe(true);
+
     expect(
       (await app.post(`/crew/trips/${leg.tripId}/status`, { status: 'departed' }, op)).status,
     ).toBe(201);
+    const third = await newBus(`RJ${run.slice(0, 2)}ZW${run.slice(2)}`);
+    const gone = await changeBus(third.id, 'Too late, the bus has left');
+    expect(gone.status).toBe(422);
+    expect(gone.body.detail).toMatch(/already left/);
     expect(
       (await app.post(`/crew/trips/${leg.tripId}/status`, { status: 'closed' }, op)).status,
     ).toBe(201);
-    const late = await assign('D4', 60);
-    expect(late.status).toBe(422);
-    expect(late.body.detail).toMatch(/trip is over/);
+    const over = await assign('D4', 60);
+    expect(over.status).toBe(422);
+    expect(over.body.detail).toMatch(/trip is over/);
   });
 });

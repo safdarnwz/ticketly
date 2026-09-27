@@ -56,13 +56,20 @@ export class TripVehicleService {
     return this.uow.run({ name: 'trip.changeVehicle', tenantId }, async () => {
       const trip = await this.repo.lockTrip(tripId);
       if (!trip) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Trip not found' });
-      if (!['scheduled', 'open'].includes(trip.status))
+      // Until the bus has actually left, another can take its place — also
+      // when the planned bus is late past the departure time, or sales have
+      // already been stopped for boarding.
+      if (trip.status === 'cancelled')
         throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
-          message: `The bus cannot be changed on a ${trip.status} trip`,
+          message: 'The bus cannot be changed on a cancelled trip',
         });
-      if (trip.departs_at <= new Date())
+      if (trip.status === 'departed' || trip.actual_departed_at)
         throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
-          message: 'This trip has already departed',
+          message: 'This bus has already left — the bus cannot be changed now',
+        });
+      if (trip.arrives_at <= new Date())
+        throw new AppError(ErrorCode.COMMON_VALIDATION, 422, {
+          message: 'This trip is over',
         });
       if (trip.vehicle_id === input.vehicleId)
         return { changed: false, layoutChanged: false, seatMoves: [], bookingsAffected: 0 };

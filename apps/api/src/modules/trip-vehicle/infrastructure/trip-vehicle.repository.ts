@@ -13,6 +13,7 @@ export interface TripRow {
   departs_at: Date;
   arrives_at: Date;
   journey_date: string;
+  actual_departed_at: Date | null;
 }
 export interface SeatRow {
   seatNumber: string;
@@ -39,7 +40,8 @@ export class TripVehicleRepository {
 
   lockTrip(tripId: string): Promise<TripRow | null> {
     return this.db.queryOne<TripRow>(
-      `SELECT id, vehicle_id, seat_layout_id, status::text AS status, departs_at, arrives_at, journey_date::text AS journey_date
+      `SELECT id, vehicle_id, seat_layout_id, status::text AS status, departs_at, arrives_at, journey_date::text AS journey_date,
+              actual_departed_at
          FROM trips WHERE tenant_id = $1 AND id = $2 FOR UPDATE`,
       [requireTenantId(), tripId],
       { name: 'tripVehicle.lockTrip' },
