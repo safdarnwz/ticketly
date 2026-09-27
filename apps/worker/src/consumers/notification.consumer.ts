@@ -1,10 +1,11 @@
 import { DatabaseService } from '@database';
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 
-import { type DomainEvent } from '@kernel';
+import { runInNewContext, type DomainEvent } from '@kernel';
 
 import { NotificationService } from '@api/modules/notification/application/services/notification.service';
 import { EventDispatcher, type EventHandler } from '../dispatcher/event-dispatcher';
+import { JourneyDetailsService } from '../schedulers/journey-details.service';
 
 /**
  * Subscribes to booking/trip events and turns them into notifications.
@@ -21,6 +22,7 @@ export class NotificationConsumer implements OnModuleInit {
     private readonly dispatcher: EventDispatcher,
     private readonly notifications: NotificationService,
     private readonly db: DatabaseService,
+    private readonly journeys: JourneyDetailsService,
   ) {}
 
   onModuleInit(): void {
@@ -38,6 +40,8 @@ export class NotificationConsumer implements OnModuleInit {
       this.dispatcher.register(this.tripPassengersHandler(type));
     for (const stage of ['8h', '4h', '1h'] as const)
       this.dispatcher.register(this.tripReminderHandler(stage));
+    for (const type of ['trip.vehicle_changed', 'trip.crew_changed'])
+      this.dispatcher.register(this.detailsChangedHandler(type));
     this.dispatcher.register(this.waitlistHandler());
     this.dispatcher.register(this.criticalIncidentHandler());
   }
@@ -137,38 +141,7 @@ export class NotificationConsumer implements OnModuleInit {
           email: (p.contactEmail as string) ?? undefined,
         };
         if (!recipients.sms && !recipients.email) return;
-        const passengers = Array.isArray(p.passengers)
-          ? (p.passengers as { seat: string; name: string }[])
-          : [];
-        const data: Record<string, string | undefined> = {
-          pnr: p.pnr as string,
-          fromStopName: p.fromStopName as string,
-          toStopName: p.toStopName as string,
-          // Already in the operator's timezone ("30 Sep, 9:30 pm").
-          boardingAt: p.boardingAt as string | undefined,
-          droppingAt: p.droppingAt as string | undefined,
-          passengerNames: passengers.map((x) => `${x.name} (${x.seat})`).join(', '),
-        };
-        if (stage !== '8h') {
-          const pickup = (p.pickup as Record<string, unknown>) ?? {};
-          const driver = p.driver as { name: string; phone: string | null } | null;
-          const attendant = p.attendant as { name: string; phone: string | null } | null;
-          Object.assign(data, {
-            busNumber: (p.busNumber as string) ?? 'TBA',
-            'pickup.stopName': pickup.stopName as string,
-            'pickup.landmark': (pickup.landmark as string) ?? '',
-            'pickup.address': (pickup.address as string) ?? '',
-            'driver.name': driver?.name ?? 'Not yet assigned',
-            'driver.phone': driver?.phone ?? 'N/A',
-            'attendant.name': attendant?.name ?? 'Not yet assigned',
-            'attendant.phone': attendant?.phone ?? 'N/A',
-            driversList: (p.driversList as string) ?? 'Not yet assigned',
-            attendantsList: (p.attendantsList as string) ?? 'Not yet assigned',
-            crewList: (p.crewList as string) ?? 'Not yet assigned',
-            trackingUrl: (p.trackingUrl as string) ?? '',
-            trackingStartsAt: (p.trackingStartsAt as string) ?? '',
-          });
-        }
+        const data = journeyData(p, stage !== '8h');
         await this.notifications.notify({
           tenantId: event.tenantId,
           eventId: event.eventId,
@@ -176,6 +149,70 @@ export class NotificationConsumer implements OnModuleInit {
           recipients,
           data,
         });
+      },
+    };
+  }
+
+  /**
+   * The trip decides its bus and crew, and either can change late (a bus
+   * breaks down and another takes its place; a driver is swapped). Whoever
+   * already got the 4-hour details — or whose seat moved with the new bus —
+   * is sent the new bus, seats, drivers and crew once; the same details are
+   * never sent twice (journey_details_hash).
+   */
+  private detailsChangedHandler(eventType: string): EventHandler {
+    return {
+      eventType,
+      handle: async (event: DomainEvent) => {
+        if (!event.tenantId) return;
+        const tenantId = event.tenantId;
+        const p = event.payload as { reason?: string; seatMoves?: { to: string }[] };
+        const movedTo = (p.seatMoves ?? []).map((m) => m.to);
+        const rows = await this.db.query<{
+          id: string;
+          journey_details_hash: string | null;
+          reminded: boolean;
+          moved: boolean;
+        }>(
+          `SELECT b.id, b.journey_details_hash, (b.reminder_4h_sent_at IS NOT NULL) AS reminded,
+                  EXISTS (SELECT 1 FROM booking_seats bs WHERE bs.booking_id = b.id AND bs.seat_number = ANY($3::text[])) AS moved
+             FROM bookings b JOIN trips t ON t.id = b.trip_id AND t.tenant_id = b.tenant_id
+            WHERE b.tenant_id = $1 AND b.trip_id = $2 AND b.status = 'confirmed'
+              AND t.status <> 'cancelled' AND t.actual_arrived_at IS NULL`,
+          [tenantId, event.aggregateId, movedTo],
+          { name: 'notify.detailsChanged.bookings', primary: true, tenantId },
+        );
+        for (const r of rows) {
+          await runInNewContext({ tenantId: tenantId, actorType: 'system' }, async () => {
+            // Not told the bus and crew yet: the 4-hour reminder will carry
+            // the new ones — unless their seat number just changed.
+            const told = r.reminded || r.journey_details_hash !== null;
+            if (!told && !r.moved) return;
+            const details = await this.journeys.boarding(r.id, 'update');
+            if (!details || details.detailsHash === r.journey_details_hash) return;
+            const changeNote =
+              eventType === 'trip.vehicle_changed'
+                ? `Your bus has changed${p.reason ? ` (${p.reason})` : ''}.${r.moved ? ' Your seat number has changed too.' : ''}`
+                : 'The driver / crew of your bus has changed.';
+            const data = { ...journeyData(details, true), changeNote };
+            await this.notifications.notify({
+              tenantId,
+              eventId: event.eventId,
+              eventType: 'trip.details_changed',
+              recipients: {
+                sms: (details.contactPhone as string) ?? undefined,
+                whatsapp: (details.contactPhone as string) ?? undefined,
+                email: (details.contactEmail as string) ?? undefined,
+              },
+              data,
+            });
+            await this.db.execute_(
+              `UPDATE bookings SET journey_details_hash = $3 WHERE tenant_id = $1 AND id = $2`,
+              [tenantId, r.id, details.detailsHash],
+              { name: 'notify.detailsChanged.hash', primary: true, tenantId },
+            );
+          });
+        }
       },
     };
   }
@@ -284,4 +321,47 @@ export class NotificationConsumer implements OnModuleInit {
       },
     };
   }
+}
+
+/**
+ * A journey payload flattened into the placeholder names the templates use.
+ * renderTemplate() looks keys up flat, so `pickup.stopName` is a literal key.
+ */
+function journeyData(
+  p: Record<string, unknown>,
+  boarding: boolean,
+): Record<string, string | undefined> {
+  const passengers = Array.isArray(p.passengers)
+    ? (p.passengers as { seat: string; name: string }[])
+    : [];
+  const data: Record<string, string | undefined> = {
+    pnr: p.pnr as string,
+    fromStopName: p.fromStopName as string,
+    toStopName: p.toStopName as string,
+    // Already in the operator's timezone ("30 Sep, 9:30 pm").
+    boardingAt: p.boardingAt as string | undefined,
+    droppingAt: p.droppingAt as string | undefined,
+    passengerNames: passengers.map((x) => `${x.name} (${x.seat})`).join(', '),
+    seats: passengers.map((x) => x.seat).join(', '),
+  };
+  if (!boarding) return data;
+  const pickup = (p.pickup as Record<string, unknown>) ?? {};
+  const driver = p.driver as { name: string; phone: string | null } | null;
+  const attendant = p.attendant as { name: string; phone: string | null } | null;
+  return {
+    ...data,
+    busNumber: (p.busNumber as string) ?? 'TBA',
+    'pickup.stopName': pickup.stopName as string,
+    'pickup.landmark': (pickup.landmark as string) ?? '',
+    'pickup.address': (pickup.address as string) ?? '',
+    'driver.name': driver?.name ?? 'Not yet assigned',
+    'driver.phone': driver?.phone ?? 'N/A',
+    'attendant.name': attendant?.name ?? 'Not yet assigned',
+    'attendant.phone': attendant?.phone ?? 'N/A',
+    driversList: (p.driversList as string) ?? 'Not yet assigned',
+    attendantsList: (p.attendantsList as string) ?? 'Not yet assigned',
+    crewList: (p.crewList as string) ?? 'Not yet assigned',
+    trackingUrl: (p.trackingUrl as string) ?? '',
+    trackingStartsAt: (p.trackingStartsAt as string) ?? '',
+  };
 }

@@ -33,6 +33,7 @@ import { PlatformSettingsModule } from '@api/modules/platform-settings/platform-
 import { WaitlistConsumer } from './consumers/waitlist.consumer';
 import { PayoutScheduler } from './schedulers/payout.scheduler';
 import { TripReminderScheduler } from './schedulers/trip-reminder.scheduler';
+import { JourneyDetailsService } from './schedulers/journey-details.service';
 import { ConnectionMonitorScheduler } from './schedulers/connection-monitor.scheduler';
 import { InventoryHorizonScheduler } from './schedulers/inventory-horizon.scheduler';
 import { SchedulingModule } from '@api/modules/scheduling/scheduling.module';
@@ -100,6 +101,7 @@ import { GdsModule } from '@api/modules/gds/gds.module';
     SchedulerService,
     PayoutScheduler,
     TripReminderScheduler,
+    JourneyDetailsService,
     ConnectionMonitorScheduler,
     InventoryHorizonScheduler,
   ],

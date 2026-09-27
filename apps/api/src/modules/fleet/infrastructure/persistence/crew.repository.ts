@@ -289,12 +289,20 @@ export class CrewRepository {
   }
 
   /** The trip a duty is for — this operator's only; null when not found. */
-  async tripForDuty(tripId: TripId): Promise<{ status: string } | null> {
-    return this.db.queryOne<{ status: string }>(
-      `SELECT status::text AS status FROM trips WHERE tenant_id = $1 AND id = $2`,
+  /** The trip a duty is for: its state, whether it already ran, and how many drivers it has. */
+  async tripForDuty(
+    tripId: TripId,
+  ): Promise<{ status: string; hasRun: boolean; drivers: number } | null> {
+    const row = await this.db.queryOne<{ status: string; has_run: boolean; drivers: string }>(
+      `SELECT t.status::text AS status, (t.actual_arrived_at IS NOT NULL) AS has_run,
+              (SELECT count(*) FROM crew_duties d JOIN crew c ON c.id = d.crew_id
+                WHERE d.tenant_id = t.tenant_id AND d.trip_id = t.id AND d.status = 'assigned'
+                  AND d.attendance <> 'absent' AND c.role = 'driver') AS drivers
+         FROM trips t WHERE t.tenant_id = $1 AND t.id = $2`,
       [requireTenantId(), tripId],
       { name: 'crew.tripForDuty' },
     );
+    return row ? { status: row.status, hasRun: row.has_run, drivers: Number(row.drivers) } : null;
   }
 
   async insertDuty(input: {
@@ -424,12 +432,14 @@ export class CrewRepository {
   async listDuties(
     date?: LocalDate,
     limit = 300,
+    tripId?: string,
   ): Promise<
     {
       id: string;
       crewId: string;
       crewName: string;
       crewRole: string;
+      crewPhone: string | null;
       tripId: string | null;
       tripLabel: string | null;
       startsAt: Date;
@@ -439,8 +449,11 @@ export class CrewRepository {
       overrideReason: string | null;
     }[]
   > {
+    // One trip's crew (every assigned duty, past or not); or a day's sheet;
+    // or everything still to come.
     return this.db.query(
-      `SELECT d.id, d.crew_id AS "crewId", c.full_name AS "crewName", c.role::text AS "crewRole", d.trip_id AS "tripId",
+      `SELECT d.id, d.crew_id AS "crewId", c.full_name AS "crewName", c.role::text AS "crewRole",
+              c.phone AS "crewPhone", d.trip_id AS "tripId",
               CASE WHEN t.id IS NULL THEN NULL ELSE s.code || ' · ' || to_char(t.journey_date, 'DD Mon') END AS "tripLabel",
               d.starts_at AS "startsAt", d.ends_at AS "endsAt", d.driving_minutes AS "drivingMinutes",
               d.attendance, d.override_reason AS "overrideReason"
@@ -448,10 +461,11 @@ export class CrewRepository {
          LEFT JOIN trips t ON t.id = d.trip_id AND t.tenant_id = d.tenant_id
          LEFT JOIN services s ON s.id = t.service_id
         WHERE d.tenant_id = $1 AND d.status = 'assigned'
-          AND CASE WHEN $3::date IS NULL THEN d.ends_at > now()
+          AND CASE WHEN $5::uuid IS NOT NULL THEN d.trip_id = $5::uuid
+                   WHEN $3::date IS NULL THEN d.ends_at > now()
                    ELSE (d.starts_at AT TIME ZONE $4)::date = $3::date END
-        ORDER BY d.starts_at LIMIT $2`,
-      [requireTenantId(), limit, date ?? null, this.config.domain.timezone],
+        ORDER BY (c.role = 'driver') DESC, d.starts_at LIMIT $2`,
+      [requireTenantId(), limit, date ?? null, this.config.domain.timezone, tripId ?? null],
       { name: 'crew.listDuties' },
     );
   }

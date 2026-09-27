@@ -469,10 +469,12 @@ export class FleetController {
   @RequirePermission(Permission.CREW_MANAGE)
   @ApiOperation({
     summary:
-      'Roster: every upcoming assigned duty, or with ?date=YYYY-MM-DD every duty of that day (attendance sheet)',
+      'Roster: every upcoming assigned duty; ?date=YYYY-MM-DD every duty of that day (attendance sheet); ?tripId= the crew of one trip',
   })
   async listDuties(@Query(zodQuery(ListDutiesQuerySchema)) q: ListDutiesQueryDto) {
-    return { duties: await this.crew.listDuties(q.date ? localDate(q.date) : undefined) };
+    return {
+      duties: await this.crew.listDuties(q.date ? localDate(q.date) : undefined, 300, q.tripId),
+    };
   }
 
   @Post('crew/duties/:id/cancel')

@@ -6,6 +6,7 @@ import { EventBus } from '@messaging';
 import { Logger } from '@observability';
 
 import { TrackingService } from '@api/modules/tracking/application/services/tracking.service';
+import { JourneyDetailsService } from '@worker/schedulers/journey-details.service';
 import { TripReminderScheduler } from '@worker/schedulers/trip-reminder.scheduler';
 
 import { bootstrapTestApp, type TestApp } from './support/bootstrap';
@@ -57,10 +58,9 @@ describe('journey reminders and the tracking window (e2e)', () => {
     );
   const reminders = () =>
     new TripReminderScheduler(
-      app.nest.get(DatabaseService),
       app.nest.get(UnitOfWork),
       app.nest.get(EventBus),
-      app.nest.get(TrackingService),
+      new JourneyDetailsService(app.nest.get(DatabaseService), app.nest.get(TrackingService)),
       app.nest.get(Logger),
     ).run();
   /** The reminder event queued for our booking at a stage (the dev worker may have sent it). */

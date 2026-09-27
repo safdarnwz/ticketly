@@ -194,7 +194,7 @@ export class TrackingRepository {
     return this.db.query<CrewOnDuty>(
       `SELECT c.role::text AS role, c.full_name AS name, c.phone
          FROM crew_duties cd JOIN crew c ON c.id = cd.crew_id
-        WHERE cd.tenant_id = $1 AND cd.trip_id = $2 AND cd.status <> 'cancelled'
+        WHERE cd.tenant_id = $1 AND cd.trip_id = $2 AND cd.status <> 'cancelled' AND cd.attendance <> 'absent'
         ORDER BY (c.role = 'driver') DESC, cd.starts_at, c.full_name`,
       [requireTenantId(), tripId],
       { name: 'tracking.tripCrew' },

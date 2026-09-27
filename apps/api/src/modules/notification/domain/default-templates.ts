@@ -109,6 +109,22 @@ export const DEFAULT_OPERATOR_TEMPLATES: readonly DefaultTemplate[] = [
     body: 'Your bus boards in 1 hour, at {{boardingAt}}.\n\nPickup point: {{pickup.stopName}}\nLandmark: {{pickup.landmark}}\nAddress: {{pickup.address}}\n\nBus number: {{busNumber}}\nYour crew:\n{{crewList}}\n\nYour bus is live on the map now: {{trackingUrl}}\n\nPlease be at your pickup point 15 minutes early.',
   },
   {
+    eventType: 'trip.details_changed',
+    channel: 'sms',
+    body: 'Update for PNR {{pnr}}: {{changeNote}} Bus {{busNumber}}, seat(s) {{seats}}, boarding {{boardingAt}}. Driver(s): {{driversList}}. Crew: {{attendantsList}}. Track: {{trackingUrl}}',
+  },
+  {
+    eventType: 'trip.details_changed',
+    channel: 'whatsapp',
+    body: 'Update for your trip *{{pnr}}*\n\n{{changeNote}}\n\n🚌 Bus number: *{{busNumber}}*\n💺 Seat(s): *{{seats}}*\n📍 Pickup: {{pickup.stopName}}, {{boardingAt}}\n👨\u200d✈️ Driver(s): {{driversList}}\n🧑\u200d💼 Conductor / attendant(s): {{attendantsList}}\n\n📍 Track your bus: {{trackingUrl}}',
+  },
+  {
+    eventType: 'trip.details_changed',
+    channel: 'email',
+    subject: 'Your bus or crew has changed — PNR {{pnr}}',
+    body: '{{changeNote}}\n\nPNR: {{pnr}}\nBus number: {{busNumber}}\nSeat(s): {{seats}}\nPickup: {{pickup.stopName}}, {{boardingAt}}\n\nYour crew:\n{{crewList}}\n\nTrack your bus: {{trackingUrl}}',
+  },
+  {
     eventType: 'connection.at_risk',
     channel: 'sms',
     body: 'Your connecting bus (PNR {{pnr}}) is running {{delayMinutes}} min late. Only {{marginMinutes}} min margin left for your next bus. We are monitoring this for you.',

@@ -36,6 +36,9 @@ const MS_PER_DAY = 86_400_000;
  * instant, one INSERT loses and surfaces as a 409, so a driver is never
  * physically double-booked even under a race the application check can't see.
  */
+/** Drivers taking turns on one trip. */
+export const MAX_DRIVERS_PER_TRIP = 3;
+
 @Injectable()
 export class CrewService {
   constructor(
@@ -98,6 +101,17 @@ export class CrewService {
             ErrorCode.COMMON_VALIDATION,
             'That trip is cancelled — it needs no crew',
           );
+        if (trip.hasRun)
+          throw new DomainError(
+            ErrorCode.COMMON_VALIDATION,
+            'That trip is over — it needs no crew',
+          );
+        // A long overnight run has two or three drivers taking turns; never more.
+        if (member.role === 'driver' && trip.drivers >= MAX_DRIVERS_PER_TRIP)
+          throw new DomainError(
+            ErrorCode.COMMON_VALIDATION,
+            `This trip already has ${MAX_DRIVERS_PER_TRIP} drivers — remove one before adding another`,
+          );
       }
       const rules = input.rules ?? (await this.crew.loadRules());
       const existing = await this.crew.loadDuties(
@@ -119,7 +133,7 @@ export class CrewService {
         override = { reason, conflicts: check.conflicts, approvedBy: getUserId() ?? null };
       }
       try {
-        return await this.crew.insertDuty({
+        const id = await this.crew.insertDuty({
           crewId: input.crewId,
           tripId: input.tripId,
           startsAt: input.startsAt,
@@ -127,6 +141,8 @@ export class CrewService {
           drivingMinutes: input.drivingMinutes,
           override,
         });
+        if (input.tripId) this.crewChanged(input.tripId);
+        return id;
       } catch (error) {
         if (error instanceof ConflictError)
           throw new ConflictError(
@@ -169,6 +185,7 @@ export class CrewService {
           aggregateId: d.crewId,
           payload: { dutyId, tripId: d.tripId, startsAt: d.startsAt.toISOString() },
         });
+        if (d.tripId) this.crewChanged(d.tripId as TripId); // no longer on the bus
       }
       return { attendance };
     });
@@ -221,6 +238,20 @@ export class CrewService {
       if (d.endsAt.getTime() <= Date.now())
         throw new DomainError(ErrorCode.COMMON_VALIDATION, 'This duty has already ended');
       await this.crew.cancelDuty(id);
+      if (d.tripId) this.crewChanged(d.tripId as TripId);
+    });
+  }
+
+  /**
+   * The trip's crew changed — passengers already given the driver and crew
+   * (the 4-hour reminder) are sent the new names and numbers.
+   */
+  private crewChanged(tripId: TripId): void {
+    this.events.publish({
+      type: 'trip.crew_changed',
+      aggregateType: 'trip',
+      aggregateId: tripId,
+      payload: { tripId },
     });
   }
 
