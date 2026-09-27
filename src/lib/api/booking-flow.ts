@@ -36,9 +36,14 @@ export interface TripStop {
   canAlight: boolean;
 }
 
+/** What the operator lets a passenger carry free, and what more costs. */
+export interface LuggagePolicy { freeKg: number; freePieces: number; extraPerKgMinor: number | null; note: string }
+
 export interface TripDetail {
   trip: { id: string; routeId: string; journeyDate: string; departsAt: string; arrivesAt: string; status: string; totalSeats: number };
   stops: TripStop[];
+  /** Null until the operator publishes one. */
+  luggage?: LuggagePolicy | null;
 }
 
 export interface CheckoutConcession {

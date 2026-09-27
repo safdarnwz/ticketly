@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, Clock, Star } from 'lucide-react';
 
 import { Button, Card, CardBody, CardHeader } from '@/components/ui';
+import { LuggageNote } from '@/components/customer/LuggageNote';
 import { SeatSelector, type SeatSelection } from '@/components/customer/SeatSelector';
 import { flowApi } from '@/lib/api/booking-flow';
 import { bookingsApi } from '@/lib/api/bookings';
@@ -148,6 +149,7 @@ export function TripPage() {
                 <span className="font-semibold">{sel.seats.length ? formatMoney(estimate, trip.currency) : '—'}</span>
               </div>
               <p className="-mt-2 text-[11px] text-text-muted">Includes GST. Final price is confirmed on the next step.</p>
+              <LuggageNote tripId={trip.tripId} />
               {error && <p role="alert" className="text-xs text-danger">{error}</p>}
               <Button
                 fullWidth

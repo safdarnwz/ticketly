@@ -6,6 +6,7 @@ import { ArrowLeft, CalendarClock, LifeBuoy, MapPin, Armchair, PencilLine, Star,
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, Input, Modal, PageLoader, Select, statusTone, useToast } from '@/components/ui';
 import { CancelBookingModal } from '@/components/booking/CancelBookingModal';
 import { LiveTrackingCard } from '@/components/customer/LiveTrackingCard';
+import { LuggageNote } from '@/components/customer/LuggageNote';
 import { PrintTicketButton } from '@/components/customer/PrintTicketButton';
 import { BookingChangeModal, type ChangeKind } from '@/pages/bookings/BookingChanges';
 import { bookingsApi, type ManagedBooking } from '@/lib/api/bookings';
@@ -75,6 +76,8 @@ export function ManageBookingPage() {
           <div className="flex justify-between sm:col-span-2"><span className="text-text-muted">Fare{b.status === 'cancelled' ? '' : ` · ${b.passengers.length} seat${b.passengers.length === 1 ? '' : 's'}`}</span><span className="font-semibold">{formatMoney(b.totalMinor, b.currency)}</span></div>
         </CardBody>
       </Card>
+
+      <LuggageNote tripId={b.tripId} tenantId={b.tenantId} />
 
       <Card>
         <CardHeader title="Travellers" subtitle={`${b.passengers.length} seat${b.passengers.length === 1 ? '' : 's'}`} />

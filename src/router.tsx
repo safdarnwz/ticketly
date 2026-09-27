@@ -30,6 +30,8 @@ import { PartnersPage } from '@/pages/admin/PartnersPage';
 import { BillingPage } from '@/pages/admin/BillingPage';
 import { HealthPage } from '@/pages/admin/HealthPage';
 import { WaitlistRulesPage } from '@/pages/settings/WaitlistRulesPage';
+import { LuggagePolicyPage } from '@/pages/settings/LuggagePolicyPage';
+import { AddOnsPage } from '@/pages/settings/AddOnsPage';
 import { ManageBookingPage } from '@/pages/customer/ManageBookingPage';
 import { AccountPage } from '@/pages/customer/AccountPage';
 
@@ -149,6 +151,8 @@ const tenantAdminRouter = createBrowserRouter([
               { path: 'refund-policy', element: <RefundPolicyPage /> },
               { path: 'connections', element: <ConnectionsPage /> },
               { path: 'waitlist', element: <WaitlistRulesPage /> },
+              { path: 'luggage', element: <LuggagePolicyPage /> },
+              { path: 'add-ons', element: <AddOnsPage /> },
               { path: 'templates', element: <TemplatesPage /> },
               { path: 'branding', element: <BrandingPage /> },
             ],
