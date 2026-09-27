@@ -13,6 +13,7 @@ describe('agents (e2e)', () => {
   let app: TestApp;
   let other: Record<string, string>;
   let agentId: string;
+  let agentUserId: string;
   let soldPnr: string | undefined;
   const op = { as: 'operator' as const };
   const run = Date.now().toString(36);
@@ -66,12 +67,36 @@ describe('agents (e2e)', () => {
     const ok = await create({});
     expect(ok.status, JSON.stringify(ok.body)).toBe(201);
     agentId = ok.body.agentId;
+    agentUserId = ok.body.userId;
     expect((await create({ name: `Other ${run}` })).status).toBe(409); // same login email
     if (theirBranch)
       expect((await app.patch(`/agents/${agentId}`, { branchId: theirBranch.id }, op)).status).toBe(
         404,
       );
     expect((await app.get(`/agents/${agentId}`, { headers: other })).status).toBe(404);
+  });
+
+  it("an agent's login is not staff: not listed, not counted, never given an operator role", async () => {
+    const staff = await app.get('/users?limit=200', op);
+    expect(staff.status).toBe(200);
+    const ids = (staff.body.items ?? staff.body) as { id: string }[];
+    expect(ids.some((u) => u.id === agentUserId)).toBe(false);
+    expect((await app.get(`/users/${agentUserId}`, op)).status).toBe(404);
+    const admin = ((await app.get('/roles', op)).body.items as { id: string; code: string }[]).find(
+      (r) => r.code === 'admin' || r.code === 'operator_admin',
+    )!;
+    expect((await app.put(`/users/${agentUserId}/roles/${admin.id}`, {}, op)).status).toBe(404);
+    expect(
+      (await app.post(`/users/${agentUserId}/roles`, { roles: [admin.code] }, op)).status,
+    ).toBe(404);
+    expect(
+      (await app.put(`/users/${agentUserId}/password`, { password: 'Taken-over-123' }, op)).status,
+    ).toBe(404);
+    expect((await app.put(`/users/${agentUserId}/branch`, { branchId: null }, op)).status).toBe(
+      404,
+    );
+    // A suspended agent cannot be switched back on through the staff screen.
+    expect((await app.patch(`/users/${agentUserId}`, { status: 'active' }, op)).status).toBe(404);
   });
 
   it('money in, corrections within the limit, slabs and the statement', async () => {

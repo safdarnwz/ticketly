@@ -113,7 +113,8 @@ export class UserService {
   ): Promise<void> {
     await this.uow.run({ name: 'user.update', tenantId: requireTenantId() }, async () => {
       const user = await this.users.findById(userId);
-      if (!user) throw new NotFoundError('User', userId);
+      // Staff only: an agent's or crew member's login is enabled / suspended from its own screen.
+      if (!user || !(await this.staff.find(userId))) throw new NotFoundError('User', userId);
       if (patch.fullName || patch.phone)
         user.updateProfile({
           fullName: patch.fullName ?? user.snapshot().fullName,

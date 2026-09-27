@@ -19,7 +19,15 @@ import prettier from 'eslint-config-prettier';
  */
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'coverage/**', 'node_modules/**', '**/*.js', '**/*.mjs', '**/*.cjs', 'vitest*.config.ts'],
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      'node_modules/**',
+      '**/*.js',
+      '**/*.mjs',
+      '**/*.cjs',
+      'vitest*.config.ts',
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -29,7 +37,10 @@ export default tseslint.config(
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
       '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports' }],
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-misused-promises': 'error',
@@ -71,7 +82,8 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.spec.ts', '**/*.e2e-spec.ts', 'libs/testing/**', 'test/**'],
+    // scripts/scale drives the HTTP API like the e2e suite does (untyped JSON in and out).
+    files: ['**/*.spec.ts', '**/*.e2e-spec.ts', 'libs/testing/**', 'test/**', 'scripts/scale/**'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',

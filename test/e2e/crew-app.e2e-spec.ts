@@ -68,6 +68,18 @@ describe('crew app (e2e)', () => {
     expect((await app.get('/bookings/search', crew)).status).toBe(403);
     // Staff are not crew.
     expect((await app.get('/crew/me', op)).status).toBe(403);
+    // …and crew are not staff: the login is not on the staff list nor reachable by the staff endpoints.
+    const { user_id: crewUserId } = await sqlOne<{ user_id: string }>(
+      app,
+      'SELECT user_id FROM crew WHERE id = $1',
+      [crewId],
+    );
+    const staff = (await app.get('/users?limit=200', op)).body.items as { id: string }[];
+    expect(staff.some((u) => u.id === crewUserId)).toBe(false);
+    expect((await app.get(`/users/${crewUserId}`, op)).status).toBe(404);
+    expect((await app.post(`/users/${crewUserId}/roles`, { roles: ['admin'] }, op)).status).toBe(
+      404,
+    );
   });
 
   it('only the trips on my duty: manifest, boarding, reports, lost item, GPS, panic', async () => {

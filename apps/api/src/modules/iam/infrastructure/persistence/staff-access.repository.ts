@@ -4,6 +4,7 @@ import { DatabaseService } from '@database';
 import { type TenantId } from '@kernel';
 
 import { type LoginWindow } from '../../domain/access-policy';
+import { IS_STAFF } from './staff-sql';
 
 /** A field left `undefined` keeps its current value; `null` clears it. */
 export interface StaffAccessPatch {
@@ -19,7 +20,8 @@ export class StaffAccessRepository {
 
   async exists(userId: string, tenantId: TenantId): Promise<boolean> {
     const r = await this.db.queryOne<{ id: string }>(
-      `SELECT id FROM users WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL`,
+      `SELECT u.id FROM users u
+        WHERE u.id = $1 AND u.tenant_id = $2 AND u.deleted_at IS NULL AND ${IS_STAFF('u')}`,
       [userId, tenantId],
       { name: 'staff.exists', primary: true },
     );

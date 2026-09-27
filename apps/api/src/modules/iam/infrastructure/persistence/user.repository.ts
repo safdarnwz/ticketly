@@ -5,6 +5,7 @@ import { requireTenantId, type TenantId, type UserId } from '@kernel';
 import { FieldEncryptor } from '@security';
 
 import { User, type UserKind, type UserProps, type UserStatus } from '../../domain/user.entity';
+import { IS_STAFF } from './staff-sql';
 
 registerConstraintMessages({
   users_tenant_email_idx: 'Someone already uses this email',
@@ -117,8 +118,8 @@ export class UserRepository {
   /** Staff users counting towards the plan quota: active, not deleted. */
   async countActiveStaff(): Promise<number> {
     const row = await this.db.queryOne<{ n: string }>(
-      `SELECT count(*) AS n FROM users
-        WHERE tenant_id = $1 AND kind = 'staff' AND status = 'active' AND deleted_at IS NULL`,
+      `SELECT count(*) AS n FROM users u
+        WHERE u.tenant_id = $1 AND ${IS_STAFF('u')} AND u.status = 'active' AND u.deleted_at IS NULL`,
       [requireTenantId()],
       { name: 'user.countActiveStaff', primary: true },
     );

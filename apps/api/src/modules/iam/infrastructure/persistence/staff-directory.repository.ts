@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '@database';
 import { getUserId, requireTenantId } from '@kernel';
 import { FieldEncryptor } from '@security';
+import { IS_STAFF } from './staff-sql';
 
 export interface StaffRow {
   id: string;
@@ -85,7 +86,7 @@ export class StaffDirectoryRepository {
     const q = input.q?.trim() ?? '';
     const rows = await this.db.query<StaffRow>(
       `${this.select}
-        WHERE u.tenant_id = $1 AND u.kind = 'staff' AND u.deleted_at IS NULL
+        WHERE u.tenant_id = $1 AND ${IS_STAFF('u')} AND u.deleted_at IS NULL
           AND ($2::text = '' OR u.full_name ILIKE '%' || $2 || '%' OR u.email_blind = $3 OR u.phone_blind = $3)
           AND ($4::text IS NULL OR u.status::text = $4)
           AND ($5::uuid IS NULL OR u.branch_id = $5)
@@ -110,7 +111,7 @@ export class StaffDirectoryRepository {
   async find(id: string): Promise<StaffRow | null> {
     const row = await this.db.queryOne<StaffRow>(
       `${this.select}
-        WHERE u.tenant_id = $1 AND u.kind = 'staff' AND u.deleted_at IS NULL AND u.id = $2`,
+        WHERE u.tenant_id = $1 AND ${IS_STAFF('u')} AND u.deleted_at IS NULL AND u.id = $2`,
       [requireTenantId(), id],
       { name: 'staff.find', primary: true },
     );
@@ -124,7 +125,7 @@ export class StaffDirectoryRepository {
          FROM users u
          JOIN user_roles ur ON ur.user_id = u.id AND (ur.expires_at IS NULL OR ur.expires_at > now())
          JOIN role_permissions rp ON rp.role_id = ur.role_id AND rp.permission IN ('user:manage', '*')
-        WHERE u.tenant_id = $1 AND u.kind = 'staff' AND u.status = 'active' AND u.deleted_at IS NULL
+        WHERE u.tenant_id = $1 AND ${IS_STAFF('u')} AND u.status = 'active' AND u.deleted_at IS NULL
           AND ($2::uuid IS NULL OR u.id <> $2) AND ($3::uuid IS NULL OR ur.role_id <> $3)`,
       [requireTenantId(), excluding ?? null, withoutRoleId ?? null],
       { name: 'staff.activeUserManagers', primary: true },
@@ -200,7 +201,7 @@ export class StaffDirectoryRepository {
            FROM users u
            LEFT JOIN bookings b ON b.booked_by = u.id AND b.tenant_id = u.tenant_id
                                 AND (b.created_at AT TIME ZONE $4)::date BETWEEN $2::date AND $3::date
-          WHERE u.tenant_id = $1 AND u.kind = 'staff' AND u.deleted_at IS NULL
+          WHERE u.tenant_id = $1 AND ${IS_STAFF('u')} AND u.deleted_at IS NULL
           GROUP BY u.id)
        SELECT u.id AS "userId", u.full_name AS "fullName", br.name AS "branchName",
               s.bookings, s.seats, s.revenue AS "revenueMinor", s.cancelled,

@@ -97,6 +97,14 @@ export function createPool(
     client.on('notice', (notice) => {
       options.logger.debug({ pool: options.name, notice: notice.message }, 'postgres notice');
     });
+    // The pool listens only while a client is idle. A checked-out client the
+    // server terminates (idle-in-transaction timeout, admin kill, failover)
+    // emits 'error' with no listener — an uncaught exception that took the
+    // whole API down. The query in flight still rejects and its transaction
+    // rolls back; the client is discarded on release.
+    client.on('error', (error) => {
+      options.logger.error(error, 'Database client error', { pool: options.name });
+    });
   });
 
   return { name: options.name, role: options.role, pool };
