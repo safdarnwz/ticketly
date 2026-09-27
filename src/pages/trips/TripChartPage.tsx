@@ -124,7 +124,8 @@ export function TripChartPage() {
             <Button variant="outline" leftIcon={<Unlock className="h-4 w-4" />} disabled={busy} onClick={() => { setBlockMode(true); setPicked(null); }}>Block / open seats</Button>
           ))}
           {!locked && future && <Button variant="outline" leftIcon={<Clock className="h-4 w-4" />} disabled={busy} onClick={() => setDialog('retime')}>Change departure time</Button>}
-          {!locked && future && <Button variant="outline" leftIcon={<BusIcon className="h-4 w-4" />} disabled={busy} onClick={() => setDialog('bus')}>{t.vehicleId ? 'Change bus' : 'Assign bus'}</Button>}
+          {/* Until the bus has actually left — also when it is running late past its time. */}
+          {!locked && new Date(t.arrivesAt).getTime() > Date.now() && <Button variant="outline" leftIcon={<BusIcon className="h-4 w-4" />} disabled={busy} onClick={() => setDialog('bus')}>{t.vehicleId ? 'Change bus' : 'Assign bus'}</Button>}
           {t.status !== 'cancelled' && t.status !== 'departed' && !t.hasRun && (() => {
             const early = new Date(t.departsAt).getTime() - Date.now() > 2 * 3_600_000;
             return <Button variant="outline" leftIcon={<PlayCircle className="h-4 w-4" />} loading={markDeparted.isPending} disabled={busy || early}

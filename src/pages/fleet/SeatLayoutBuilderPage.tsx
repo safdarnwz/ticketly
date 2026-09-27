@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Eraser, Hash, MousePointer2, RotateCw, Save, Trash2, Wand2, Minus, Plus } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Eraser, GripVertical, Hash, MousePointer2, RotateCw, Save, Trash2, Wand2, Minus, Plus } from 'lucide-react';
 
 import { Badge, Button, Card, CardBody, CardHeader, ErrorState, Input, PageLoader, Select, useToast } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -9,8 +9,8 @@ import { FixtureTile, SeatMap } from '@/components/customer/SeatMap';
 import { masterDataApi } from '@/lib/api/masterData';
 import {
   DEFAULT_NUMBERING, FIXTURE_LABEL, LAYOUT_TEMPLATES, MAX_COLUMNS, MAX_ROWS, NUMBERING_PRESETS,
-  autoNumber, autoPositions, clearCell, deleteLine, fromPayload, insertLine, numberProblems, occupantAt, placeItem, resizeDeck, setDecks, toPayload,
-  type Deck, type FixtureKind, type LayoutDraft, type LayoutSeat, type NumberingOptions, type SeatKind,
+  autoNumber, autoPositions, clearCell, deleteLine, fromPayload, insertLine, layoutChecks, moveItem, numberProblems, occupantAt, placeItem, resizeDeck, setDecks, toPayload,
+  type Deck, type ItemRef, type FixtureKind, type LayoutDraft, type LayoutSeat, type NumberingOptions, type SeatKind,
 } from '@/lib/seat-layout';
 import { cn } from '@/lib/utils';
 
@@ -71,6 +71,9 @@ export function SeatLayoutBuilderPage() {
   const [washSize, setWashSize] = useState('2x2');
   const [sel, setSel] = useState<{ deck: Deck; row: number; column: number } | null>(null);
   const [painting, setPainting] = useState(false);
+  // What is being dragged: a tool from the palette, or a seat / fixture already placed.
+  const [drag, setDrag] = useState<{ toolKey?: string; item?: ItemRef; rowSpan: number; colSpan: number } | null>(null);
+  const [hover, setHover] = useState<{ deck: Deck; row: number; column: number } | null>(null);
   const [numbering, setNumbering] = useState<NumberingOptions>(DEFAULT_NUMBERING);
   const [serverError, setServerError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
@@ -118,6 +121,34 @@ export function SeatLayoutBuilderPage() {
       ? placeItem(draft, { seat: { type: tool.type, deck, row, column, rowSpan: tool.rowSpan, colSpan: tool.colSpan } })
       : placeItem(draft, { fixture: { kind: tool.kind, deck, row, column, rowSpan: tool.rowSpan, colSpan: tool.colSpan } });
     if (change(res)) setSel({ deck, row, column });
+  };
+
+  const toolFor = (key: string): Tool => {
+    const t = TOOLS.find((x) => x.key === key)!.tool;
+    if (t.id === 'fixture' && t.kind === 'washroom') {
+      const [r, c] = washSize.split('x').map(Number);
+      return { ...t, rowSpan: r, colSpan: c };
+    }
+    return t;
+  };
+
+  /** A palette tool or a placed item dropped on a cell. */
+  const dropAt = (deck: Deck, row: number, column: number) => {
+    const d = drag;
+    setDrag(null);
+    setHover(null);
+    if (!draft || !d) return;
+    if (d.item) {
+      if (change(moveItem(draft, d.item, { deck, row, column }))) setSel({ deck, row, column });
+      return;
+    }
+    const t = toolFor(d.toolKey!);
+    if (t.id === 'seat' || t.id === 'fixture') {
+      const res = t.id === 'seat'
+        ? placeItem(draft, { seat: { type: t.type, deck, row, column, rowSpan: t.rowSpan, colSpan: t.colSpan } })
+        : placeItem(draft, { fixture: { kind: t.kind, deck, row, column, rowSpan: t.rowSpan, colSpan: t.colSpan } });
+      if (change(res)) { setSel({ deck, row, column }); setToolKey('select'); }
+    }
   };
 
   const selected = draft && sel ? occupantAt(draft, sel.deck, sel.row, sel.column) : null;
@@ -216,9 +247,17 @@ export function SeatLayoutBuilderPage() {
 
               <div className="flex flex-wrap gap-1.5" role="toolbar" aria-label="Tools">
                 {TOOLS.filter((t) => draft.decks === 2 || t.key !== 'stairs').map((t) => (
-                  <button key={t.key} type="button" title={t.hint} aria-pressed={toolKey === t.key} onClick={() => setToolKey(t.key)}
+                  <button key={t.key} type="button" title={t.tool.id === 'seat' || t.tool.id === 'fixture' ? `${t.hint} — drag onto the bus, or click then click a cell` : t.hint} aria-pressed={toolKey === t.key} onClick={() => setToolKey(t.key)}
+                    draggable={t.tool.id === 'seat' || t.tool.id === 'fixture'}
+                    onDragStart={(e) => {
+                      const tt = toolFor(t.key);
+                      e.dataTransfer.setData('text/plain', t.key);
+                      e.dataTransfer.effectAllowed = 'copy';
+                      setDrag({ toolKey: t.key, rowSpan: 'rowSpan' in tt ? tt.rowSpan : 1, colSpan: 'colSpan' in tt ? tt.colSpan : 1 });
+                    }}
+                    onDragEnd={() => { setDrag(null); setHover(null); }}
                     className={cn('flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium', toolKey === t.key ? 'border-primary bg-primary text-white' : 'border-border bg-surface text-text hover:bg-surface-muted')}>
-                    {t.tool.id === 'select' ? <MousePointer2 className="h-3.5 w-3.5" /> : t.tool.id === 'erase' ? <Eraser className="h-3.5 w-3.5" /> : null}
+                    {t.tool.id === 'select' ? <MousePointer2 className="h-3.5 w-3.5" /> : t.tool.id === 'erase' ? <Eraser className="h-3.5 w-3.5" /> : <GripVertical className="h-3.5 w-3.5 opacity-50" />}
                     {t.label}
                   </button>
                 ))}
@@ -229,14 +268,21 @@ export function SeatLayoutBuilderPage() {
                 )}
               </div>
               <p className="text-xs text-text-muted">
-                {tool.id === 'select' ? 'Click a seat to rename it or change what it is; click an empty cell to add rows or columns there.' :
+                {tool.id === 'select' ? 'Drag a seat, berth, door or washroom from above onto the bus; drag anything already placed to move it (even to the other deck). Click a seat to rename it; click an empty cell to add rows or columns there.' :
                   tool.id === 'erase' ? 'Click or drag over cells to clear them — an empty column is the aisle.' :
                   `Click or drag to place: ${TOOLS.find((t) => t.key === toolKey)!.hint}. Whatever is underneath is replaced.`}
               </p>
 
               <div className="flex flex-wrap gap-4 overflow-x-auto pb-2" onPointerUp={() => setPainting(false)} onPointerLeave={() => setPainting(false)}>
                 {draft.grids.slice(0, draft.decks).map((g, deck) => (
-                  <DeckEditor key={deck} deck={deck as Deck} draft={draft} problems={problems} sel={sel}
+                  <DeckEditor key={deck} deck={deck as Deck} draft={draft} problems={problems} sel={sel} drag={drag} hover={hover}
+                    onHover={(r, c) => setHover({ deck: deck as Deck, row: r, column: c })}
+                    onDrop={(r, c) => dropAt(deck as Deck, r, c)}
+                    onPick={(ref) => {
+                      const it = ref.kind === 'seat' ? draft.seats[ref.index] : draft.fixtures[ref.index];
+                      setDrag({ item: ref, rowSpan: it.rowSpan ?? 1, colSpan: it.colSpan ?? 1 });
+                    }}
+                    onDragEnd={() => { setDrag(null); setHover(null); }}
                     onResize={(grid) => change(resizeDeck(draft, deck as Deck, grid))}
                     onDown={(r, c) => { setPainting(tool.id !== 'select'); applyAt(deck as Deck, r, c); }}
                     onEnter={(r, c) => { if (painting && tool.id !== 'select' && (tool.id === 'erase' || (tool.rowSpan === 1 && tool.colSpan === 1))) applyAt(deck as Deck, r, c); }}
@@ -348,6 +394,20 @@ export function SeatLayoutBuilderPage() {
           </Card>
 
           <Card>
+            <CardHeader title="Checklist" subtitle="What passengers, crew and the bus rules expect — shown, not forced" />
+            <CardBody>
+              <ul className="flex flex-col gap-2 text-sm">
+                {layoutChecks(draft).map((c) => (
+                  <li key={c.label} className="flex items-start gap-2">
+                    {c.ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />}
+                    <span><span className={cn('font-medium', c.ok ? 'text-text' : 'text-warning')}>{c.label}</span>{!c.ok && <span className="block text-xs text-text-muted">{c.detail}</span>}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardBody>
+          </Card>
+
+          <Card>
             <CardBody className="flex flex-wrap gap-2 text-xs">
               <Badge tone="success">{draft.seats.filter((s) => s.type === 'seater').length} seater</Badge>
               <Badge tone="warning">{draft.seats.filter((s) => s.type === 'semi_sleeper').length} semi-sleeper</Badge>
@@ -364,11 +424,28 @@ export function SeatLayoutBuilderPage() {
 }
 
 /** One deck as an editable grid with its own rows and columns. */
-function DeckEditor({ deck, draft, grid, title, problems, sel, onResize, onDown, onEnter }: {
+function DeckEditor({ deck, draft, grid, title, problems, sel, drag, hover, onResize, onDown, onEnter, onHover, onDrop, onPick, onDragEnd }: {
   deck: Deck; draft: LayoutDraft; grid: { rows: number; columns: number }; title: string; problems: Map<number, string>;
   sel: { deck: Deck; row: number; column: number } | null;
+  drag: { rowSpan: number; colSpan: number } | null;
+  hover: { deck: Deck; row: number; column: number } | null;
   onResize: (g: { rows: number; columns: number }) => void; onDown: (r: number, c: number) => void; onEnter: (r: number, c: number) => void;
+  onHover: (r: number, c: number) => void; onDrop: (r: number, c: number) => void; onPick: (ref: ItemRef) => void; onDragEnd: () => void;
 }) {
+  // Where the dragged thing would land: its whole footprint, red when it does not fit.
+  const landing = drag && hover?.deck === deck ? { ...hover, rowSpan: drag.rowSpan, colSpan: drag.colSpan } : null;
+  const fits = landing ? landing.row + landing.rowSpan <= grid.rows && landing.column + landing.colSpan <= grid.columns : true;
+  const dropProps = (r: number, c: number) => ({
+    onDragOver: (e: React.DragEvent) => { e.preventDefault(); if (hover?.deck !== deck || hover.row !== r || hover.column !== c) onHover(r, c); },
+    onDrop: (e: React.DragEvent) => { e.preventDefault(); onDrop(r, c); },
+  });
+  const pickProps = (ref: ItemRef, r: number, c: number) => ({
+    draggable: true,
+    onDragStart: (e: React.DragEvent) => { e.dataTransfer.setData('text/plain', `${ref.kind}:${ref.index}`); e.dataTransfer.effectAllowed = 'move'; onPick(ref); },
+    onDragEnd,
+    onClick: () => onDown(r, c),
+    ...dropProps(r, c),
+  });
   const cell = '2.4rem';
   const stepper = (label: string, value: number, max: number, set: (n: number) => void): ReactNode => (
     <div className="flex items-center gap-1 text-xs">
@@ -397,12 +474,15 @@ function DeckEditor({ deck, draft, grid, title, problems, sel, onResize, onDown,
           return (
             <button key={`c${i}`} type="button" aria-label={`${title} row ${r + 1} column ${c + 1}`}
               onPointerDown={(e) => { e.preventDefault(); onDown(r, c); }} onPointerEnter={() => onEnter(r, c)}
+              {...dropProps(r, c)}
               className={cn('rounded border border-dashed border-border/70 bg-surface hover:border-primary', isSel && 'ring-2 ring-primary')}
               style={{ gridColumn: c + 2, gridRow: r + 2 }} />
           );
         })}
         {draft.fixtures.map((f, i) => f.deck === deck && (
-          <div key={`f${i}`} className="pointer-events-none p-px" style={{ gridColumn: `${f.column + 2} / span ${f.colSpan ?? 1}`, gridRow: `${f.row + 2} / span ${f.rowSpan ?? 1}` }}>
+          <div key={`f${i}`} role="button" aria-label={`${FIXTURE_LABEL[f.kind]} at row ${f.row + 1} column ${f.column + 1} — drag to move`} className="cursor-grab p-px active:cursor-grabbing"
+            {...pickProps({ kind: 'fixture', index: i }, f.row, f.column)}
+            style={{ gridColumn: `${f.column + 2} / span ${f.colSpan ?? 1}`, gridRow: `${f.row + 2} / span ${f.rowSpan ?? 1}` }}>
             <FixtureTile kind={f.kind} />
           </div>
         ))}
@@ -411,8 +491,9 @@ function DeckEditor({ deck, draft, grid, title, problems, sel, onResize, onDown,
           const bad = problems.get(i);
           const isSel = sel?.deck === deck && sel.row >= s.row && sel.row < s.row + (s.rowSpan ?? 1) && sel.column >= s.column && sel.column < s.column + (s.colSpan ?? 1);
           return (
-            <div key={`s${i}`} title={bad ?? `${TYPE_LABEL[s.type]} ${s.number}`}
-              className={cn('pointer-events-none flex flex-col items-center justify-center rounded-md border-2 text-[10px] font-semibold leading-tight',
+            <div key={`s${i}`} title={bad ?? `${TYPE_LABEL[s.type]} ${s.number} — drag to move`} role="button" aria-label={`Seat ${s.number || 'without number'} — drag to move`}
+              {...pickProps({ kind: 'seat', index: i }, s.row, s.column)}
+              className={cn('flex cursor-grab flex-col active:cursor-grabbing items-center justify-center rounded-md border-2 text-[10px] font-semibold leading-tight',
                 SEAT_TILE[s.type], bad && 'border-danger bg-danger/10 text-danger', s.bookable === false && s.type !== 'crew' && 'opacity-50', isSel && 'ring-2 ring-primary ring-offset-1')}
               style={{ gridColumn: `${s.column + 2} / span ${s.colSpan ?? 1}`, gridRow: `${s.row + 2} / span ${s.rowSpan ?? 1}` }}>
               <span>{s.number || '?'}</span>
@@ -420,6 +501,10 @@ function DeckEditor({ deck, draft, grid, title, problems, sel, onResize, onDown,
             </div>
           );
         })}
+        {landing && (
+          <div aria-hidden className={cn('pointer-events-none rounded-md border-2 border-dashed', fits ? 'border-primary bg-primary/15' : 'border-danger bg-danger/15')}
+            style={{ gridColumn: `${landing.column + 2} / span ${Math.min(landing.colSpan, grid.columns - landing.column)}`, gridRow: `${landing.row + 2} / span ${Math.min(landing.rowSpan, grid.rows - landing.row)}` }} />
+        )}
       </div>
     </section>
   );

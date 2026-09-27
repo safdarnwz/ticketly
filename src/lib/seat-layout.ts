@@ -428,3 +428,59 @@ export const LAYOUT_TEMPLATES: { id: string; label: string; describe: string; bu
     build: () => ({ decks: 1, grids: [{ rows: 10, columns: 5 }], seats: [], fixtures: [] }),
   },
 ];
+
+// ── Drag and drop ──────────────────────────────────────────────────────────
+
+export type ItemRef = { kind: 'seat' | 'fixture'; index: number };
+
+/**
+ * Move a placed seat or fixture to another cell (or deck). It keeps its
+ * number, type and marks. Dropping it on top of something else is refused —
+ * nothing is ever removed by a drag.
+ */
+export function moveItem(d: LayoutDraft, ref: ItemRef, to: { deck: Deck; row: number; column: number }): { draft: LayoutDraft; error?: string } {
+  const item = ref.kind === 'seat' ? d.seats[ref.index] : d.fixtures[ref.index];
+  if (!item) return { draft: d };
+  if (item.deck === to.deck && item.row === to.row && item.column === to.column) return { draft: d };
+  const moved = { ...item, deck: to.deck, row: to.row, column: to.column };
+  const rest: LayoutDraft = ref.kind === 'seat'
+    ? { ...d, seats: d.seats.filter((_, i) => i !== ref.index) }
+    : { ...d, fixtures: d.fixtures.filter((_, i) => i !== ref.index) };
+  const off = outOfGrid(rest, moved);
+  if (off) return { draft: d, error: off };
+  if ([...rest.seats, ...rest.fixtures].some((x) => overlaps(x, moved)))
+    return { draft: d, error: 'Something is already there — drop it on an empty spot' };
+  if (ref.kind === 'fixture' && (moved as LayoutFixture).kind === 'staircase' && d.decks < 2) return { draft: d, error: 'Stairs need an upper deck' };
+  return ref.kind === 'seat'
+    ? { draft: { ...rest, seats: [...rest.seats, moved as LayoutSeat] } }
+    : { draft: { ...rest, fixtures: [...rest.fixtures, moved as LayoutFixture] } };
+}
+
+// ── The rules a coach is checked against ───────────────────────────────────
+
+export interface LayoutCheck { ok: boolean; label: string; detail: string }
+
+/**
+ * What the operator should see before saving: the things passengers, the
+ * crew and the bus-body and accessibility rules expect on a coach. None of
+ * them blocks saving — a mini-bus may really have no washroom — but each is
+ * shown with what to do.
+ */
+export function layoutChecks(d: LayoutDraft): LayoutCheck[] {
+  const passenger = d.seats.filter((s) => s.type !== 'crew' && s.bookable !== false);
+  const ladies = passenger.filter((s) => s.ladiesOnly).length;
+  const accessible = passenger.filter((s) => s.accessible);
+  const doors = d.fixtures.filter((f) => f.kind === 'door');
+  const nearDoor = (s: LayoutSeat) => doors.some((f) => f.deck === s.deck && Math.abs(f.row - s.row) <= 2);
+  const exits = d.fixtures.filter((f) => f.kind === 'emergency_exit').length;
+  const upperSeats = passenger.filter((s) => s.deck === 1).length;
+  return [
+    { ok: d.fixtures.some((f) => f.kind === 'driver'), label: 'Driver seat placed', detail: 'Shows passengers where the front of the bus is.' },
+    { ok: doors.some((f) => f.deck === 0), label: 'Door on the lower deck', detail: 'Place the entry door (and the rear door if the bus has one).' },
+    { ok: passenger.length <= 22 || exits > 0, label: 'Emergency exit marked', detail: `Bus body rules ask for emergency exits on coaches of this size${passenger.length ? ` (${passenger.length} seats)` : ''}.` },
+    { ok: ladies > 0, label: `Ladies seats marked (${ladies})`, detail: 'State transport rules reserve seats for women — mark them; bookings then keep them for women.' },
+    { ok: accessible.length > 0 && accessible.some(nearDoor), label: `Seat for a passenger with a disability${accessible.length ? ', near the door' : ''}`, detail: accessible.length ? 'Keep it within two rows of a door so a wheelchair user can reach it.' : 'Mark at least one seat near the door as disability-friendly.' },
+    { ok: d.decks < 2 || upperSeats > 0, label: 'Upper deck has seats', detail: 'An upper deck with nothing to sell — add berths or make it a single deck.' },
+    { ok: numberProblems(d).size === 0 && passenger.every((s) => s.number.trim()), label: 'Every seat has its own number', detail: 'Fix the seats shown in red.' },
+  ];
+}

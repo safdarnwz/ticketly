@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bus as BusIcon, Phone, Trash2, UserPlus } from 'lucide-react';
+import { AlertTriangle, Bus as BusIcon, Phone, Trash2, UserPlus } from 'lucide-react';
 
 import { Badge, Button, Card, CardBody, CardHeader, Input, Select, useToast } from '@/components/ui';
 import { fleetApi, type Duty } from '@/lib/api/fleet';
-import { cn } from '@/lib/utils';
+import { cn, formatDateTime } from '@/lib/utils';
 
 const MAX_DRIVERS = 3;
 const ROLE_LABEL: Record<string, string> = { driver: 'Driver', conductor: 'Conductor', attendant: 'Attendant' };
@@ -61,13 +61,27 @@ export function TripCrewCard({ trip, busLabel, canEdit, onChangeBus }: {
     <Card className="mb-4 print:hidden">
       <CardHeader title="Bus and crew for this trip" subtitle="The trip decides — any verified bus can run any route. Passengers get these in the 4-hour and 1-hour reminders; a later change is sent to them at once." />
       <CardBody className="grid gap-4 lg:grid-cols-3">
+        {(() => {
+          // The bus and crew are normally settled before the 4-hour reminder,
+          // which gives passengers the bus number and the crew's mobiles.
+          const reminderAt = Date.parse(trip.departsAt) - 4 * 3_600_000;
+          const soon = Date.parse(trip.departsAt) - Date.now() < 6 * 3_600_000 && Date.parse(trip.departsAt) > Date.now();
+          const missing = [!trip.vehicleId && 'the bus', !crew.isLoading && drivers.length === 0 && 'a driver'].filter(Boolean) as string[];
+          if (!editable || !missing.length) return null;
+          return (
+            <div role="alert" className={cn('flex items-start gap-2 rounded-lg border p-3 text-sm lg:col-span-3', soon ? 'border-warning/50 bg-warning/10' : 'border-border bg-surface-muted')}>
+              <AlertTriangle className={cn('mt-0.5 h-4 w-4 shrink-0', soon ? 'text-warning' : 'text-text-muted')} />
+              <span className="text-text">Choose {missing.join(' and ')} before {formatDateTime(new Date(reminderAt).toISOString())} — the 4-hour reminder then carries the bus number and the crew&apos;s mobiles.{Date.now() > reminderAt ? ' The reminder has gone out; passengers will be sent the details as soon as you add them.' : ''}</span>
+            </div>
+          );
+        })()}
         <div className="rounded-lg border border-border p-3">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Bus</div>
           <div className="flex items-center justify-between gap-2">
             <span className={cn('flex items-center gap-2 text-sm', busLabel ? 'font-mono font-semibold text-text' : 'text-warning')}><BusIcon className="h-4 w-4" />{busLabel ?? 'No bus yet'}</span>
-            {editable && new Date(trip.departsAt).getTime() > Date.now() && <Button size="sm" variant="outline" onClick={onChangeBus}>{trip.vehicleId ? 'Change bus' : 'Assign bus'}</Button>}
+            {editable && trip.status !== 'departed' && new Date(trip.arrivesAt).getTime() > Date.now() && <Button size="sm" variant="outline" onClick={onChangeBus}>{trip.vehicleId ? 'Change bus' : 'Assign bus'}</Button>}
           </div>
-          <p className="mt-2 text-xs text-text-muted">Late or broken down? Put another bus here — passengers keep their seat, or move to the same kind of seat.</p>
+          <p className="mt-2 text-xs text-text-muted">Late or broken down? Until the bus leaves, put another here — passengers keep their seat (or move to the same kind of seat) and are told the new bus number.</p>
         </div>
 
         <div className="rounded-lg border border-border p-3">
