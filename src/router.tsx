@@ -46,6 +46,7 @@ import { TripChartPage } from '@/pages/trips/TripChartPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { RoutesPage } from '@/pages/routes/RoutesPage';
 import { FleetPage } from '@/pages/fleet/FleetPage';
+import { SeatLayoutBuilderPage } from '@/pages/fleet/SeatLayoutBuilderPage';
 import { OperationsPage } from '@/pages/operations/OperationsPage';
 import { SchedulePage } from '@/pages/schedule/SchedulePage';
 import { PricingPage } from '@/pages/pricing/PricingPage';
@@ -139,6 +140,8 @@ const tenantAdminRouter = createBrowserRouter([
           { path: '/fleet', element: <FleetPage /> },
           { path: '/operations', element: <OperationsPage /> },
           { path: '/fleet/vehicles/:id', element: <VehicleDetailPage /> },
+          { path: '/fleet/seat-layouts/new', element: <SeatLayoutBuilderPage /> },
+          { path: '/fleet/seat-layouts/:id', element: <SeatLayoutBuilderPage /> },
           { path: '/schedule', element: <SchedulePage /> },
           { path: '/pricing', element: <PricingPage /> },
           { path: '/distribution', element: <DistributionPage /> },

@@ -1,9 +1,10 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { Accessibility, Check } from 'lucide-react';
+import { Accessibility, Bath, Check, Coffee, DoorOpen } from 'lucide-react';
 
 import type { SeatCell, SeatMapResponse } from '@/lib/api/booking-flow';
 import { SEAT_TYPE_LABEL, cn } from '@/lib/utils';
 import { TONE_LABEL, bookingTone, type SeatTone, type SeatView } from '@/lib/seat-tones';
+import { FIXTURE_LABEL, type LayoutFixture } from '@/lib/seat-layout';
 
 /**
  * The bus as it is laid out — the same map on every screen (customer, counter,
@@ -39,6 +40,38 @@ function SteeringWheel({ className }: { className?: string }) {
       <circle cx="12" cy="12" r="2.2" />
       <path d="M3.2 10.5 9.9 11.4M20.8 10.5l-6.7.9M12 14.2v7.2" />
     </svg>
+  );
+}
+
+/** Stairs to the upper deck, drawn. */
+function Stairs({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+      <path d="M3 20h5v-5h5v-5h5V5h3" />
+    </svg>
+  );
+}
+
+/**
+ * What is not a seat — driver, door, washroom, stairs, emergency exit,
+ * pantry — drawn where the operator put it, so a passenger can see the
+ * washroom is two rows behind their seat or the door is right beside it.
+ */
+export function FixtureTile({ kind, small }: { kind: LayoutFixture['kind']; small?: boolean }) {
+  const icon = 'h-4 w-4 shrink-0 sm:h-5 sm:w-5';
+  const body =
+    kind === 'driver' ? <SteeringWheel className={icon} /> :
+    kind === 'door' ? <DoorOpen className={icon} aria-hidden /> :
+    kind === 'washroom' ? <Bath className={icon} aria-hidden /> :
+    kind === 'staircase' ? <Stairs className={icon} /> :
+    kind === 'pantry' ? <Coffee className={icon} aria-hidden /> :
+    <span className="text-[8px] font-bold leading-none sm:text-[9px]">EXIT</span>;
+  const tone = kind === 'emergency_exit' ? 'border-[#fca5a5] bg-[#fef2f2] text-[#dc2626]' : kind === 'washroom' ? 'border-[#bae6fd] bg-[#f0f9ff] text-[#0369a1]' : 'border-[#e5e7eb] bg-[#f8fafc] text-[#64748b]';
+  return (
+    <span className={cn('flex h-full w-full flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed', tone)} title={FIXTURE_LABEL[kind]}>
+      {body}
+      {!small && kind !== 'driver' && kind !== 'emergency_exit' && <span className="hidden text-[8px] font-medium leading-none sm:block">{kind === 'washroom' ? 'WC' : FIXTURE_LABEL[kind]}</span>}
+    </span>
   );
 }
 
@@ -95,14 +128,23 @@ export function SeatMap({
   legend?: 'booking' | 'crew' | 'none';
   compact?: boolean;
 }) {
+  const fixtures = map.layout.fixtures ?? [];
   const decks = Array.from({ length: Math.max(1, map.layout.decks) }, (_, d) => d).filter((d) =>
-    map.seats.some((s) => s.deck === d),
+    map.seats.some((s) => s.deck === d) || fixtures.some((f) => f.deck === d),
   );
+  // Each deck's own grid; older layouts share one size (rows from the seats).
+  const gridOf = (deck: number) => {
+    const g = map.layout.grids?.[deck];
+    if (g) return g;
+    const on = map.seats.filter((s) => s.deck === deck);
+    return { rows: on.length ? Math.max(...on.map((s) => s.row + s.rowSpan)) : map.layout.rows, columns: map.layout.columns };
+  };
+  const hasDriver = fixtures.some((f) => f.kind === 'driver');
   const prices = fares
     ? [...new Set(map.seats.filter((s) => s.available).map((s) => fares.get(s.seatNumber)).filter((p): p is number => p !== undefined))].sort((a, b) => a - b)
     : [];
   // Cell size fits every deck side by side on a phone, and stays comfortable on a desktop.
-  const totalCols = map.layout.columns * decks.length;
+  const totalCols = decks.reduce((n, d) => n + gridOf(d).columns, 0);
   const cell = compact ? '1.9rem' : `clamp(1.55rem, calc((100vw - ${decks.length * 3 + 3}rem) / ${totalCols}), 2.6rem)`;
   const style = { '--cell': cell, '--row': `calc(var(--cell) * 1.3)` } as CSSProperties;
 
@@ -122,20 +164,26 @@ export function SeatMap({
       <div className="flex justify-center gap-2 sm:gap-4">
         {decks.map((deck) => {
           const seats = map.seats.filter((s) => s.deck === deck);
-          const rows = Math.max(...seats.map((s) => s.row + s.rowSpan));
+          const { rows, columns } = gridOf(deck);
           return (
             <section key={deck} aria-label={deck === 0 ? 'Lower deck' : 'Upper deck'} className="rounded-2xl border border-border bg-surface p-2 shadow-sm sm:p-3">
               <header className="mb-2 flex items-center justify-between gap-2 px-0.5">
                 <span className="text-[11px] font-semibold text-text sm:text-xs">{map.layout.decks > 1 ? (deck === 0 ? 'Lower deck' : 'Upper deck') : 'Seats'}</span>
-                {deck === 0 ? <SteeringWheel className="h-5 w-5 text-text-muted sm:h-6 sm:w-6" /> : <span className="h-5 w-5 sm:h-6 sm:w-6" />}
+                {deck === 0 && !hasDriver ? <SteeringWheel className="h-5 w-5 text-text-muted sm:h-6 sm:w-6" /> : <span className="h-5 w-5 sm:h-6 sm:w-6" />}
               </header>
               <div
                 className="grid gap-1"
                 style={{
-                  gridTemplateColumns: `repeat(${map.layout.columns}, var(--cell))`,
+                  gridTemplateColumns: `repeat(${columns}, var(--cell))`,
                   gridTemplateRows: `repeat(${rows}, var(--row))`,
                 }}
               >
+                {fixtures.filter((f) => f.deck === deck).map((f, i) => (
+                  <div key={`f${i}`} aria-label={FIXTURE_LABEL[f.kind]} role="img" className="p-0.5"
+                    style={{ gridColumn: `${f.column + 1} / span ${f.colSpan ?? 1}`, gridRow: `${f.row + 1} / span ${f.rowSpan ?? 1}` }}>
+                    <FixtureTile kind={f.kind} small={(f.rowSpan ?? 1) * (f.colSpan ?? 1) === 1} />
+                  </div>
+                ))}
                 {seats.map((s) => {
                   const isSel = selected.includes(s.seatNumber);
                   const view = viewOf?.(s);
@@ -167,7 +215,7 @@ export function SeatMap({
                   );
                   return (
                     <button
-                      key={s.seatNumber}
+                      key={`${s.deck}:${s.row}:${s.column}`}
                       type="button"
                       disabled={!clickable}
                       aria-pressed={view ? undefined : isSel}

@@ -1,5 +1,6 @@
 import { get, post, withIdempotency } from './client';
 import { idempotencyKey } from '@/lib/utils';
+import type { LayoutFixture } from '@/lib/seat-layout';
 
 export interface City { id: string; name: string; state?: string }
 export interface Stop { id: string; name: string; cityId?: string }
@@ -30,7 +31,15 @@ export interface SeatMapResponse {
   seatRule?: SeatNeighbourRule;
   available: number;
   total: number;
-  layout: { decks: number; rows: number; columns: number };
+  layout: {
+    decks: number;
+    rows: number;
+    columns: number;
+    /** Each deck's own rows × columns (lower first). */
+    grids?: { rows: number; columns: number }[];
+    /** Driver, doors, washroom, stairs, emergency exit, pantry — where they are on the bus. */
+    fixtures?: LayoutFixture[];
+  };
   seats: SeatCell[];
 }
 

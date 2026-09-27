@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Bus, Users, LayoutGrid, Sparkles, Upload, CalendarClock } from 'lucide-react';
 
@@ -16,7 +16,9 @@ import { parseCsv } from '@/lib/csv';
 type Tab = 'vehicles' | 'layouts' | 'setup' | 'crew' | 'renewals';
 
 export function FleetPage() {
-  const [tab, setTab] = useState<Tab>('vehicles');
+  const [params, setParams] = useSearchParams();
+  const tab = (['vehicles', 'layouts', 'setup', 'crew', 'renewals'].includes(params.get('tab') ?? '') ? params.get('tab') : 'vehicles') as Tab;
+  const setTab = (t: Tab) => setParams(t === 'vehicles' ? {} : { tab: t }, { replace: true });
   const tabs: { key: Tab; label: string; icon: typeof Bus }[] = [
     { key: 'vehicles', label: 'Vehicles', icon: Bus },
     { key: 'layouts', label: 'Seat Layouts', icon: LayoutGrid },
