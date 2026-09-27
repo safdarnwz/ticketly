@@ -115,13 +115,12 @@ export class AmendmentService {
         });
       const oldTrip = await this.trips.getById(booking.tripId);
       const target = await this.resolveTarget(input);
-      const quote = await this.pricing.quote({
-        tripId: input.newTripId,
-        fromStopId: input.newFromStopId,
-        toStopId: input.newToStopId,
-        seatType: 'seater',
-        seatCount: input.newSeatNumbers.length,
-      });
+      const quote = await this.priceSeats(
+        input.newTripId,
+        input.newFromStopId,
+        input.newToStopId,
+        input.newSeatNumbers,
+      );
       const rq = quoteReschedule({
         originalFareMinor: booking.totalMinor,
         newFareMinor: quote.totalMinor,
@@ -168,6 +167,43 @@ export class AmendmentService {
       const amendmentId = await this.moveBooking(input, target, quote.totalMinor, money);
       return { status: 'rescheduled', ...money, amendmentId };
     });
+  }
+
+  /**
+   * The new seats priced as what they are. Each seat type has its own fare, so
+   * seats are quoted per type and added up — pricing every seat as a seater
+   * refused sleeper buses ("no fare") and, on a bus with both, moved a sleeper
+   * passenger at the seater fare and refunded the difference.
+   */
+  private async priceSeats(
+    tripId: string,
+    fromStopId: string,
+    toStopId: string,
+    seatNumbers: string[],
+  ): Promise<{ totalMinor: number }> {
+    const types = await this.inventory.seatTypes(tripId as TripId, seatNumbers);
+    const unknown = seatNumbers.filter((s) => !types.get(s)?.bookable);
+    if (unknown.length)
+      throw new AppError(ErrorCode.INVENTORY_SEAT_UNAVAILABLE, 422, {
+        message: `Not a bookable seat on this trip: ${unknown.join(', ')}`,
+      });
+    const byType = new Map<string, string[]>();
+    for (const s of seatNumbers) {
+      const t = types.get(s)!.seatType;
+      byType.set(t, [...(byType.get(t) ?? []), s]);
+    }
+    let totalMinor = 0;
+    for (const [seatType, seats] of byType) {
+      const q = await this.pricing.quote({
+        tripId: tripId as TripId,
+        fromStopId: fromStopId as StopId,
+        toStopId: toStopId as StopId,
+        seatType: seatType,
+        seatNumbers: seats,
+      });
+      totalMinor += q.totalMinor;
+    }
+    return { totalMinor };
   }
 
   /**
