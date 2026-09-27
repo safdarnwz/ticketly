@@ -24,8 +24,8 @@ Status of every scenario from the product scenario list. Generated from the trac
 | Frontend status | Count |
 |---|---|
 | — | 3103 |
-| DONE | 510 |
-| TODO | 465 |
+| DONE | 587 |
+| TODO | 388 |
 | DUP | 9 |
 
 
@@ -35,73 +35,73 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
-| 1 | Create new multi-tenant bus operator account | DONE | TODO | verified manually: existing module/API |
-| 2 | Enter operator company name and legal details | DONE | TODO | verified manually: existing module/API |
-| 3 | Assign unique operator code | DONE | TODO | verified manually: existing module/API |
-| 4 | Assign custom domain to operator | DONE | TODO | PUT /admin/tenants/:id/domain (host resolves immediately) |
-| 5 | Upload operator logo | DONE | TODO | verified manually: existing module/API |
-| 6 | Set operator primary contact person | DONE | TODO | verified manually: existing module/API |
+| 1 | Create new multi-tenant bus operator account | DONE | DONE | verified manually: existing module/API · UI: Super admin → Operators: provision (legal name, code, contact), suspend with reason, re-activate, change plan, Export CSV, Message all |
+| 2 | Enter operator company name and legal details | DONE | DONE | verified manually: existing module/API · UI: Super admin → Operators: provision (legal name, code, contact), suspend with reason, re-activate, change plan, Export CSV, Message all |
+| 3 | Assign unique operator code | DONE | DONE | verified manually: existing module/API · UI: Super admin → Operators: provision (legal name, code, contact), suspend with reason, re-activate, change plan, Export CSV, Message all |
+| 4 | Assign custom domain to operator | DONE | DONE | PUT /admin/tenants/:id/domain (host resolves immediately) · UI: Super admin → Operators → Settings: custom domain, favicon, API rate limit, per-operator feature flags + roll back everywhere |
+| 5 | Upload operator logo | DONE | DONE | verified manually: existing module/API · UI: Operator console → Settings → Branding: logo |
+| 6 | Set operator primary contact person | DONE | DONE | verified manually: existing module/API · UI: Super admin → Operators: provision (legal name, code, contact), suspend with reason, re-activate, change plan, Export CSV, Message all |
 | 7 | Set operator email and phone | DONE | DONE | verified manually: existing module/API · UI: Settings → Company profile |
-| 8 | Set GST number for operator | DONE | TODO | verified manually: existing module/API |
-| 9 | Set PAN number for operator | DONE | TODO | verified manually: existing module/API |
+| 8 | Set GST number for operator | DONE | DONE | verified manually: existing module/API · UI: Super admin → Applications → Details: GSTIN, PAN, bank, documents; hold / reject / reopen with reason |
+| 9 | Set PAN number for operator | DONE | DONE | verified manually: existing module/API · UI: Super admin → Applications → Details: GSTIN, PAN, bank, documents; hold / reject / reopen with reason |
 | 10 | Enter bank account details for settlements | DONE | DONE | verified manually: existing module/API · UI: Settings › Bank Details: checked fields, re-enter number, change under review, withdraw |
-| 11 | Enable or disable global payment gateways | DONE | TODO | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test |
-| 12 | Configure Razorpay credentials | DONE | TODO | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test |
-| 13 | Configure PayU credentials | DONE | TODO | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test |
-| 14 | Configure Easebuzz credentials | DONE | TODO | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test |
-| 15 | Configure Paytm credentials | DONE | TODO | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test |
-| 16 | Configure SMS gateway credentials | DONE | TODO | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test |
-| 17 | Configure WhatsApp Business API credentials | DONE | TODO | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test |
-| 18 | Configure Email SMTP settings | DONE | TODO | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test |
-| 19 | Test SMS sending | DONE | TODO | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test |
-| 20 | Test WhatsApp sending | DONE | TODO | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test |
-| 21 | Test Email sending | DONE | TODO | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test |
-| 22 | Create global role-permission templates | DONE | TODO | GET/POST/PUT/DELETE /admin/role-templates; POST /roles/templates/:id/apply |
-| 23 | Edit existing global role permissions | DONE | TODO | verified manually: existing module/API |
+| 11 | Enable or disable global payment gateways | DONE | DONE | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test · UI: Super admin → Settings → Integrations: credentials per provider (secrets write-only), enable/disable, test send |
+| 12 | Configure Razorpay credentials | DONE | DONE | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test · UI: Super admin → Settings → Integrations: credentials per provider (secrets write-only), enable/disable, test send |
+| 13 | Configure PayU credentials | DONE | DONE | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test · UI: Super admin → Settings → Integrations: credentials per provider (secrets write-only), enable/disable, test send |
+| 14 | Configure Easebuzz credentials | DONE | DONE | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test · UI: Super admin → Settings → Integrations: credentials per provider (secrets write-only), enable/disable, test send |
+| 15 | Configure Paytm credentials | DONE | DONE | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test · UI: Super admin → Settings → Integrations: credentials per provider (secrets write-only), enable/disable, test send |
+| 16 | Configure SMS gateway credentials | DONE | DONE | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test · UI: Super admin → Settings → Integrations: credentials per provider (secrets write-only), enable/disable, test send |
+| 17 | Configure WhatsApp Business API credentials | DONE | DONE | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test · UI: Super admin → Settings → Integrations: credentials per provider (secrets write-only), enable/disable, test send |
+| 18 | Configure Email SMTP settings | DONE | DONE | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test · UI: Super admin → Settings → Integrations: credentials per provider (secrets write-only), enable/disable, test send |
+| 19 | Test SMS sending | DONE | DONE | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test · UI: Super admin → Settings → Integrations: credentials per provider (secrets write-only), enable/disable, test send |
+| 20 | Test WhatsApp sending | DONE | DONE | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test · UI: Super admin → Settings → Integrations: credentials per provider (secrets write-only), enable/disable, test send |
+| 21 | Test Email sending | DONE | DONE | GET/PUT /admin/integrations, POST /admin/integrations/:provider/enabled/test · UI: Super admin → Settings → Integrations: credentials per provider (secrets write-only), enable/disable, test send |
+| 22 | Create global role-permission templates | DONE | DONE | GET/POST/PUT/DELETE /admin/role-templates; POST /roles/templates/:id/apply · UI: Super admin → Settings → Role templates: create / edit / remove, permissions by group |
+| 23 | Edit existing global role permissions | DONE | DONE | verified manually: existing module/API · UI: Super admin → Settings → Role templates: create / edit / remove, permissions by group |
 | 24 | Create new custom platform role | DONE | TODO | verified manually: existing module/API |
 | 25 | Assign multiple roles to platform user | DONE | TODO | verified manually: existing module/API |
-| 26 | Set IP whitelist for platform admin access | DONE | TODO | PUT /admin/policies/admin-ip-allowlist (enforced at admin login) |
-| 27 | Set password minimum length policy | DONE | TODO | PUT /admin/policies/password (enforced wherever a password is set; expiry at login) |
-| 28 | Set password complexity rules | DONE | TODO | PUT /admin/policies/password (enforced wherever a password is set; expiry at login) |
-| 29 | Set password expiry days | DONE | TODO | PUT /admin/policies/password (enforced wherever a password is set; expiry at login) |
-| 30 | Set maximum failed login attempts | DONE | TODO | verified manually: existing module/API |
+| 26 | Set IP whitelist for platform admin access | DONE | DONE | PUT /admin/policies/admin-ip-allowlist (enforced at admin login) · UI: Super admin → Settings → Security: password rules, admin sign-in IP list, suspicious sign-in alerts, encryption keys |
+| 27 | Set password minimum length policy | DONE | DONE | PUT /admin/policies/password (enforced wherever a password is set; expiry at login) · UI: Super admin → Settings → Security: password rules, admin sign-in IP list, suspicious sign-in alerts, encryption keys |
+| 28 | Set password complexity rules | DONE | DONE | PUT /admin/policies/password (enforced wherever a password is set; expiry at login) · UI: Super admin → Settings → Security: password rules, admin sign-in IP list, suspicious sign-in alerts, encryption keys |
+| 29 | Set password expiry days | DONE | DONE | PUT /admin/policies/password (enforced wherever a password is set; expiry at login) · UI: Super admin → Settings → Security: password rules, admin sign-in IP list, suspicious sign-in alerts, encryption keys |
+| 30 | Set maximum failed login attempts | DONE | DONE | verified manually: existing module/API · UI: Super admin → Settings → Security: password rules, admin sign-in IP list, suspicious sign-in alerts, encryption keys |
 | 31 | Lock operator account on suspicious activity | DONE | TODO | verified manually: existing module/API |
 | 32 | Unlock operator account | DONE | TODO | verified manually: existing module/API |
-| 33 | Define global GST tax slabs | DONE | TODO | PUT /admin/policies/gst-slabs |
+| 33 | Define global GST tax slabs | DONE | DONE | PUT /admin/policies/gst-slabs · UI: Super admin → Settings → Business rules: GST slabs, agent credit default/cap, OTA release default, data retention (server minimums) |
 | 34 | Create cancellation policy templates | DONE | DONE | verified manually: existing module/API · UI: Settings › Cancellation Policy: tiers with checks, preview, reset to default |
 | 35 | Create refund policy templates | DONE | DONE | verified manually: existing module/API · UI: Settings › Cancellation Policy: tiers with checks, preview, reset to default |
 | 36 | Enable dynamic pricing engine globally | DONE | TODO | verified manually: existing module/API |
-| 37 | Enable redBus integration | DONE | TODO | verified manually: existing module/API |
-| 38 | Enable AbhiBus integration | DONE | TODO | verified manually: existing module/API |
-| 39 | Enable MakeMyTrip integration | DONE | TODO | verified manually: existing module/API |
-| 40 | Enable Goibibo integration | DONE | TODO | verified manually: existing module/API |
-| 41 | Enable ixigo integration | DONE | TODO | verified manually: existing module/API |
-| 42 | Set global default inventory release percentage for OTAs | DONE | TODO | PUT /scheduling/services/:id/sales-rules {otaReleasePct}; platform default PUT /admin/policies/ota-release; enforced on hold |
+| 37 | Enable redBus integration | DONE | DONE | verified manually: existing module/API · UI: Super admin → OTA partners: add, activate/suspend, terms, prepaid top-ups, API keys (shown once, revoke), webhook + test |
+| 38 | Enable AbhiBus integration | DONE | DONE | verified manually: existing module/API · UI: Super admin → OTA partners: add, activate/suspend, terms, prepaid top-ups, API keys (shown once, revoke), webhook + test |
+| 39 | Enable MakeMyTrip integration | DONE | DONE | verified manually: existing module/API · UI: Super admin → OTA partners: add, activate/suspend, terms, prepaid top-ups, API keys (shown once, revoke), webhook + test |
+| 40 | Enable Goibibo integration | DONE | DONE | verified manually: existing module/API · UI: Super admin → OTA partners: add, activate/suspend, terms, prepaid top-ups, API keys (shown once, revoke), webhook + test |
+| 41 | Enable ixigo integration | DONE | DONE | verified manually: existing module/API · UI: Super admin → OTA partners: add, activate/suspend, terms, prepaid top-ups, API keys (shown once, revoke), webhook + test |
+| 42 | Set global default inventory release percentage for OTAs | DONE | DONE | PUT /scheduling/services/:id/sales-rules {otaReleasePct}; platform default PUT /admin/policies/ota-release; enforced on hold · UI: Super admin → Settings → Business rules: GST slabs, agent credit default/cap, OTA release default, data retention (server minimums) |
 | 43 | Define commission slab structures | DONE | TODO | verified manually: existing module/API |
-| 44 | Set default agent credit limit policy | DONE | TODO | PUT /admin/policies/agent-credit (default + cap applied on agent create) |
-| 45 | Publish system-wide announcement banner | DONE | TODO | verified manually: existing module/API |
-| 46 | Schedule announcement start and end time | DONE | TODO | verified manually: existing module/API |
-| 47 | Enable maintenance mode | DONE | TODO | MaintenanceGuard |
-| 48 | Disable maintenance mode | DONE | TODO | MaintenanceGuard |
+| 44 | Set default agent credit limit policy | DONE | DONE | PUT /admin/policies/agent-credit (default + cap applied on agent create) · UI: Super admin → Settings → Business rules: GST slabs, agent credit default/cap, OTA release default, data retention (server minimums) |
+| 45 | Publish system-wide announcement banner | DONE | DONE | verified manually: existing module/API · UI: Super admin → Announcements: banner with start and end time |
+| 46 | Schedule announcement start and end time | DONE | DONE | verified manually: existing module/API · UI: Super admin → Announcements: banner with start and end time |
+| 47 | Enable maintenance mode | DONE | DONE | MaintenanceGuard · UI: Super admin → Settings → System: maintenance mode now / planned windows (tell operators, cancel), cache clear, audit log CSV 30/90 days |
+| 48 | Disable maintenance mode | DONE | DONE | MaintenanceGuard · UI: Super admin → Settings → System: maintenance mode now / planned windows (tell operators, cancel), cache clear, audit log CSV 30/90 days |
 | 49 | Trigger manual full database backup | INFRA | — | DevOps/monitoring runbook (not an app feature) |
 | 50 | Trigger incremental backup | INFRA | — | DevOps/monitoring runbook (not an app feature) |
 | 51 | Test backup restore on staging | INFRA | — | DevOps/monitoring runbook (not an app feature) |
-| 52 | Export platform audit logs for last 30 days | DONE | TODO | GET /admin/tenants/audit-log/export?days=30/90 (CSV) |
-| 53 | Export platform audit logs for last 90 days | DONE | TODO | GET /admin/tenants/audit-log/export?days=30/90 (CSV) |
-| 54 | Configure suspicious login activity alerts | DONE | TODO | PUT /admin/policies/suspicious-login (SecurityAlertService) |
+| 52 | Export platform audit logs for last 30 days | DONE | DONE | GET /admin/tenants/audit-log/export?days=30/90 (CSV) · UI: Super admin → Settings → System: maintenance mode now / planned windows (tell operators, cancel), cache clear, audit log CSV 30/90 days |
+| 53 | Export platform audit logs for last 90 days | DONE | DONE | GET /admin/tenants/audit-log/export?days=30/90 (CSV) · UI: Super admin → Settings → System: maintenance mode now / planned windows (tell operators, cancel), cache clear, audit log CSV 30/90 days |
+| 54 | Configure suspicious login activity alerts | DONE | DONE | PUT /admin/policies/suspicious-login (SecurityAlertService) · UI: Super admin → Settings → Security: password rules, admin sign-in IP list, suspicious sign-in alerts, encryption keys |
 | 55 | Set high CPU usage alert threshold | INFRA | — | DevOps/monitoring runbook (not an app feature) |
 | 56 | Set high memory usage alert threshold | INFRA | — | DevOps/monitoring runbook (not an app feature) |
 | 57 | Set disk space alert threshold | INFRA | — | DevOps/monitoring runbook (not an app feature) |
-| 58 | Enable feature flag for specific operator | DONE | TODO | PUT /admin/tenants/:id/features/:feature, POST /admin/tenants/features/:feature/rollback |
-| 59 | Disable feature flag for specific operator | DONE | TODO | PUT /admin/tenants/:id/features/:feature, POST /admin/tenants/features/:feature/rollback |
-| 60 | Rollback feature flag globally | DONE | TODO | PUT /admin/tenants/:id/features/:feature, POST /admin/tenants/features/:feature/rollback |
+| 58 | Enable feature flag for specific operator | DONE | DONE | PUT /admin/tenants/:id/features/:feature, POST /admin/tenants/features/:feature/rollback · UI: Super admin → Operators → Settings: custom domain, favicon, API rate limit, per-operator feature flags + roll back everywhere |
+| 59 | Disable feature flag for specific operator | DONE | DONE | PUT /admin/tenants/:id/features/:feature, POST /admin/tenants/features/:feature/rollback · UI: Super admin → Operators → Settings: custom domain, favicon, API rate limit, per-operator feature flags + roll back everywhere |
+| 60 | Rollback feature flag globally | DONE | DONE | PUT /admin/tenants/:id/features/:feature, POST /admin/tenants/features/:feature/rollback · UI: Super admin → Operators → Settings: custom domain, favicon, API rate limit, per-operator feature flags + roll back everywhere |
 | 61 | Set global API rate limits | DONE | TODO | verified manually: existing module/API |
-| 62 | Set per-operator API rate limits | DONE | TODO | PUT /admin/tenants/:id/rate-limit (RateLimitGuard reads it, cached) |
+| 62 | Set per-operator API rate limits | DONE | DONE | PUT /admin/tenants/:id/rate-limit (RateLimitGuard reads it, cached) · UI: Super admin → Operators → Settings: custom domain, favicon, API rate limit, per-operator feature flags + roll back everywhere |
 | 63 | Configure webhook endpoints for events | DONE | DONE | POST/GET/DELETE /webhooks, POST /webhooks/:id/test — public https URLs only (no localhost / private / metadata addresses, re-checked per send, no redirects), one registration per URL, 10 per operator, 404 across operators · UI: Distribution: register with event choice + URL checks, secret shown once, send test (status/latency), deliveries, revoke with confirm |
 | 64 | Test webhook delivery | DONE | DONE | POST/GET/DELETE /webhooks, POST /webhooks/:id/test — public https URLs only (no localhost / private / metadata addresses, re-checked per send, no redirects), one registration per URL, 10 per operator, 404 across operators · UI: Distribution: register with event choice + URL checks, secret shown once, send test (status/latency), deliveries, revoke with confirm |
 | 65 | Set white-label primary color for operator | DONE | TODO | verified manually: existing module/API |
 | 66 | Set white-label secondary color for operator | DONE | TODO | verified manually: existing module/API |
-| 67 | Set white-label favicon for operator | DONE | TODO | PUT /admin/tenants/:id/favicon; GET /operator/branding (public) |
+| 67 | Set white-label favicon for operator | DONE | DONE | PUT /admin/tenants/:id/favicon; GET /operator/branding (public) · UI: Super admin → Operators → Settings: custom domain, favicon, API rate limit, per-operator feature flags + roll back everywhere |
 | 68 | Define offline booking sync rules | GAP | — | verified manually: not built yet |
 | 69 | Manage global seat layout templates library | DONE | TODO | verified manually: existing module/API |
 | 70 | Create new seat layout template | DONE | TODO | verified manually: existing module/API |
@@ -109,7 +109,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 72 | Delete unused seat layout template | DONE | TODO | verified manually: existing module/API |
 | 73 | Create global report templates | GAP | — | verified manually: not built yet |
 | 74 | Give custom report builder access to operator | GAP | — | verified manually: not built yet |
-| 75 | Set data retention policy in days | DONE | TODO | PUT /admin/policies/data-retention + worker 'data-retention' purge job |
+| 75 | Set data retention policy in days | DONE | DONE | PUT /admin/policies/data-retention + worker 'data-retention' purge job · UI: Super admin → Settings → Business rules: GST slabs, agent credit default/cap, OTA release default, data retention (server minimums) |
 | 76 | Process data deletion request | DONE | TODO | verified manually: existing module/API |
 | 77 | Set support ticket priority matrix | DONE | DONE | support tickets: staff raise by PNR / reply / priority / assign / resolve; customers own tickets only; author from account · UI: Support: queue views (active/mine/unassigned/…), search, ticket thread with reply, resolve/reopen/close, priority, assign; raise for a caller by PNR |
 | 78 | Deploy critical bug hotfix | INFRA | — | DevOps/monitoring runbook (not an app feature) |
@@ -124,37 +124,37 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 | 87 | Add new language pack | DONE | TODO | verified manually: existing module/API |
 | 88 | Monitor platform health dashboard | INFRA | — | DevOps/monitoring runbook (not an app feature) |
 | 89 | View current uptime percentage | INFRA | — | DevOps/monitoring runbook (not an app feature) |
-| 90 | View booking success rate | DONE | TODO | verified manually: existing module/API |
-| 91 | View overall error rate | DONE | TODO | verified manually: existing module/API |
-| 92 | View total active operators | DONE | TODO | verified manually: existing module/API |
+| 90 | View booking success rate | DONE | DONE | verified manually: existing module/API · UI: Super admin → Platform health: payment success per gateway, error rate, SMS/WhatsApp/email delivery, operator ranking |
+| 91 | View overall error rate | DONE | DONE | verified manually: existing module/API · UI: Super admin → Platform health: payment success per gateway, error rate, SMS/WhatsApp/email delivery, operator ranking |
+| 92 | View total active operators | DONE | DONE | verified manually: existing module/API · UI: Super admin → Analytics & Plans: active operators / total |
 | 93 | View total active buses across platform | DONE | TODO | verified manually: existing module/API |
 | 94 | View platform-wide daily booking volume | DONE | DONE | GET /admin/monitoring/bookings/activity (per operator, today by default) + GET /admin/monitoring/bookings (feed, live holds) · UI: super admin › Live bookings |
 | 95 | View platform-wide monthly revenue | DONE | TODO | verified manually: existing module/API |
-| 96 | Suspend non-paying operator | DONE | TODO | verified manually: existing module/API |
-| 97 | Set suspension reason | DONE | TODO | verified manually: existing module/API |
-| 98 | Reactivate suspended operator | DONE | TODO | verified manually: existing module/API |
-| 99 | Change operator subscription plan | DONE | TODO | verified manually: existing module/API |
-| 100 | Generate platform invoice for operator | DONE | TODO | POST/GET /admin/billing/invoices (GST, FY numbering); GET /operator/platform-invoices |
-| 101 | Apply platform-level discount | DONE | TODO | POST/GET/DELETE /admin/billing/discounts (applied on platform invoices) |
-| 102 | Set maximum buses allowed per plan | DONE | TODO | plan maxVehicles enforced on bus create |
-| 103 | Set maximum branches allowed per plan | DONE | TODO | plan quotas max_branches / max_agents enforced (entitlements module; also users, routes, buses) |
-| 104 | Set maximum agents allowed per plan | DONE | TODO | plan quotas max_branches / max_agents enforced (entitlements module; also users, routes, buses) |
-| 105 | Configure platform commission percentage | DONE | TODO | verified manually: existing module/API |
-| 106 | View operator-wise performance ranking | DONE | TODO | GET /admin/tenants/ranking?from&to&sortBy |
-| 107 | Export complete operator list with status | DONE | TODO | GET /admin/tenants/export (CSV) |
-| 108 | Send bulk notification to all operators | DONE | TODO | POST/GET /admin/tenants/broadcasts |
-| 109 | Schedule platform maintenance window | DONE | TODO | POST /admin/platform/maintenance/windows (auto maintenance mode while running) |
-| 110 | Notify operators about maintenance | DONE | TODO | POST /admin/platform/maintenance/windows/:id/notify (or notifyOperators on create) |
-| 111 | Monitor payment gateway success rates | DONE | TODO | GET /admin/monitoring/payments |
-| 112 | Monitor SMS delivery success rates | DONE | TODO | GET /admin/monitoring/messages (per channel/provider) |
-| 113 | Monitor WhatsApp delivery success rates | DONE | TODO | GET /admin/monitoring/messages (per channel/provider) |
+| 96 | Suspend non-paying operator | DONE | DONE | verified manually: existing module/API · UI: Super admin → Operators: provision (legal name, code, contact), suspend with reason, re-activate, change plan, Export CSV, Message all |
+| 97 | Set suspension reason | DONE | DONE | verified manually: existing module/API · UI: Super admin → Operators: provision (legal name, code, contact), suspend with reason, re-activate, change plan, Export CSV, Message all |
+| 98 | Reactivate suspended operator | DONE | DONE | verified manually: existing module/API · UI: Super admin → Operators: provision (legal name, code, contact), suspend with reason, re-activate, change plan, Export CSV, Message all |
+| 99 | Change operator subscription plan | DONE | DONE | verified manually: existing module/API · UI: Super admin → Operators: provision (legal name, code, contact), suspend with reason, re-activate, change plan, Export CSV, Message all |
+| 100 | Generate platform invoice for operator | DONE | DONE | POST/GET /admin/billing/invoices (GST, FY numbering); GET /operator/platform-invoices · UI: Super admin → Billing: generate GST invoice for a period (one per period), discounts for one / all operators, revoke |
+| 101 | Apply platform-level discount | DONE | DONE | POST/GET/DELETE /admin/billing/discounts (applied on platform invoices) · UI: Super admin → Billing: generate GST invoice for a period (one per period), discounts for one / all operators, revoke |
+| 102 | Set maximum buses allowed per plan | DONE | DONE | plan maxVehicles enforced on bus create · UI: Super admin → Analytics & Plans → Plans: price, max buses / branches / agents / staff / routes, included features; edit |
+| 103 | Set maximum branches allowed per plan | DONE | DONE | plan quotas max_branches / max_agents enforced (entitlements module; also users, routes, buses) · UI: Super admin → Analytics & Plans → Plans: price, max buses / branches / agents / staff / routes, included features; edit |
+| 104 | Set maximum agents allowed per plan | DONE | DONE | plan quotas max_branches / max_agents enforced (entitlements module; also users, routes, buses) · UI: Super admin → Analytics & Plans → Plans: price, max buses / branches / agents / staff / routes, included features; edit |
+| 105 | Configure platform commission percentage | DONE | DONE | verified manually: existing module/API · UI: Super admin → Analytics & Plans → platform settings: default commission % |
+| 106 | View operator-wise performance ranking | DONE | DONE | GET /admin/tenants/ranking?from&to&sortBy · UI: Super admin → Platform health: payment success per gateway, error rate, SMS/WhatsApp/email delivery, operator ranking |
+| 107 | Export complete operator list with status | DONE | DONE | GET /admin/tenants/export (CSV) · UI: Super admin → Operators: provision (legal name, code, contact), suspend with reason, re-activate, change plan, Export CSV, Message all |
+| 108 | Send bulk notification to all operators | DONE | DONE | POST/GET /admin/tenants/broadcasts · UI: Super admin → Operators: provision (legal name, code, contact), suspend with reason, re-activate, change plan, Export CSV, Message all |
+| 109 | Schedule platform maintenance window | DONE | DONE | POST /admin/platform/maintenance/windows (auto maintenance mode while running) · UI: Super admin → Settings → System: maintenance mode now / planned windows (tell operators, cancel), cache clear, audit log CSV 30/90 days |
+| 110 | Notify operators about maintenance | DONE | DONE | POST /admin/platform/maintenance/windows/:id/notify (or notifyOperators on create) · UI: Super admin → Settings → System: maintenance mode now / planned windows (tell operators, cancel), cache clear, audit log CSV 30/90 days |
+| 111 | Monitor payment gateway success rates | DONE | DONE | GET /admin/monitoring/payments · UI: Super admin → Platform health: payment success per gateway, error rate, SMS/WhatsApp/email delivery, operator ranking |
+| 112 | Monitor SMS delivery success rates | DONE | DONE | GET /admin/monitoring/messages (per channel/provider) · UI: Super admin → Platform health: payment success per gateway, error rate, SMS/WhatsApp/email delivery, operator ranking |
+| 113 | Monitor WhatsApp delivery success rates | DONE | DONE | GET /admin/monitoring/messages (per channel/provider) · UI: Super admin → Platform health: payment success per gateway, error rate, SMS/WhatsApp/email delivery, operator ranking |
 | 114 | View aggregated error logs across services | INFRA | — | DevOps/monitoring runbook (not an app feature) |
 | 115 | Restart specific microservice | INFRA | — | DevOps/monitoring runbook (not an app feature) |
-| 116 | Clear platform-level cache | DONE | TODO | POST /admin/platform/cache/clear |
+| 116 | Clear platform-level cache | DONE | DONE | POST /admin/platform/cache/clear · UI: Super admin → Settings → System: maintenance mode now / planned windows (tell operators, cancel), cache clear, audit log CSV 30/90 days |
 | 117 | Run database optimization job | INFRA | — | DevOps/monitoring runbook (not an app feature) |
 | 118 | View slow query logs | INFRA | — | DevOps/monitoring runbook (not an app feature) |
-| 119 | Manage partner API keys | DONE | TODO | verified manually: existing module/API |
-| 120 | Rotate platform encryption keys | DONE | TODO | key ring (ENCRYPTION_PREVIOUS_KEYS) + POST /admin/security/encryption/reencrypt; RUNBOOK |
+| 119 | Manage partner API keys | DONE | DONE | verified manually: existing module/API · UI: Super admin → OTA partners: add, activate/suspend, terms, prepaid top-ups, API keys (shown once, revoke), webhook + test |
+| 120 | Rotate platform encryption keys | DONE | DONE | key ring (ENCRYPTION_PREVIOUS_KEYS) + POST /admin/security/encryption/reencrypt; RUNBOOK · UI: Super admin → Settings → Security: password rules, admin sign-in IP list, suspicious sign-in alerts, encryption keys |
 | 121 | Complete operator profile with full address | DONE | DONE | PATCH /operator/profile {address, contacts} · UI: Settings → Company profile |
 | 122 | Upload company logo | DONE | DONE | verified manually: existing module/API · UI: Settings → Branding |
 | 123 | Set primary and secondary contact | DONE | DONE | PATCH /operator/profile {address, contacts} · UI: Settings → Company profile |
@@ -790,7 +790,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
-| 1 | CONCURRENCY & RACE CONDITIONS (901-1000) | DONE | TODO | verified manually: existing module/API |
+| 1 | CONCURRENCY & RACE CONDITIONS (901-1000) | DONE | DONE | verified manually: existing module/API · UI: Super admin → Operators: provision (legal name, code, contact), suspend with reason, re-activate, change plan, Export CSV, Message all |
 
 ## #501–#1000
 
@@ -905,7 +905,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
-| 2 | PAYMENT & REFUND EDGE CASES (1001-1100) | DONE | TODO | verified manually: existing module/API |
+| 2 | PAYMENT & REFUND EDGE CASES (1001-1100) | DONE | DONE | verified manually: existing module/API · UI: Super admin → Operators: provision (legal name, code, contact), suspend with reason, re-activate, change plan, Export CSV, Message all |
 
 ## #1001–#1500
 
@@ -1020,7 +1020,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
-| 3 | OFFLINE MODE EDGE CASES (1101-1200) | DONE | TODO | verified manually: existing module/API |
+| 3 | OFFLINE MODE EDGE CASES (1101-1200) | DONE | DONE | verified manually: existing module/API · UI: Super admin → Operators: provision (legal name, code, contact), suspend with reason, re-activate, change plan, Export CSV, Message all |
 
 ## #1001–#1500
 
@@ -1115,7 +1115,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
-| 4 | BUSINESS LOGIC & POLICY EDGE CASES (1201-1300) | DONE | TODO | PUT /admin/tenants/:id/domain (host resolves immediately) |
+| 4 | BUSINESS LOGIC & POLICY EDGE CASES (1201-1300) | DONE | DONE | PUT /admin/tenants/:id/domain (host resolves immediately) · UI: Super admin → Operators → Settings: custom domain, favicon, API rate limit, per-operator feature flags + roll back everywhere |
 
 ## #1001–#1500
 
@@ -1230,7 +1230,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
-| 5 | INVENTORY, SCHEDULE, OTA & FINANCIAL EDGE CASES (1301-1400) | DONE | TODO | verified manually: existing module/API |
+| 5 | INVENTORY, SCHEDULE, OTA & FINANCIAL EDGE CASES (1301-1400) | DONE | DONE | verified manually: existing module/API · UI: Operator console → Settings → Branding: logo |
 
 ## #1001–#1500
 
@@ -1305,7 +1305,7 @@ CONFLICT 20, DONE 367, GAP 99, INFRA 17, PROCESS 3
 
 | # | Scenario | Backend | Frontend | Where / note |
 |---|---|---|---|---|
-| 6 | OPERATIONAL, CREW & SYSTEM EDGE CASES (1401-1500) | DONE | TODO | verified manually: existing module/API |
+| 6 | OPERATIONAL, CREW & SYSTEM EDGE CASES (1401-1500) | DONE | DONE | verified manually: existing module/API · UI: Super admin → Operators: provision (legal name, code, contact), suspend with reason, re-activate, change plan, Export CSV, Message all |
 
 ## #1001–#1500
 

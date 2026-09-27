@@ -13,7 +13,14 @@ import {
   zodBody,
   zodQuery,
 } from '@http';
-import { BadRequestError, csvField, getContext, toCsv, type TenantId } from '@kernel';
+import {
+  BadRequestError,
+  csvField,
+  getContext,
+  NotFoundError,
+  toCsv,
+  type TenantId,
+} from '@kernel';
 
 import { AuditService } from '../../iam';
 import { BookingRepository } from '../../booking';
@@ -103,6 +110,17 @@ export class TenantAdminController {
     return {
       items: rows.map((t) => ({ ...t, consoleUrl: `https://app.${t.slug}.${baseDomain}` })),
     };
+  }
+
+  @Get(':id')
+  @ApiOperation({
+    summary:
+      "One operator's platform settings: plan and its features, the operator's feature overrides, custom domain, API rate limit, favicon",
+  })
+  async detail(@UuidParam('id') id: string) {
+    const t = await this.tenants.adminDetail(id);
+    if (!t) throw new NotFoundError('Operator', id);
+    return t;
   }
 
   @Get(':id/stats')
@@ -225,7 +243,8 @@ export class TenantAdminController {
   ) {
     if (!FeatureKeySchema.safeParse(feature).success)
       throw new BadRequestError('Invalid feature key');
-    await this.tenants.setFeatureOverride(id, feature, dto.enabled);
+    if (!(await this.tenants.setFeatureOverride(id, feature, dto.enabled)))
+      throw new NotFoundError('Operator', id);
     await this.tenantContext.invalidate(id as TenantId);
     return { ok: true, feature, enabled: dto.enabled };
   }

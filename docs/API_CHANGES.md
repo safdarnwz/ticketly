@@ -480,3 +480,9 @@ an unknown id is now 404 (was 200).
 - **My trips:** `GET /bookings/mine` rows add `routeName`, `departsAt`, `operatorName`, `fromName`, `toName`.
 - **Agent statement / ledger (fix):** `GET /agents/:id/statement` and the agent ledger's `from/to` are the
   operator's days (its time zone) — a receipt taken at 00:30 in India was counted on the day before.
+- **Platform admin — operator settings:** new `GET /admin/tenants/:id` (plan with its features, the operator's
+  feature overrides, custom domain, API rate limit, whether a favicon is set; 404 unknown).
+  `PUT /admin/tenants/:id/features/:feature` for an unknown operator is 404 (was 200 and did nothing).
+- **Platform admin — integrations:** `GET /admin/integrations` items add `fields {config, secrets}` — each
+  setting's key, type (text / number / boolean / choice with options), whether it is required and its default,
+  read from the same schemas that validate a save.

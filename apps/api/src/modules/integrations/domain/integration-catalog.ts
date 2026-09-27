@@ -143,6 +143,51 @@ export function validateIntegrationUpdate(
   return { ok: true, config: config.data, secrets: secrets.data };
 }
 
+/** One field of a provider's settings, for the admin form — read from the schemas above. */
+export interface IntegrationField {
+  key: string;
+  type: 'text' | 'number' | 'boolean' | 'choice';
+  required: boolean;
+  options?: string[];
+  defaultValue?: unknown;
+}
+
+/** The form fields of a provider: its config (shown back) and its secrets (write-only). */
+export function describeIntegration(provider: IntegrationProvider): {
+  config: IntegrationField[];
+  secrets: IntegrationField[];
+} {
+  const def = INTEGRATIONS[provider];
+  return { config: fieldsOf(def.config.shape), secrets: fieldsOf(def.secrets.shape) };
+}
+
+function fieldsOf(shape: Record<string, z.ZodTypeAny>): IntegrationField[] {
+  return Object.entries(shape).map(([key, schema]) => {
+    let t: z.ZodTypeAny = schema;
+    let required = true;
+    let defaultValue: unknown;
+    for (;;) {
+      if (t instanceof z.ZodOptional) required = false;
+      else if (t instanceof z.ZodDefault) {
+        required = false;
+        defaultValue = (t._def as { defaultValue: () => unknown }).defaultValue();
+      } else break;
+      t = (t._def as { innerType: z.ZodTypeAny }).innerType;
+    }
+    if (t instanceof z.ZodNumber) return { key, type: 'number', required, defaultValue };
+    if (t instanceof z.ZodBoolean) return { key, type: 'boolean', required, defaultValue };
+    if (t instanceof z.ZodEnum)
+      return {
+        key,
+        type: 'choice',
+        required,
+        defaultValue,
+        options: (t.options as readonly string[]).slice(),
+      };
+    return { key, type: 'text', required, defaultValue };
+  });
+}
+
 /** "abcd…wxyz" style hint so an admin can tell WHICH key is stored without seeing it. */
 export function maskSecret(value: string): string {
   if (value.length <= 8) return '•'.repeat(value.length);

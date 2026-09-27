@@ -83,4 +83,58 @@ describe('platform boundary (e2e)', () => {
     const list = await app.get('/admin/operator-applications', { as: 'platformAdmin' });
     expect(list.status).toBe(200);
   });
+
+  it("one operator's platform settings: detail, feature flags, domain and rate limit", async () => {
+    const sa = { as: 'platformAdmin' as const };
+    const unknownId = '00000000-0000-4000-8000-000000000000';
+    const detail = await app.get(`/admin/tenants/${tenantId}`, sa);
+    expect(detail.status, JSON.stringify(detail.body)).toBe(200);
+    expect(detail.body).toMatchObject({
+      id: tenantId,
+      displayName: 'E2E Travels',
+      primaryDomain: null,
+      apiRateLimit: null,
+      hasFavicon: false,
+      featureOverrides: {},
+    });
+    expect((await app.get(`/admin/tenants/${unknownId}`, sa)).status).toBe(404);
+    expect((await app.get(`/admin/tenants/${tenantId}`, { headers: owner })).status).toBe(403);
+
+    const flag = (id: string, enabled: boolean | null) =>
+      app.put(`/admin/tenants/${id}/features/gps_tracking`, { enabled }, sa);
+    expect((await flag(tenantId, true)).status).toBe(200);
+    expect((await app.get(`/admin/tenants/${tenantId}`, sa)).body.featureOverrides).toEqual({
+      gps_tracking: true,
+    });
+    expect((await flag(tenantId, null)).status).toBe(200);
+    expect((await app.get(`/admin/tenants/${tenantId}`, sa)).body.featureOverrides).toEqual({});
+    expect((await flag(unknownId, true)).status).toBe(404); // used to answer 200
+    expect(
+      (await app.put(`/admin/tenants/${tenantId}/features/bad key!`, { enabled: true }, sa)).status,
+    ).toBe(400);
+
+    expect((await app.put(`/admin/tenants/${tenantId}/rate-limit`, { limit: 5 }, sa)).status).toBe(
+      400,
+    );
+    expect(
+      (await app.put(`/admin/tenants/${tenantId}/rate-limit`, { limit: 600 }, sa)).status,
+    ).toBe(200);
+    expect(
+      (await app.put(`/admin/tenants/${tenantId}/domain`, { domain: 'not a host' }, sa)).status,
+    ).toBe(400);
+    expect((await app.get(`/admin/tenants/${tenantId}`, sa)).body.apiRateLimit).toBe(600);
+  });
+
+  it('integrations describe their own form fields; secrets never come back', async () => {
+    const r = await app.get('/admin/integrations', { as: 'platformAdmin' });
+    expect(r.status).toBe(200);
+    const smtp = (
+      r.body.items as { provider: string; fields: { config: { key: string }[] } }[]
+    ).find((i) => i.provider === 'smtp')!;
+    expect(smtp.fields.config.map((f) => f.key)).toEqual(
+      expect.arrayContaining(['host', 'port', 'secure', 'user', 'fromAddress']),
+    );
+    expect(JSON.stringify(r.body)).not.toMatch(/"password":"[^n•]/);
+    expect((await app.get('/admin/integrations', { headers: owner })).status).toBe(403);
+  });
 });

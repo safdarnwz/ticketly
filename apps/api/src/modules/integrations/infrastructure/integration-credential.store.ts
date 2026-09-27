@@ -13,6 +13,8 @@ import {
   type IntegrationConfig,
   type IntegrationProvider,
   type IntegrationSecrets,
+  describeIntegration,
+  type IntegrationField,
 } from '../domain/integration-catalog';
 
 export interface ActiveIntegration<P extends IntegrationProvider> {
@@ -25,6 +27,8 @@ export interface IntegrationView {
   label: string;
   kind: string;
   runtime: string;
+  /** The form: which settings the provider takes (config shown back, secrets write-only). */
+  fields: { config: IntegrationField[]; secrets: IntegrationField[] };
   enabled: boolean;
   configured: boolean;
   config: Record<string, unknown>;
@@ -286,6 +290,7 @@ export class IntegrationCredentialStore implements OnModuleInit, OnModuleDestroy
       label: def.label,
       kind: def.kind,
       runtime: def.runtime,
+      fields: describeIntegration(provider),
       enabled: row?.enabled ?? false,
       configured: Boolean(row?.secrets),
       config: row?.config ?? {},

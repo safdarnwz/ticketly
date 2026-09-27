@@ -205,6 +205,42 @@ export class TenantRepository {
     );
   }
 
+  /**
+   * One operator for the platform admin's settings panel: plan (with its
+   * features), the operator's own feature overrides, custom domain, API rate
+   * limit and whether a favicon is set. Null when unknown.
+   */
+  async adminDetail(id: string): Promise<{
+    id: string;
+    slug: string;
+    displayName: string;
+    legalName: string;
+    status: string;
+    contactEmail: string;
+    contactPhone: string | null;
+    primaryDomain: string | null;
+    apiRateLimit: number | null;
+    hasFavicon: boolean;
+    featureOverrides: Record<string, boolean>;
+    plan: { id: string; code: string; name: string; features: Record<string, boolean> } | null;
+  } | null> {
+    return this.db.queryOne(
+      `SELECT t.id, t.slug, t.display_name AS "displayName", t.legal_name AS "legalName", t.status,
+              t.contact_email AS "contactEmail", t.contact_phone AS "contactPhone",
+              t.primary_domain AS "primaryDomain", t.api_rate_limit AS "apiRateLimit",
+              (t.settings->>'faviconUrl') IS NOT NULL AS "hasFavicon",
+              coalesce(t.feature_overrides, '{}'::jsonb) AS "featureOverrides",
+              CASE WHEN p.id IS NULL THEN NULL
+                   ELSE jsonb_build_object('id', p.id, 'code', p.code, 'name', p.name,
+                                           'features', coalesce(p.features, '{}'::jsonb)) END AS plan
+         FROM tenants t
+         LEFT JOIN plans p ON p.id = t.plan_id
+        WHERE t.id = $1 AND t.deleted_at IS NULL`,
+      [id],
+      { name: 'tenant.adminDetail', primary: true },
+    );
+  }
+
   /** Every operator with its plan and contact details — the platform export (#107). */
   async listForExport(): Promise<Record<string, unknown>[]> {
     return this.db.query(
@@ -224,14 +260,15 @@ export class TenantRepository {
     tenantId: string,
     feature: string,
     enabled: boolean | null,
-  ): Promise<void> {
-    await this.db.execute_(
+  ): Promise<boolean> {
+    const n = await this.db.execute_(
       enabled === null
         ? `UPDATE tenants SET feature_overrides = feature_overrides - $2 WHERE id = $1`
         : `UPDATE tenants SET feature_overrides = feature_overrides || jsonb_build_object($2::text, $3::boolean) WHERE id = $1`,
       enabled === null ? [tenantId, feature] : [tenantId, feature, enabled],
       { name: 'tenant.setFeatureOverride', primary: true },
     );
+    return n > 0;
   }
 
   /** Global rollback: remove one feature's override from EVERY operator. Returns affected tenant ids. */
