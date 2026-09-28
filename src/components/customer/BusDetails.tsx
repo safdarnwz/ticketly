@@ -28,7 +28,7 @@ const hhmm = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { hour: 
 const day = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
 
 /**
- * Everything about this bus under the seat map, as redBus shows it: tabs that
+ * Everything about this bus under the seat map, as booking sites show it: tabs that
  * jump to each section, and the sections in one scroll — highlights, the
  * cancellation policy with this trip's real dates, the route, boarding and
  * dropping points, features, this bus's own reviews, safety, the bus and the

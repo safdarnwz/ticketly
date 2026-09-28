@@ -49,7 +49,7 @@ const errText = (e: unknown, fallback: string) => (e instanceof Error ? e.messag
 /**
  * Build a bus once — rows and columns per deck, every seat, berth, door,
  * washroom and staircase where it really is, seat numbers generated the
- * redBus / Bitla way and changed by hand where the bus differs — and every
+ * standard way and changed by hand where the bus differs — and every
  * screen (booking, counter, agent, chart, crew) draws exactly this.
  */
 export function SeatLayoutBuilderPage() {
@@ -361,7 +361,7 @@ export function SeatLayoutBuilderPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Seat numbers" subtitle="Generate them the redBus / Bitla way, then change any seat by hand" />
+            <CardHeader title="Seat numbers" subtitle="Generate them the standard way, then change any seat by hand" />
             <CardBody className="flex flex-col gap-3 text-sm">
               <div className="flex flex-col gap-1.5" role="radiogroup" aria-label="Numbering style">
                 {NUMBERING_PRESETS.map((p) => (

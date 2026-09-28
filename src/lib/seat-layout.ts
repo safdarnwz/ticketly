@@ -10,7 +10,7 @@
  * none in many), the staircase, an emergency exit, a pantry. Each deck has
  * its own rows and columns.
  *
- * Seat numbers follow what redBus and Bitla (TicketSimply) show:
+ * Seat numbers follow the common Indian bus convention:
  *   - seaters and semi-sleepers 1, 2, 3 … front to back, left to right;
  *   - sleeper berths L1, L2 … on the lower deck and U1, U2 … on the upper;
  *   - or airline style — row number + seat letter (1A 1B 1C 1D), berths L1A;
@@ -190,7 +190,7 @@ export function setDecks(d: LayoutDraft, decks: 1 | 2): { draft: LayoutDraft; er
 export type NumberingPreset = 'standard' | 'airline' | 'continuous';
 export interface NumberingOptions {
   preset: NumberingPreset;
-  /** Across each row left → right (redBus default), or down each column front → back. */
+  /** Across each row left → right (the usual default), or down each column front → back. */
   direction: 'rows' | 'columns';
   start: number;
   lowerPrefix: string;
@@ -203,7 +203,7 @@ export interface NumberingOptions {
 export const DEFAULT_NUMBERING: NumberingOptions = { preset: 'standard', direction: 'rows', start: 1, lowerPrefix: 'L', upperPrefix: 'U', seaterPrefix: '' };
 
 export const NUMBERING_PRESETS: { id: NumberingPreset; label: string; example: string }[] = [
-  { id: 'standard', label: 'redBus / Bitla standard', example: 'Seats 1, 2, 3 · berths L1, L2 · U1, U2' },
+  { id: 'standard', label: 'Standard (1, 2, 3 · L1 · U1)', example: 'Seats 1, 2, 3 · berths L1, L2 · U1, U2' },
   { id: 'airline', label: 'Row + letter', example: '1A 1B 1C 1D · berths L1A, U1A' },
   { id: 'continuous', label: 'One running count', example: '1 … N over both decks' },
 ];
