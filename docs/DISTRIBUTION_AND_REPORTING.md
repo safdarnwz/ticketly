@@ -5,7 +5,7 @@ and ship the whole thing without Docker.
 
 ## OTA / GDS distribution API (`modules/gds`)
 
-The redBus/Paytm-style integration surface. There is **one** partner API: the
+The OTA integration surface. There is **one** partner API: the
 GDS. (An older per-operator "distribution" API keyed with `X-Api-Key` sold only
 one operator's seats and duplicated the same flow; it was removed and its
 webhooks moved to `modules/webhooks`.)

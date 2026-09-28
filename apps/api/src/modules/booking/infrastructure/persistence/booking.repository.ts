@@ -488,7 +488,7 @@ export class BookingRepository {
    *  1. PNR is only unique PER TENANT (`UNIQUE(tenant_id, pnr)`, see
    *     0007_booking.sql) — two different operators can mint the identical
    *     PNR string. `contactPhone` is REQUIRED to disambiguate, exactly like
-   *     real-world OTAs (RedBus/IRCTC) require PNR + a second identity fact.
+   *     real-world booking platforms require PNR + a second identity fact.
    *     It also stops a stranger who merely guesses/knows a PNR from seeing
    *     someone else's booking.
    *  2. Reading across tenants needs `bypassRls` — the normal per-request GUC

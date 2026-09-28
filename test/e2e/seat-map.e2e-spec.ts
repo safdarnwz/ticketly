@@ -18,7 +18,7 @@ interface Seat {
 }
 
 /**
- * The seat map as redBus / AbhiBus show it: a price on every seat (the same
+ * The seat map as bus booking sites show it: a price on every seat (the same
  * number a quote gives) and, when the operator turns it on, the seat beside a
  * woman kept for women (and beside a man for men) — shown on the map and
  * checked when the seat is held, on every channel; staff may override.

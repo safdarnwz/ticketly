@@ -4,7 +4,7 @@
  * ============================================================================
  *
  * SEAT QUOTA: an operator reserves specific seats of a trip for ONE agent or
- * branch (Bitla-style allocation). Nobody else can sell them. At
+ * branch (a seat allocation). Nobody else can sell them. At
  * `departs_at - releaseMinutesBefore` any unsold quota seat returns to general
  * sale automatically, so reserved inventory never departs empty.
  *

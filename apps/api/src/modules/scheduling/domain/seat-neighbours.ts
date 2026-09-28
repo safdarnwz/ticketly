@@ -1,5 +1,5 @@
 /**
- * Who may sit next to whom (the redBus / AbhiBus "for female" / "for male"
+ * Who may sit next to whom (the usual "for female" / "for male"
  * seats). Two seats are neighbours when they are on the same deck, share a
  * row, and touch side by side — no aisle between them. A double sleeper berth
  * pair and the two seats of a 2+2 row are neighbours; seats across the aisle,

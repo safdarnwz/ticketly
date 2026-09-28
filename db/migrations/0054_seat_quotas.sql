@@ -1,7 +1,7 @@
 -- =============================================================================
 -- 0054_seat_quotas
 --
--- Seats of a trip reserved for ONE agent or branch (Bitla-style allocation).
+-- Seats of a trip reserved for ONE agent or branch (a seat allocation).
 -- The seat is blocked in trip_seats.blocked_legs with `mask` (all bits, so it
 -- is independent of stop numbering); only its holder can book it (the quota
 -- is "consumed" and the bits cleared in the same transaction as the hold).

@@ -212,7 +212,7 @@ export const LuggagePolicySchema = z.object({
 export type LuggagePolicyDto = z.infer<typeof LuggagePolicySchema>;
 
 /**
- * The other rules a passenger sees before booking (redBus "Other policies"):
+ * The other rules a passenger sees before booking ("Other policies" under the seat map):
  * pets, liquor, smoking, how long the bus waits at a pickup point, plus any
  * notes of the operator's own. Child tickets come from the passenger policy
  * and luggage from the luggage policy.

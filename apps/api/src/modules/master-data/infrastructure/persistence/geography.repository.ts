@@ -63,8 +63,8 @@ export class GeographyRepository {
    * remember to set for every new city, this uses a REAL, self-maintaining
    * signal: whichever matching city has more routes serving it wins the
    * bare slug — a town with fifty daily services is unambiguously the one
-   * a bare "/results?from=..." URL means, the way redBus and every other
-   * Indian bus platform's plain city-name URLs resolve in practice. The
+   * a bare "/results?from=..." URL means, the way plain city-name URLs on
+   * Indian bus booking sites resolve in practice. The
    * losing city is never unreachable — it's still found by the normal
    * fuzzy-autocomplete search (searchCities), just not by guessing its
    * bare slug in a URL.

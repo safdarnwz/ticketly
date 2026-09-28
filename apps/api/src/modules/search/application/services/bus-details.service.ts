@@ -44,7 +44,7 @@ type Luggage = {
 
 /**
  * Everything a passenger reads before choosing a seat — the tabs under the
- * seat map, as redBus shows them: highlights, cancellation policy (with the
+ * seat map, as bus booking sites show them: highlights, cancellation policy (with the
  * real dates for this trip), the route, boarding and dropping points, the
  * bus's features, its reviews, safety, the bus itself and the operator's
  * other policies.
