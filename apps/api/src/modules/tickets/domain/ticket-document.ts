@@ -124,17 +124,17 @@ function ticketBody(v: TicketView, qr: string): string {
   ) => `
     <td style="vertical-align:top;text-align:${align};width:50%">
       <div style="${muted}"><span style="color:${dot};font-size:14px">&#9679;</span> ${label}</div>
-      <div style="font-size:16px;font-weight:700;margin-top:2px">${e(s.name)}</div>
+      <div style="font-size:16px;font-weight:600;margin-top:2px">${e(s.name)}</div>
       ${s.landmark ? `<div style="${muted}">${e(s.landmark)}</div>` : ''}
       ${w ? `<div style="font-size:14px;font-weight:600;margin-top:4px">${e(w.time)}</div><div style="${muted}">${e(w.date)}</div>` : ''}
     </td>`;
 
-  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;margin:0 auto;border:1px solid ${P.border};border-top:5px solid ${P.accent};border-radius:16px;font-family:'Nunito Sans',Arial,Helvetica,sans-serif;color:${P.text};border-collapse:separate;background:${P.surface}">
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;margin:0 auto;border:1px solid ${P.border};border-top:5px solid ${P.accent};border-radius:16px;font-family:Inter,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${P.text};border-collapse:separate;background:${P.surface}">
   <tr><td style="padding:18px 20px;border-bottom:1px solid ${P.border}">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>
       <td style="vertical-align:top">
         ${v.logoDataUri ? `<img src="${e(v.logoDataUri)}" alt="" style="max-height:40px;max-width:120px;margin-bottom:6px">` : ''}
-        <div style="font-size:18px;font-weight:700">${e(v.operatorName)}</div>
+        <div style="font-size:18px;font-weight:600">${e(v.operatorName)}</div>
         ${v.operatorGstin ? `<div style="${muted}">GSTIN ${e(v.operatorGstin)}</div>` : ''}
         <div style="margin-top:8px;font-size:13px">PNR <b style="font-size:15px;letter-spacing:.5px;color:${P.primary}">${e(v.pnr)}</b></div>
         <div style="${muted}">${v.passengers.length} seat${v.passengers.length === 1 ? '' : 's'}${v.seatType ? ` · ${e(SEAT_TYPE[v.seatType] ?? v.seatType)}` : ''}</div>
@@ -156,11 +156,11 @@ function ticketBody(v: TicketView, qr: string): string {
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
       <tr><td style="padding:2px 0">Fare</td><td style="text-align:right">${money(v.fareMinor)}</td></tr>
       <tr><td style="padding:2px 0">GST</td><td style="text-align:right">${money(v.taxMinor)}</td></tr>
-      <tr><td style="padding:6px 0 0;border-top:1px solid ${P.border};font-weight:700">Total paid</td><td style="padding:6px 0 0;border-top:1px solid ${P.border};text-align:right;font-weight:700;color:${P.info}">${money(v.totalMinor)}</td></tr>
+      <tr><td style="padding:6px 0 0;border-top:1px solid ${P.border};font-weight:600">Total paid</td><td style="padding:6px 0 0;border-top:1px solid ${P.border};text-align:right;font-weight:600;color:${P.info}">${money(v.totalMinor)}</td></tr>
     </table>
   </td></tr>
   <tr><td style="padding:14px 20px;font-size:13px">
-    <a href="${e(v.trackingUrl)}" style="color:${P.accent};font-weight:700">Track your bus live</a>
+    <a href="${e(v.trackingUrl)}" style="color:${P.accent};font-weight:600">Track your bus live</a>
     ${v.operatorPhone ? `<span style="${muted}"> · Operator helpline ${e(v.operatorPhone)}</span>` : ''}
     <div style="${muted};margin-top:8px">Reach the boarding point 15 minutes before departure with a photo ID. ${e(v.operatorName)} is the transport provider for this journey. Your GST tax invoice is sent in a separate email.</div>
   </td></tr>
@@ -182,7 +182,7 @@ export function renderTicketEmail(v: TicketView, qrCid: string): string {
     v.intro ?? `Your booking with ${v.operatorName} is confirmed. Here is your e-ticket.`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(ticketSubject(v))}</title></head>
 <body style="margin:0;padding:16px;background:${BRAND_PALETTE.bg}">
-<div style="max-width:640px;margin:0 auto 12px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${BRAND_PALETTE.text};white-space:pre-line">${escapeHtml(intro)}</div>
+<div style="max-width:640px;margin:0 auto 12px;font-family:Inter,-apple-system,Segoe UI,Roboto,Arial,sans-serif;font-size:14px;color:${BRAND_PALETTE.text};white-space:pre-line">${escapeHtml(intro)}</div>
 <div style="background:${BRAND_PALETTE.surface};max-width:642px;margin:0 auto;border-radius:16px">${ticketBody(v, `<img src="cid:${escapeHtml(qrCid)}" width="110" height="110" alt="Boarding QR for PNR ${escapeHtml(v.pnr)}" style="display:block">`)}</div>
 </body></html>`;
 }

@@ -61,7 +61,7 @@ export function renderEmail(input: {
     : '';
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width"><title>${esc(input.title)}</title></head>
-<body style="margin:0;background:${p.bg};font-family:'Nunito Sans',Segoe UI,Arial,sans-serif;color:${p.text}">
+<body style="margin:0;background:${p.bg};font-family:Inter,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${p.text}">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${p.bg};padding:24px 0">
     <tr><td align="center">
       <table role="presentation" width="560" cellpadding="0" cellspacing="0"
@@ -100,7 +100,7 @@ export function renderOtpEmail(opts: {
     heading: `Hi ${opts.name ? esc(opts.name) : 'there'}, here’s your code`,
     bodyHtml: `<p>Use this one-time code to ${reason}. It expires in 5 minutes.</p>
       <div style="margin:16px 0;text-align:center">
-        <span style="display:inline-block;font-size:30px;font-weight:600;letter-spacing:8px;color:${p.primary};
+        <span style="display:inline-block;font-size:28px;font-weight:600;letter-spacing:6px;color:${p.primary};
           background:${p.bg};border:1px dashed ${p.border};border-radius:10px;padding:14px 22px">${esc(opts.code)}</span>
       </div>
       <p style="color:${p.textMuted}">If you didn’t request this, you can safely ignore this email.</p>`,
@@ -133,11 +133,11 @@ export function renderBookingConfirmedEmail(opts: {
     heading: 'Your booking is confirmed ✅',
     bodyHtml: `<p>${opts.name ? `Hi ${esc(opts.name)}, ` : ''}your seats are booked.</p>
       <table role="presentation" style="width:100%;font-size:14px;margin-top:8px">
-        <tr><td style="padding:6px 0;color:${(opts.palette ?? DEFAULT_EMAIL_PALETTE).textMuted}">PNR</td><td style="padding:6px 0;text-align:right;font-weight:700">${esc(opts.pnr)}</td></tr>
+        <tr><td style="padding:6px 0;color:${(opts.palette ?? DEFAULT_EMAIL_PALETTE).textMuted}">PNR</td><td style="padding:6px 0;text-align:right;font-weight:600">${esc(opts.pnr)}</td></tr>
         <tr><td style="padding:6px 0;color:${(opts.palette ?? DEFAULT_EMAIL_PALETTE).textMuted}">Route</td><td style="padding:6px 0;text-align:right">${esc(opts.route)}</td></tr>
         <tr><td style="padding:6px 0;color:${(opts.palette ?? DEFAULT_EMAIL_PALETTE).textMuted}">Departs</td><td style="padding:6px 0;text-align:right">${esc(opts.departAt)}</td></tr>
         <tr><td style="padding:6px 0;color:${(opts.palette ?? DEFAULT_EMAIL_PALETTE).textMuted}">Seats</td><td style="padding:6px 0;text-align:right">${esc(opts.seats)}</td></tr>
-        <tr><td style="padding:6px 0;color:${(opts.palette ?? DEFAULT_EMAIL_PALETTE).textMuted}">Total paid</td><td style="padding:6px 0;text-align:right;font-weight:700">${esc(opts.totalFormatted)}</td></tr>
+        <tr><td style="padding:6px 0;color:${(opts.palette ?? DEFAULT_EMAIL_PALETTE).textMuted}">Total paid</td><td style="padding:6px 0;text-align:right;font-weight:600">${esc(opts.totalFormatted)}</td></tr>
       </table>`,
     cta: { label: 'View / print ticket', url: 'https://ticketly.com/bookings' },
   });

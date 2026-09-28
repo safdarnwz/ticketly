@@ -233,11 +233,11 @@ export function renderInvoiceEmail(doc: InvoiceDocument): string {
     .join('');
   const span = doc.interState ? 2 : 3;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(invoiceSubject(doc))}</title></head>
-<body style="margin:0;padding:16px;background:${P.bg};font-family:Arial,Helvetica,sans-serif;color:${P.text}">
+<body style="margin:0;padding:16px;background:${P.bg};font-family:Inter,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:${P.text}">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;margin:0 auto;background:${P.surface};border:1px solid ${P.border};border-top:5px solid ${P.primary};border-radius:16px">
 <tr><td style="padding:18px 20px;border-bottom:1px solid ${P.border}">
-  <div style="font-size:12px;letter-spacing:1px;color:${P.accent};font-weight:700">TAX INVOICE</div>
-  <div style="font-size:18px;font-weight:700;margin-top:4px">${esc(doc.supplier.name)}</div>
+  <div style="font-size:13px;color:${P.accent};font-weight:600">Tax invoice</div>
+  <div style="font-size:18px;font-weight:600;margin-top:4px">${esc(doc.supplier.name)}</div>
   <div style="${muted}">Invoice ${esc(doc.invoiceNumber)} · ${esc(formatInvoiceDate(doc.invoiceDate, doc.timeZone))}</div>
 </td></tr>
 <tr><td style="padding:14px 20px;border-bottom:1px solid ${P.border}">
@@ -261,7 +261,7 @@ export function renderInvoiceEmail(doc: InvoiceDocument): string {
     <tr><th style="${cell};text-align:left">Description</th><th style="${num}">Taxable value</th>${taxHead}</tr>
     ${rows}
     ${doc.roundOffMinor ? `<tr><td style="${cell}" colspan="${span}">Round off</td><td style="${num}">${rs(doc.roundOffMinor)}</td></tr>` : ''}
-    <tr><td style="${cell};font-weight:700" colspan="${span}">Total (incl. GST)</td><td style="${num};font-weight:700;color:${P.info}">${rs(doc.totalMinor)}</td></tr>
+    <tr><td style="${cell};font-weight:600" colspan="${span}">Total (incl. GST)</td><td style="${num};font-weight:600;color:${P.info}">${rs(doc.totalMinor)}</td></tr>
   </table>
   <div style="font-size:13px;margin:10px 8px 0"><span style="${muted}">Amount in words:</span> ${esc(amountInWords(doc.totalMinor))}</div>
 </td></tr>
