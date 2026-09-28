@@ -132,6 +132,8 @@ export interface TripBusDetails {
   amenities: { code: string; name: string; icon: string | null }[];
   reviews: (BusReviews & { liked: { aspect: string; count: number; label: string }[] }) | null;
   safety: { key: string; label: string; ok: boolean; detail: string }[];
+  /** Government rules of the states on this route (set by the platform) — they apply whatever the operator's policies say. */
+  stateRules?: { stateId: string; stateName: string; norms: { id: string; category: string; title: string; body: string }[] }[];
   policies: { key: string; title: string; text: string }[];
 }
 

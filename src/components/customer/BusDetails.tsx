@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import {
-  AlertCircle, Baby, BadgeCheck, Beer, Bus as BusIcon, Check, CigaretteOff, Clock, Luggage, MapPin, PawPrint, ShieldCheck, Star, X,
+  AlertCircle, Baby, BadgeCheck, Beer, Bus as BusIcon, Check, CigaretteOff, Clock, Landmark, Luggage, MapPin, PawPrint, ShieldCheck, Star, X,
 } from 'lucide-react';
 
 import { Button, ErrorState, Modal, Skeleton } from '@/components/ui';
@@ -163,6 +163,25 @@ export function BusDetails({ tripId, fromStopId, toStopId, tenantId }: { tripId:
       ) : <p className="text-sm text-text-muted">The operator will assign the bus for this trip before departure — its number comes in the 4-hour reminder.</p>)}
 
       {section('policies', 'Other policies', (
+        <div className="flex flex-col gap-6">
+          {(d.stateRules?.length ?? 0) > 0 && (
+            <div className="rounded-2xl border border-[#f5c26b] bg-[#fff8e6] p-4">
+              <div className="flex items-center gap-2 font-semibold text-text"><Landmark className="h-5 w-5" /> Government rules on this route</div>
+              <p className="mb-3 text-xs text-text-muted">Set for each state the bus passes through. They apply to every passenger, whatever the operator’s policies below say.</p>
+              <div className="flex flex-col gap-3">
+                {d.stateRules!.map((s) => (
+                  <div key={s.stateId}>
+                    <div className="text-sm font-semibold text-text">{s.stateName}</div>
+                    <ul className="mt-1 flex flex-col gap-2">
+                      {s.norms.map((n) => (
+                        <li key={n.id} className="text-sm"><span className="font-medium text-text">{n.title}.</span> <span className="text-text-muted">{n.body}</span></li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         <ul className="flex flex-col gap-5">
           {d.policies.map((p) => (
             <li key={p.key} className="flex gap-4">
@@ -171,6 +190,7 @@ export function BusDetails({ tripId, fromStopId, toStopId, tenantId }: { tripId:
             </li>
           ))}
         </ul>
+        </div>
       ))}
     </div>
   );

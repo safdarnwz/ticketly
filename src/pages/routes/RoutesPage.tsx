@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, MapPin, Route as RouteIcon, Trash2, CheckCircle2, Archive, Copy, PauseCircle, PlayCircle, Upload, IndianRupee } from 'lucide-react';
+import { Plus, MapPin, Route as RouteIcon, Trash2, CheckCircle2, Archive, Copy, PauseCircle, PlayCircle, Upload, IndianRupee, Landmark } from 'lucide-react';
 
 import { PointChargesModal } from './PointChargesModal';
+import { StateRulesForCities, StateRulesModal } from './StateRulesPanel';
 
 import { Button, Card, CardBody, Badge, statusTone, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast, TabBar } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { masterDataApi, type RouteRow, type City, type Stop } from '@/lib/api/masterData';
 import { parseCsv } from '@/lib/csv';
 
-interface StopDraft { stopId: string; stopName: string; sequence: number; distanceFromOriginM: number; departOffsetMin: number }
+interface StopDraft { stopId: string; stopName: string; sequence: number; distanceFromOriginM: number; departOffsetMin: number; cityId?: string }
 
 export function RoutesPage() {
   const [view, setView] = useState<'routes' | 'stops'>('routes');
@@ -28,6 +29,7 @@ function RoutesTab() {
   const [adding, setAdding] = useState(false);
   const [duplicating, setDuplicating] = useState<RouteRow | null>(null);
   const [charging, setCharging] = useState<RouteRow | null>(null);
+  const [rulesFor, setRulesFor] = useState<RouteRow | null>(null);
   const [dupCode, setDupCode] = useState('');
   const [dupName, setDupName] = useState('');
 
@@ -71,7 +73,7 @@ function RoutesTab() {
     setStops((arr) => {
       const prev = arr[arr.length - 1];
       return [...arr, {
-        stopId: s.id, stopName: s.name, sequence: seq,
+        stopId: s.id, stopName: s.name, sequence: seq, cityId: s.cityId ?? stopCity?.id,
         distanceFromOriginM: prev ? prev.distanceFromOriginM + 50_000 : 0,
         departOffsetMin: prev ? prev.departOffsetMin + 60 : 0,
       }];
@@ -120,6 +122,7 @@ function RoutesTab() {
           {r.status === 'draft' && <Button size="sm" variant="outline" leftIcon={<CheckCircle2 className="h-4 w-4" />} loading={publish.isPending && publish.variables === r.id} disabled={publish.isPending} onClick={() => publish.mutate(r.id)}>Publish</Button>}
           {r.status === 'published' && <Button size="sm" variant="ghost" leftIcon={<Archive className="h-4 w-4" />} loading={archive.isPending && archive.variables === r.id} disabled={archive.isPending} onClick={() => archive.mutate(r.id)}>Archive</Button>}
           {r.status !== 'archived' && <Button size="sm" variant="ghost" leftIcon={<IndianRupee className="h-4 w-4" />} onClick={() => setCharging(r)}>Point charges</Button>}
+          <Button size="sm" variant="ghost" leftIcon={<Landmark className="h-4 w-4" />} onClick={() => setRulesFor(r)}>State rules</Button>
           <Button size="sm" variant="ghost" leftIcon={<Copy className="h-4 w-4" />} onClick={() => { setDuplicating(r); setDupCode(`${r.code}-COPY`); setDupName(`${r.name} (copy)`); }}>Duplicate</Button>
         </div>
       ),
@@ -240,10 +243,13 @@ function RoutesTab() {
               </Card>
             )}
           </div>
+          {/* From the cities, not chosen: every state the bus passes through brings its rules. */}
+          <StateRulesForCities cityIds={[origin?.id ?? '', ...stops.map((st) => st.cityId ?? ''), dest?.id ?? '']} />
         </div>
       </Modal>
 
       <PointChargesModal route={charging} onClose={() => setCharging(null)} />
+      <StateRulesModal route={rulesFor} onClose={() => setRulesFor(null)} />
 
       <Modal open={!!duplicating} onClose={() => setDuplicating(null)} title={`Duplicate — ${duplicating?.name ?? ''}`}
         footer={<><Button variant="ghost" onClick={() => setDuplicating(null)}>Cancel</Button><Button loading={duplicate.isPending} disabled={!dupCode || !dupName} onClick={() => duplicate.mutate()}>Duplicate as draft</Button></>}>

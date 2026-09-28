@@ -23,6 +23,7 @@ import { ConfirmationPage } from '@/pages/customer/ConfirmationPage';
 import { IntegrationsPage } from '@/pages/settings/IntegrationsPage';
 import { SecurityPage } from '@/pages/settings/SecurityPage';
 import { BusinessRulesPage } from '@/pages/settings/BusinessRulesPage';
+import { StateNormsPage } from '@/pages/settings/StateNormsPage';
 import { RoleTemplatesPage } from '@/pages/settings/RoleTemplatesPage';
 import { SystemPage } from '@/pages/settings/SystemPage';
 import { VehicleApprovalsPage } from '@/pages/admin/VehicleApprovalsPage';
@@ -218,6 +219,7 @@ const superAdminRouter = createBrowserRouter([
               { path: 'integrations', element: <IntegrationsPage /> },
               { path: 'security', element: <SecurityPage /> },
               { path: 'business-rules', element: <BusinessRulesPage /> },
+              { path: 'state-rules', element: <StateNormsPage /> },
               { path: 'role-templates', element: <RoleTemplatesPage /> },
               { path: 'system', element: <SystemPage /> },
               { path: 'appearance', element: <AppearancePage /> },
