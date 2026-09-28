@@ -90,8 +90,8 @@ export function SearchForm({ compact, initialReturnDate, onDone }: {
           aria-pressed={(k === 'round-trip') === roundTrip}
           onClick={() => setRoundTrip(k === 'round-trip')}
           className={cn(
-            'rounded-pill px-3.5 py-1 font-semibold transition',
-            (k === 'round-trip') === roundTrip ? 'bg-surface text-text shadow-sm' : 'text-text-muted hover:text-text',
+            'rounded-pill px-4 py-1.5 font-medium transition',
+            (k === 'round-trip') === roundTrip ? 'bg-primary text-primary-fg' : 'text-text-muted hover:text-text',
           )}
         >
           {k === 'one-way' ? 'One way' : 'Round trip'}
@@ -126,23 +126,18 @@ export function SearchForm({ compact, initialReturnDate, onDone }: {
   if (!compact) {
     return (
       <form onSubmit={submit} noValidate className="flex min-w-0 flex-col gap-6">
-        <div className="relative">
-          <div>
-            {fromInput('journey')}
-            <div className="flex items-center gap-3 py-1.5">
-              <span className="flex w-3 justify-center self-stretch"><span className="dot-line h-full min-h-[28px]" /></span>
-              <div className="h-px flex-1 bg-border" />
-              <button
-                type="button"
-                onClick={swap}
-                aria-label="Swap cities"
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-muted text-text-muted hover:bg-border hover:text-text"
-              >
-                <ArrowUpDown className="h-4 w-4" />
-              </button>
-            </div>
-            {toInput('journey')}
-          </div>
+        <div className="relative rounded-[20px] bg-surface-muted">
+          <div className="py-3.5 pl-4 pr-16">{fromInput('journey')}</div>
+          <div className="mx-4 h-px bg-border" />
+          <div className="py-3.5 pl-4 pr-16">{toInput('journey')}</div>
+          <button
+            type="button"
+            onClick={swap}
+            aria-label="Swap cities"
+            className="absolute right-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border-4 border-surface-muted bg-primary text-primary-fg hover:opacity-90"
+          >
+            <ArrowUpDown className="h-4 w-4" />
+          </button>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -162,7 +157,7 @@ export function SearchForm({ compact, initialReturnDate, onDone }: {
           />
         )}
 
-        <Button type="submit" size="lg" fullWidth leftIcon={<Search className="h-4 w-4" />}>
+        <Button type="submit" size="lg" fullWidth className="h-14 text-base" leftIcon={<Search className="h-[18px] w-[18px]" />}>
           Search buses
         </Button>
       </form>

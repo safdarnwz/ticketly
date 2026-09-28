@@ -52,18 +52,19 @@ export function DateStrip({ label, value, min, max, days = 6, onChange, error }:
               aria-label={`${p.weekday} ${p.day} ${p.month}`}
               onClick={() => onChange(d)}
               className={cn(
-                'flex min-w-0 flex-col items-start gap-1 rounded-lg border px-2.5 py-2 text-left',
-                on ? 'border-primary bg-primary text-primary-fg' : 'border-border bg-surface text-text hover:bg-surface-muted',
+                'flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-2.5 text-center',
+                on ? 'bg-primary text-primary-fg' : 'bg-surface-muted text-text hover:bg-border',
               )}
             >
               <span className={cn('w-full truncate text-xs', on ? 'text-primary-fg/80' : 'text-text-muted')}>{p.weekday.slice(0, 3)}</span>
-              <span className="text-base font-medium leading-none">{p.day} <span className="text-xs font-normal">{p.month}</span></span>
+              <span className="text-lg font-semibold leading-none">{p.day}</span>
+              <span className={cn('text-xs', on ? 'text-primary-fg/80' : 'text-text-muted')}>{p.month}</span>
             </button>
           );
         })}
-        <label className="relative flex min-w-0 cursor-pointer flex-col items-start justify-center gap-1 rounded-lg border border-dashed border-border px-2.5 py-2 text-text-muted hover:bg-surface-muted">
+        <label className="relative flex min-w-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-border px-1 py-2.5 text-center text-text-muted hover:bg-surface-muted">
           <CalendarDays className="h-4 w-4" />
-          <span className="text-xs">Other date</span>
+          <span className="text-xs">Other</span>
           <input
             ref={picker}
             type="date"

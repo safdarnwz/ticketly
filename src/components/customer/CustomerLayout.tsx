@@ -2,7 +2,6 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { useQuery } from '@tanstack/react-query';
 import { Bus, Home, Search, Ticket, UserRound } from 'lucide-react';
 
-import { Button } from '@/components/ui';
 import { BackButton } from '@/components/layout/BackButton';
 import { AnnouncementBanner } from '@/components/layout/AnnouncementBanner';
 import { legalApi } from '@/lib/api/legal';
@@ -45,48 +44,52 @@ export function CustomerLayout() {
   ];
   const backTo = BACK_TARGETS.find(([prefix]) => location.pathname.startsWith(prefix))?.[1];
 
+  const initial = user?.fullName?.trim().charAt(0).toUpperCase();
+
   return (
     <div className="flex min-h-screen flex-col bg-bg">
-      <header className="sticky top-0 z-30 bg-bg">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-fg"><Bus className="h-5 w-5" /></div>
-            <span className="font-display text-xl text-text">Ticketly</span>
+      <header className="sticky top-0 z-30 border-b border-border bg-bg">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4">
+          <Link to="/" className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-primary text-primary-fg"><Bus className="h-[18px] w-[18px]" /></span>
+            <span className="text-lg font-semibold tracking-tight text-text">ticketly</span>
           </Link>
-          <nav className="hidden items-center gap-2 sm:flex">
-            <Link to="/account"><Button variant="ghost" size="sm" leftIcon={<Ticket className="h-4 w-4" />}>My trips</Button></Link>
+          <nav className="flex items-center gap-1.5">
+            <NavLink
+              to="/account"
+              className={({ isActive }) => cn('hidden h-10 items-center gap-2 rounded-pill px-4 text-sm font-medium sm:flex', isActive ? 'bg-surface-muted text-text' : 'text-text-muted hover:text-text')}
+            >
+              <Ticket className="h-4 w-4" /> My trips
+            </NavLink>
             {token && user ? (
               <>
-                <span className="text-sm text-text-muted">{user.fullName}</span>
-                <Button variant="outline" size="sm" onClick={() => { logout(); navigate('/'); }}>Sign out</Button>
+                <span className="hidden h-9 w-9 items-center justify-center rounded-full bg-accent/10 text-sm font-semibold text-accent sm:flex" title={user.fullName}>{initial}</span>
+                <button type="button" className="h-10 rounded-pill px-3 text-sm font-medium text-text-muted hover:text-text" onClick={() => { logout(); navigate('/'); }}>Sign out</button>
               </>
             ) : (
-              <Button size="sm" className="rounded-pill" leftIcon={<UserRound className="h-4 w-4" />} onClick={() => navigate('/login')}>Sign in</Button>
+              <Link to="/login" className="flex h-10 items-center gap-2 rounded-pill bg-primary px-4 text-sm font-medium text-primary-fg hover:opacity-90">
+                <UserRound className="h-4 w-4" /> Sign in
+              </Link>
             )}
           </nav>
-          {token && user ? (
-            <button type="button" className="text-sm font-semibold text-text-muted sm:hidden" onClick={() => { logout(); navigate('/'); }}>Sign out</button>
-          ) : (
-            <Link to="/login" className="text-sm font-semibold text-primary sm:hidden">Sign in</Link>
-          )}
         </div>
       </header>
 
       <AnnouncementBanner audience="customers" className="mx-auto w-full max-w-6xl" />
 
-      <main className="flex-1 pb-safe sm:pb-0">
+      <main className="flex-1 pb-28 sm:pb-0">
         {showBack && (
-          <div className="mx-auto max-w-6xl px-4 pt-3">
+          <div className="mx-auto max-w-6xl px-4 pt-4">
             <BackButton to={backTo} />
           </div>
         )}
         <Outlet />
       </main>
 
-      <footer className="mb-[72px] border-t border-border bg-surface sm:mb-0">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-6 text-sm text-text-muted sm:flex-row">
-          <span>© Ticketly — book bus tickets across India</span>
-          <div className="flex flex-wrap justify-center gap-4">
+      <footer className="border-t border-border">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pb-28 pt-8 text-sm text-text-muted sm:flex-row sm:items-center sm:justify-between sm:pb-8">
+          <span>© Ticketly · Bus tickets across India</span>
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
             <Link to="/become-operator" className="hover:text-text">Become an operator</Link>
             {(legal.data?.items ?? []).map((p) => (
               <Link key={p.slug} to={`/legal/${p.slug}`} className="hover:text-text">{p.title}</Link>
@@ -94,9 +97,9 @@ export function CustomerLayout() {
           </div>
         </div>
       </footer>
-      {/* Phone tab bar — the three places a traveller goes. */}
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] sm:hidden">
-        <div className="mx-auto grid h-[64px] max-w-md grid-cols-3">
+      {/* Phone tab bar — a floating ink pill with the three places a traveller goes. */}
+      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] sm:hidden">
+        <div className="mx-auto grid h-16 max-w-sm grid-cols-3 gap-1 rounded-pill bg-primary p-1.5 shadow-lg">
           {[
             { to: '/', label: 'Home', icon: Home, end: true },
             { to: '/results', label: 'Search', icon: Search, end: false },
@@ -106,14 +109,10 @@ export function CustomerLayout() {
               key={to}
               to={to}
               end={end}
-              className={({ isActive }) => cn('flex flex-col items-center justify-center gap-1 text-xs font-semibold', isActive ? 'text-accent' : 'text-text-muted')}
+              className={({ isActive }) => cn('flex items-center justify-center gap-2 rounded-pill text-sm font-medium', isActive ? 'bg-white text-text' : 'text-white/70')}
             >
-              {({ isActive }) => (
-                <>
-                  <span className={cn('flex h-8 w-12 items-center justify-center rounded-pill transition', isActive && 'bg-accent/10')}><Icon className="h-5 w-5" /></span>
-                  {label}
-                </>
-              )}
+              <Icon className="h-[18px] w-[18px]" />
+              {label}
             </NavLink>
           ))}
         </div>

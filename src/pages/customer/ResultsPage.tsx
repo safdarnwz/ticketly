@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { CalendarX2, ChevronLeft, ChevronRight, Pencil, SlidersHorizontal, Waypoints, X } from 'lucide-react';
+import { ArrowRight, CalendarX2, ChevronLeft, ChevronRight, Pencil, SlidersHorizontal, Waypoints, X } from 'lucide-react';
 
 import { Button, Card, CardBody, EmptyState, ErrorState, Modal, Skeleton } from '@/components/ui';
 import { SearchForm } from '@/components/customer/SearchForm';
-import { CompactTripCard, TripResultCard } from '@/components/customer/TripResultCard';
+import { TripResultCard } from '@/components/customer/TripResultCard';
 import { ResultFilters } from '@/components/customer/ResultFilters';
 import {
   EMPTY_FILTERS,
@@ -19,7 +19,7 @@ import { storefrontApi, type SearchInput } from '@/lib/api/storefront';
 import { flowApi } from '@/lib/api/booking-flow';
 import type { SearchResult } from '@/lib/api/types';
 import { useBooking } from '@/stores/booking';
-import { SEAT_TYPE_LABEL, addDaysIso, cn, formatDateLabel, slugifyCityName, todayLocal } from '@/lib/utils';
+import { addDaysIso, cn, formatDateLabel, slugifyCityName, todayLocal } from '@/lib/utils';
 
 type Sort = NonNullable<SearchInput['sort']>;
 const SORTS: { key: Sort; label: string }[] = [
@@ -29,16 +29,6 @@ const SORTS: { key: Sort; label: string }[] = [
   { key: 'rating', label: 'Top rated' },
 ];
 const isDate = (v: string | null): v is string => Boolean(v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)));
-
-/** Buses grouped by their main seat type, groups in the order the sort put them. */
-function groupByType(list: SearchResult[]): [string, SearchResult[]][] {
-  const groups = new Map<string, SearchResult[]>();
-  for (const t of list) {
-    const key = t.seatTypes.length ? t.seatTypes.map((x) => SEAT_TYPE_LABEL[x] ?? x).join(' / ') : 'Bus';
-    groups.set(key, [...(groups.get(key) ?? []), t]);
-  }
-  return [...groups.entries()];
-}
 
 export function ResultsPage() {
   const [params, setParams] = useSearchParams();
@@ -144,36 +134,31 @@ export function ResultsPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-10 pt-4">
-      {/* Journey header: pink "from" and purple "to", big city names, round edit button. */}
-      <section className="soft-card relative mb-4 px-5 py-5 sm:px-7">
-        <div className="flex items-center gap-4 pr-16">
-          <div className="flex flex-col items-center self-stretch py-1.5">
-            <span className="dot-from" /><span className="dot-line my-1 flex-1" /><span className="dot-to" />
+      {/* Journey bar: the route in one line, the date under it, an Edit pill. */}
+      <section className="mb-5 flex items-center gap-3 rounded-[20px] bg-surface-muted py-3 pl-5 pr-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2 text-lg font-semibold tracking-tight text-text">
+            <span className="truncate">{originName}</span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-text-muted" />
+            <span className="truncate">{destName}</span>
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-[12px] text-text-muted">From</div>
-            <div className="truncate text-xl font-medium leading-tight text-text">{originName}</div>
-            <div className="my-2 h-px bg-border" />
-            <div className="text-[12px] text-text-muted">Destination</div>
-            <div className="truncate text-xl font-medium leading-tight text-text">{destName}</div>
+          <div className="text-sm text-text-muted">
+            {formatDateLabel(date, { weekday: 'short', day: '2-digit', month: 'short' })}
+            {returnDate && <> · Return {formatDateLabel(returnDate, { day: '2-digit', month: 'short' })}</>}
           </div>
-        </div>
-        <div className="mt-3 text-sm text-text-muted">
-          {formatDateLabel(date, { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}
-          {returnDate && <> · Return {formatDateLabel(returnDate)}</>}
         </div>
         <button
           type="button"
           aria-label={editing ? 'Close search' : 'Modify search'}
           aria-expanded={editing}
           onClick={() => setEditing((v) => !v)}
-          className="absolute right-5 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-surface text-text hover:bg-surface-muted sm:right-7"
+          className="flex h-10 shrink-0 items-center gap-1.5 rounded-pill bg-surface px-4 text-sm font-medium text-text hover:bg-border"
         >
-          {editing ? <X className="h-5 w-5" /> : <Pencil className="h-5 w-5" />}
+          {editing ? <><X className="h-4 w-4" /> Close</> : <><Pencil className="h-4 w-4" /> Edit</>}
         </button>
       </section>
       {editing && (
-        <Card className="mb-4"><CardBody><SearchForm compact initialReturnDate={returnDate} onDone={() => setEditing(false)} /></CardBody></Card>
+        <Card className="mb-5"><CardBody><SearchForm compact initialReturnDate={returnDate} onDone={() => setEditing(false)} /></CardBody></Card>
       )}
 
       {date < today && (
@@ -208,12 +193,12 @@ export function ResultsPage() {
       {leg === 'onward' && (
         <div className="mb-4">
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm text-text-muted">Travel date</span>
+            <span className="text-sm font-medium text-text">Travel date</span>
             <div className="flex gap-1">
-              <button type="button" aria-label="Earlier dates" disabled={stripStart <= today} onClick={() => setDate(addDaysIso(date, -1) < today ? today : addDaysIso(date, -1))} className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-surface text-text-muted hover:text-text disabled:opacity-40">
+              <button type="button" aria-label="Earlier dates" disabled={stripStart <= today} onClick={() => setDate(addDaysIso(date, -1) < today ? today : addDaysIso(date, -1))} className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-muted text-text hover:bg-border disabled:opacity-40">
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <button type="button" aria-label="Later dates" onClick={() => setDate(addDaysIso(date, 1))} className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-surface text-text-muted hover:text-text">
+              <button type="button" aria-label="Later dates" onClick={() => setDate(addDaysIso(date, 1))} className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-muted text-text hover:bg-border">
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
@@ -226,13 +211,14 @@ export function ResultsPage() {
                 onClick={() => setDate(d)}
                 aria-pressed={d === date}
                 className={cn(
-                  'flex min-w-0 flex-col items-start rounded-lg border px-2.5 py-2 text-left',
+                  'flex min-w-0 flex-col items-center rounded-2xl px-1 py-2.5 text-center',
                   i >= 4 && 'hidden sm:flex',
-                  d === date ? 'border-primary bg-primary text-primary-fg' : 'border-border bg-surface text-text hover:bg-surface-muted',
+                  d === date ? 'bg-primary text-primary-fg' : 'bg-surface-muted text-text hover:bg-border',
                 )}
               >
                 <span className={cn('text-xs', d === date ? 'text-primary-fg/80' : 'text-text-muted')}>{formatDateLabel(d, { weekday: 'short' })}</span>
-                <span className="text-base font-medium leading-tight">{formatDateLabel(d, { day: 'numeric' })} <span className="text-xs font-normal">{formatDateLabel(d, { month: 'short' })}</span></span>
+                <span className="text-lg font-semibold leading-tight">{formatDateLabel(d, { day: 'numeric' })}</span>
+                <span className={cn('text-xs', d === date ? 'text-primary-fg/80' : 'text-text-muted')}>{formatDateLabel(d, { month: 'short' })}</span>
               </button>
             ))}
           </div>
@@ -255,7 +241,7 @@ export function ResultsPage() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="lg:hidden" leftIcon={<SlidersHorizontal className="h-3.5 w-3.5" />} onClick={() => setFiltersOpen(true)}>
+              <Button variant="secondary" size="sm" className="lg:hidden" leftIcon={<SlidersHorizontal className="h-3.5 w-3.5" />} onClick={() => setFiltersOpen(true)}>
                 Filters{filterCount ? ` (${filterCount})` : ''}
               </Button>
               {/* Phones: a plain select, so nothing scrolls sideways; wider screens: the buttons. */}
@@ -264,19 +250,19 @@ export function ResultsPage() {
                 <select
                   value={sort}
                   onChange={(e) => update((p) => (e.target.value === 'departure' ? p.delete('sort') : p.set('sort', e.target.value)))}
-                  className="h-9 rounded-md border border-border bg-surface px-2 text-sm text-text"
+                  className="h-9 rounded-pill border-0 bg-surface-muted pl-3 pr-8 text-sm font-medium text-text"
                 >
                   {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
                 </select>
               </label>
-              <div className="hidden rounded-lg bg-surface-muted p-1 text-xs sm:flex" role="group" aria-label="Sort">
+              <div className="hidden gap-1 text-sm sm:flex" role="group" aria-label="Sort">
                 {SORTS.map((s) => (
                   <button
                     key={s.key}
                     type="button"
                     aria-pressed={sort === s.key}
                     onClick={() => update((p) => (s.key === 'departure' ? p.delete('sort') : p.set('sort', s.key)))}
-                    className={cn('whitespace-nowrap rounded-md px-3 py-1.5 font-medium', sort === s.key ? 'bg-surface text-text shadow-sm' : 'text-text-muted hover:text-text')}
+                    className={cn('h-9 whitespace-nowrap rounded-pill px-4 font-medium', sort === s.key ? 'bg-primary text-primary-fg' : 'bg-surface-muted text-text hover:bg-border')}
                   >
                     {s.label}
                   </button>
@@ -287,28 +273,12 @@ export function ResultsPage() {
 
           <div className={cn('flex flex-col gap-3', search.isFetching && search.data && 'opacity-60 transition-opacity')}>
             {search.isLoading ? (
-              [0, 1, 2].map((i) => <Skeleton key={i} className="h-36 w-full" />)
+              [0, 1, 2].map((i) => <Skeleton key={i} className="h-40 w-full rounded-[20px]" />)
             ) : search.isError ? (
               <ErrorState error={search.error} onRetry={search.refetch} />
             ) : list.length > 0 ? (
               <>
-                {/* Phones: one list per bus type, full-width rows — no sideways scrolling. */}
-                <div className="flex flex-col gap-5 sm:hidden">
-                  {groupByType(list).map(([type, trips]) => (
-                    <section key={type} aria-label={`${type} buses`}>
-                      <div className="mb-2 flex items-baseline justify-between">
-                        <h3 className="text-base font-semibold text-text">{type}</h3>
-                        <span className="text-xs text-text-muted">{trips.length} bus{trips.length === 1 ? '' : 'es'}</span>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        {trips.map((t) => <CompactTripCard key={t.tripId} trip={t} onSelect={select} />)}
-                      </div>
-                    </section>
-                  ))}
-                </div>
-                <div className="hidden flex-col gap-3 sm:flex">
-                  {list.map((t) => <TripResultCard key={t.tripId} trip={t} onSelect={select} />)}
-                </div>
+                {list.map((t) => <TripResultCard key={t.tripId} trip={t} onSelect={select} />)}
               </>
             ) : filterCount > 0 ? (
               <EmptyState

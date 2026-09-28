@@ -16,8 +16,8 @@ import { FIXTURE_LABEL, type LayoutFixture } from '@/lib/seat-layout';
  */
 
 const TONE: Record<SeatTone, { box: string; text: string; pillow: string }> = {
-  available: { box: 'border-[#1f9d55] bg-white', text: 'text-[#1f9d55]', pillow: 'bg-[#1f9d55]/25' },
-  selected: { box: 'border-[#1f9d55] bg-[#1f9d55]', text: 'text-white', pillow: 'bg-white/70' },
+  available: { box: 'border-[color:var(--seat-free)] bg-white', text: 'text-[color:var(--seat-free)]', pillow: 'bg-[color:var(--seat-on-soft)]' },
+  selected: { box: 'border-[color:var(--seat-on)] bg-[color:var(--seat-on)]', text: 'text-white', pillow: 'bg-white/70' },
   booked: { box: 'border-[#d4d7dd] bg-[#e5e7eb]', text: 'text-[#9aa0a9]', pillow: 'bg-[#cfd3d9]' },
   bookedFemale: { box: 'border-[#f4b6cc] bg-[#fbe1ea]', text: 'text-[#d9557f]', pillow: 'bg-[#f4b6cc]' },
   forFemale: { box: 'border-[#e8508a] bg-[#fff5f8]', text: 'text-[#e8508a]', pillow: 'bg-[#e8508a]/25' },
@@ -80,7 +80,7 @@ function Chair({ tone, semi }: { tone: SeatTone; semi?: boolean }) {
   const t = TONE[tone];
   const filled = tone === 'selected' || tone === 'boarded';
   return (
-    <svg viewBox="0 0 32 32" className={cn('h-full w-full', filled ? 'text-[#1f9d55]' : t.text)} aria-hidden>
+    <svg viewBox="0 0 32 32" className={cn('h-full w-full', filled ? 'text-[color:var(--seat-on)]' : t.text)} aria-hidden>
       <path
         d={semi ? 'M6.5 2h19A1.5 1.5 0 0 1 27 3.5V21H5V3.5A1.5 1.5 0 0 1 6.5 2z' : 'M6.5 5h19A1.5 1.5 0 0 1 27 6.5V21H5V6.5A1.5 1.5 0 0 1 6.5 5z'}
         fill={filled ? 'currentColor' : tone === 'booked' || tone === 'bookedFemale' || tone === 'checkedOut' ? 'currentColor' : 'white'}
@@ -210,7 +210,7 @@ export function SeatMap({
                         <Chair tone={tone} semi={s.seatType === 'semi_sleeper'} />
                         <span className={cn('absolute inset-x-0 top-[30%] text-center text-[8px] font-semibold leading-none sm:text-[11px]', tone === 'selected' || tone === 'boarded' ? 'text-white' : t.text)}>{s.seatNumber}</span>
                       </span>
-                      {caption && <span className={cn('mt-0.5 truncate text-center text-[8px] font-semibold leading-none sm:text-[11px]', tone === 'selected' ? 'text-[#1f9d55]' : t.text === 'text-white' ? 'text-[#1f9d55]' : t.text)}>{caption}</span>}
+                      {caption && <span className={cn('mt-0.5 truncate text-center text-[8px] font-semibold leading-none sm:text-[11px]', tone === 'selected' ? 'text-[color:var(--seat-on)]' : t.text === 'text-white' ? 'text-[#1f9d55]' : t.text)}>{caption}</span>}
                     </span>
                   );
                   return (
@@ -224,7 +224,7 @@ export function SeatMap({
                       onClick={() => (view ? onSeatClick?.(s) : onToggle?.(s))}
                       style={{ gridColumn: `${s.column + 1} / span ${s.colSpan}`, gridRow: `${s.row + 1} / span ${s.rowSpan}` }}
                       className={cn(
-                        'relative rounded-[5px] p-0 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e8508a]',
+                        'relative rounded-[5px] p-0 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--seat-on)]',
                         clickable ? 'cursor-pointer hover:-translate-y-px' : 'cursor-default',
                         dimmed && 'opacity-25',
                       )}

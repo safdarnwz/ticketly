@@ -13,6 +13,9 @@
  *  runtime from GET /v1/appearance.
  */
 :root {
+  --seat-on: #1f9d55;
+  --seat-free: #1f9d55;
+  --seat-on-soft: #e3f4ea;
   --yb-color-primary: #000000;
   --yb-color-primary-fg: #ffffff;
   --yb-color-secondary: #000000;
@@ -73,39 +76,40 @@
 }
 
 /*
- * The customer storefront (people booking tickets) — the soft "journey" look:
- * one slate-navy colour for actions and selection, muted slate for secondary
- * marks, prices in the text colour, white cards on faint shadows over a cool
- * off-white background, calm rounding, the same Inter as everywhere. Operator, platform and staff
- * consoles keep the flat black-and-white look above. Set on <body> for the
- * customer host (ThemeProvider), so dialogs and toasts get it too.
+ * The customer storefront (people booking tickets) — a clean, current travel-app
+ * look: pure white, ink-black text and pill buttons, one electric-violet accent
+ * for selection and highlights, grey filled fields instead of boxes, hairline
+ * cards with no shadows, generous rounding and tight large headings.
+ * Operator, platform and staff consoles keep the flat black-and-white look
+ * above. Set on <body> for the customer host (ThemeProvider), so dialogs and
+ * toasts get it too.
  */
 .theme-customer {
-  --yb-color-primary: #3f5475;
+  --yb-color-primary: #0f0f12;
   --yb-color-primary-fg: #ffffff;
-  --yb-color-secondary: #8390a8;
+  --yb-color-secondary: #5b3df5;
   --yb-color-secondary-fg: #ffffff;
-  --yb-color-accent: #3f5475;
-  --yb-color-bg: #f4f6fb;
+  --yb-color-accent: #5b3df5;
+  --yb-color-bg: #ffffff;
   --yb-color-surface: #ffffff;
-  --yb-color-surface-muted: #eaeef5;
-  --yb-color-border: #e1e6ef;
-  --yb-color-text: #2f3e5c;
-  --yb-color-text-muted: #8390a8;
-  --yb-color-success: #1fa971;
-  --yb-color-warning: #e39a2d;
-  --yb-color-danger: #e5484d;
-  --yb-color-info: #3f72af;
+  --yb-color-surface-muted: #f4f4f6;
+  --yb-color-border: #ebebef;
+  --yb-color-text: #0f0f12;
+  --yb-color-text-muted: #6f6f7a;
+  --yb-color-success: #12a150;
+  --yb-color-warning: #e8890c;
+  --yb-color-danger: #e5383b;
+  --yb-color-info: #5b3df5;
 
-  --yb-radius-sm: 8px;
-  --yb-radius-md: 10px;
-  --yb-radius-lg: 12px;
-  --yb-radius-xl: 16px;
-  --yb-radius-pill: 10px;
+  --yb-radius-sm: 10px;
+  --yb-radius-md: 14px;
+  --yb-radius-lg: 18px;
+  --yb-radius-xl: 24px;
+  --yb-radius-pill: 999px;
 
-  --yb-shadow-sm: 0 1px 2px rgba(47, 62, 92, 0.05);
-  --yb-shadow-md: 0 2px 8px rgba(47, 62, 92, 0.06);
-  --yb-shadow-lg: 0 8px 24px rgba(47, 62, 92, 0.10);
+  --yb-shadow-sm: none;
+  --yb-shadow-md: 0 1px 2px rgba(15, 15, 18, 0.04);
+  --yb-shadow-lg: 0 12px 40px rgba(15, 15, 18, 0.12);
 
   --yb-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --yb-font-family-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -117,28 +121,35 @@
 
   --yb-spacing-unit: 4px;
 
-  --yb-btn-height: 44px;
-  --yb-btn-padding-x: 20px;
-  --yb-btn-radius: 10px;
+  --yb-btn-height: 48px;
+  --yb-btn-padding-x: 22px;
+  --yb-btn-radius: 999px;
   --yb-btn-font-weight: 500;
 
-  --yb-input-height: 44px;
-  --yb-input-padding-x: 14px;
-  --yb-input-radius: 10px;
+  --yb-input-height: 50px;
+  --yb-input-padding-x: 16px;
+  --yb-input-radius: 14px;
   --yb-input-border-width: 1px;
 
-  --yb-card-radius: 14px;
+  --yb-card-radius: 20px;
   --yb-card-padding: 20px;
-  --yb-card-shadow: var(--yb-shadow-sm);
+  --yb-card-shadow: none;
 
-  --yb-dropdown-radius: 10px;
-  --yb-dropdown-shadow: var(--yb-shadow-md);
+  --yb-dropdown-radius: 16px;
+  --yb-dropdown-shadow: var(--yb-shadow-lg);
 
-  --yb-modal-radius: 16px;
+  --yb-modal-radius: 24px;
   --yb-modal-shadow: var(--yb-shadow-lg);
-  --yb-card-border: transparent;
+  --yb-card-border: var(--yb-color-border);
   --yb-display-weight: 600;
+
+  /* Seats: free seats in a quiet grey outline, your seats filled ink. */
+  --seat-on: #0f0f12;
+  --seat-free: #8b8b96;
+  --seat-on-soft: #ececf0;
 }
+/* Tight, confident headings on the storefront. */
+.theme-customer h1, .theme-customer h2, .theme-customer .font-display { letter-spacing: -0.02em; }
 
 html { font-size: var(--yb-font-size-base); }
 
@@ -212,7 +223,7 @@ a, button, input, select, textarea {
   .lift { transition: border-color .14s ease, background-color .14s ease, box-shadow .18s ease, transform .18s ease; }
   .lift:hover { border-color: var(--yb-color-text-muted); }
   /* The customer look lifts cards on soft shadows instead. */
-  .theme-customer .lift:hover { border-color: transparent; box-shadow: var(--yb-shadow-md); }
+  .theme-customer .lift:hover { border-color: var(--yb-color-text); }
   /* Journey pieces from the customer design: a soft floating card, the pink
      "from" and purple "to" ring dots joined by a dotted line, and a sheet that
      rises from the bottom with a big rounded top. */
@@ -229,3 +240,6 @@ a, button, input, select, textarea {
   .pb-safe { padding-bottom: calc(env(safe-area-inset-bottom) + 72px); }
   .focus-ring:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--yb-color-primary) 16%, transparent); }
 }
+
+/* Storefront journey dots: violet start, ink end. */
+.theme-customer .dot-to { border-color: var(--yb-color-text); }
