@@ -113,8 +113,8 @@ function RoutesTab() {
   });
 
   const columns: Column<RouteRow>[] = [
-    { key: 'code', header: 'Code', render: (r) => <span className="font-mono text-xs">{r.code}</span> },
-    { key: 'name', header: 'Route', render: (r) => <span className="font-medium text-text">{r.name}</span> },
+    { key: 'code', header: 'Code', look: 'key', under: 'name', render: (r) => <span className="font-mono text-xs">{r.code}</span> },
+    { key: 'name', header: 'Route', look: 'strong', render: (r) => <span className="font-medium text-text">{r.name}</span> },
     { key: 'status', header: 'Status', render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge> },
     {
       key: 'actions', header: '', render: (r) => (
@@ -307,10 +307,10 @@ function StopsTab() {
   const openEdit = (s: Stop) => { setEditing(s); setForm({ cityId: s.cityId ?? '', name: s.name, kind: s.kind, landmark: s.landmark ?? '', address: s.address ?? '', pincode: s.pincode ?? '' }); };
 
   const columns: Column<Stop>[] = [
-    { key: 'name', header: 'Stop', render: (s) => <button className="font-medium text-text decoration-dotted" onClick={() => openEdit(s)}>{s.name}</button> },
-    { key: 'kind', header: 'Type', render: (s) => <Badge>{s.kind}</Badge> },
-    { key: 'landmark', header: 'Landmark', render: (s) => s.landmark ?? '—' },
-    { key: 'pincode', header: 'Pincode', render: (s) => s.pincode ?? '—' },
+    { key: 'name', header: 'Stop', look: 'strong', render: (s) => <button className="font-medium text-text decoration-dotted" onClick={() => openEdit(s)}>{s.name}</button> },
+    { key: 'kind', header: 'Type', under: 'name', render: (s) => <Badge>{s.kind}</Badge> },
+    { key: 'landmark', header: 'Landmark', look: 'muted', under: 'name', render: (s) => s.landmark ?? '—' },
+    { key: 'pincode', header: 'Pincode', look: 'muted', under: 'status', render: (s) => s.pincode ?? '—' },
     { key: 'status', header: 'Status', render: (s) => <Badge tone={s.isActive === false ? 'neutral' : 'success'}>{s.isActive === false ? 'Inactive' : 'Active'}</Badge> },
     {
       key: 'actions', header: '', render: (s) => (

@@ -13,9 +13,9 @@ export function PlatformBillsPage() {
   const q = useQuery({ queryKey: ['platform-invoices'], queryFn: operatorProfileApi.invoices });
   const [open, setOpen] = useState<PlatformInvoice | null>(null);
   const cols: Column<PlatformInvoice>[] = [
-    { key: 'no', header: 'Invoice', render: (i) => <span className="font-mono">{i.invoiceNumber}</span> },
-    { key: 'period', header: 'Period', render: (i) => `${d(i.periodFrom)} – ${d(i.periodTo)}` },
-    { key: 'total', header: 'Total', render: (i) => formatMoney(i.totalMinor, i.currency) },
+    { key: 'no', header: 'Invoice', look: 'key', render: (i) => <span className="font-mono">{i.invoiceNumber}</span> },
+    { key: 'period', header: 'Period', look: 'muted', under: 'no', render: (i) => `${d(i.periodFrom)} – ${d(i.periodTo)}` },
+    { key: 'total', header: 'Total', look: 'figure', render: (i) => formatMoney(i.totalMinor, i.currency) },
     { key: 'act', header: '', render: (i) => <Button size="sm" variant="ghost" onClick={() => setOpen(i)}>View</Button> },
   ];
   if (q.isLoading) return <PageLoader />;

@@ -102,11 +102,11 @@ function ServicesTab() {
   const routeName = (id: string) => allRoutes.data?.items.find((r) => r.id === id)?.name ?? '—';
   const typeName = (id: string) => types.data?.items.find((t) => t.id === id)?.name ?? '—';
   const columns: Column<ServiceRow>[] = [
-    { key: 'code', header: 'Code', render: (r) => <span className="whitespace-nowrap font-mono text-xs">{r.code}</span> },
-    { key: 'route', header: 'Route', render: (r) => <span className="font-medium text-text">{routeName(r.routeId)}</span> },
-    { key: 'time', header: 'Departs', render: (r) => hhmm(r.startMinute) },
-    { key: 'runs', header: 'Runs', render: (r) => <span className="text-text-muted">{runsOn(r.recurrence)}{r.recurrence ? ` · till ${r.recurrence.endDate}` : ''}</span> },
-    { key: 'type', header: 'Bus type', render: (r) => <span className="text-text-muted">{typeName(r.vehicleTypeId)}</span> },
+    { key: 'code', header: 'Code', look: 'key', render: (r) => <span className="whitespace-nowrap font-mono text-xs">{r.code}</span> },
+    { key: 'route', header: 'Route', look: 'strong', render: (r) => <span className="font-medium text-text">{routeName(r.routeId)}</span> },
+    { key: 'time', header: 'Departs', under: 'code', render: (r) => hhmm(r.startMinute) },
+    { key: 'runs', header: 'Runs', under: 'route', render: (r) => <span className="text-text-muted">{runsOn(r.recurrence)}{r.recurrence ? ` · till ${r.recurrence.endDate}` : ''}</span> },
+    { key: 'type', header: 'Bus type', look: 'muted', under: 'route', render: (r) => <span className="text-text-muted">{typeName(r.vehicleTypeId)}</span> },
     { key: 'status', header: 'Status', render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge> },
     {
       key: 'actions', header: '', render: (r) => (

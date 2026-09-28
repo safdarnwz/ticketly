@@ -74,12 +74,12 @@ export function BranchesPage() {
   const setDay = (d: Weekday, v: { open: string; close: string } | null) => setForm((f) => ({ ...f, hours: { ...f.hours, [d]: v } }));
 
   const columns: Column<Branch>[] = [
-    { key: 'name', header: 'Branch', render: (b) => <div><span className="font-medium text-text">{b.name}</span>{b.code && <div className="font-mono text-xs text-text-muted">{b.code}</div>}</div> },
-    { key: 'address', header: 'Address', render: (b) => <span className="text-text-muted">{b.address || '—'}</span> },
-    { key: 'phone', header: 'Phone', render: (b) => b.phone || '—' },
-    { key: 'hours', header: 'Hours', render: (b) => <span className="text-xs text-text-muted">{hoursSummary(b.workingHours)}</span> },
-    { key: 'manager', header: 'Manager', render: (b) => <span className="text-sm">{staffName(b.managerUserId)}</span> },
-    { key: 'staff', header: 'Staff', render: (b) => b.staffCount },
+    { key: 'name', header: 'Branch', look: 'strong', render: (b) => <div><span className="font-medium text-text">{b.name}</span>{b.code && <div className="font-mono text-xs text-text-muted">{b.code}</div>}</div> },
+    { key: 'address', header: 'Address', look: 'muted', under: 'name', render: (b) => <span className="text-text-muted">{b.address || '—'}</span> },
+    { key: 'phone', header: 'Phone', under: 'manager', render: (b) => b.phone || '—' },
+    { key: 'hours', header: 'Hours', look: 'muted', optional: true, render: (b) => <span className="text-xs text-text-muted">{hoursSummary(b.workingHours)}</span> },
+    { key: 'manager', header: 'Manager', look: 'strong', render: (b) => <span className="text-sm">{staffName(b.managerUserId)}</span> },
+    { key: 'staff', header: 'Staff', look: 'count', render: (b) => b.staffCount },
     { key: 'status', header: 'Status', render: (b) => <Badge tone={b.status === 'active' ? 'success' : 'neutral'}>{b.status === 'active' ? 'Active' : 'Inactive'}</Badge> },
     {
       key: 'actions', header: '', render: (b) => (

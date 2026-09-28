@@ -36,17 +36,17 @@ export function CustomersPage() {
 
   const columns: Column<Customer>[] = [
     {
-      key: 'name', header: 'Customer', render: (c) => (
+      key: 'name', header: 'Customer', look: 'strong', render: (c) => (
         <div>
           <div className="flex items-center gap-2 font-medium text-text">{c.name ?? 'Unnamed'}{c.frequent && <Badge tone="success">Frequent</Badge>}{c.blocked && <Badge tone="danger">Blocked</Badge>}</div>
           <div className="text-xs text-text-muted">{c.customerId ? 'Account' : 'Guest'}{c.email ? ` · ${c.email}` : ''}</div>
         </div>
       ),
     },
-    { key: 'phone', header: 'Mobile', render: (c) => <span className="font-mono text-sm">{c.phone ?? '—'}</span> },
-    { key: 'trips', header: 'Trips', render: (c) => <span>{c.trips}{c.cancelled ? <span className="text-xs text-text-muted"> · {c.cancelled} cancelled</span> : ''}</span> },
-    { key: 'spent', header: 'Spent', render: (c) => formatMoney(c.spentMinor, 'INR') },
-    { key: 'last', header: 'Last journey', render: (c) => <span className="text-sm text-text-muted">{dateOf(c.lastJourneyDate)}</span> },
+    { key: 'phone', header: 'Mobile', under: 'name', render: (c) => <span className="font-mono text-sm">{c.phone ?? '—'}</span> },
+    { key: 'trips', header: 'Trips', look: 'count', under: 'spent', render: (c) => <span>{c.trips}{c.cancelled ? <span className="text-xs text-text-muted"> · {c.cancelled} cancelled</span> : ''}</span> },
+    { key: 'spent', header: 'Spent', look: 'figure', render: (c) => formatMoney(c.spentMinor, 'INR') },
+    { key: 'last', header: 'Last journey', look: 'muted', render: (c) => <span className="text-sm text-text-muted">{dateOf(c.lastJourneyDate)}</span> },
   ];
 
   return (
@@ -103,11 +103,11 @@ function CustomerModal({ customerKey, onClose }: { customerKey: string; onClose:
   });
 
   const history: Column<CustomerBooking>[] = [
-    { key: 'pnr', header: 'PNR', render: (b) => <Link to={`/bookings/${b.pnr}`} className="font-mono text-primary hover:underline">{b.pnr}</Link> },
+    { key: 'pnr', header: 'PNR', look: 'key', render: (b) => <Link to={`/bookings/${b.pnr}`} className="font-mono text-primary hover:underline">{b.pnr}</Link> },
     { key: 'journey', header: 'Journey', render: (b) => <div className="text-sm"><div>{b.routeName ?? '—'}</div><div className="text-xs text-text-muted">{dateOf(b.journeyDate)} · {b.seatCount} seat{b.seatCount === 1 ? '' : 's'}</div></div> },
-    { key: 'amount', header: 'Amount', render: (b) => formatMoney(b.totalMinor, 'INR') },
+    { key: 'amount', header: 'Amount', look: 'figure', render: (b) => formatMoney(b.totalMinor, 'INR') },
     { key: 'status', header: 'Status', render: (b) => <Badge tone={statusTone(b.status)}>{b.status}</Badge> },
-    { key: 'booked', header: 'Booked', render: (b) => <span className="text-xs text-text-muted">{formatDateTime(b.createdAt)}</span> },
+    { key: 'booked', header: 'Booked', look: 'muted', under: 'pnr', render: (b) => <span className="text-xs text-text-muted">{formatDateTime(b.createdAt)}</span> },
   ];
   const d = c.data;
 

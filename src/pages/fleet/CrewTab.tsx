@@ -52,16 +52,16 @@ function CrewList() {
   const today = todayLocal();
   const soon = addDaysIso(today, 30);
   const columns: Column<Crew>[] = [
-    { key: 'name', header: 'Name', render: (r) => <div><div className="font-medium text-text">{r.fullName}</div><div className="text-xs text-text-muted">{[r.phone, r.employeeCode].filter(Boolean).join(' · ') || '—'}</div></div> },
-    { key: 'role', header: 'Role', render: (r) => <Badge>{r.role}</Badge> },
-    { key: 'licence', header: 'Licence', render: (r) => r.licenceNo ? (
+    { key: 'name', header: 'Name', look: 'strong', render: (r) => <div><div className="font-medium text-text">{r.fullName}</div><div className="text-xs text-text-muted">{[r.phone, r.employeeCode].filter(Boolean).join(' · ') || '—'}</div></div> },
+    { key: 'role', header: 'Role', under: 'name', render: (r) => <Badge>{r.role}</Badge> },
+    { key: 'licence', header: 'Licence', look: 'muted', render: (r) => r.licenceNo ? (
       <div><div className="text-text-muted">{r.licenceNo}</div>
         {r.licenceExpiresOn && <div className={cn('text-xs', r.licenceExpiresOn < today ? 'text-danger' : r.licenceExpiresOn <= soon ? 'text-warning' : 'text-text-muted')}>
           {r.licenceExpiresOn < today ? 'expired' : 'valid till'} {r.licenceExpiresOn}</div>}</div>
     ) : <span className="text-text-muted">{r.role === 'driver' ? <span className="text-danger">missing</span> : '—'}</span> },
     { key: 'duties', header: 'Upcoming duties', render: (r) => r.upcomingDuties },
     { key: 'status', header: 'Status', render: (r) => <Badge tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status] ?? r.status}</Badge> },
-    { key: 'app', header: 'Crew app', render: (r) => r.hasLogin ? <Badge tone="success">has login</Badge> : <span className="text-xs text-text-muted">no login</span> },
+    { key: 'app', header: 'Crew app', under: 'status', render: (r) => r.hasLogin ? <Badge tone="success">has login</Badge> : <span className="text-xs text-text-muted">no login</span> },
     { key: 'act', header: '', render: (r) => (
       <div className="flex justify-end gap-1">
         <Button size="sm" variant="ghost" disabled={!r.phone || r.status !== 'active'} title={!r.phone ? 'Add a mobile number first' : r.status !== 'active' ? 'Only active crew use the app' : undefined} onClick={() => setLoginFor(r)}>{r.hasLogin ? 'Reset app password' : 'Give app login'}</Button>
@@ -209,10 +209,10 @@ function Roster() {
   const now = Date.now();
   const busy = cancel.isPending || mark.isPending;
   const columns: Column<Duty>[] = [
-    { key: 'crew', header: 'Crew', render: (r) => <div><div className="font-medium text-text">{r.crewName}</div><div className="text-xs text-text-muted">{r.crewRole}</div></div> },
+    { key: 'crew', header: 'Crew', look: 'strong', render: (r) => <div><div className="font-medium text-text">{r.crewName}</div><div className="text-xs text-text-muted">{r.crewRole}</div></div> },
     { key: 'trip', header: 'Trip', render: (r) => <span className="text-text-muted">{r.tripLabel ?? 'Not tied to a trip'}</span> },
-    { key: 'when', header: 'When', render: (r) => <div className="text-sm">{formatDateTime(r.startsAt)}<div className="text-xs text-text-muted">to {formatDateTime(r.endsAt)}</div></div> },
-    { key: 'driving', header: 'Driving', render: (r) => minutesToHm(r.drivingMinutes) },
+    { key: 'when', header: 'When', look: 'muted', under: 'trip', render: (r) => <div className="text-sm">{formatDateTime(r.startsAt)}<div className="text-xs text-text-muted">to {formatDateTime(r.endsAt)}</div></div> },
+    { key: 'driving', header: 'Driving', under: 'crew', render: (r) => minutesToHm(r.drivingMinutes) },
     { key: 'att', header: 'Attendance', render: (r) => <div className="flex flex-col gap-1"><Badge tone={ATTENDANCE_TONE[r.attendance] ?? 'neutral'}>{r.attendance === 'pending' ? 'not marked' : r.attendance}</Badge>{r.overrideReason && <span className="text-xs text-warning" title={r.overrideReason}>rule exception</span>}</div> },
     { key: 'act', header: '', render: (r) => {
       const canMark = new Date(r.startsAt).getTime() - now <= 6 * 3_600_000;
@@ -404,9 +404,9 @@ function Compliance() {
   const bad = !from || !to || from > to;
   const q = useQuery({ queryKey: ['crew-compliance', from, to], queryFn: () => fleetApi.crewCompliance(from, to), enabled: !bad });
   const columns: Column<ComplianceRow>[] = [
-    { key: 'crew', header: 'Crew', render: (r) => <div><div className="font-medium text-text">{r.crewName}</div><div className="text-xs text-text-muted">{r.role}</div></div> },
-    { key: 'when', header: 'Duty', render: (r) => formatDateTime(r.startsAt) },
-    { key: 'what', header: 'Issue', render: (r) => (
+    { key: 'crew', header: 'Crew', look: 'strong', render: (r) => <div><div className="font-medium text-text">{r.crewName}</div><div className="text-xs text-text-muted">{r.role}</div></div> },
+    { key: 'when', header: 'Duty', look: 'muted', under: 'crew', render: (r) => formatDateTime(r.startsAt) },
+    { key: 'what', header: 'Issue', look: 'note', render: (r) => (
       <div className="flex flex-col gap-1 text-sm">
         {r.overrideReason && <span><Badge tone="warning">rule exception</Badge> {r.overrideReason}{r.approvedBy ? <span className="text-xs text-text-muted"> — approved by {r.approvedBy}</span> : null}</span>}
         {r.attendance !== 'present' && <span><Badge tone={ATTENDANCE_TONE[r.attendance] ?? 'neutral'}>{r.attendance === 'pending' ? 'attendance not marked' : r.attendance}</Badge></span>}

@@ -157,8 +157,8 @@ function Quotas({ chart, locked, onChanged }: { chart: TripChart; locked: boolea
   });
   const holders = holderType === 'agent' ? (agents.data?.items ?? []).map((a) => ({ label: `${a.name} (${a.code})`, value: a.id })) : (branches.data?.items ?? []).filter((b) => b.status === 'active').map((b) => ({ label: b.name, value: b.id }));
   const cols: Column<Quota>[] = [
-    { key: 'seat', header: 'Seat', render: (x) => <span className="font-mono">{x.seatNumber}</span> },
-    { key: 'for', header: 'Kept for', render: (x) => <span>{x.holderName ?? x.holderId.slice(0, 8)} <span className="text-xs text-text-muted">{x.holderType}</span></span> },
+    { key: 'seat', header: 'Seat', look: 'key', render: (x) => <span className="font-mono">{x.seatNumber}</span> },
+    { key: 'for', header: 'Kept for', under: 'seat', render: (x) => <span>{x.holderName ?? x.holderId.slice(0, 8)} <span className="text-xs text-text-muted">{x.holderType}</span></span> },
     { key: 'state', header: 'State', render: (x) => x.consumedAt ? <Badge tone="success">Sold</Badge> : x.releasedAt ? <Badge tone="neutral">Released</Badge> : <span className="text-xs">until {formatDateTime(x.releaseAt)}</span> },
     { key: 'act', header: '', render: (x) => !x.consumedAt && !x.releasedAt && !locked ? <Button size="sm" variant="ghost" disabled={release.isPending} onClick={() => release.mutate(x.seatNumber)}>Take back</Button> : null },
   ];
@@ -240,10 +240,10 @@ function Money({ tripId, cancelled }: { tripId: string; cancelled: boolean }) {
     onError: (x) => toast.error(errText(x)),
   });
   const cols: Column<Expense>[] = [
-    { key: 'what', header: 'What', render: (x) => <span className={cn(x.voidedAt && 'text-text-muted line-through')}>{label(x.category)}{x.note ? ` · ${x.note}` : ''}</span> },
-    { key: 'receipt', header: 'Receipt', render: (x) => x.receiptFileId ? <Button size="sm" variant="ghost" onClick={() => void tripOpsExtraApi.openReceipt(x.receiptFileId!).catch((e) => toast.error(errText(e)))}>View</Button> : <span className="text-xs text-text-muted">—</span> },
-    { key: 'amt', header: 'Amount', render: (x) => <span className={cn(x.voidedAt && 'text-text-muted line-through')}>{formatMoney(x.amountMinor)}</span> },
-    { key: 'who', header: 'Added', render: (x) => <span className="text-xs text-text-muted">{formatDateTime(x.incurredAt)}{x.createdBy ? ` · ${x.createdBy}` : ''}{x.voidedAt ? ` · voided: ${x.voidReason}` : ''}</span> },
+    { key: 'what', header: 'What', look: 'strong', render: (x) => <span className={cn(x.voidedAt && 'text-text-muted line-through')}>{label(x.category)}{x.note ? ` · ${x.note}` : ''}</span> },
+    { key: 'receipt', header: 'Receipt', under: 'what', render: (x) => x.receiptFileId ? <Button size="sm" variant="ghost" onClick={() => void tripOpsExtraApi.openReceipt(x.receiptFileId!).catch((e) => toast.error(errText(e)))}>View</Button> : <span className="text-xs text-text-muted">—</span> },
+    { key: 'amt', header: 'Amount', look: 'figure', render: (x) => <span className={cn(x.voidedAt && 'text-text-muted line-through')}>{formatMoney(x.amountMinor)}</span> },
+    { key: 'who', header: 'Added', look: 'muted', under: 'what', render: (x) => <span className="text-xs text-text-muted">{formatDateTime(x.incurredAt)}{x.createdBy ? ` · ${x.createdBy}` : ''}{x.voidedAt ? ` · voided: ${x.voidReason}` : ''}</span> },
     { key: 'act', header: '', render: (x) => x.voidedAt ? null : voiding?.id === x.id ? (
       <span className="flex items-center gap-1"><input aria-label="Why void" className="h-8 rounded-md border border-border px-2 text-xs" placeholder="Why? (5+ letters)" value={voiding.reason} onChange={(e) => setVoiding({ ...voiding, reason: e.target.value })} />
         <Button size="sm" variant="danger" disabled={voiding.reason.trim().length < 5 || voidM.isPending} onClick={() => voidM.mutate({ id: x.id, reason: voiding.reason.trim() })}>Void</Button></span>

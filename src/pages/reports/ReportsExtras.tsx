@@ -29,13 +29,13 @@ export function PnlTab({ from, to }: { from: string; to: string }) {
   const total = items.reduce((s, r) => ({ sales: s.sales + Number(r.salesMinor), net: s.net + Number(r.netRevenueMinor), cost: s.cost + Number(r.expensesMinor), profit: s.profit + Number(r.profitMinor) }), { sales: 0, net: 0, cost: 0, profit: 0 });
   const columns: Column<PnlRow>[] = [
     { key: 'label', header: groupBy === 'route' ? 'Route' : groupBy === 'vehicle' ? 'Bus' : 'Trip', render: (r) => <span className="font-medium text-text">{r.label}</span> },
-    { key: 'trips', header: 'Trips', render: (r) => r.trips },
-    { key: 'occ', header: 'Occupancy', render: (r) => `${r.occupancyPct}% · ${r.seatsSold}/${r.seatsTotal}` },
-    { key: 'sales', header: 'Sales', render: (r) => money(r.salesMinor) },
-    { key: 'net', header: 'Net revenue', render: (r) => <span title="After GST and agent commission">{money(r.netRevenueMinor)}</span> },
-    { key: 'cost', header: 'Expenses', render: (r) => money(r.expensesMinor) },
-    { key: 'profit', header: 'Profit', render: (r) => <span className={Number(r.profitMinor) < 0 ? 'font-semibold text-danger' : 'font-semibold text-success'}>{money(r.profitMinor)}</span> },
-    { key: 'margin', header: 'Margin', render: (r) => (r.marginPct == null ? '—' : `${r.marginPct}%`) },
+    { key: 'trips', header: 'Trips', look: 'count', render: (r) => r.trips },
+    { key: 'occ', header: 'Occupancy', look: 'count', under: 'trips', render: (r) => `${r.occupancyPct}% · ${r.seatsSold}/${r.seatsTotal}` },
+    { key: 'sales', header: 'Sales', look: 'figure', render: (r) => money(r.salesMinor) },
+    { key: 'net', header: 'Net revenue', look: 'figure', render: (r) => <span title="After GST and agent commission">{money(r.netRevenueMinor)}</span> },
+    { key: 'cost', header: 'Expenses', look: 'figure', under: 'sales', render: (r) => money(r.expensesMinor) },
+    { key: 'profit', header: 'Profit', look: 'figure', render: (r) => <span className={Number(r.profitMinor) < 0 ? 'font-semibold text-danger' : 'font-semibold text-success'}>{money(r.profitMinor)}</span> },
+    { key: 'margin', header: 'Margin', look: 'count', under: 'profit', render: (r) => (r.marginPct == null ? '—' : `${r.marginPct}%`) },
   ];
   return (
     <div className="flex flex-col gap-4">
@@ -95,9 +95,9 @@ export function DispatchTab({ from, to }: { from: string; to: string }) {
         <h3 className="mb-2 text-sm font-semibold text-text">Late departures</h3>
         {delayed.length === 0 ? <EmptyState title="No trip left more than 10 minutes late" /> : (
           <Table rows={delayed} columns={[
-            { key: 'route', header: 'Route', render: (r) => <Link className="text-primary" to={`/trips/${r.tripId}`}>{r.routeName}</Link> },
-            { key: 'sched', header: 'Scheduled', render: (r) => formatDateTime(r.scheduled) },
-            { key: 'actual', header: 'Left at', render: (r) => formatDateTime(r.actual) },
+            { key: 'route', header: 'Route', look: 'strong', render: (r) => <Link className="text-primary" to={`/trips/${r.tripId}`}>{r.routeName}</Link> },
+            { key: 'sched', header: 'Scheduled', look: 'muted', render: (r) => formatDateTime(r.scheduled) },
+            { key: 'actual', header: 'Left at', under: 'sched', render: (r) => formatDateTime(r.actual) },
             { key: 'late', header: 'Late by', render: (r) => <span className="text-danger">{minutesToHm(r.delayMin)}</span> },
           ]} />
         )}
@@ -106,19 +106,19 @@ export function DispatchTab({ from, to }: { from: string; to: string }) {
         <section>
           <h3 className="mb-2 text-sm font-semibold text-text">Bus use {idle.length > 0 && <span className="font-normal text-warning">· {idle.length} idle</span>}</h3>
           {buses.length === 0 ? <EmptyState title="No buses" /> : <Table rows={buses} columns={[
-            { key: 'bus', header: 'Bus', render: (r) => <span className={r.trips === 0 ? 'text-warning' : 'text-text'}>{r.bus}</span> },
-            { key: 'trips', header: 'Trips', render: (r) => r.trips },
-            { key: 'hours', header: 'Scheduled hours', render: (r) => r.scheduledHours ?? 0 },
+            { key: 'bus', header: 'Bus', look: 'key', render: (r) => <span className={r.trips === 0 ? 'text-warning' : 'text-text'}>{r.bus}</span> },
+            { key: 'trips', header: 'Trips', look: 'count', render: (r) => r.trips },
+            { key: 'hours', header: 'Scheduled hours', look: 'count', render: (r) => r.scheduledHours ?? 0 },
           ]} />}
         </section>
         <section>
           <h3 className="mb-2 text-sm font-semibold text-text">Crew</h3>
           {crew.length === 0 ? <EmptyState title="No crew" /> : <Table rows={crew} columns={[
-            { key: 'name', header: 'Name', render: (r) => <div>{r.name}<div className="text-xs text-text-muted">{r.role}</div></div> },
-            { key: 'duties', header: 'Duties', render: (r) => r.duties },
-            { key: 'late', header: 'Late', render: (r) => <span className={r.late ? 'text-warning' : ''}>{r.late}</span> },
-            { key: 'absent', header: 'Absent', render: (r) => <span className={r.absent ? 'text-danger' : ''}>{r.absent}</span> },
-            { key: 'drive', header: 'Driving', render: (r) => minutesToHm(r.drivingMinutes) },
+            { key: 'name', header: 'Name', look: 'strong', render: (r) => <div>{r.name}<div className="text-xs text-text-muted">{r.role}</div></div> },
+            { key: 'duties', header: 'Duties', look: 'count', render: (r) => r.duties },
+            { key: 'late', header: 'Late', look: 'count', render: (r) => <span className={r.late ? 'text-warning' : ''}>{r.late}</span> },
+            { key: 'absent', header: 'Absent', look: 'count', under: 'late', render: (r) => <span className={r.absent ? 'text-danger' : ''}>{r.absent}</span> },
+            { key: 'drive', header: 'Driving', look: 'count', under: 'duties', render: (r) => minutesToHm(r.drivingMinutes) },
           ]} />}
         </section>
       </div>
@@ -138,9 +138,9 @@ export function ForecastTab() {
   const weak = useQuery({ queryKey: ['report-weak', suggestDays, maxPct], queryFn: () => reportsApi.cancelSuggestions(suggestDays, maxPct) });
   const pct = (r: ForecastRow) => (r.forecastPct == null ? <span className="text-text-muted">not enough history</span> : <span className={r.forecastPct < maxPct ? 'text-danger' : 'text-text'}>{r.forecastPct}% ({r.forecastSeats} seats)</span>);
   const base: Column<ForecastRow>[] = [
-    { key: 'trip', header: 'Trip', render: (r) => <Link className="text-primary" to={`/trips/${r.tripId}`}>{r.routeName} · {formatDateLabel(r.journeyDate)}</Link> },
-    { key: 'sold', header: 'Sold now', render: (r) => `${r.currentSold} / ${r.totalSeats}` },
-    { key: 'fc', header: 'Expected at departure', render: pct },
+    { key: 'trip', header: 'Trip', look: 'strong', render: (r) => <Link className="text-primary" to={`/trips/${r.tripId}`}>{r.routeName} · {formatDateLabel(r.journeyDate)}</Link> },
+    { key: 'sold', header: 'Sold now', look: 'count', render: (r) => `${r.currentSold} / ${r.totalSeats}` },
+    { key: 'fc', header: 'Expected at departure', look: 'count', under: 'sold', render: pct },
     { key: 'conf', header: 'Confidence', render: (r) => <Badge tone={CONF_TONE[r.confidence]}>{r.confidence}</Badge> },
   ];
   return (

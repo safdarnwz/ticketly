@@ -55,13 +55,13 @@ export function OperatorsPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Approve failed'),
   });
   const columns: Column<Row>[] = [
-    { key: 'company', header: 'Company', render: (r) => <span className="font-medium text-text">{r.companyName}</span> },
-    { key: 'applicant', header: 'Applicant', render: (r) => <span>{r.firstName} {r.lastName}<div className="text-xs text-text-muted">{r.email}</div></span> },
-    { key: 'location', header: 'Location', render: (r) => <span className="text-text-muted">{[r.city, r.state].filter(Boolean).join(', ') || '—'}</span> },
+    { key: 'company', header: 'Company', look: 'strong', render: (r) => <span className="font-medium text-text">{r.companyName}</span> },
+    { key: 'applicant', header: 'Applicant', under: 'company', render: (r) => <span>{r.firstName} {r.lastName}<div className="text-xs text-text-muted">{r.email}</div></span> },
+    { key: 'location', header: 'Location', look: 'muted', under: 'company', render: (r) => <span className="text-text-muted">{[r.city, r.state].filter(Boolean).join(', ') || '—'}</span> },
     { key: 'status', header: 'Status', render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge> },
-    { key: 'kyc', header: 'KYC', render: (r) => <KycStatusCell applicationId={r.id} /> },
+    { key: 'kyc', header: 'KYC', under: 'status', render: (r) => <KycStatusCell applicationId={r.id} /> },
     {
-      key: 'console', header: 'Console', render: (r) => r.consoleUrl ? (
+      key: 'console', header: 'Console', optional: true, render: (r) => r.consoleUrl ? (
         <a href={r.consoleUrl} target="_blank" rel="noreferrer" className="font-mono text-xs text-primary">{r.consoleUrl}</a>
       ) : <span className="text-text-muted">—</span>,
     },

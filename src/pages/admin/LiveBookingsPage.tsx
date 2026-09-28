@@ -155,7 +155,7 @@ export function LiveBookingsPage() {
 
   const opColumns: Column<OperatorActivity>[] = [
     {
-      key: 'op', header: 'Operator', render: (o) => (
+      key: 'op', header: 'Operator', look: 'strong', render: (o) => (
         <div>
           <div className="font-medium text-text">{o.operatorName}</div>
           <div className="flex items-center gap-1.5 text-xs text-text-muted">{o.operatorSlug}{o.operatorStatus !== 'active' && <Badge tone={statusTone(o.operatorStatus)}>{o.operatorStatus}</Badge>}</div>
@@ -163,31 +163,31 @@ export function LiveBookingsPage() {
       ),
     },
     {
-      key: 'live', header: 'Paying now', render: (o) => o.holdsLive ? (
+      key: 'live', header: 'Paying now', look: 'count', render: (o) => o.holdsLive ? (
         <span className="inline-flex items-center gap-1.5 font-medium text-warning"><CircleDot className="h-3.5 w-3.5 animate-pulse" />{o.holdsLive} · {o.seatsOnHold} seats</span>
       ) : <span className="text-text-muted">—</span>,
     },
-    { key: 'confirmed', header: 'Confirmed', render: (o) => `${o.confirmed} · ${o.seatsSold} seats`, className: 'whitespace-nowrap' },
-    { key: 'gross', header: 'Gross', render: (o) => formatMoney(o.grossMinor), className: 'whitespace-nowrap text-right' },
-    { key: 'cancelled', header: 'Cancelled', render: (o) => o.cancelled || '—' },
-    { key: 'last', header: 'Last booking', render: (o) => <span className="text-text-muted">{ago(o.lastBookingAt, now)}</span> },
+    { key: 'confirmed', header: 'Confirmed', look: 'count', render: (o) => `${o.confirmed} · ${o.seatsSold} seats`, className: 'whitespace-nowrap' },
+    { key: 'gross', header: 'Gross', look: 'figure', render: (o) => formatMoney(o.grossMinor), className: 'whitespace-nowrap text-right' },
+    { key: 'cancelled', header: 'Cancelled', look: 'count', under: 'confirmed', render: (o) => o.cancelled || '—' },
+    { key: 'last', header: 'Last booking', look: 'muted', under: 'gross', render: (o) => <span className="text-text-muted">{ago(o.lastBookingAt, now)}</span> },
   ];
 
   const feedColumns: Column<MonitoredBooking>[] = [
-    { key: 'at', header: 'Booked', render: (b) => <span className="whitespace-nowrap text-text-muted">{dt(b.createdAt)}</span> },
-    { key: 'pnr', header: 'PNR', render: (b) => <span className="font-mono font-semibold">{b.pnr}</span> },
-    { key: 'op', header: 'Operator', render: (b) => <button type="button" className="text-left text-primary hover:underline" onClick={() => set({ operator: b.tenantId })}>{b.operatorName}</button> },
+    { key: 'at', header: 'Booked', look: 'muted', under: 'pnr', render: (b) => <span className="whitespace-nowrap text-text-muted">{dt(b.createdAt)}</span> },
+    { key: 'pnr', header: 'PNR', look: 'key', render: (b) => <span className="font-mono font-semibold">{b.pnr}</span> },
+    { key: 'op', header: 'Operator', look: 'strong', render: (b) => <button type="button" className="text-left text-primary hover:underline" onClick={() => set({ operator: b.tenantId })}>{b.operatorName}</button> },
     {
-      key: 'journey', header: 'Journey', render: (b) => (
-        <div className="min-w-40">
+      key: 'journey', header: 'Journey', under: 'op', render: (b) => (
+        <div className="min-w-0">
           <div>{b.from ?? '—'} → {b.to ?? '—'}</div>
           <div className="text-xs text-text-muted">Departs {dt(b.departsAt)}</div>
         </div>
       ),
     },
-    { key: 'seats', header: 'Seats', render: (b) => b.seatCount, className: 'text-center' },
-    { key: 'amount', header: 'Amount', render: (b) => <span className="whitespace-nowrap">{formatMoney(b.liveHold || b.status === 'expired' ? b.totalMinor : b.paidMinor, b.currency)}</span>, className: 'text-right' },
-    { key: 'channel', header: 'Channel', render: (b) => <span className="whitespace-nowrap text-text-muted">{CHANNEL_LABEL[b.channel] ?? b.channel}{b.soldBy ? ` · ${b.soldBy === 'gds' ? 'GDS' : 'Agent'}` : ''}</span> },
+    { key: 'seats', header: 'Seats', look: 'count', under: 'amount', render: (b) => b.seatCount, className: 'text-center' },
+    { key: 'amount', header: 'Amount', look: 'figure', render: (b) => <span className="whitespace-nowrap">{formatMoney(b.liveHold || b.status === 'expired' ? b.totalMinor : b.paidMinor, b.currency)}</span>, className: 'text-right' },
+    { key: 'channel', header: 'Channel', under: 'status', render: (b) => <span className="whitespace-nowrap text-text-muted">{CHANNEL_LABEL[b.channel] ?? b.channel}{b.soldBy ? ` · ${b.soldBy === 'gds' ? 'GDS' : 'Agent'}` : ''}</span> },
     {
       key: 'status', header: 'Status', render: (b) => b.liveHold ? (
         <span className="inline-flex flex-col">
@@ -197,14 +197,14 @@ export function LiveBookingsPage() {
       ) : <Badge tone={statusTone(b.status)}>{b.status === 'completed' ? 'travelled' : b.status}</Badge>,
     },
     {
-      key: 'emails', header: 'Emails', render: (b) => ['confirmed', 'completed', 'cancelled'].includes(b.status) ? (
+      key: 'emails', header: 'Emails', optional: true, render: (b) => ['confirmed', 'completed', 'cancelled'].includes(b.status) ? (
         <div className="flex flex-col gap-0.5">
           <EmailBadge label="Ticket" status={b.emails.eticket} />
           <EmailBadge label="Invoice" status={b.emails.invoice} />
         </div>
       ) : <span className="text-text-muted">—</span>,
     },
-    { key: 'contact', header: 'Contact', render: (b) => <span className="whitespace-nowrap font-mono text-xs text-text-muted">{b.contactPhone ?? '—'}{b.contactEmail ? <><br />{b.contactEmail}</> : null}</span> },
+    { key: 'contact', header: 'Contact', under: 'op', render: (b) => <span className="whitespace-nowrap font-mono text-xs text-text-muted">{b.contactPhone ?? '—'}{b.contactEmail ? <><br />{b.contactEmail}</> : null}</span> },
   ];
 
   const t = activity.data?.totals;

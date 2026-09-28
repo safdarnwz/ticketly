@@ -99,18 +99,18 @@ function VehiclesTab() {
 
   const columns: Column<Vehicle>[] = [
     {
-      key: 'reg', header: 'Registration', render: (r) => (
+      key: 'reg', header: 'Registration', look: 'key', render: (r) => (
         <div className="flex items-center gap-2">
           {r.photoUrl && <img src={r.photoUrl} alt="" className="h-8 w-8 rounded object-cover" />}
           <Link to={`/fleet/vehicles/${r.id}`} className="font-mono text-sm font-medium text-primary hover:underline">{r.registrationNo}</Link>
         </div>
       ),
     },
-    { key: 'model', header: 'Make/Model', render: (r) => <span className="text-text-muted">{[r.make, r.model].filter(Boolean).join(' ') || '—'}</span> },
+    { key: 'model', header: 'Make/Model', under: 'reg', render: (r) => <span className="text-text-muted">{[r.make, r.model].filter(Boolean).join(' ') || '—'}</span> },
     { key: 'status', header: 'Status', render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge> },
-    { key: 'verification', header: 'Platform check', render: (r) => <Badge tone={r.verificationStatus === 'approved' ? 'success' : r.verificationStatus === 'rejected' ? 'danger' : 'warning'}>{r.verificationStatus === 'approved' ? 'verified' : r.verificationStatus === 'draft' ? 'not submitted' : r.verificationStatus ?? '—'}</Badge> },
+    { key: 'verification', header: 'Platform check', under: 'status', render: (r) => <Badge tone={r.verificationStatus === 'approved' ? 'success' : r.verificationStatus === 'rejected' ? 'danger' : 'warning'}>{r.verificationStatus === 'approved' ? 'verified' : r.verificationStatus === 'draft' ? 'not submitted' : r.verificationStatus ?? '—'}</Badge> },
     {
-      key: 'permitType', header: 'Permit type',
+      key: 'permitType', header: 'Permit type', look: 'muted',
       render: (r) => (
         <Select value={r.permitType ?? ''} onChange={(e) => setPermitType.mutate({ id: r.id, permitType: e.target.value as 'aitp' | 'stage_carriage' | 'state_tourist_permit' | 'contract_carriage' })}
           options={[
@@ -122,7 +122,7 @@ function VehiclesTab() {
           ]} />
       ),
     },
-    { key: 'note', header: 'Service note', render: (r) => <span className="text-xs text-text-muted">{r.serviceNote ?? '—'}</span> },
+    { key: 'note', header: 'Service note', look: 'note', optional: true, render: (r) => <span className="text-xs text-text-muted">{r.serviceNote ?? '—'}</span> },
     {
       key: 'actions', header: '', render: (r) => (
         <div className="flex justify-end gap-1 whitespace-nowrap">

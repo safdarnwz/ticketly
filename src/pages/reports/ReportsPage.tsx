@@ -87,11 +87,11 @@ function RevenueTab({ from, to }: { from: string; to: string }) {
   if (q.isError) return <ErrorState error={q.error} onRetry={q.refetch} />;
 
   const columns: Column<{ date: string; bookings: number; grossMinor: number; cancelledMinor: number; seatsSold: number }>[] = [
-    { key: 'date', header: 'Day', render: (r) => day(r.date) },
-    { key: 'bookings', header: 'Bookings sold', render: (r) => r.bookings },
-    { key: 'gross', header: 'Sales', render: (r) => formatMoney(r.grossMinor, 'INR') },
-    { key: 'cancelled', header: 'Later cancelled', render: (r) => formatMoney(r.cancelledMinor, 'INR') },
-    { key: 'seats', header: 'Seats sold', render: (r) => r.seatsSold },
+    { key: 'date', header: 'Day', look: 'strong', render: (r) => day(r.date) },
+    { key: 'bookings', header: 'Bookings sold', look: 'count', render: (r) => r.bookings },
+    { key: 'gross', header: 'Sales', look: 'figure', render: (r) => formatMoney(r.grossMinor, 'INR') },
+    { key: 'cancelled', header: 'Later cancelled', look: 'count', under: 'bookings', render: (r) => formatMoney(r.cancelledMinor, 'INR') },
+    { key: 'seats', header: 'Seats sold', look: 'count', under: 'bookings', render: (r) => r.seatsSold },
   ];
 
   return (
@@ -114,12 +114,12 @@ function OccupancyTab({ from, to }: { from: string; to: string }) {
   if (q.isLoading) return <PageLoader />;
   if (q.isError) return <ErrorState error={q.error} onRetry={q.refetch} />;
   const columns: Column<{ date: string; routeName: string; trips: number; totalSeats: number; soldSeats: number; occupancyPct: number; revenueMinor: number }>[] = [
-    { key: 'date', header: 'Journey day', render: (r) => day(r.date) },
-    { key: 'route', header: 'Route', render: (r) => r.routeName },
-    { key: 'trips', header: 'Buses' },
-    { key: 'sold', header: 'Seats sold', render: (r) => `${r.soldSeats} / ${r.totalSeats}` },
-    { key: 'pct', header: 'Occupancy', render: (r) => <OccBar pct={r.occupancyPct} /> },
-    { key: 'revenue', header: 'Revenue', render: (r) => formatMoney(r.revenueMinor, 'INR') },
+    { key: 'date', header: 'Journey day', look: 'strong', render: (r) => day(r.date) },
+    { key: 'route', header: 'Route', under: 'date', render: (r) => r.routeName },
+    { key: 'trips', header: 'Buses', look: 'count' },
+    { key: 'sold', header: 'Seats sold', look: 'count', render: (r) => `${r.soldSeats} / ${r.totalSeats}` },
+    { key: 'pct', header: 'Occupancy', look: 'count', under: 'sold', render: (r) => <OccBar pct={r.occupancyPct} /> },
+    { key: 'revenue', header: 'Revenue', look: 'figure', render: (r) => formatMoney(r.revenueMinor, 'INR') },
   ];
   return q.data!.series.length ? <Table columns={columns} rows={q.data!.series} /> : <EmptyState title="No data in this range" />;
 }
@@ -129,11 +129,11 @@ function RoutesTab() {
   if (q.isLoading) return <PageLoader />;
   if (q.isError) return <ErrorState error={q.error} onRetry={q.refetch} />;
   const columns: Column<{ routeId: string; routeName: string; routeCode: string; trips: number; totalCapacity: number; seatsSold: number; occupancyPct: number; revenueMinor: number }>[] = [
-    { key: 'route', header: 'Route', render: (r) => <span>{r.routeName} <span className="text-xs text-text-muted">({r.routeCode})</span></span> },
-    { key: 'trips', header: 'Trips' },
-    { key: 'sold', header: 'Seats sold', render: (r) => `${r.seatsSold} / ${r.totalCapacity}` },
-    { key: 'pct', header: 'Occupancy', render: (r) => <OccBar pct={r.occupancyPct} /> },
-    { key: 'revenue', header: 'Revenue', render: (r) => formatMoney(r.revenueMinor, 'INR') },
+    { key: 'route', header: 'Route', look: 'strong', render: (r) => <span>{r.routeName} <span className="text-xs text-text-muted">({r.routeCode})</span></span> },
+    { key: 'trips', header: 'Trips', look: 'count' },
+    { key: 'sold', header: 'Seats sold', look: 'count', render: (r) => `${r.seatsSold} / ${r.totalCapacity}` },
+    { key: 'pct', header: 'Occupancy', look: 'count', under: 'sold', render: (r) => <OccBar pct={r.occupancyPct} /> },
+    { key: 'revenue', header: 'Revenue', look: 'figure', render: (r) => formatMoney(r.revenueMinor, 'INR') },
   ];
   return (
     <>
@@ -148,9 +148,9 @@ function CancellationsTab({ from, to }: { from: string; to: string }) {
   if (q.isLoading) return <PageLoader />;
   if (q.isError) return <ErrorState error={q.error} onRetry={q.refetch} />;
   const columns: Column<{ date: string; cancelledCount: number; refundedMinor: number }>[] = [
-    { key: 'date', header: 'Day cancelled', render: (r) => day(r.date) },
-    { key: 'count', header: 'Cancellations', render: (r) => r.cancelledCount },
-    { key: 'refunded', header: 'Refunded', render: (r) => formatMoney(r.refundedMinor, 'INR') },
+    { key: 'date', header: 'Day cancelled', look: 'strong', render: (r) => day(r.date) },
+    { key: 'count', header: 'Cancellations', look: 'count', render: (r) => r.cancelledCount },
+    { key: 'refunded', header: 'Refunded', look: 'figure', render: (r) => formatMoney(r.refundedMinor, 'INR') },
   ];
   return (
     <>
@@ -187,7 +187,7 @@ function PeakHoursTab({ from, to }: { from: string; to: string }) {
 
 function OccBar({ pct }: { pct: number }) {
   return (
-    <div className="flex min-w-32 items-center gap-2">
+    <div className="flex w-24 items-center gap-2 sm:w-32">
       <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-muted"><div className={cn('h-2 rounded-full', pct >= 70 ? 'bg-success' : pct >= 40 ? 'bg-primary' : 'bg-warning')} style={{ width: `${Math.min(100, pct)}%` }} /></div>
       <span className="w-12 text-right text-xs">{pct}%</span>
     </div>

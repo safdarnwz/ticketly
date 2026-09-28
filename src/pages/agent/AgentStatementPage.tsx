@@ -37,16 +37,16 @@ export function AgentStatementPage() {
     ]);
   };
   const cols: Column<AgentLedgerRow>[] = [
-    { key: 'when', header: 'When', render: (e) => formatDateTime(e.createdAt) },
-    { key: 'kind', header: 'Entry', render: (e) => KIND[e.kind] ?? e.kind },
-    { key: 'amt', header: 'Amount', render: (e) => <span className={cn(Number(e.amountMinor) < 0 ? 'text-danger' : 'text-success')}>{Number(e.amountMinor) < 0 ? '−' : '+'}{formatMoney(Math.abs(Number(e.amountMinor)))}</span> },
-    { key: 'bal', header: 'Balance after', render: (e) => formatMoney(Number(e.balanceAfterMinor)) },
-    { key: 'ref', header: 'Reference', render: (e) => <span className="text-xs text-text-muted">{e.pnr ? `PNR ${e.pnr}` : e.reference ?? e.note ?? ''}</span> },
+    { key: 'when', header: 'When', look: 'muted', under: 'kind', render: (e) => formatDateTime(e.createdAt) },
+    { key: 'kind', header: 'Entry', look: 'strong', render: (e) => KIND[e.kind] ?? e.kind },
+    { key: 'amt', header: 'Amount', look: 'figure', render: (e) => <span className={cn(Number(e.amountMinor) < 0 ? 'text-danger' : 'text-success')}>{Number(e.amountMinor) < 0 ? '−' : '+'}{formatMoney(Math.abs(Number(e.amountMinor)))}</span> },
+    { key: 'bal', header: 'Balance after', look: 'count', under: 'amt', render: (e) => formatMoney(Number(e.balanceAfterMinor)) },
+    { key: 'ref', header: 'Reference', look: 'muted', optional: true, render: (e) => <span className="text-xs text-text-muted">{e.pnr ? `PNR ${e.pnr}` : e.reference ?? e.note ?? ''}</span> },
   ];
   const pcols: Column<AgentBookingRow>[] = [
-    { key: 'pnr', header: 'PNR', render: (b) => <span className="font-mono">{b.pnr}</span> },
-    { key: 'trip', header: 'Journey', render: (b) => `${b.routeName} · ${formatDateTime(b.departsAt)}` },
-    { key: 'c', header: 'Commission', render: (b) => formatMoney(Number(b.commissionMinor)) },
+    { key: 'pnr', header: 'PNR', look: 'key', render: (b) => <span className="font-mono">{b.pnr}</span> },
+    { key: 'trip', header: 'Journey', under: 'pnr', render: (b) => `${b.routeName} · ${formatDateTime(b.departsAt)}` },
+    { key: 'c', header: 'Commission', look: 'figure', render: (b) => formatMoney(Number(b.commissionMinor)) },
   ];
   return (
     <>

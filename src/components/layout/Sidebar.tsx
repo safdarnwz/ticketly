@@ -13,7 +13,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { nav, kind } = useConsoleNav();
   return (
     <>
-      <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-border px-5">
+      <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-border px-4">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-fg">
           <Bus className="h-5 w-5" />
         </div>
@@ -24,7 +24,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           )}
         </div>
       </div>
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3" aria-label="Console">
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2" aria-label="Console">
         {nav.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
@@ -33,7 +33,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             onClick={onNavigate}
             className={({ isActive }) =>
               cn(
-                'group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                'group relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
                 isActive
                   ? 'bg-surface-muted text-text'
                   : 'text-text-muted hover:bg-surface-muted hover:text-text',
@@ -61,7 +61,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export function Sidebar() {
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface text-text-muted md:flex">
+    <aside className="hidden w-52 shrink-0 flex-col border-r border-border bg-surface text-text-muted md:flex">
       <SidebarContent />
     </aside>
   );

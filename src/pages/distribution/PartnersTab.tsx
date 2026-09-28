@@ -21,8 +21,8 @@ export function PartnersTab() {
   });
   const pctBad = pct === '' || !(Number(pct) >= 0 && Number(pct) <= 30);
   const cols: Column<OtaPartner>[] = [
-    { key: 'name', header: 'Partner', render: (p) => <div><div className="font-medium">{p.name}</div><div className="text-xs text-text-muted">{p.kind} · {p.code}</div></div> },
-    { key: 'pct', header: 'Commission you give', render: (p) => p.commissionPct != null ? `${Number(p.commissionPct)}%` : <span className="text-text-muted">default {Number(p.defaultCommissionPct)}%</span> },
+    { key: 'name', header: 'Partner', look: 'strong', render: (p) => <div><div className="font-medium">{p.name}</div><div className="text-xs text-text-muted">{p.kind} · {p.code}</div></div> },
+    { key: 'pct', header: 'Commission you give', look: 'figure', render: (p) => p.commissionPct != null ? `${Number(p.commissionPct)}%` : <span className="text-text-muted">default {Number(p.defaultCommissionPct)}%</span> },
     { key: 'status', header: 'Selling', render: (p) => <Badge tone={p.status === 'active' ? 'success' : 'neutral'}>{p.status === 'active' ? 'On' : p.status === 'paused' ? 'Paused' : 'Not started'}</Badge> },
     { key: 'act', header: '', render: (p) => (
       <div className="flex gap-2">
@@ -60,10 +60,10 @@ export function ApiKeysTab() {
     onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
   });
   const cols: Column<ApiKey>[] = [
-    { key: 'name', header: 'Name', render: (k) => <div><div className="font-medium">{k.name}</div><div className="font-mono text-xs text-text-muted">gds_{k.prefix}_…</div></div> },
+    { key: 'name', header: 'Name', look: 'strong', render: (k) => <div><div className="font-medium">{k.name}</div><div className="font-mono text-xs text-text-muted">gds_{k.prefix}_…</div></div> },
     { key: 'scopes', header: 'Can', render: (k) => <div className="flex flex-wrap gap-1">{k.scopes.map((s) => <Badge key={s}>{s}</Badge>)}</div> },
-    { key: 'ips', header: 'From', render: (k) => <span className="text-xs">{k.ipAllowlist.length ? k.ipAllowlist.join(', ') : 'Any IP'}</span> },
-    { key: 'exp', header: 'Expires', render: (k) => <span className="text-xs text-text-muted">{k.expiresAt ? formatDateTime(k.expiresAt) : 'Never'}</span> },
+    { key: 'ips', header: 'From', look: 'muted', under: 'scopes', render: (k) => <span className="text-xs">{k.ipAllowlist.length ? k.ipAllowlist.join(', ') : 'Any IP'}</span> },
+    { key: 'exp', header: 'Expires', look: 'muted', under: 'name', render: (k) => <span className="text-xs text-text-muted">{k.expiresAt ? formatDateTime(k.expiresAt) : 'Never'}</span> },
     { key: 'act', header: '', render: (k) => <Button size="sm" variant="ghost" className="text-danger" leftIcon={<Trash2 className="h-3.5 w-3.5" />} disabled={revoke.isPending} onClick={() => { if (window.confirm(`Revoke "${k.name}"? Anything using it stops working.`)) revoke.mutate(k); }}>Revoke</Button> },
   ];
   return (

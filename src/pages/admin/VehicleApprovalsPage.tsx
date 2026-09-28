@@ -28,11 +28,11 @@ export function VehicleApprovalsPage() {
   const [open, setOpen] = useState<VehicleQueueRow | null>(null);
   const q = useQuery({ queryKey: ['admin-vehicles', filter, search], queryFn: () => platformAdminApi.vehicles(filter || undefined, search.trim() || undefined) });
   const columns: Column<VehicleQueueRow>[] = [
-    { key: 'reg', header: 'Bus', render: (r) => <span><b className="font-mono">{r.registrationNo}</b> <span className="text-text-muted">{[r.make, r.model, r.manufactureYear].filter(Boolean).join(' ')}</span></span> },
-    { key: 'op', header: 'Operator', render: (r) => r.operatorName },
+    { key: 'reg', header: 'Bus', look: 'key', render: (r) => <span><b className="font-mono">{r.registrationNo}</b> <span className="text-text-muted">{[r.make, r.model, r.manufactureYear].filter(Boolean).join(' ')}</span></span> },
+    { key: 'op', header: 'Operator', under: 'reg', render: (r) => r.operatorName },
     { key: 'st', header: 'Review', render: (r) => <Badge tone={statusTone(r.verificationStatus)}>{r.verificationStatus}</Badge> },
     { key: 'docs', header: 'Documents to check', render: (r) => (r.pendingDocuments ? <Badge tone="warning">{r.pendingDocuments}</Badge> : <span className="text-text-muted">—</span>) },
-    { key: 'at', header: 'Submitted', render: (r) => (r.submittedAt ? formatDateTime(r.submittedAt) : '—') },
+    { key: 'at', header: 'Submitted', look: 'muted', under: 'st', render: (r) => (r.submittedAt ? formatDateTime(r.submittedAt) : '—') },
     { key: 'a', header: '', render: (r) => <Button size="sm" variant="outline" onClick={() => setOpen(r)}>Review</Button> },
   ];
   return (

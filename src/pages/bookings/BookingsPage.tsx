@@ -121,27 +121,40 @@ export function BookingsPage() {
   };
 
   const columns: Column<StaffBookingRow>[] = [
-    { key: 'pnr', header: 'PNR', render: (b) => <span className="font-mono font-semibold">{b.pnr}</span> },
-    { key: 'at', header: 'Booked', render: (b) => <span className="whitespace-nowrap text-text-muted">{dt(b.createdAt)}</span> },
+    {
+      key: 'pnr', header: 'PNR', look: 'key', render: (b) => (
+        <div>
+          <div className="whitespace-nowrap font-mono">{b.pnr}</div>
+          <div className="text-xs font-normal text-text-muted">Seat {b.seats.join(', ') || '—'}</div>
+        </div>
+      ),
+    },
     {
       key: 'pax', header: 'Passenger', render: (b) => (
-        <div>
-          <div>{b.leadPassenger ?? '—'}{b.seatCount > 1 && <span className="text-text-muted"> +{b.seatCount - 1}</span>}</div>
-          <div className="text-xs text-text-muted">Seat {b.seats.join(', ') || '—'}</div>
+        <div className="min-w-0">
+          <div className="font-medium">{b.leadPassenger ?? '—'}{b.seatCount > 1 && <span className="font-normal text-text-muted"> +{b.seatCount - 1}</span>}</div>
+          {b.contactPhone && <a className="block whitespace-nowrap text-xs text-primary hover:underline" href={`tel:${b.contactPhone}`} onClick={(e) => e.stopPropagation()}>{b.contactPhone}</a>}
+          {b.contactEmail && <div className="text-xs text-text-muted [overflow-wrap:anywhere]">{b.contactEmail}</div>}
         </div>
       ),
     },
     {
       key: 'journey', header: 'Journey', render: (b) => (
-        <div className="min-w-40">
+        <div className="min-w-0">
           <div>{b.fromName ?? '—'} → {b.toName ?? '—'}</div>
           <div className="text-xs text-text-muted">{b.journeyDate} · {formatTime(b.departsAt)}</div>
         </div>
       ),
     },
-    { key: 'contact', header: 'Contact', render: (b) => <span className="whitespace-nowrap text-xs">{b.contactPhone ? <a className="text-primary hover:underline" href={`tel:${b.contactPhone}`} onClick={(e) => e.stopPropagation()}>{b.contactPhone}</a> : '—'}{b.contactEmail && <><br /><span className="text-text-muted">{b.contactEmail}</span></>}</span> },
-    { key: 'channel', header: 'Channel', render: (b) => <span className="whitespace-nowrap text-text-muted">{CHANNEL_LABEL[b.channel] ?? b.channel}{b.agentName ? <><br /><span className="text-xs">{b.agentName}</span></> : null}</span> },
-    { key: 'amount', header: 'Amount', render: (b) => formatMoney(b.liveHold || b.status === 'expired' ? b.totalMinor : b.paidMinor), className: 'text-right whitespace-nowrap' },
+    {
+      key: 'channel', header: 'Channel', under: 'status', render: (b) => (
+        <div>
+          <div className="whitespace-nowrap">{CHANNEL_LABEL[b.channel] ?? b.channel}{b.agentName ? <span className="text-text-muted"> · {b.agentName}</span> : null}</div>
+          <div className="whitespace-nowrap text-xs text-text-muted">{dt(b.createdAt)}</div>
+        </div>
+      ),
+    },
+    { key: 'amount', header: 'Amount', look: 'figure', render: (b) => formatMoney(b.liveHold || b.status === 'expired' ? b.totalMinor : b.paidMinor), className: 'text-right whitespace-nowrap' },
     { key: 'status', header: 'Status', render: (b) => <div className="flex flex-col items-start gap-1"><Badge tone={b.liveHold ? 'warning' : statusTone(b.status)}>{b.liveHold ? 'paying now' : b.status === 'completed' ? 'travelled' : b.status}</Badge>{b.noShowSeats?.length ? <Badge tone="danger">no-show: {b.noShowSeats.join(', ')}</Badge> : null}</div> },
   ];
 

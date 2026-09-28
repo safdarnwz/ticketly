@@ -80,9 +80,9 @@ function PlansTab() {
   const [ruleTried, setRuleTried] = useState(false);
   const seatFareError = seatOverride.fareMinor < 100 ? 'At least ₹1' : seatOverride.fareMinor > 10_000_000 ? 'At most ₹1,00,000' : undefined;
   const columns: Column<FarePlan>[] = [
-    { key: 'name', header: 'Plan', render: (r) => <span className="font-medium text-text">{r.name}</span> },
-    { key: 'route', header: 'Route', render: (r) => <span className="text-text-muted">{routes.data?.items.find((x) => x.id === r.routeId)?.name ?? '—'}</span> },
-    { key: 'currency', header: 'Currency', render: (r) => r.currency },
+    { key: 'name', header: 'Plan', look: 'strong', render: (r) => <span className="font-medium text-text">{r.name}</span> },
+    { key: 'route', header: 'Route', under: 'name', render: (r) => <span className="text-text-muted">{routes.data?.items.find((x) => x.id === r.routeId)?.name ?? '—'}</span> },
+    { key: 'currency', header: 'Currency', look: 'muted', under: 'status', render: (r) => r.currency },
     { key: 'status', header: 'Status', render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge> },
     {
       key: 'actions', header: '', render: (r) => (
@@ -257,8 +257,8 @@ function PoliciesTab() {
   const removeStep = (key: 'occupancy' | 'advance', i: number) => setForm((f) => ({ ...f, [key]: f[key].filter((_, j) => j !== i) }));
 
   const columns: Column<PricingPolicy>[] = [
-    { key: 'name', header: 'Policy', render: (r) => <span className="font-medium text-text">{r.name}</span> },
-    { key: 'scope', header: 'Applies to', render: (r) => scopeName(r) },
+    { key: 'name', header: 'Policy', look: 'strong', render: (r) => <span className="font-medium text-text">{r.name}</span> },
+    { key: 'scope', header: 'Applies to', under: 'name', render: (r) => scopeName(r) },
     { key: 'ladder', header: 'Price changes', render: (r) => <ul className="text-xs text-text-muted">{ladderSummary(r.ladder).map((l) => <li key={l}>{l}</li>)}</ul> },
     { key: 'status', header: 'Status', render: (r) => <Badge tone={r.isActive ? 'success' : 'neutral'}>{r.isActive ? 'Active' : 'Off'}</Badge> },
     { key: 'actions', header: '', render: (r) => r.isActive ? <div className="flex justify-end"><Button size="sm" variant="ghost" className="text-danger" onClick={() => setStopping(r)}>Switch off</Button></div> : null },
@@ -395,9 +395,9 @@ function CouponsTab() {
   const expired = (c: Coupon) => !!c.validTo && Date.parse(c.validTo) < Date.now();
   const usedUp = (c: Coupon) => c.maxRedemptions != null && c.usageCount >= c.maxRedemptions;
   const columns: Column<Coupon>[] = [
-    { key: 'code', header: 'Code', render: (r) => <div><div className="font-mono text-sm font-semibold text-text">{r.code}</div>{r.description && <div className="text-xs text-text-muted">{r.description}</div>}</div> },
+    { key: 'code', header: 'Code', look: 'key', render: (r) => <div><div className="font-mono text-sm font-semibold text-text">{r.code}</div>{r.description && <div className="text-xs text-text-muted">{r.description}</div>}</div> },
     {
-      key: 'value', header: 'Discount', render: (r) => (
+      key: 'value', header: 'Discount', look: 'figure', render: (r) => (
         <div>
           <div className="font-medium text-text">{r.kind === 'percent' ? `${r.value}% off` : `${formatMoney(Number(r.value), 'INR')} off`}</div>
           <div className="text-xs text-text-muted">
@@ -406,9 +406,9 @@ function CouponsTab() {
         </div>
       ),
     },
-    { key: 'usage', header: 'Used', render: (r) => <span>{r.usageCount}{r.maxRedemptions ? ` / ${r.maxRedemptions}` : ' (no limit)'}{r.perUserLimit ? <span className="block text-xs text-text-muted">{r.perUserLimit}× per customer</span> : null}</span> },
-    { key: 'valid', header: 'Valid till', render: (r) => r.validTo ? <span className={expired(r) ? 'text-danger' : ''}>{formatDateLabel(localDateOf(r.validTo), { day: '2-digit', month: 'short', year: 'numeric' })}</span> : <span className="text-text-muted">No end date</span> },
-    { key: 'flags', header: 'Flags', render: (r) => <div className="flex gap-1">{r.firstBookingOnly && <Badge>First booking</Badge>}</div> },
+    { key: 'usage', header: 'Used', look: 'count', under: 'value', render: (r) => <span>{r.usageCount}{r.maxRedemptions ? ` / ${r.maxRedemptions}` : ' (no limit)'}{r.perUserLimit ? <span className="block text-xs text-text-muted">{r.perUserLimit}× per customer</span> : null}</span> },
+    { key: 'valid', header: 'Valid till', look: 'muted', under: 'status', render: (r) => r.validTo ? <span className={expired(r) ? 'text-danger' : ''}>{formatDateLabel(localDateOf(r.validTo), { day: '2-digit', month: 'short', year: 'numeric' })}</span> : <span className="text-text-muted">No end date</span> },
+    { key: 'flags', header: 'Flags', under: 'code', render: (r) => <div className="flex gap-1">{r.firstBookingOnly && <Badge>First booking</Badge>}</div> },
     {
       key: 'status', header: 'Status', render: (r) => {
         const [tone, label] = r.isActive === false ? ['neutral', 'Off'] : expired(r) ? ['danger', 'Expired'] : usedUp(r) ? ['warning', 'Used up'] : ['success', 'Active'];

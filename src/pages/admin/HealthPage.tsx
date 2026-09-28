@@ -26,28 +26,28 @@ export function HealthPage() {
   const ranking = useQuery({ queryKey: ['health-ranking', from, to, sortBy], queryFn: () => platformAdminApi.ranking(from, to, sortBy), enabled: !bad });
 
   const payCols: Column<PaymentHealthRow>[] = [
-    { key: 'g', header: 'Gateway', render: (r) => <b>{r.gateway}</b> },
-    { key: 'a', header: 'Attempts', render: (r) => r.attempts.toLocaleString('en-IN') },
-    { key: 'c', header: 'Paid', render: (r) => r.captured.toLocaleString('en-IN') },
-    { key: 'f', header: 'Failed', render: (r) => r.failed.toLocaleString('en-IN') },
-    { key: 'x', header: 'Abandoned', render: (r) => r.abandoned.toLocaleString('en-IN') },
-    { key: 's', header: 'Success', render: (r) => <b className={tone(r.successRate)}>{pct(r.successRate)}</b> },
+    { key: 'g', header: 'Gateway', look: 'strong', render: (r) => <b>{r.gateway}</b> },
+    { key: 'a', header: 'Attempts', look: 'count', render: (r) => r.attempts.toLocaleString('en-IN') },
+    { key: 'c', header: 'Paid', look: 'count', render: (r) => r.captured.toLocaleString('en-IN') },
+    { key: 'f', header: 'Failed', look: 'count', render: (r) => r.failed.toLocaleString('en-IN') },
+    { key: 'x', header: 'Abandoned', look: 'count', under: 'f', render: (r) => r.abandoned.toLocaleString('en-IN') },
+    { key: 's', header: 'Success', look: 'figure', render: (r) => <b className={tone(r.successRate)}>{pct(r.successRate)}</b> },
   ];
   const msgCols: Column<MessageHealthRow>[] = [
-    { key: 'c', header: 'Channel', render: (r) => <b>{r.channel}</b> },
-    { key: 'p', header: 'Provider', render: (r) => r.provider },
-    { key: 't', header: 'Sent', render: (r) => `${r.sent.toLocaleString('en-IN')} / ${r.total.toLocaleString('en-IN')}` },
-    { key: 'f', header: 'Failed', render: (r) => r.failed.toLocaleString('en-IN') },
-    { key: 'q', header: 'Waiting', render: (r) => r.pending.toLocaleString('en-IN') },
-    { key: 's', header: 'Delivered', render: (r) => <b className={tone(r.successRate)}>{pct(r.successRate)}</b> },
+    { key: 'c', header: 'Channel', look: 'strong', render: (r) => <b>{r.channel}</b> },
+    { key: 'p', header: 'Provider', under: 'c', render: (r) => r.provider },
+    { key: 't', header: 'Sent', look: 'count', render: (r) => `${r.sent.toLocaleString('en-IN')} / ${r.total.toLocaleString('en-IN')}` },
+    { key: 'f', header: 'Failed', look: 'count', render: (r) => r.failed.toLocaleString('en-IN') },
+    { key: 'q', header: 'Waiting', look: 'count', under: 'f', render: (r) => r.pending.toLocaleString('en-IN') },
+    { key: 's', header: 'Delivered', look: 'figure', render: (r) => <b className={tone(r.successRate)}>{pct(r.successRate)}</b> },
   ];
   const rankCols: Column<RankingRow>[] = [
-    { key: 'r', header: '#', render: (r) => r.rank },
-    { key: 'n', header: 'Operator', render: (r) => <b>{r.displayName}</b> },
-    { key: 'rev', header: 'Revenue', render: (r) => formatMoney(r.revenueMinor) },
-    { key: 'b', header: 'Bookings', render: (r) => r.bookings.toLocaleString('en-IN') },
-    { key: 's', header: 'Seats', render: (r) => r.seats.toLocaleString('en-IN') },
-    { key: 'c', header: 'Cancelled', render: (r) => `${r.cancelled} (${pct(r.cancellationRate)})` },
+    { key: 'r', header: '#', look: 'muted', render: (r) => r.rank },
+    { key: 'n', header: 'Operator', look: 'strong', render: (r) => <b>{r.displayName}</b> },
+    { key: 'rev', header: 'Revenue', look: 'figure', render: (r) => formatMoney(r.revenueMinor) },
+    { key: 'b', header: 'Bookings', look: 'count', render: (r) => r.bookings.toLocaleString('en-IN') },
+    { key: 's', header: 'Seats', look: 'count', under: 'b', render: (r) => r.seats.toLocaleString('en-IN') },
+    { key: 'c', header: 'Cancelled', look: 'count', render: (r) => `${r.cancelled} (${pct(r.cancellationRate)})` },
   ];
   const totalPay = (payments.data?.items ?? []).reduce((a, r) => ({ attempts: a.attempts + r.attempts, captured: a.captured + r.captured }), { attempts: 0, captured: 0 });
 

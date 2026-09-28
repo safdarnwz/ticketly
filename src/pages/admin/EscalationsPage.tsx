@@ -34,11 +34,11 @@ export function EscalationsPage() {
   const list = useQuery({ queryKey: ['escalations', view.key], queryFn: () => escalationsApi.list(view.key), placeholderData: keepPreviousData, refetchInterval: 60_000 });
   const rows = list.data?.items ?? [];
   const columns: Column<Escalation>[] = [
-    { key: 'op', header: 'Operator', render: (e) => <span className="font-medium text-text">{e.operatorName}</span> },
-    { key: 'subject', header: 'Ticket', render: (e) => <div><div className="text-text">{e.subject}</div><div className="text-xs capitalize text-text-muted">{e.category}{e.pnr ? <> · <span className="font-mono normal-case">{e.pnr}</span></> : ''}{e.escalatedByName ? ` · by ${e.escalatedByName}` : ''}</div></div> },
-    { key: 'priority', header: 'Priority', render: (e) => <Badge tone={PRIORITY_TONE[e.priority]}>{e.priority}</Badge> },
+    { key: 'op', header: 'Operator', under: 'subject', render: (e) => <span className="font-medium text-text">{e.operatorName}</span> },
+    { key: 'subject', header: 'Ticket', look: 'strong', render: (e) => <div><div className="text-text">{e.subject}</div><div className="text-xs capitalize text-text-muted">{e.category}{e.pnr ? <> · <span className="font-mono normal-case">{e.pnr}</span></> : ''}{e.escalatedByName ? ` · by ${e.escalatedByName}` : ''}</div></div> },
+    { key: 'priority', header: 'Priority', under: 'state', render: (e) => <Badge tone={PRIORITY_TONE[e.priority]}>{e.priority}</Badge> },
     { key: 'state', header: 'State', render: (e) => <Badge tone={TONE[e.escalationStatus][0]}>{TONE[e.escalationStatus][1]}</Badge> },
-    { key: 'age', header: 'Escalated', render: (e) => <span className="text-xs text-text-muted" title={formatDateTime(e.escalatedAt)}>{age(e.escalatedAt)} ago{e.lastAuthor === 'escalation' && e.escalationStatus === 'open' ? ' · operator wrote last' : ''}</span> },
+    { key: 'age', header: 'Escalated', look: 'muted', under: 'state', render: (e) => <span className="text-xs text-text-muted" title={formatDateTime(e.escalatedAt)}>{age(e.escalatedAt)} ago{e.lastAuthor === 'escalation' && e.escalationStatus === 'open' ? ' · operator wrote last' : ''}</span> },
   ];
   return (
     <>

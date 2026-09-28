@@ -92,10 +92,10 @@ export function RefundsPage() {
       key: 'pick', header: '', render: (r: RefundQueueRow) => r.status === 'failed' && r.destination === 'source'
         ? <input type="checkbox" aria-label={`Select ${r.pnr}`} checked={picked.has(r.id)} disabled={bulkRunning} onChange={() => togglePick(r.id)} onClick={(e) => e.stopPropagation()} /> : null,
     }] : []),
-    { key: 'pnr', header: 'Booking', render: (r) => <div><Link to={`/bookings/${r.pnr}`} className="font-mono font-semibold text-primary hover:underline" onClick={(e) => e.stopPropagation()}>{r.pnr}</Link>{r.contactPhone && <div className="text-xs text-text-muted">{r.contactPhone}</div>}</div> },
-    { key: 'amount', header: 'Amount', render: (r) => <span className="font-semibold">{formatMoney(r.amountMinor, r.currency)}</span> },
+    { key: 'pnr', header: 'Booking', look: 'key', render: (r) => <div><Link to={`/bookings/${r.pnr}`} className="font-mono font-semibold text-primary hover:underline" onClick={(e) => e.stopPropagation()}>{r.pnr}</Link>{r.contactPhone && <div className="text-xs text-text-muted">{r.contactPhone}</div>}</div> },
+    { key: 'amount', header: 'Amount', look: 'figure', render: (r) => <span className="font-semibold">{formatMoney(r.amountMinor, r.currency)}</span> },
     {
-      key: 'to', header: 'To', render: (r) => r.destination === 'alternate_account'
+      key: 'to', header: 'To', under: 'amount', render: (r) => r.destination === 'alternate_account'
         ? <div className="text-sm"><div>{r.accountHolder}</div><div className="text-xs text-text-muted">{r.bankName ?? 'Bank'} {r.accountMasked} · {r.ifsc}</div></div>
         : <span className="text-sm text-text-muted">Original payment</span>,
     },
@@ -111,7 +111,7 @@ export function RefundsPage() {
         );
       },
     },
-    { key: 'when', header: 'Raised', render: (r) => <span className="text-xs text-text-muted">{formatDateTime(r.createdAt)}</span> },
+    { key: 'when', header: 'Raised', look: 'muted', under: 'status', render: (r) => <span className="text-xs text-text-muted">{formatDateTime(r.createdAt)}</span> },
     {
       key: 'actions', header: '', render: (r) => (
         <div className="flex justify-end gap-2">

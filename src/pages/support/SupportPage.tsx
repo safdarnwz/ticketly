@@ -71,17 +71,17 @@ export function SupportPage() {
 
   const columns: Column<Ticket>[] = [
     {
-      key: 'subject', header: 'Ticket', render: (t) => (
+      key: 'subject', header: 'Ticket', look: 'strong', render: (t) => (
         <div>
           <div className="font-medium text-text">{t.subject}</div>
           <div className="text-xs capitalize text-text-muted">{t.category}{t.pnr ? <> · <span className="font-mono normal-case">{t.pnr}</span></> : ''}{t.customerName ? ` · ${t.customerName}` : ''}</div>
         </div>
       ),
     },
-    { key: 'priority', header: 'Priority', render: (t) => <Badge tone={PRIORITY_TONE[t.priority]}>{t.priority}</Badge> },
+    { key: 'priority', header: 'Priority', under: 'status', render: (t) => <Badge tone={PRIORITY_TONE[t.priority]}>{t.priority}</Badge> },
     { key: 'status', header: 'Status', render: (t) => <div className="flex flex-col items-start gap-1"><Badge tone={STATUS[t.status][1]}>{STATUS[t.status][0]}</Badge>{t.escalationStatus && <Badge tone={ESCALATION[t.escalationStatus][1]}>{ESCALATION[t.escalationStatus][0]}</Badge>}</div> },
-    { key: 'owner', header: 'Assigned', render: (t) => <span className={cn('text-sm', !t.assignedName && 'text-text-muted')}>{t.assignedName ?? 'Nobody'}</span> },
-    { key: 'age', header: 'Waiting', render: (t) => <span className="text-xs text-text-muted" title={formatDateTime(t.createdAt)}>{t.status === 'open' || t.status === 'pending' ? age(t.lastMessageAt ?? t.createdAt) : '—'}{t.lastAuthor === 'customer' && t.status === 'open' ? ' · customer wrote last' : ''}</span> },
+    { key: 'owner', header: 'Assigned', look: 'muted', under: 'subject', render: (t) => <span className={cn('text-sm', !t.assignedName && 'text-text-muted')}>{t.assignedName ?? 'Nobody'}</span> },
+    { key: 'age', header: 'Waiting', look: 'muted', under: 'status', render: (t) => <span className="text-xs text-text-muted" title={formatDateTime(t.createdAt)}>{t.status === 'open' || t.status === 'pending' ? age(t.lastMessageAt ?? t.createdAt) : '—'}{t.lastAuthor === 'customer' && t.status === 'open' ? ' · customer wrote last' : ''}</span> },
   ];
 
   return (

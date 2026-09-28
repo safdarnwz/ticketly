@@ -32,19 +32,19 @@ export function BillingPage() {
     onError: (e) => toast.error(errText(e, 'Could not revoke')),
   });
   const invCols: Column<PlatformInvoice>[] = [
-    { key: 'no', header: 'Invoice', render: (r) => <span className="font-mono">{r.invoiceNumber}</span> },
-    { key: 'op', header: 'Operator', render: (r) => name(r.tenantId) },
-    { key: 'p', header: 'Period', render: (r) => `${r.periodFrom} → ${r.periodTo}` },
-    { key: 'd', header: 'Discount', render: (r) => (r.discountMinor ? formatMoney(r.discountMinor, r.currency) : '—') },
-    { key: 'g', header: 'GST', render: (r) => formatMoney(r.gstMinor, r.currency) },
-    { key: 't', header: 'Total', render: (r) => <b>{formatMoney(r.totalMinor, r.currency)}</b> },
+    { key: 'no', header: 'Invoice', look: 'key', render: (r) => <span className="font-mono">{r.invoiceNumber}</span> },
+    { key: 'op', header: 'Operator', under: 'no', render: (r) => name(r.tenantId) },
+    { key: 'p', header: 'Period', look: 'muted', under: 'no', render: (r) => `${r.periodFrom} → ${r.periodTo}` },
+    { key: 'd', header: 'Discount', look: 'count', under: 't', render: (r) => (r.discountMinor ? formatMoney(r.discountMinor, r.currency) : '—') },
+    { key: 'g', header: 'GST', look: 'count', under: 't', render: (r) => formatMoney(r.gstMinor, r.currency) },
+    { key: 't', header: 'Total', look: 'figure', render: (r) => <b>{formatMoney(r.totalMinor, r.currency)}</b> },
     { key: 'a', header: '', render: (r) => <Button size="sm" variant="ghost" onClick={() => setViewing(r.id)}>View</Button> },
   ];
   const discCols: Column<PlatformDiscount>[] = [
-    { key: 'op', header: 'For', render: (r) => name(r.tenantId) },
-    { key: 'v', header: 'Discount', render: (r) => (r.kind === 'percent' ? `${r.value}%` : formatMoney(Math.round(r.value))) },
-    { key: 'w', header: 'Valid', render: (r) => `${r.validFrom} → ${r.validTo ?? 'open-ended'}` },
-    { key: 'r', header: 'Reason', render: (r) => <span className="text-text-muted">{r.reason}</span> },
+    { key: 'op', header: 'For', look: 'strong', render: (r) => name(r.tenantId) },
+    { key: 'v', header: 'Discount', look: 'figure', render: (r) => (r.kind === 'percent' ? `${r.value}%` : formatMoney(Math.round(r.value))) },
+    { key: 'w', header: 'Valid', look: 'muted', under: 'v', render: (r) => `${r.validFrom} → ${r.validTo ?? 'open-ended'}` },
+    { key: 'r', header: 'Reason', look: 'note', under: 'op', render: (r) => <span className="text-text-muted">{r.reason}</span> },
     { key: 's', header: '', render: (r) => (r.revokedAt ? <Badge tone="neutral">revoked</Badge> : <Button size="sm" variant="ghost" loading={revoke.isPending && revoke.variables === r.id} disabled={revoke.isPending} onClick={() => { if (window.confirm('Revoke this discount?')) revoke.mutate(r.id); }}>Revoke</Button>) },
   ];
   return (

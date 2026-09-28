@@ -27,9 +27,9 @@ export function AddOnsPage() {
     onError: (x) => toast.error(errText(x, 'Could not change it')),
   });
   const cols: Column<AddOn>[] = [
-    { key: 'n', header: 'Add-on', render: (a) => <span><b>{a.name}</b> <span className="font-mono text-xs text-text-muted">{a.code}</span></span> },
-    { key: 'k', header: 'Kind', render: (a) => KINDS.find((k) => k.value === a.kind)?.label ?? a.kind },
-    { key: 'p', header: 'Price', render: (a) => `${formatMoney(a.priceMinor)} ${a.perPassenger ? 'per passenger' : 'per piece'}` },
+    { key: 'n', header: 'Add-on', look: 'strong', render: (a) => <span><b>{a.name}</b> <span className="font-mono text-xs text-text-muted">{a.code}</span></span> },
+    { key: 'k', header: 'Kind', under: 'n', render: (a) => KINDS.find((k) => k.value === a.kind)?.label ?? a.kind },
+    { key: 'p', header: 'Price', look: 'figure', render: (a) => `${formatMoney(a.priceMinor)} ${a.perPassenger ? 'per passenger' : 'per piece'}` },
     { key: 's', header: 'Status', render: (a) => <Badge tone={a.active ? 'success' : 'neutral'}>{a.active ? 'on sale' : 'stopped'}</Badge> },
     { key: 'x', header: '', render: (a) => (
       <div className="flex justify-end gap-1">

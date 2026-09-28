@@ -65,13 +65,13 @@ function OnTheRoad() {
   const q = useQuery({ queryKey: ['on-the-road'], queryFn: operationsApi.onTheRoad, refetchInterval: 30_000 });
   const now = Date.now();
   const columns: Column<BusOnRoad>[] = [
-    { key: 'bus', header: 'Bus', render: (r) => <div><Link className="font-medium text-primary hover:underline" to={`/trips/${r.tripId}`}>{r.routeName}</Link><div className="font-mono text-xs text-text-muted">{r.bus ?? 'no bus assigned'} · left {formatTime(r.departsAt)}</div></div> },
+    { key: 'bus', header: 'Bus', look: 'key', render: (r) => <div><Link className="font-medium text-primary hover:underline" to={`/trips/${r.tripId}`}>{r.routeName}</Link><div className="font-mono text-xs text-text-muted">{r.bus ?? 'no bus assigned'} · left {formatTime(r.departsAt)}</div></div> },
     { key: 'where', header: 'Where', render: (r) => r.lat == null || r.lng == null ? <span className="text-text-muted">No GPS yet</span>
       : <a className="text-primary" href={`https://www.google.com/maps?q=${r.lat},${r.lng}`} target="_blank" rel="noreferrer">{Number(r.lat).toFixed(4)}, {Number(r.lng).toFixed(4)}</a> },
-    { key: 'speed', header: 'Speed', render: (r) => (r.speedKmph == null ? '—' : `${Math.round(Number(r.speedKmph))} km/h`) },
+    { key: 'speed', header: 'Speed', look: 'count', under: 'where', render: (r) => (r.speedKmph == null ? '—' : `${Math.round(Number(r.speedKmph))} km/h`) },
     { key: 'next', header: 'Next stop', render: (r) => r.nextStop ? <span>{r.nextStop}{r.nextStopEtaAt ? <span className="text-text-muted"> · {formatTime(r.nextStopEtaAt)}</span> : null}</span> : '—' },
-    { key: 'late', header: 'Running', render: (r) => { const d = Number(r.delayMinutes); return d > 0 && d < 1440 ? <Badge tone="warning">{d} min late</Badge> : d < -5 && d > -1440 ? <Badge tone="success">{-d} min early</Badge> : <span className="text-text-muted">on time</span>; } },
-    { key: 'ping', header: 'Signal', render: (r) => !r.lastPingAt ? <Badge tone="danger">none</Badge>
+    { key: 'late', header: 'Running', under: 'next', render: (r) => { const d = Number(r.delayMinutes); return d > 0 && d < 1440 ? <Badge tone="warning">{d} min late</Badge> : d < -5 && d > -1440 ? <Badge tone="success">{-d} min early</Badge> : <span className="text-text-muted">on time</span>; } },
+    { key: 'ping', header: 'Signal', look: 'muted', render: (r) => !r.lastPingAt ? <Badge tone="danger">none</Badge>
       : now - new Date(r.lastPingAt).getTime() > SIGNAL_LOST_MS ? <Badge tone="danger">lost · {formatTime(r.lastPingAt)}</Badge>
         : <span className="text-xs text-text-muted">{formatTime(r.lastPingAt)}</span> },
   ];
@@ -110,7 +110,7 @@ function Incidents() {
     onError: (e) => toast.error(errText(e, 'Could not update')),
   });
   const columns: Column<Incident>[] = [
-    { key: 'what', header: 'Incident', render: (r) => (
+    { key: 'what', header: 'Incident', look: 'strong', render: (r) => (
       <div className="max-w-md">
         <div className="flex flex-wrap items-center gap-2"><Badge tone={SEVERITY_TONE[r.severity]}>{r.severity}</Badge><span className="font-medium text-text">{typeLabel(r.type)}</span>
           {r.overdue && <span className="flex items-center gap-1 text-xs text-danger"><AlertTriangle className="h-3 w-3" /> not acknowledged in time</span>}</div>
@@ -120,8 +120,8 @@ function Incidents() {
         {r.resolution_note && <p className="mt-1 text-xs text-success">Resolved: {r.resolution_note}</p>}
       </div>
     ) },
-    { key: 'trip', header: 'Trip', render: (r) => <span className="text-text-muted">{r.trip_label ?? '—'}</span> },
-    { key: 'when', header: 'Reported', render: (r) => <div className="text-sm">{formatDateTime(r.created_at)}<div className="text-xs text-text-muted">{r.reported_by_name ?? ''}</div></div> },
+    { key: 'trip', header: 'Trip', under: 'what', render: (r) => <span className="text-text-muted">{r.trip_label ?? '—'}</span> },
+    { key: 'when', header: 'Reported', look: 'muted', under: 'status', render: (r) => <div className="text-sm">{formatDateTime(r.created_at)}<div className="text-xs text-text-muted">{r.reported_by_name ?? ''}</div></div> },
     { key: 'status', header: 'Status', render: (r) => <Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge> },
     { key: 'act', header: '', render: (r) => (
       <div className="flex justify-end gap-1">
@@ -242,9 +242,9 @@ function LostFound() {
   });
   const now = Date.now();
   const columns: Column<LostItem>[] = [
-    { key: 'item', header: 'Item', render: (r) => <div><div className="font-medium text-text">{r.description}</div><div className="text-xs text-text-muted">{[r.seat_number && `seat ${r.seat_number}`, r.stored_at && `kept at ${r.stored_at}`].filter(Boolean).join(' · ') || '—'}</div></div> },
-    { key: 'trip', header: 'Found on', render: (r) => <span className="text-text-muted">{r.trip_label ?? 'Not tied to a trip'}</span> },
-    { key: 'when', header: 'Found', render: (r) => formatDateTime(r.found_at) },
+    { key: 'item', header: 'Item', look: 'strong', render: (r) => <div><div className="font-medium text-text">{r.description}</div><div className="text-xs text-text-muted">{[r.seat_number && `seat ${r.seat_number}`, r.stored_at && `kept at ${r.stored_at}`].filter(Boolean).join(' · ') || '—'}</div></div> },
+    { key: 'trip', header: 'Found on', under: 'item', render: (r) => <span className="text-text-muted">{r.trip_label ?? 'Not tied to a trip'}</span> },
+    { key: 'when', header: 'Found', look: 'muted', under: 'status', render: (r) => formatDateTime(r.found_at) },
     { key: 'status', header: 'Status', render: (r) => (
       <div><Badge tone={r.status === 'found' ? 'warning' : r.status === 'claimed' ? 'success' : 'neutral'}>{r.status}</Badge>
         {r.status === 'claimed' && <div className="text-xs text-text-muted">{r.claimant_name}{r.claim_pnr ? ` · ${r.claim_pnr}` : ''}</div>}</div>

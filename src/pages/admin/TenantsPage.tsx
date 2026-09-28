@@ -85,10 +85,10 @@ export function TenantsPage() {
   });
 
   const columns: Column<TenantRow>[] = [
-    { key: 'name', header: 'Operator', render: (r) => <span className="font-medium text-text">{r.displayName}</span> },
-    { key: 'email', header: 'Contact', render: (r) => <span className="text-text-muted">{r.contactEmail}</span> },
+    { key: 'name', header: 'Operator', look: 'strong', render: (r) => <span className="font-medium text-text">{r.displayName}</span> },
+    { key: 'email', header: 'Contact', under: 'name', render: (r) => <span className="text-text-muted">{r.contactEmail}</span> },
     { key: 'status', header: 'Status', render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge> },
-    { key: 'console', header: 'Console', render: (r) => <a href={r.consoleUrl} target="_blank" rel="noreferrer" className="font-mono text-xs text-primary">{r.consoleUrl}</a> },
+    { key: 'console', header: 'Console', under: 'status', render: (r) => <a href={r.consoleUrl} target="_blank" rel="noreferrer" className="font-mono text-xs text-primary">{r.consoleUrl}</a> },
     {
       key: 'actions', header: '', render: (r) => (
         <div className="flex justify-end gap-2">

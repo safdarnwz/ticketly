@@ -66,10 +66,10 @@ export function WebhooksTab() {
   const toggleEvent = (e: string) => setForm((f) => ({ ...f, events: f.events.includes(e) ? f.events.filter((x) => x !== e) : [...f.events, e] }));
 
   const columns: Column<Webhook>[] = [
-    { key: 'name', header: 'Name', render: (w) => <span className="font-medium text-text">{w.name}</span> },
-    { key: 'url', header: 'URL', render: (w) => <span className="break-all font-mono text-xs text-text-muted">{w.url}</span> },
+    { key: 'name', header: 'Name', look: 'strong', render: (w) => <span className="font-medium text-text">{w.name}</span> },
+    { key: 'url', header: 'URL', look: 'muted', under: 'name', render: (w) => <span className="break-all font-mono text-xs text-text-muted">{w.url}</span> },
     { key: 'events', header: 'Events', render: (w) => w.eventTypes.length ? <span title={w.eventTypes.join(', ')}>{w.eventTypes.length} selected</span> : 'All events' },
-    { key: 'since', header: 'Added', render: (w) => <span className="text-xs text-text-muted">{formatDateTime(w.createdAt)}</span> },
+    { key: 'since', header: 'Added', look: 'muted', under: 'status', render: (w) => <span className="text-xs text-text-muted">{formatDateTime(w.createdAt)}</span> },
     { key: 'status', header: 'Status', render: (w) => <Badge tone={w.isActive ? 'success' : 'neutral'}>{w.isActive ? 'Active' : 'Revoked'}</Badge> },
     {
       key: 'actions', header: '', render: (w) => (
@@ -83,12 +83,12 @@ export function WebhooksTab() {
   ];
 
   const deliveryColumns: Column<WebhookDelivery>[] = [
-    { key: 'when', header: 'When', render: (d) => formatDateTime(d.createdAt) },
-    { key: 'event', header: 'Event', render: (d) => <Badge>{d.eventType}</Badge> },
+    { key: 'when', header: 'When', look: 'muted', under: 'event', render: (d) => formatDateTime(d.createdAt) },
+    { key: 'event', header: 'Event', look: 'strong', render: (d) => <Badge>{d.eventType}</Badge> },
     { key: 'status', header: 'Status', render: (d) => <Badge tone={statusTone(d.status)}>{d.status}</Badge> },
-    { key: 'attempts', header: 'Attempts', render: (d) => d.attempts },
-    { key: 'code', header: 'Answer', render: (d) => d.responseStatus ?? '—' },
-    { key: 'error', header: 'Last error', render: (d) => <span className="text-xs text-danger">{d.lastError ?? '—'}</span> },
+    { key: 'attempts', header: 'Attempts', look: 'count', under: 'status', render: (d) => d.attempts },
+    { key: 'code', header: 'Answer', under: 'status', render: (d) => d.responseStatus ?? '—' },
+    { key: 'error', header: 'Last error', look: 'note', render: (d) => <span className="text-xs text-danger">{d.lastError ?? '—'}</span> },
   ];
 
   return (

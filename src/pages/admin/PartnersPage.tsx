@@ -21,12 +21,12 @@ export function PartnersPage() {
   const [open, setOpen] = useState<Partner | null>(null);
   const q = useQuery({ queryKey: ['gds-partners', status], queryFn: () => platformAdminApi.partners(status || undefined) });
   const columns: Column<Partner>[] = [
-    { key: 'n', header: 'Partner', render: (r) => <span><b>{r.name}</b> <span className="font-mono text-xs text-text-muted">{r.code}</span></span> },
-    { key: 'k', header: 'Type', render: (r) => (r.kind === 'ota' ? 'OTA' : 'Agent network') },
+    { key: 'n', header: 'Partner', look: 'strong', render: (r) => <span><b>{r.name}</b> <span className="font-mono text-xs text-text-muted">{r.code}</span></span> },
+    { key: 'k', header: 'Type', under: 'n', render: (r) => (r.kind === 'ota' ? 'OTA' : 'Agent network') },
     { key: 's', header: 'Status', render: (r) => <Badge tone={statusTone(r.status)}>{r.status}</Badge> },
-    { key: 'b', header: 'Billing', render: (r) => `${r.billingMode}${r.billingMode === 'postpaid' ? ` · limit ${formatMoney(r.creditLimitMinor)}` : ''}` },
-    { key: 'bal', header: 'Balance', render: (r) => formatMoney(r.balanceMinor) },
-    { key: 'c', header: 'Commission', render: (r) => `${r.defaultCommissionPct}%` },
+    { key: 'b', header: 'Billing', under: 's', render: (r) => `${r.billingMode}${r.billingMode === 'postpaid' ? ` · limit ${formatMoney(r.creditLimitMinor)}` : ''}` },
+    { key: 'bal', header: 'Balance', look: 'figure', render: (r) => formatMoney(r.balanceMinor) },
+    { key: 'c', header: 'Commission', under: 'bal', render: (r) => `${r.defaultCommissionPct}%` },
     { key: 'a', header: '', render: (r) => <Button size="sm" variant="outline" onClick={() => setOpen(r)}>Manage</Button> },
   ];
   return (

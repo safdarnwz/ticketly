@@ -107,10 +107,10 @@ function PlansTab() {
   const featureKeys = [...new Set((plans.data?.items ?? []).flatMap((p) => Object.keys(p.features ?? {})))].sort();
 
   const columns: Column<Plan>[] = [
-    { key: 'name', header: 'Plan', render: (p) => <span className="font-medium text-text">{p.name} <span className="font-mono text-xs text-text-muted">{p.code}</span></span> },
-    { key: 'price', header: 'Price / month', render: (p) => formatMoney(p.monthlyPrice, p.currency) },
-    { key: 'limits', header: 'Allows', render: (p) => <span className="text-xs text-text-muted">{QUOTAS.map((q) => `${q.label} ${limitText(p.quotas?.[q.key])}`).join(' · ')}</span> },
-    { key: 'features', header: 'Includes', render: (p) => <span className="text-xs text-text-muted">{Object.entries(p.features ?? {}).filter(([, v]) => v).map(([k]) => k).join(', ') || '—'}</span> },
+    { key: 'name', header: 'Plan', look: 'strong', render: (p) => <span className="font-medium text-text">{p.name} <span className="font-mono text-xs text-text-muted">{p.code}</span></span> },
+    { key: 'price', header: 'Price / month', look: 'figure', render: (p) => formatMoney(p.monthlyPrice, p.currency) },
+    { key: 'limits', header: 'Allows', look: 'muted', under: 'name', render: (p) => <span className="text-xs text-text-muted">{QUOTAS.map((q) => `${q.label} ${limitText(p.quotas?.[q.key])}`).join(' · ')}</span> },
+    { key: 'features', header: 'Includes', optional: true, render: (p) => <span className="text-xs text-text-muted">{Object.entries(p.features ?? {}).filter(([, v]) => v).map(([k]) => k).join(', ') || '—'}</span> },
     { key: 'status', header: 'Status', render: (p) => <Badge tone={p.isActive ? 'success' : 'neutral'}>{p.isActive ? 'Active' : 'Retired'}</Badge> },
     {
       key: 'actions', header: '', render: (p) => (
@@ -189,11 +189,11 @@ function AuditTab() {
   const log = useQuery({ queryKey: ['audit-log', applied], queryFn: () => auditApi.list(applied) });
 
   const columns: Column<AuditEntry>[] = [
-    { key: 'when', header: 'When', render: (e) => formatDateTime(e.occurredAt) },
-    { key: 'action', header: 'Action', render: (e) => <Badge>{e.action}</Badge> },
-    { key: 'resource', header: 'Resource', render: (e) => <span className="text-text-muted">{e.resourceType}{e.resourceId ? ` · ${e.resourceId.slice(0, 8)}…` : ''}</span> },
-    { key: 'actor', header: 'Actor', render: (e) => <span className="font-mono text-xs">{e.actorId ? `${e.actorId.slice(0, 8)}…` : e.actorType}</span> },
-    { key: 'tenant', header: 'Tenant', render: (e) => e.tenantId ? <span className="font-mono text-xs">{e.tenantId.slice(0, 8)}…</span> : <span className="text-text-muted">platform</span> },
+    { key: 'when', header: 'When', look: 'muted', under: 'action', render: (e) => formatDateTime(e.occurredAt) },
+    { key: 'action', header: 'Action', look: 'strong', render: (e) => <Badge>{e.action}</Badge> },
+    { key: 'resource', header: 'Resource', under: 'action', render: (e) => <span className="text-text-muted">{e.resourceType}{e.resourceId ? ` · ${e.resourceId.slice(0, 8)}…` : ''}</span> },
+    { key: 'actor', header: 'Actor', look: 'muted', render: (e) => <span className="font-mono text-xs">{e.actorId ? `${e.actorId.slice(0, 8)}…` : e.actorType}</span> },
+    { key: 'tenant', header: 'Tenant', under: 'actor', render: (e) => e.tenantId ? <span className="font-mono text-xs">{e.tenantId.slice(0, 8)}…</span> : <span className="text-text-muted">platform</span> },
   ];
 
   return (
@@ -459,10 +459,10 @@ function PayoutsTab() {
   };
 
   const columns: Column<PayoutInstruction>[] = [
-    { key: 'when', header: 'Created', render: (p) => formatDateTime(p.createdAt) },
-    { key: 'beneficiary', header: 'Beneficiary', render: (p) => <span className="font-medium text-text">{p.beneficiaryName}</span> },
-    { key: 'account', header: 'Account', render: (p) => <span className="font-mono text-xs text-text-muted">••••{p.bankAccountNumber.slice(-4)} · {p.bankIfsc}</span> },
-    { key: 'amount', header: 'Amount', render: (p) => formatMoney(p.amountMinor, p.currency) },
+    { key: 'when', header: 'Created', look: 'muted', under: 'beneficiary', render: (p) => formatDateTime(p.createdAt) },
+    { key: 'beneficiary', header: 'Beneficiary', look: 'strong', render: (p) => <span className="font-medium text-text">{p.beneficiaryName}</span> },
+    { key: 'account', header: 'Account', under: 'beneficiary', render: (p) => <span className="font-mono text-xs text-text-muted">••••{p.bankAccountNumber.slice(-4)} · {p.bankIfsc}</span> },
+    { key: 'amount', header: 'Amount', look: 'figure', render: (p) => formatMoney(p.amountMinor, p.currency) },
     { key: 'status', header: 'Status', render: (p) => <Badge tone={statusTone(p.status)}>{p.status.replace('_', ' ')}</Badge> },
     {
       key: 'actions', header: '', render: (p) => (

@@ -33,10 +33,10 @@ export function AgentsTab() {
   const rows = list.data?.items ?? [];
 
   const columns: Column<Agent>[] = [
-    { key: 'name', header: 'Agent', render: (a) => <div><div className="font-medium text-text">{a.name}</div><div className="font-mono text-xs text-text-muted">{a.code}{a.city ? ` · ${a.city}` : ''}</div></div> },
-    { key: 'terms', header: 'Terms', render: (a) => <span className="text-sm">{a.billingMode === 'prepaid' ? 'Prepaid' : `Credit ${formatMoney(a.creditLimitMinor)}`} · {a.commissionPct}%</span> },
-    { key: 'balance', header: 'Balance', render: (a) => <div><span className={cn('text-sm', a.balanceMinor < 0 && 'text-danger')}>{formatMoney(a.balanceMinor)}</span>{a.lowBalance && <Badge tone="warning" className="ml-1">Low</Badge>}<div className="text-xs text-text-muted">Can spend {formatMoney(a.spendableMinor)}</div></div> },
-    { key: 'sales', header: 'Sales', render: (a) => <span className="text-sm">{a.bookings ?? 0} · {formatMoney(a.salesMinor ?? 0)}</span> },
+    { key: 'name', header: 'Agent', look: 'strong', render: (a) => <div><div className="font-medium text-text">{a.name}</div><div className="font-mono text-xs text-text-muted">{a.code}{a.city ? ` · ${a.city}` : ''}</div></div> },
+    { key: 'terms', header: 'Terms', under: 'name', render: (a) => <span className="text-sm">{a.billingMode === 'prepaid' ? 'Prepaid' : `Credit ${formatMoney(a.creditLimitMinor)}`} · {a.commissionPct}%</span> },
+    { key: 'balance', header: 'Balance', look: 'figure', render: (a) => <div><span className={cn('text-sm', a.balanceMinor < 0 && 'text-danger')}>{formatMoney(a.balanceMinor)}</span>{a.lowBalance && <Badge tone="warning" className="ml-1">Low</Badge>}<div className="text-xs text-text-muted">Can spend {formatMoney(a.spendableMinor)}</div></div> },
+    { key: 'sales', header: 'Sales', under: 'balance', render: (a) => <span className="text-sm">{a.bookings ?? 0} · {formatMoney(a.salesMinor ?? 0)}</span> },
     { key: 'status', header: 'Status', render: (a) => <Badge tone={STATUS_TONE[a.status]}>{a.status}</Badge> },
   ];
 
@@ -189,10 +189,10 @@ function MoneyTab({ agent, onDone }: { agent: Agent; onDone: () => void }) {
   const amountBad = amount !== '' && !isAmount(amount);
   const adjBad = adj !== '' && !isAmount(adj, { allowNegative: true });
   const cols: Column<AgentLedgerEntry>[] = [
-    { key: 'when', header: 'When', render: (l) => <span className="text-xs text-text-muted">{formatDateTime(l.createdAt)}</span> },
-    { key: 'what', header: 'What', render: (l) => <span>{KIND_LABEL[l.kind] ?? l.kind}{l.pnr ? <span className="font-mono text-xs text-text-muted"> · {l.pnr}</span> : ''}{l.note ? <span className="text-xs text-text-muted"> · {l.note}</span> : ''}</span> },
-    { key: 'amt', header: 'Amount', render: (l) => <span className={l.amountMinor < 0 ? 'text-danger' : 'text-success'}>{formatMoney(l.amountMinor)}</span> },
-    { key: 'bal', header: 'Balance', render: (l) => formatMoney(l.balanceAfterMinor) },
+    { key: 'when', header: 'When', look: 'muted', under: 'what', render: (l) => <span className="text-xs text-text-muted">{formatDateTime(l.createdAt)}</span> },
+    { key: 'what', header: 'What', look: 'strong', render: (l) => <span>{KIND_LABEL[l.kind] ?? l.kind}{l.pnr ? <span className="font-mono text-xs text-text-muted"> · {l.pnr}</span> : ''}{l.note ? <span className="text-xs text-text-muted"> · {l.note}</span> : ''}</span> },
+    { key: 'amt', header: 'Amount', look: 'figure', render: (l) => <span className={l.amountMinor < 0 ? 'text-danger' : 'text-success'}>{formatMoney(l.amountMinor)}</span> },
+    { key: 'bal', header: 'Balance', look: 'count', under: 'amt', render: (l) => formatMoney(l.balanceAfterMinor) },
   ];
   return (
     <div className="flex flex-col gap-3">

@@ -53,11 +53,11 @@ function Directory() {
   const reset = () => setPage(1);
 
   const columns: Column<Staff>[] = [
-    { key: 'name', header: 'Name', render: (s) => <div><div className="font-medium text-text">{s.fullName}</div><div className="text-xs text-text-muted">{s.email}</div></div> },
-    { key: 'phone', header: 'Mobile', render: (s) => <span className="font-mono text-sm">{s.phone ?? '—'}</span> },
+    { key: 'name', header: 'Name', look: 'strong', render: (s) => <div><div className="font-medium text-text">{s.fullName}</div><div className="text-xs text-text-muted">{s.email}</div></div> },
+    { key: 'phone', header: 'Mobile', under: 'name', render: (s) => <span className="font-mono text-sm">{s.phone ?? '—'}</span> },
     { key: 'roles', header: 'Roles', render: (s) => <div className="flex flex-wrap gap-1">{s.roles.map((r) => <Badge key={r.id}>{r.name}{r.expiresAt ? ' ⏳' : ''}</Badge>)}</div> },
-    { key: 'branch', header: 'Branch', render: (s) => <span className={cn('text-sm', !s.branchName && 'text-text-muted')}>{s.branchName ?? 'None'}</span> },
-    { key: 'login', header: 'Last sign-in', render: (s) => <span className="text-xs text-text-muted">{s.lastLoginAt ? formatDateTime(s.lastLoginAt) : 'Never'}</span> },
+    { key: 'branch', header: 'Branch', under: 'roles', render: (s) => <span className={cn('text-sm', !s.branchName && 'text-text-muted')}>{s.branchName ?? 'None'}</span> },
+    { key: 'login', header: 'Last sign-in', look: 'muted', under: 'status', render: (s) => <span className="text-xs text-text-muted">{s.lastLoginAt ? formatDateTime(s.lastLoginAt) : 'Never'}</span> },
     { key: 'status', header: 'Status', render: (s) => <Badge tone={s.status === 'active' ? 'success' : 'neutral'}>{s.status === 'active' ? 'Active' : 'Disabled'}</Badge> },
   ];
 
@@ -335,12 +335,12 @@ function Performance() {
   const selling = rows.filter((r) => r.bookings > 0);
   const avg = selling.length ? selling.reduce((a, r) => a + r.revenueMinor, 0) / selling.length : 0;
   const columns: Column<StaffPerformance>[] = [
-    { key: 'name', header: 'Staff', render: (r) => <div><div className="font-medium">{r.fullName}</div><div className="text-xs text-text-muted">{r.branchName ?? 'No branch'}</div></div> },
-    { key: 'bookings', header: 'Bookings', render: (r) => r.bookings },
-    { key: 'seats', header: 'Seats', render: (r) => r.seats },
-    { key: 'revenue', header: 'Revenue', render: (r) => formatMoney(r.revenueMinor, 'INR') },
+    { key: 'name', header: 'Staff', look: 'strong', render: (r) => <div><div className="font-medium">{r.fullName}</div><div className="text-xs text-text-muted">{r.branchName ?? 'No branch'}</div></div> },
+    { key: 'bookings', header: 'Bookings', look: 'count', render: (r) => r.bookings },
+    { key: 'seats', header: 'Seats', look: 'count', under: 'bookings', render: (r) => r.seats },
+    { key: 'revenue', header: 'Revenue', look: 'figure', render: (r) => formatMoney(r.revenueMinor, 'INR') },
     { key: 'target', header: 'Bookings vs target', render: (r) => <TargetProgress done={r.bookings} target={r.targetBookings} /> },
-    { key: 'cancel', header: 'Cancelled', render: (r) => <span className={cn(r.cancellationRatePct > 20 && 'text-danger')}>{r.cancelled} ({r.cancellationRatePct}%)</span> },
+    { key: 'cancel', header: 'Cancelled', look: 'count', under: 'bookings', render: (r) => <span className={cn(r.cancellationRatePct > 20 && 'text-danger')}>{r.cancelled} ({r.cancellationRatePct}%)</span> },
     {
       key: 'flag', header: '', render: (r) => r.bookings === 0 ? <span className="text-xs text-text-muted">No counter sales</span>
         : r === selling[0] ? <Badge tone="success">Top seller</Badge>

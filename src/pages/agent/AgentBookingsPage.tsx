@@ -29,13 +29,13 @@ export function AgentBookingsPage() {
   const rows = (list.data?.items ?? []).filter((b) => !term || b.pnr.toUpperCase().includes(term) || (digits.length >= 4 && b.contactPhone.replace(/\D/g, '').includes(digits)));
   const sold = rows.filter((b) => b.status === 'confirmed' || b.status === 'completed');
   const cols: Column<AgentBookingRow>[] = [
-    { key: 'pnr', header: 'PNR', render: (b) => <span className="font-mono font-medium text-text">{b.pnr}</span> },
-    { key: 'trip', header: 'Journey', render: (b) => <div><div className="text-text">{b.routeName}</div><div className="text-xs text-text-muted">{formatDateTime(b.departsAt)}</div></div> },
-    { key: 'pax', header: 'Seats', render: (b) => b.seatCount },
-    { key: 'mobile', header: 'Passenger mobile', render: (b) => <a className="text-primary" href={`tel:${b.contactPhone}`} onClick={(e) => e.stopPropagation()}>{b.contactPhone}</a> },
+    { key: 'pnr', header: 'PNR', look: 'key', render: (b) => <span className="font-mono font-medium text-text">{b.pnr}</span> },
+    { key: 'trip', header: 'Journey', look: 'strong', render: (b) => <div><div className="text-text">{b.routeName}</div><div className="text-xs text-text-muted">{formatDateTime(b.departsAt)}</div></div> },
+    { key: 'pax', header: 'Seats', look: 'count', under: 'trip', render: (b) => b.seatCount },
+    { key: 'mobile', header: 'Passenger mobile', under: 'pnr', render: (b) => <a className="text-primary" href={`tel:${b.contactPhone}`} onClick={(e) => e.stopPropagation()}>{b.contactPhone}</a> },
     { key: 'status', header: 'Status', render: (b) => <Badge tone={b.status === 'confirmed' ? 'success' : b.status === 'cancelled' ? 'danger' : 'neutral'}>{b.status}</Badge> },
-    { key: 'total', header: 'Fare', render: (b) => formatMoney(b.totalMinor, b.currency) },
-    { key: 'comm', header: 'Your commission', render: (b) => <span className={cn(Number(b.commissionMinor) > 0 ? 'text-success' : 'text-text-muted')}>{formatMoney(Number(b.commissionMinor), b.currency)}</span> },
+    { key: 'total', header: 'Fare', look: 'figure', render: (b) => formatMoney(b.totalMinor, b.currency) },
+    { key: 'comm', header: 'Your commission', look: 'figure', under: 'total', render: (b) => <span className={cn(Number(b.commissionMinor) > 0 ? 'text-success' : 'text-text-muted')}>{formatMoney(Number(b.commissionMinor), b.currency)}</span> },
   ];
   return (
     <>

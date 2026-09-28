@@ -44,15 +44,15 @@ export function TripsPage() {
   const capacity = rows.reduce((a, t) => a + (t.status === 'cancelled' ? 0 : t.totalSeats), 0);
 
   const columns: Column<TripRow>[] = [
-    { key: 'dep', header: 'Departs', render: (t) => <span className="font-semibold">{formatTime(t.departsAt)}</span> },
-    { key: 'service', header: 'Service', render: (t) => (t.serviceCode ? <span className="whitespace-nowrap font-mono text-xs font-semibold">{t.serviceCode}</span> : <span className="text-text-muted">One-off</span>) },
-    { key: 'route', header: 'Route', render: (t) => t.routeName },
+    { key: 'dep', header: 'Departs', look: 'key', render: (t) => <span className="font-semibold">{formatTime(t.departsAt)}</span> },
+    { key: 'service', header: 'Service', under: 'dep', render: (t) => (t.serviceCode ? <span className="whitespace-nowrap font-mono text-xs font-semibold">{t.serviceCode}</span> : <span className="text-text-muted">One-off</span>) },
+    { key: 'route', header: 'Route', look: 'strong', render: (t) => t.routeName },
     // The bus is chosen per trip and can change day to day.
-    { key: 'bus', header: 'Bus', render: (t) => (t.busNumber ? <span className="font-mono text-xs">{t.busNumber}</span> : <span className="text-warning">Not assigned</span>) },
-    { key: 'arr', header: 'Arrives', render: (t) => <span className="text-text-muted">{formatTime(t.arrivesAt)}{t.arrivesAt.slice(0, 10) !== t.departsAt.slice(0, 10) ? ' +1' : ''}</span> },
+    { key: 'bus', header: 'Bus', under: 'route', render: (t) => (t.busNumber ? <span className="font-mono text-xs">{t.busNumber}</span> : <span className="text-warning">Not assigned</span>) },
+    { key: 'arr', header: 'Arrives', look: 'muted', under: 'dep', render: (t) => <span className="text-text-muted">{formatTime(t.arrivesAt)}{t.arrivesAt.slice(0, 10) !== t.departsAt.slice(0, 10) ? ' +1' : ''}</span> },
     {
       key: 'occ', header: 'Seats', render: (t) => (
-        <div className="min-w-40">
+        <div className="min-w-24">
           <div className="flex h-2 overflow-hidden rounded-full bg-surface-muted" role="img" aria-label={`${t.bookedSeats} of ${t.totalSeats} seats sold`}>
             <div className="bg-primary" style={{ width: `${t.totalSeats ? Math.min(100, (t.bookedSeats / t.totalSeats) * 100) : 0}%` }} />
             <div className="bg-warning" style={{ width: `${t.totalSeats ? Math.min(100, (t.heldSeats / t.totalSeats) * 100) : 0}%` }} />
@@ -61,7 +61,7 @@ export function TripsPage() {
         </div>
       ),
     },
-    { key: 'status', header: 'Status', render: (t) => <Badge tone={statusTone(t.status === 'closed' ? 'held' : t.status)}>{TRIP_STATUS_LABEL[t.status] ?? t.status}</Badge> },
+    { key: 'status', header: 'Status', under: 'occ', render: (t) => <Badge tone={statusTone(t.status === 'closed' ? 'held' : t.status)}>{TRIP_STATUS_LABEL[t.status] ?? t.status}</Badge> },
   ];
 
   return (

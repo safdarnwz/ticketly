@@ -45,7 +45,7 @@ function Occupancy({ t }: { t: TripRow }) {
   const paid = t.totalSeats ? (t.bookedSeats / t.totalSeats) * 100 : 0;
   const held = t.totalSeats ? (t.heldSeats / t.totalSeats) * 100 : 0;
   return (
-    <div className="min-w-36">
+    <div className="w-24 sm:w-32">
       <div className="flex h-2 overflow-hidden rounded-full bg-surface-muted" role="img" aria-label={`${t.bookedSeats} of ${t.totalSeats} seats sold`}>
         <div className="bg-primary" style={{ width: `${Math.min(100, paid)}%` }} />
         <div className="bg-warning" style={{ width: `${Math.min(100 - paid, held)}%` }} />
@@ -83,17 +83,17 @@ function StaffDashboard() {
   const s = summary.data;
 
   const tripColumns: Column<TripRow>[] = [
-    { key: 'dep', header: 'Departs', render: (t) => <span className="font-semibold">{formatTime(t.departsAt)}</span> },
-    { key: 'route', header: 'Route', render: (t) => t.routeName },
+    { key: 'dep', header: 'Departs', look: 'key', render: (t) => <span className="font-semibold">{formatTime(t.departsAt)}</span> },
+    { key: 'route', header: 'Route', look: 'strong', render: (t) => t.routeName },
     { key: 'occ', header: 'Occupancy', render: (t) => <Occupancy t={t} /> },
     { key: 'status', header: 'Status', render: (t) => <Badge tone={statusTone(t.status)}>{t.status}</Badge> },
   ];
   const bookingColumns: Column<StaffBookingRow>[] = [
-    { key: 'pnr', header: 'PNR', render: (b) => <span className="font-mono font-semibold">{b.pnr}</span> },
-    { key: 'who', header: 'Passenger', render: (b) => <span>{b.leadPassenger ?? '—'}{b.seatCount > 1 ? <span className="text-text-muted"> +{b.seatCount - 1}</span> : null}</span> },
-    { key: 'route', header: 'Journey', render: (b) => <span className="whitespace-nowrap text-text-muted">{b.routeName}<br /><span className="text-xs">{b.journeyDate}</span></span> },
-    { key: 'amt', header: 'Amount', render: (b) => formatMoney(b.paidMinor || b.totalMinor), className: 'text-right whitespace-nowrap' },
-    { key: 'st', header: 'Status', render: (b) => <Badge tone={b.liveHold ? 'warning' : statusTone(b.status)}>{b.liveHold ? 'paying now' : b.status}</Badge> },
+    { key: 'pnr', header: 'PNR', look: 'key', render: (b) => <span className="font-mono font-semibold">{b.pnr}</span> },
+    { key: 'who', header: 'Passenger', under: 'pnr', render: (b) => <span>{b.leadPassenger ?? '—'}{b.seatCount > 1 ? <span className="text-text-muted"> +{b.seatCount - 1}</span> : null}</span> },
+    { key: 'route', header: 'Journey', under: 'pnr', render: (b) => <span className="whitespace-nowrap text-text-muted">{b.routeName}<br /><span className="text-xs">{b.journeyDate}</span></span> },
+    { key: 'amt', header: 'Amount', look: 'figure', render: (b) => formatMoney(b.paidMinor || b.totalMinor), className: 'text-right whitespace-nowrap' },
+    { key: 'st', header: 'Status', under: 'amt', render: (b) => <Badge tone={b.liveHold ? 'warning' : statusTone(b.status)}>{b.liveHold ? 'paying now' : b.status}</Badge> },
   ];
 
   return (
