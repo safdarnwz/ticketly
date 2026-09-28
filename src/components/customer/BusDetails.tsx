@@ -60,7 +60,7 @@ export function BusDetails({ tripId, fromStopId, toStopId, tenantId }: { tripId:
   const go = (k: TabKey) => { setActive(k); refs.current[k]?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   const section = (k: TabKey, title: string, body: React.ReactNode, sub?: string) => (
     <section key={k} data-tab={k} ref={(el) => { refs.current[k] = el; }} aria-labelledby={`bd-${k}`} className="scroll-mt-32 border-b border-border px-4 py-6 last:border-0 sm:px-6">
-      <h3 id={`bd-${k}`} className="font-display text-xl text-text">{title}</h3>
+      <h3 id={`bd-${k}`} className="text-lg font-semibold text-text">{title}</h3>
       {sub && <p className="text-sm text-text-muted">{sub}</p>}
       <div className="mt-4">{body}</div>
     </section>
@@ -71,21 +71,21 @@ export function BusDetails({ tripId, fromStopId, toStopId, tenantId }: { tripId:
       <div ref={tabBar} role="tablist" aria-label="About this bus" className="sticky top-16 z-10 flex gap-1 overflow-x-auto rounded-t-2xl border-b border-border bg-surface px-2 [scrollbar-width:none]">
         {TABS.map(([k, label]) => (
           <button key={k} data-key={k} role="tab" aria-selected={active === k} onClick={() => go(k)}
-            className={cn('shrink-0 border-b-2 px-3 py-3 text-sm font-medium', active === k ? 'border-[#d84e55] text-[#d84e55]' : 'border-transparent text-text hover:text-text-muted')}>
+            className={cn('shrink-0 border-b-2 px-3 py-3 text-sm font-medium', active === k ? 'border-text text-text' : 'border-transparent text-text-muted hover:text-text')}>
             {label}
           </button>
         ))}
       </div>
 
       {section('highlights', 'Highlights', (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <dl className="grid gap-x-8 sm:grid-cols-2">
           {d.highlights.map((h) => (
-            <div key={h.key} className="rounded-2xl border border-border p-4 shadow-sm">
-              <div className="font-display text-lg text-text">{h.title}</div>
-              <div className="text-sm text-text-muted">{h.detail}</div>
+            <div key={h.key} className="border-b border-border py-3 last:border-0 sm:[&:nth-last-child(2)]:border-0">
+              <dt className="font-medium text-text">{h.title}</dt>
+              <dd className="text-sm text-text-muted">{h.detail}</dd>
             </div>
           ))}
-        </div>
+        </dl>
       ))}
 
       {section('cancellation', 'Cancellation policy', (
@@ -116,7 +116,7 @@ export function BusDetails({ tripId, fromStopId, toStopId, tenantId }: { tripId:
         <ol className="flex flex-wrap items-center gap-y-2 text-base text-text">
           {d.route.stops.map((s, i) => (
             <li key={i} className="flex items-center whitespace-nowrap">
-              <span className={cn((s.boardHere || s.dropHere) && 'rounded bg-[#fde68a] px-1 font-semibold')}>{s.name}</span>
+              <span className={cn((s.boardHere || s.dropHere) && 'rounded bg-surface-muted px-1.5 font-medium')}>{s.name}</span>
               {i < d.route.stops.length - 1 && <span aria-hidden className="mx-2 text-text-muted">→</span>}
             </li>
           ))}
@@ -128,7 +128,7 @@ export function BusDetails({ tripId, fromStopId, toStopId, tenantId }: { tripId:
 
       {section('features', 'Bus features', d.amenities.length ? (
         <div className="flex flex-wrap gap-2">
-          {d.amenities.map((a) => <span key={a.code} className="rounded-xl bg-[#e8edff] px-3 py-2 text-sm text-text">{a.name}</span>)}
+          {d.amenities.map((a) => <span key={a.code} className="rounded-lg border border-border px-3 py-1.5 text-sm text-text">{a.name}</span>)}
         </div>
       ) : <p className="text-sm text-text-muted">The operator has not listed the features of this bus yet.</p>)}
 
@@ -165,7 +165,7 @@ export function BusDetails({ tripId, fromStopId, toStopId, tenantId }: { tripId:
       {section('policies', 'Other policies', (
         <div className="flex flex-col gap-6">
           {(d.stateRules?.length ?? 0) > 0 && (
-            <div className="rounded-2xl border border-[#f5c26b] bg-[#fff8e6] p-4">
+            <div className="rounded-xl border border-warning/40 bg-warning/5 p-4">
               <div className="flex items-center gap-2 font-semibold text-text"><Landmark className="h-5 w-5" /> Government rules on this route</div>
               <p className="mb-3 text-xs text-text-muted">Set for each state the bus passes through. They apply to every passenger, whatever the operator’s policies below say.</p>
               <div className="flex flex-col gap-3">
@@ -235,7 +235,7 @@ function Reviews({ d, tenantId }: { d: TripBusDetails; tenantId?: string }) {
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1 text-sm font-medium text-success"><BadgeCheck className="h-4 w-4" /> Real feedback from verified travellers of this bus</span>
-        <span className="text-right"><span className="flex items-center gap-1 font-display text-3xl text-success"><Star className="h-6 w-6 fill-current" />{r.average}</span><span className="text-xs text-text-muted">{r.count} rating{r.count === 1 ? '' : 's'}</span></span>
+        <span className="text-right"><span className="flex items-center gap-1 text-3xl font-semibold text-text"><Star className="h-5 w-5 fill-current text-warning" />{r.average}</span><span className="text-xs text-text-muted">{r.count} rating{r.count === 1 ? '' : 's'}</span></span>
       </div>
       <div className="flex flex-col gap-2">
         {([5, 4, 3, 2, 1] as const).map((n) => (
@@ -249,11 +249,11 @@ function Reviews({ d, tenantId }: { d: TripBusDetails; tenantId?: string }) {
       {r.liked.length > 0 && (
         <div>
           <div className="mb-2 font-semibold text-text">Loved by travellers</div>
-          <div className="flex flex-wrap gap-2">{r.liked.map((l) => <span key={l.aspect} className="rounded-xl bg-[#c6f6c6] px-3 py-1.5 text-sm text-text">{l.label} ({l.count})</span>)}</div>
+          <div className="flex flex-wrap gap-2">{r.liked.map((l) => <span key={l.aspect} className="rounded-lg border border-border px-3 py-1.5 text-sm text-text">{l.label} ({l.count})</span>)}</div>
         </div>
       )}
       <ul className="flex flex-col gap-3">{r.items.slice(0, 3).map((x) => <ReviewItem key={x.id} x={x} />)}</ul>
-      {r.count > 3 && <Button variant="outline" className="!rounded-pill !border-0 !bg-[#ffe1e1]" onClick={() => setAll(true)}>Read all reviews ({r.count})</Button>}
+      {r.count > 3 && <Button variant="outline" onClick={() => setAll(true)}>Read all reviews ({r.count})</Button>}
       {all && <AllReviews vehicleId={d.bus.id} tenantId={tenantId} total={r.count} onClose={() => setAll(false)} />}
     </div>
   );

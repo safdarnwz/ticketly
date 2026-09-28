@@ -76,7 +76,7 @@ export function TripCrewCard({ trip, busLabel, canEdit, onChangeBus }: {
           );
         })()}
         <div className="rounded-lg border border-border p-3">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Bus</div>
+          <div className="mb-2 text-xs font-semibold text-text-muted">Bus</div>
           <div className="flex items-center justify-between gap-2">
             <span className={cn('flex items-center gap-2 text-sm', busLabel ? 'font-mono font-semibold text-text' : 'text-warning')}><BusIcon className="h-4 w-4" />{busLabel ?? 'No bus yet'}</span>
             {editable && trip.status !== 'departed' && new Date(trip.arrivesAt).getTime() > Date.now() && <Button size="sm" variant="outline" onClick={onChangeBus}>{trip.vehicleId ? 'Change bus' : 'Assign bus'}</Button>}
@@ -85,7 +85,7 @@ export function TripCrewCard({ trip, busLabel, canEdit, onChangeBus }: {
         </div>
 
         <div className="rounded-lg border border-border p-3">
-          <div className="mb-1 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-text-muted">
+          <div className="mb-1 flex items-center justify-between text-xs font-semibold text-text-muted">
             <span>Drivers ({drivers.length}/{MAX_DRIVERS})</span>
             {!drivers.length && !crew.isLoading && <span className="normal-case text-warning">none yet</span>}
           </div>
@@ -95,7 +95,7 @@ export function TripCrewCard({ trip, busLabel, canEdit, onChangeBus }: {
         </div>
 
         <div className="rounded-lg border border-border p-3">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">Conductor / attendants</div>
+          <div className="mb-1 text-xs font-semibold text-text-muted">Conductor / attendants</div>
           <ul className="divide-y divide-border">{others.map((d) => row(d, ROLE_LABEL[d.crewRole] ?? d.crewRole))}</ul>
           {!others.length && !crew.isLoading && <p className="text-xs text-text-muted">No conductor yet.</p>}
         </div>

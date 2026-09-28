@@ -96,7 +96,7 @@ export function CityInput({ label, value, onSelect, onClear, error, placeholder 
                 aria-controls={listId}
                 aria-invalid={Boolean(error)}
                 autoComplete="off"
-                className="w-full truncate border-0 bg-transparent p-0 pr-7 font-display text-[26px] leading-tight text-text outline-none placeholder:font-semibold placeholder:text-text-muted/60 sm:text-[28px]"
+                className="w-full truncate border-0 bg-transparent p-0 pr-7 text-xl font-medium leading-tight text-text outline-none placeholder:font-normal placeholder:text-text-muted"
               />
               {loading && <Loader2 className="absolute right-1 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-text-muted" />}
             </div>

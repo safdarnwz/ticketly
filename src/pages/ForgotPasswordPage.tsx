@@ -63,7 +63,7 @@ export function ForgotPasswordPage() {
             <ArrowLeft className="h-4 w-4" /> Back to sign in
           </Link>
 
-          <h1 className="font-display text-4xl tracking-tight text-text">Reset your password</h1>
+          <h1 className="text-2xl font-semibold text-text">Reset your password</h1>
           <p className="mt-2 text-text-muted">
             {step === 'request' ? "We'll send a code to your registered email or mobile." : `Enter the code sent to ${identity} and your new password.`}
           </p>
@@ -86,7 +86,7 @@ export function ForgotPasswordPage() {
               <input
                 value={code} onChange={(e) => setCode(e.target.value)}
                 placeholder="6-digit code" inputMode="numeric" required
-                className="h-12 w-full rounded-input border border-border bg-surface px-3 text-center text-lg tracking-[0.3em] text-text transition-colors focus-ring hover:border-primary/30 focus:border-primary"
+                className="h-12 w-full rounded-input border border-border bg-surface px-3 text-center text-lg text-text transition-colors focus-ring hover:border-primary/30 focus:border-primary"
               />
               <div className="relative">
                 <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />

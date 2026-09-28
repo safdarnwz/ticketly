@@ -465,8 +465,8 @@ function DeckEditor({ deck, draft, grid, title, problems, sel, drag, hover, onRe
         </div>
       </header>
       <div className="grid select-none gap-1" style={{ gridTemplateColumns: `1.2rem repeat(${grid.columns}, ${cell})`, gridTemplateRows: `1rem repeat(${grid.rows}, ${cell})` }}>
-        {Array.from({ length: grid.columns }, (_, c) => <span key={`h${c}`} className="text-center text-[9px] text-text-muted" style={{ gridColumn: c + 2, gridRow: 1 }}>{c + 1}</span>)}
-        {Array.from({ length: grid.rows }, (_, r) => <span key={`r${r}`} className="self-center text-right text-[9px] text-text-muted" style={{ gridColumn: 1, gridRow: r + 2 }}>{r + 1}</span>)}
+        {Array.from({ length: grid.columns }, (_, c) => <span key={`h${c}`} className="text-center text-[11px] text-text-muted" style={{ gridColumn: c + 2, gridRow: 1 }}>{c + 1}</span>)}
+        {Array.from({ length: grid.rows }, (_, r) => <span key={`r${r}`} className="self-center text-right text-[11px] text-text-muted" style={{ gridColumn: 1, gridRow: r + 2 }}>{r + 1}</span>)}
         {Array.from({ length: grid.rows * grid.columns }, (_, i) => {
           const r = Math.floor(i / grid.columns);
           const c = i % grid.columns;
@@ -493,7 +493,7 @@ function DeckEditor({ deck, draft, grid, title, problems, sel, drag, hover, onRe
           return (
             <div key={`s${i}`} title={bad ?? `${TYPE_LABEL[s.type]} ${s.number} — drag to move`} role="button" aria-label={`Seat ${s.number || 'without number'} — drag to move`}
               {...pickProps({ kind: 'seat', index: i }, s.row, s.column)}
-              className={cn('flex cursor-grab flex-col active:cursor-grabbing items-center justify-center rounded-[4px] border-2 text-[10px] font-semibold leading-tight',
+              className={cn('flex cursor-grab flex-col active:cursor-grabbing items-center justify-center rounded-[4px] border-2 text-[11px] font-semibold leading-tight',
                 SEAT_TILE[s.type], bad && 'border-danger bg-danger/10 text-danger', s.bookable === false && s.type !== 'crew' && 'opacity-50', isSel && 'ring-2 ring-primary ring-offset-1')}
               style={{ gridColumn: `${s.column + 2} / span ${s.colSpan ?? 1}`, gridRow: `${s.row + 2} / span ${s.rowSpan ?? 1}` }}>
               <span>{s.number || '?'}</span>

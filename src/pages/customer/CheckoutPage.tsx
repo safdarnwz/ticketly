@@ -319,7 +319,7 @@ export function CheckoutPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-10 pt-4">
-      <ol className="mb-5 grid grid-cols-3 gap-2 text-[11px] font-semibold sm:text-xs" aria-label="Checkout steps">
+      <ol className="mb-5 grid grid-cols-3 gap-2 text-xs font-semibold sm:text-xs" aria-label="Checkout steps">
         <li>
           {/* Going back gives up the hold (the seat page releases it). Not while a payment is in flight. */}
           <button type="button" onClick={reselect} disabled={paying} className="flex w-full flex-col gap-1.5 text-left text-text-muted hover:text-text disabled:cursor-not-allowed disabled:opacity-50">
@@ -488,7 +488,7 @@ export function CheckoutPage() {
                   I agree to{' '}
                   {(legal.data?.items ?? []).map((p, i, arr) => (
                     <span key={p.slug}>
-                      <Link to={`/legal/${p.slug}`} target="_blank" className="text-primary underline">{p.title}</Link>
+                      <Link to={`/legal/${p.slug}`} target="_blank" className="text-primary">{p.title}</Link>
                       {i < arr.length - 2 ? ', ' : i === arr.length - 2 ? ' and ' : ''}
                     </span>
                   ))}
@@ -506,7 +506,7 @@ export function CheckoutPage() {
               >
                 {addonBusy ? 'Updating total…' : `Pay ${formatMoney(payable, currency)}`}
               </Button>
-              <p className="-mt-3 text-center text-[11px] text-text-muted">Your seats stay held until the timer runs out.</p>
+              <p className="-mt-3 text-center text-xs text-text-muted">Your seats stay held until the timer runs out.</p>
             </>
           )}
         </div>

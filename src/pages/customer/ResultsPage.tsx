@@ -152,10 +152,10 @@ export function ResultsPage() {
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-[12px] text-text-muted">From</div>
-            <div className="truncate font-display text-[22px] leading-tight text-text sm:text-[26px]">{originName}</div>
+            <div className="truncate text-xl font-medium leading-tight text-text">{originName}</div>
             <div className="my-2 h-px bg-border" />
             <div className="text-[12px] text-text-muted">Destination</div>
-            <div className="truncate font-display text-[22px] leading-tight text-text sm:text-[26px]">{destName}</div>
+            <div className="truncate text-xl font-medium leading-tight text-text">{destName}</div>
           </div>
         </div>
         <div className="mt-3 text-sm text-text-muted">
@@ -167,7 +167,7 @@ export function ResultsPage() {
           aria-label={editing ? 'Close search' : 'Modify search'}
           aria-expanded={editing}
           onClick={() => setEditing((v) => !v)}
-          className="absolute right-5 top-1/2 flex h-14 w-14 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-fg shadow-lg transition hover:scale-105 sm:right-7"
+          className="absolute right-5 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-surface text-text hover:bg-surface-muted sm:right-7"
         >
           {editing ? <X className="h-5 w-5" /> : <Pencil className="h-5 w-5" />}
         </button>
@@ -223,8 +223,8 @@ export function ResultsPage() {
                   d === date ? 'bg-accent text-white shadow-md' : 'bg-surface-muted text-text-muted hover:bg-border',
                 )}
               >
-                <span className="text-[11px] font-semibold">{formatDateLabel(d, { weekday: 'short' })}</span>
-                <span className={cn('font-display text-xl leading-tight', d !== date && 'text-text')}>{formatDateLabel(d, { day: 'numeric' })}<span className="ml-1 text-[11px] font-semibold">{formatDateLabel(d, { month: 'short' })}</span></span>
+                <span className="text-xs font-semibold">{formatDateLabel(d, { weekday: 'short' })}</span>
+                <span className={cn('font-display text-xl leading-tight', d !== date && 'text-text')}>{formatDateLabel(d, { day: 'numeric' })}<span className="ml-1 text-xs font-semibold">{formatDateLabel(d, { month: 'short' })}</span></span>
               </button>
             ))}
           </div>
@@ -276,16 +276,16 @@ export function ResultsPage() {
               <ErrorState error={search.error} onRetry={search.refetch} />
             ) : list.length > 0 ? (
               <>
-                {/* Phones: one sideways carousel per bus type, like a shelf. */}
+                {/* Phones: one list per bus type, full-width rows — no sideways scrolling. */}
                 <div className="flex flex-col gap-5 sm:hidden">
                   {groupByType(list).map(([type, trips]) => (
                     <section key={type} aria-label={`${type} buses`}>
                       <div className="mb-2 flex items-baseline justify-between">
-                        <h3 className="font-display text-[17px] text-text">{type}</h3>
+                        <h3 className="text-base font-semibold text-text">{type}</h3>
                         <span className="text-xs text-text-muted">{trips.length} bus{trips.length === 1 ? '' : 'es'}</span>
                       </div>
-                      <div className="no-scrollbar -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-3 pt-1">
-                        {trips.map((t, i) => <CompactTripCard key={t.tripId} trip={t} onSelect={select} muted={i > 0} />)}
+                      <div className="flex flex-col gap-2">
+                        {trips.map((t) => <CompactTripCard key={t.tripId} trip={t} onSelect={select} />)}
                       </div>
                     </section>
                   ))}

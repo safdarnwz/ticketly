@@ -21,7 +21,8 @@ const variants: Record<Variant, string> = {
   secondary: 'bg-surface-muted text-text hover:bg-border',
   outline: 'hairline bg-surface text-text hover:bg-surface-muted',
   ghost: 'bg-transparent text-text hover:bg-surface-muted',
-  danger: 'bg-danger text-white hover:opacity-90',
+  // Destructive actions read clearly without shouting: red text on a quiet surface.
+  danger: 'hairline bg-surface text-danger hover:bg-danger/5',
 };
 
 // One height token drives EVERY button in the app → uniform sizing by construction.
@@ -40,8 +41,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       ref={ref}
       disabled={disabled || loading}
       className={cn(
-        'inline-flex select-none items-center justify-center whitespace-nowrap rounded-btn font-semibold tracking-[-0.01em]',
-        'transition-all duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex select-none items-center justify-center whitespace-nowrap rounded-btn font-medium',
+        'transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50',
         'focus-visible:focus-ring',
         variants[variant],
         sizes[size],

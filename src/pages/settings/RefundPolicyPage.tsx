@@ -164,7 +164,7 @@ export function RefundPolicyPage() {
           </div>
           <p className="text-xs text-text-muted">
             Changes apply to cancellations made after saving — a booking already cancelled under the old policy is never recalculated.
-            This is also what shows to customers on the <a href="/legal/refund-policy" target="_blank" className="text-primary underline">Cancellation &amp; Refund Policy</a> page — keep the two in sync manually for now.
+            This is also what shows to customers on the <a href="/legal/refund-policy" target="_blank" className="text-primary">Cancellation &amp; Refund Policy</a> page — keep the two in sync manually for now.
           </p>
         </CardBody>
       </Card>

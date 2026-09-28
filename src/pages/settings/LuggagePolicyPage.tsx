@@ -54,7 +54,7 @@ export function LuggagePolicyPage() {
           <Input label="Per extra kg (₹, optional)" type="number" value={f.perKg} error={e.perKg} hint="Empty = extra bags are sold as an add-on" onChange={(x) => setF({ ...f, perKg: x.target.value })} />
         </div>
         <Input label="Note for passengers (optional)" value={f.note} error={e.note} maxLength={300} placeholder="e.g. No gas cylinders or live animals" onChange={(x) => setF({ ...f, note: x.target.value })} />
-        <p className="text-xs text-text-muted">Extra bags per piece are an add-on at checkout — set their price in <Link className="underline" to="/pricing">Settings → Add-ons</Link>.</p>
+        <p className="text-xs text-text-muted">Extra bags per piece are an add-on at checkout — set their price in <Link className="" to="/pricing">Settings → Add-ons</Link>.</p>
         <div className="flex gap-2">
           <Button loading={save.isPending} disabled={save.isPending || Object.values(e).some(Boolean)} onClick={() => save.mutate()}>{live ? 'Save' : 'Publish'}</Button>
           {live && <Button variant="ghost" loading={reset.isPending} disabled={reset.isPending} onClick={() => reset.mutate()}>Withdraw</Button>}

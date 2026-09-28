@@ -40,7 +40,7 @@ export function RegisterPage() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10">
-      <h1 className="text-center font-display text-4xl tracking-tight text-text">Create your account</h1>
+      <h1 className="text-center text-2xl font-semibold text-text">Create your account</h1>
       <p className="mt-2 text-center text-sm text-text-muted">Book faster and manage all your trips in one place</p>
 
       <div className="mt-8 flex flex-col gap-4 rounded-card border border-border bg-surface p-6 shadow-card">

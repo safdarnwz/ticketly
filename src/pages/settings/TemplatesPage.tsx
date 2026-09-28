@@ -78,7 +78,7 @@ function TemplateEditor({ eventType, channel, template, placeholders, onSaved }:
       {bodyError && <span className="text-xs text-danger" role="alert">{bodyError}</span>}
       <div className="flex flex-wrap gap-1">
         {placeholders.map((p) => (
-          <button key={p} type="button" onClick={() => insert(p)} className="rounded bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-muted hover:text-text" title="Insert at the cursor">{`{{${p}}}`}</button>
+          <button key={p} type="button" onClick={() => insert(p)} className="rounded bg-surface-muted px-1.5 py-0.5 font-mono text-xs text-text-muted hover:text-text" title="Insert at the cursor">{`{{${p}}}`}</button>
         ))}
       </div>
       <div className="flex justify-end gap-2">

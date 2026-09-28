@@ -65,7 +65,7 @@ export function FixtureTile({ kind, small }: { kind: LayoutFixture['kind']; smal
     kind === 'washroom' ? <Bath className={icon} aria-hidden /> :
     kind === 'staircase' ? <Stairs className={icon} /> :
     kind === 'pantry' ? <Coffee className={icon} aria-hidden /> :
-    <span className="text-[8px] font-bold leading-none sm:text-[9px]">EXIT</span>;
+    <span className="text-[8px] font-bold leading-none sm:text-[11px]">EXIT</span>;
   const tone = kind === 'emergency_exit' ? 'border-[#fca5a5] bg-[#fef2f2] text-[#dc2626]' : kind === 'washroom' ? 'border-[#bae6fd] bg-[#f0f9ff] text-[#0369a1]' : 'border-[#e5e7eb] bg-[#f8fafc] text-[#64748b]';
   return (
     <span className={cn('flex h-full w-full flex-col items-center justify-center gap-0.5 rounded-[5px] border border-dashed', tone)} title={FIXTURE_LABEL[kind]}>
@@ -201,16 +201,16 @@ export function SeatMap({
                   const body: ReactNode = sleeper ? (
                     <span className={cn('relative block h-full w-full rounded-[5px] border-2', t.box)}>
                       <span className={cn('absolute rounded-full', t.pillow, horizontal ? 'left-1 top-1/2 h-2/3 w-1.5 -translate-y-1/2' : 'bottom-1 left-1/2 h-1.5 w-2/3 -translate-x-1/2')} />
-                      <span className={cn('absolute inset-x-0 top-1 text-center text-[9px] font-semibold leading-none sm:text-[10px]', t.text, horizontal && 'top-1/2 -translate-y-1/2')}>{s.seatNumber}</span>
-                      {caption && <span className={cn('absolute inset-x-0 text-center text-[9px] font-semibold leading-none sm:text-[10px]', t.text, horizontal ? 'bottom-0.5 left-3' : 'top-1/2 -translate-y-1/2')}>{caption}</span>}
+                      <span className={cn('absolute inset-x-0 top-1 text-center text-[11px] font-semibold leading-none sm:text-[11px]', t.text, horizontal && 'top-1/2 -translate-y-1/2')}>{s.seatNumber}</span>
+                      {caption && <span className={cn('absolute inset-x-0 text-center text-[11px] font-semibold leading-none sm:text-[11px]', t.text, horizontal ? 'bottom-0.5 left-3' : 'top-1/2 -translate-y-1/2')}>{caption}</span>}
                     </span>
                   ) : (
                     <span className="flex h-full w-full flex-col items-center">
                       <span className={cn('relative block aspect-square w-full', tone === 'blocked' && 'opacity-50')}>
                         <Chair tone={tone} semi={s.seatType === 'semi_sleeper'} />
-                        <span className={cn('absolute inset-x-0 top-[30%] text-center text-[8px] font-semibold leading-none sm:text-[9px]', tone === 'selected' || tone === 'boarded' ? 'text-white' : t.text)}>{s.seatNumber}</span>
+                        <span className={cn('absolute inset-x-0 top-[30%] text-center text-[8px] font-semibold leading-none sm:text-[11px]', tone === 'selected' || tone === 'boarded' ? 'text-white' : t.text)}>{s.seatNumber}</span>
                       </span>
-                      {caption && <span className={cn('mt-0.5 truncate text-center text-[8px] font-semibold leading-none sm:text-[9px]', tone === 'selected' ? 'text-[#1f9d55]' : t.text === 'text-white' ? 'text-[#1f9d55]' : t.text)}>{caption}</span>}
+                      {caption && <span className={cn('mt-0.5 truncate text-center text-[8px] font-semibold leading-none sm:text-[11px]', tone === 'selected' ? 'text-[#1f9d55]' : t.text === 'text-white' ? 'text-[#1f9d55]' : t.text)}>{caption}</span>}
                     </span>
                   );
                   return (

@@ -127,7 +127,7 @@ export function SearchForm({ compact, initialReturnDate, onDone }: {
     return (
       <form onSubmit={submit} noValidate className="flex min-w-0 flex-col gap-6">
         <div className="relative">
-          <div className="pr-16">
+          <div>
             {fromInput('journey')}
             <div className="flex items-center gap-3 py-1.5">
               <span className="flex w-3 justify-center self-stretch"><span className="dot-line h-full min-h-[28px]" /></span>
@@ -143,13 +143,6 @@ export function SearchForm({ compact, initialReturnDate, onDone }: {
             </div>
             {toInput('journey')}
           </div>
-          <button
-            type="submit"
-            aria-label="Search"
-            className="absolute right-0 top-1/2 flex h-14 w-14 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-primary-fg shadow-lg transition hover:scale-105 active:scale-95"
-          >
-            <Search className="h-6 w-6" />
-          </button>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -169,7 +162,7 @@ export function SearchForm({ compact, initialReturnDate, onDone }: {
           />
         )}
 
-        <Button type="submit" size="lg" fullWidth className="rounded-pill" leftIcon={<Search className="h-4 w-4" />}>
+        <Button type="submit" size="lg" fullWidth leftIcon={<Search className="h-4 w-4" />}>
           Search buses
         </Button>
       </form>
@@ -221,7 +214,7 @@ export function SearchForm({ compact, initialReturnDate, onDone }: {
             {errors.returnDate && <p className="mt-1 text-xs text-danger">{errors.returnDate}</p>}
           </div>
         )}
-        <Button type="submit" size="lg" leftIcon={<Search className="h-4 w-4" />} className="w-full rounded-pill lg:mt-7 lg:w-auto">
+        <Button type="submit" size="lg" leftIcon={<Search className="h-4 w-4" />} className="w-full lg:mt-7 lg:w-auto">
           Search buses
         </Button>
       </div>

@@ -104,9 +104,9 @@ export function TripPage() {
           </div>
         </div>
         <div className="flex items-center gap-3 rounded-2xl bg-surface-muted px-4 py-3 text-text">
-          <span className="flex flex-col"><span className="flex items-center gap-1.5 text-lg font-bold"><span className="dot-from !h-2.5 !w-2.5" />{formatTime(trip.departsAt)}</span><span className="max-w-[120px] truncate text-[11px] text-text-muted">{trip.boardingStop.name}</span></span>
-          <span className="flex flex-col items-center px-1 text-[11px] font-semibold text-secondary"><Clock className="mb-0.5 h-3.5 w-3.5" />{minutesToHm(trip.durationMin)}</span>
-          <span className="flex flex-col"><span className="flex items-center gap-1.5 text-lg font-bold"><span className="dot-to !h-2.5 !w-2.5" />{formatTime(trip.arrivesAt)}</span><span className="max-w-[120px] truncate text-[11px] text-text-muted">{trip.droppingStop.name}</span></span>
+          <span className="flex flex-col"><span className="flex items-center gap-1.5 text-lg font-bold"><span className="dot-from !h-2.5 !w-2.5" />{formatTime(trip.departsAt)}</span><span className="max-w-[120px] truncate text-xs text-text-muted">{trip.boardingStop.name}</span></span>
+          <span className="flex flex-col items-center px-1 text-xs font-semibold text-secondary"><Clock className="mb-0.5 h-3.5 w-3.5" />{minutesToHm(trip.durationMin)}</span>
+          <span className="flex flex-col"><span className="flex items-center gap-1.5 text-lg font-bold"><span className="dot-to !h-2.5 !w-2.5" />{formatTime(trip.arrivesAt)}</span><span className="max-w-[120px] truncate text-xs text-text-muted">{trip.droppingStop.name}</span></span>
         </div>
       </section>
 
@@ -157,7 +157,7 @@ export function TripPage() {
                 <span className="font-semibold">Fare</span>
                 <span className="font-display text-xl text-price">{sel.seats.length ? formatMoney(estimate, trip.currency) : '—'}</span>
               </div>
-              <p className="-mt-2 text-[11px] text-text-muted">Includes GST. Final price is confirmed on the next step.</p>
+              <p className="-mt-2 text-xs text-text-muted">Includes GST. Final price is confirmed on the next step.</p>
               <LuggageNote tripId={trip.tripId} />
               {error && <p role="alert" className="text-xs text-danger">{error}</p>}
               <Button

@@ -29,7 +29,6 @@ export function SchedulePage() {
       <PageHeader
         title="Schedule"
         subtitle="Recurring services — each creates its daily trips ahead of time"
-        action={<Link to="/trips"><Button variant="outline" leftIcon={<Bus className="h-4 w-4" />}>Trips & charts</Button></Link>}
       />
       <ServicesTab />
     </>
@@ -144,7 +143,7 @@ function ServicesTab() {
 
   return (
     <>
-      <div className="mb-4 flex justify-end"><Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setAdding(true)}>New service</Button></div>
+      <div className="mb-4 flex justify-end gap-2"><Link to="/trips"><Button variant="outline" leftIcon={<Bus className="h-4 w-4" />}>Trips & charts</Button></Link><Button leftIcon={<Plus className="h-4 w-4" />} onClick={() => setAdding(true)}>New service</Button></div>
       <div className="mb-4 flex flex-col gap-4">
         <ExtraTripSuggestions onAdd={(s) => { const svc = services.data?.services.find((x) => x.id === s.serviceId); if (svc) setManaging({ service: svc, tab: 'extra', date: s.journeyDate }); }} />
       </div>

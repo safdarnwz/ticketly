@@ -47,10 +47,10 @@ export function CustomerLayout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-bg">
-      <header className="sticky top-0 z-30 bg-bg/90 backdrop-blur supports-[backdrop-filter]:bg-bg/75">
+      <header className="sticky top-0 z-30 bg-bg">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <Link to="/" className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-secondary text-white shadow-sm"><Bus className="h-5 w-5" /></div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-fg"><Bus className="h-5 w-5" /></div>
             <span className="font-display text-xl text-text">Ticketly</span>
           </Link>
           <nav className="hidden items-center gap-2 sm:flex">
@@ -95,7 +95,7 @@ export function CustomerLayout() {
         </div>
       </footer>
       {/* Phone tab bar — the three places a traveller goes. */}
-      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(47,62,92,0.08)] backdrop-blur sm:hidden">
+      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] sm:hidden">
         <div className="mx-auto grid h-[64px] max-w-md grid-cols-3">
           {[
             { to: '/', label: 'Home', icon: Home, end: true },
@@ -106,7 +106,7 @@ export function CustomerLayout() {
               key={to}
               to={to}
               end={end}
-              className={({ isActive }) => cn('flex flex-col items-center justify-center gap-1 text-[11px] font-semibold', isActive ? 'text-accent' : 'text-text-muted')}
+              className={({ isActive }) => cn('flex flex-col items-center justify-center gap-1 text-xs font-semibold', isActive ? 'text-accent' : 'text-text-muted')}
             >
               {({ isActive }) => (
                 <>

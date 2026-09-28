@@ -24,10 +24,10 @@ function Kpi({ icon, label, value, hint, tone }: { icon: ReactNode; label: strin
   return (
     <Card>
       <CardBody className="flex flex-col items-start gap-2 p-4 sm:flex-row sm:gap-3 sm:p-card">
-        <div className={cn('rounded-xl bg-surface-muted p-2 text-text-muted', tone)}>{icon}</div>
+        <div className={cn('pt-0.5 text-text-muted', tone)}>{icon}</div>
         <div className="min-w-0 max-w-full">
           <div className="text-xs text-text-muted">{label}</div>
-          <div className="truncate font-display text-lg text-text sm:text-2xl" title={value}>{value}</div>
+          <div className="truncate text-lg font-semibold text-text sm:text-2xl" title={value}>{value}</div>
           {hint && <div className="text-xs text-text-muted">{hint}</div>}
         </div>
       </CardBody>
@@ -98,10 +98,9 @@ function StaffDashboard() {
 
   return (
     <>
-      <div className="mb-6 rounded-card bg-primary p-7 text-primary-fg sm:p-8">
-        <p className="text-sm font-medium text-white/60">Operator console</p>
-        <h1 className="mt-1 font-display text-2xl tracking-tight sm:text-3xl">{greeting()}{name ? `, ${name}` : ''}.</h1>
-        <p className="mt-2 max-w-lg text-[15px] text-white/60">Today’s departures, sales and cancellations — updated every 30 seconds.</p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold text-text">{greeting()}{name ? `, ${name}` : ''}</h1>
+        <p className="mt-1 text-sm text-text-muted">Today’s departures, sales and cancellations. Updates every 30 seconds.</p>
       </div>
 
       {summary.isError ? <ErrorState error={summary.error} onRetry={summary.refetch} /> : (
@@ -158,7 +157,7 @@ function StaffDashboard() {
         </Card>
       </div>
 
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">Quick actions</h2>
+      <h2 className="mb-3 text-xs font-semibold text-text-muted">Quick actions</h2>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {shortcuts.map(({ to, label, desc, icon: Icon }) => (
           <Link key={to} to={to}>
@@ -188,7 +187,7 @@ function HourlyChart({ items }: { items: { hour: number; bookingCount: number; g
       {byHour.map((h) => (
         <div key={h.hour} className="flex flex-1 flex-col items-center gap-1" title={`${String(h.hour).padStart(2, '0')}:00 — ${h.bookingCount} bookings, ${formatMoney(Number(h.grossMinor))}`}>
           <div className={cn('w-full rounded-t', h.hour > nowHour ? 'bg-surface-muted' : 'bg-primary')} style={{ height: `${Math.max(2, (Number(h.bookingCount) / max) * 128)}px` }} />
-          <span className="h-3 text-[10px] leading-3 text-text-muted">{h.hour % 3 === 0 ? String(h.hour).padStart(2, '0') : ''}</span>
+          <span className="h-3 text-xs leading-3 text-text-muted">{h.hour % 3 === 0 ? String(h.hour).padStart(2, '0') : ''}</span>
         </div>
       ))}
     </div>

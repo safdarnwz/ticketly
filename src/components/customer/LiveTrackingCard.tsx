@@ -50,7 +50,7 @@ export function LiveTrackingCard({ tripId }: { tripId: string }) {
               <div className="flex justify-between"><span className="text-text-muted">Speed</span><span className="font-medium">{live.data.speedKmph} km/h</span></div>
             )}
             {live.data.lastPingAt && (
-              <p className="text-[11px] text-text-muted">Updated {formatTime(live.data.lastPingAt)}</p>
+              <p className="text-xs text-text-muted">Updated {formatTime(live.data.lastPingAt)}</p>
             )}
           </div>
         )}

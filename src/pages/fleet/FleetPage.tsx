@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Bus, Users, LayoutGrid, Sparkles, Upload, CalendarClock } from 'lucide-react';
+import { Plus, Bus, Users, LayoutGrid, ListChecks, Upload, CalendarClock } from 'lucide-react';
 
 import { Button, Card, CardBody, Badge, statusTone, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast, TabBar } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -22,7 +22,7 @@ export function FleetPage() {
   const tabs: { key: Tab; label: string; icon: typeof Bus }[] = [
     { key: 'vehicles', label: 'Vehicles', icon: Bus },
     { key: 'layouts', label: 'Seat Layouts', icon: LayoutGrid },
-    { key: 'setup', label: 'Vehicle Types & Amenities', icon: Sparkles },
+    { key: 'setup', label: 'Vehicle Types & Amenities', icon: ListChecks },
     { key: 'crew', label: 'Crew & Duties', icon: Users },
     { key: 'renewals', label: 'Renewals', icon: CalendarClock },
   ];
@@ -125,7 +125,7 @@ function VehiclesTab() {
     { key: 'note', header: 'Service note', render: (r) => <span className="text-xs text-text-muted">{r.serviceNote ?? '—'}</span> },
     {
       key: 'actions', header: '', render: (r) => (
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className="flex justify-end gap-1 whitespace-nowrap">
           {r.status !== 'active' && <Button size="sm" variant="outline" onClick={() => setStatus.mutate({ id: r.id, status: 'active' })}>Activate</Button>}
           {r.status !== 'maintenance' && <Button size="sm" variant="ghost" onClick={() => setStatus.mutate({ id: r.id, status: 'maintenance' })}>Maintenance</Button>}
           {r.status !== 'retired' && <Button size="sm" variant="ghost" className="text-danger" onClick={() => setStatus.mutate({ id: r.id, status: 'retired' })}>Retire</Button>}

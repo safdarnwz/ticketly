@@ -9,7 +9,7 @@ const SECTIONS = [
   { to: '/settings/state-rules', label: 'State rules', icon: Landmark, description: 'Government rules per state (liquor, smoking…) every route carries' },
   { to: '/settings/role-templates', label: 'Role templates', icon: UsersRound, description: 'Ready-made staff roles operators copy' },
   { to: '/settings/system', label: 'System', icon: Server, description: 'Maintenance mode and windows, caches, audit log' },
-  { to: '/settings/appearance', label: 'Appearance', icon: Palette, description: 'The design system for the WHOLE platform' },
+  { to: '/settings/appearance', label: 'Appearance', icon: Palette, description: 'The design system for the whole platform' },
   { to: '/settings/i18n', label: 'i18n & Currency', icon: Languages, description: 'Shared translation and FX-rate catalog' },
   { to: '/settings/privacy', label: 'Privacy (DPDP)', icon: UserRound, description: 'Data-subject access/erasure requests' },
 ];

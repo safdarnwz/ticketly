@@ -77,7 +77,7 @@ export function SeatLayoutsTab() {
   });
 
   const columns: Column<SeatLayoutRow>[] = [
-    { key: 'name', header: 'Layout name', render: (r) => <button className="font-medium text-text underline decoration-dotted" onClick={() => navigate(`/fleet/seat-layouts/${r.id}`)}>{r.name}</button> },
+    { key: 'name', header: 'Layout name', render: (r) => <button className="font-medium text-text decoration-dotted" onClick={() => navigate(`/fleet/seat-layouts/${r.id}`)}>{r.name}</button> },
     { key: 'decks', header: 'Decks', render: (r) => r.decks ?? '—' },
     { key: 'seats', header: 'Total seats', render: (r) => r.totalSeats ?? '—' },
     {

@@ -53,7 +53,7 @@ function AnalyticsTab() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {kpis.map((k) => (
           <Card key={k.label}>
             <CardBody>
@@ -321,7 +321,7 @@ function SettingsTab() {
       <Card className="lg:col-span-2">
         <CardBody className="flex flex-col gap-2 text-sm text-text-muted">
           <div className="font-semibold text-text">How a booking splits</div>
-          <p>Customer pays: <b className="text-text">fare + ticket GST</b>. The platform takes ONLY <b className="text-text">commission + GST on that commission</b>, plus any <b className="text-text">SMS/WhatsApp fees + their GST</b> — everything else (fare + ticket GST) is paid to the operator, who remits the ticket GST themselves as the actual transport supplier.</p>
+          <p>Customer pays: <b className="text-text">fare + ticket GST</b>. The platform takes only <b className="text-text">commission + GST on that commission</b>, plus any <b className="text-text">SMS/WhatsApp fees + their GST</b> — everything else (fare + ticket GST) is paid to the operator, who remits the ticket GST themselves as the actual transport supplier.</p>
         </CardBody>
       </Card>
     </div>
@@ -489,7 +489,7 @@ function PayoutsTab() {
                 <div>
                   <div className="text-sm font-medium text-text">{r.tenantName}</div>
                   <div className="text-xs text-text-muted">{r.accountHolder} · ••••{r.accountNumber.slice(-4)} · {r.ifsc}{r.bankName ? ` · ${r.bankName}` : ''}</div>
-                  <div className="text-[11px] text-text-muted">Submitted {formatDateTime(r.createdAt)}</div>
+                  <div className="text-xs text-text-muted">Submitted {formatDateTime(r.createdAt)}</div>
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" loading={approveChange.isPending} onClick={() => approveChange.mutate(r.id)}>Approve</Button>
@@ -530,7 +530,7 @@ function PayoutsTab() {
             Download this CSV and upload it to your bank corporate-netbanking bulk-payment feature (NEFT/IMPS/RTGS) — the bank executes the actual transfers.
           </p>
           <Button variant="outline" leftIcon={<Download className="h-4 w-4" />} onClick={downloadCsv}>Download CSV</Button>
-          <pre className="max-h-48 overflow-auto rounded-md border border-border bg-surface-muted p-3 text-[11px]">{generatedCsv?.csv}</pre>
+          <pre className="max-h-48 overflow-auto rounded-md border border-border bg-surface-muted p-3 text-xs">{generatedCsv?.csv}</pre>
           <p className="text-xs text-text-muted">These are marked "in batch" now — click "mark as sent" once you've actually uploaded the file to the bank, so they don't get pulled into the next batch by mistake.</p>
         </div>
       </Modal>

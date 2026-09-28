@@ -73,29 +73,23 @@ export function ConfirmationPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 pb-12 pt-6">
       {/* A ticket-like banner: confirmed, the PNR to copy, and the journey. */}
-      <div className="relative mb-6 overflow-hidden rounded-[28px] bg-gradient-to-br from-accent to-secondary p-6 text-white shadow-lg">
+      <div className="relative mb-6 overflow-hidden rounded-2xl border border-border bg-surface p-6 text-text">
         <div className="flex items-center gap-3">
-          <CheckCircle2 className="h-9 w-9 shrink-0" />
+          <CheckCircle2 className="h-8 w-8 shrink-0 text-success" />
           <div className="min-w-0">
             <h1 className="font-display text-2xl">Booking confirmed</h1>
-            <p className="flex items-center gap-2 text-sm text-white/85">
-              PNR <b className="font-mono text-base tracking-wider text-white">{b.pnr}</b>
-              <button type="button" onClick={() => void copyPnr()} aria-label="Copy PNR" className="rounded-full p-1 hover:bg-white/20"><Copy className="h-3.5 w-3.5" /></button>
+            <p className="flex items-center gap-2 text-sm text-text-muted">
+              PNR <b className="font-mono text-base text-text">{b.pnr}</b>
+              <button type="button" onClick={() => void copyPnr()} aria-label="Copy PNR" className="rounded-full p-1 hover:bg-surface-muted"><Copy className="h-3.5 w-3.5" /></button>
             </p>
           </div>
         </div>
         {b.points && (
-          <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl bg-white/15 px-4 py-3">
-            <div className="min-w-0"><div className="font-display text-xl">{formatTime(b.points.fromAt)}</div><div className="truncate text-xs text-white/85">{b.points.from}</div></div>
-            <div className="h-px flex-1 border-t border-dashed border-white/60" />
-            <div className="min-w-0 text-right"><div className="font-display text-xl">{formatTime(b.points.toAt)}</div><div className="truncate text-xs text-white/85">{b.points.to}</div></div>
+          <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl bg-surface-muted px-4 py-3">
+            <div className="min-w-0"><div className="font-display text-xl">{formatTime(b.points.fromAt)}</div><div className="truncate text-xs text-text-muted">{b.points.from}</div></div>
+            <div className="h-px flex-1 border-t border-dashed border-border" />
+            <div className="min-w-0 text-right"><div className="font-display text-xl">{formatTime(b.points.toAt)}</div><div className="truncate text-xs text-text-muted">{b.points.to}</div></div>
           </div>
-        )}
-        {b.points && (
-          <>
-            <span aria-hidden className="absolute -left-4 bottom-[74px] h-8 w-8 rounded-full bg-bg" />
-            <span aria-hidden className="absolute -right-4 bottom-[74px] h-8 w-8 rounded-full bg-bg" />
-          </>
         )}
       </div>
 

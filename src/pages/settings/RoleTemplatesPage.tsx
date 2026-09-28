@@ -97,7 +97,7 @@ function TemplateModal({ t, onClose }: { t: RoleTemplate | null; onClose: () => 
                 {g.items.map((p) => (
                   <label key={p.code} className="flex items-start gap-2 py-0.5">
                     <input type="checkbox" className="mt-0.5" checked={perms.includes(p.code)} onChange={(x) => toggle(p.code, x.target.checked)} />
-                    <span>{p.label} <span className="font-mono text-[11px] text-text-muted">{p.code}</span></span>
+                    <span>{p.label} <span className="font-mono text-xs text-text-muted">{p.code}</span></span>
                   </label>
                 ))}
               </fieldset>

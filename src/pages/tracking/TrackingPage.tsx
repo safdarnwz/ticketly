@@ -225,7 +225,7 @@ export function TrackingPage() {
 
       {live && (
         <p className="text-center text-xs text-text-muted">
-          Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="underline">OpenStreetMap</a> contributors.
+          Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="">OpenStreetMap</a> contributors.
           {data.lastPingAt && ` Last updated ${formatTime(data.lastPingAt)}.`}
         </p>
       )}

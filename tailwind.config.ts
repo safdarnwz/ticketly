@@ -46,6 +46,15 @@ export default {
         card: 'var(--yb-card-shadow)',
         dropdown: 'var(--yb-dropdown-shadow)',
       },
+      // One family, three weights: 400 body, 500 emphasis, 600 headings.
+      // Nothing heavier anywhere, whatever class a screen uses.
+      fontWeight: {
+        medium: '500',
+        semibold: '500',
+        bold: '600',
+        extrabold: '600',
+        black: '600',
+      },
       fontFamily: {
         sans: 'var(--yb-font-family)',
         heading: 'var(--yb-font-family-heading)',

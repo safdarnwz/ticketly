@@ -76,7 +76,7 @@ export function ResultFilters({ value, onChange, facets, showHeading = true }: {
       </div>
 
       <section>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Departure</h3>
+        <h3 className="mb-2 text-xs font-semibold text-text-muted">Departure</h3>
         <div className="grid grid-cols-2 gap-1.5">
           {DEPARTURE_SLOTS.map((s) => (
             <Chip key={s.key} on={value.slot === s.key} onClick={() => onChange({ ...value, slot: value.slot === s.key ? undefined : s.key })}>
@@ -88,7 +88,7 @@ export function ResultFilters({ value, onChange, facets, showHeading = true }: {
 
       {seatTypes.length > 1 && (
         <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Seat type</h3>
+          <h3 className="mb-2 text-xs font-semibold text-text-muted">Seat type</h3>
           <div className="flex flex-wrap gap-1.5">
             {seatTypes.map((t) => (
               <Chip key={t} on={value.seatTypes.includes(t)} onClick={() => onChange({ ...value, seatTypes: toggle(value.seatTypes, t) })}>
@@ -100,7 +100,7 @@ export function ResultFilters({ value, onChange, facets, showHeading = true }: {
       )}
 
       <section>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Price (₹)</h3>
+        <h3 className="mb-2 text-xs font-semibold text-text-muted">Price (₹)</h3>
         <div className="flex items-center gap-2">
           <input
             inputMode="numeric"
@@ -128,7 +128,7 @@ export function ResultFilters({ value, onChange, facets, showHeading = true }: {
       </section>
 
       <section>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Rating</h3>
+        <h3 className="mb-2 text-xs font-semibold text-text-muted">Rating</h3>
         <div className="flex gap-1.5">
           {[3, 4, 4.5].map((r) => (
             <Chip key={r} on={value.minRating === r} onClick={() => onChange({ ...value, minRating: value.minRating === r ? undefined : r })}>
@@ -140,7 +140,7 @@ export function ResultFilters({ value, onChange, facets, showHeading = true }: {
 
       {amenities.length > 0 && (
         <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Amenities</h3>
+          <h3 className="mb-2 text-xs font-semibold text-text-muted">Amenities</h3>
           <div className="flex flex-col gap-1.5">
             {amenities.map((a) => (
               <label key={a.code} className="flex cursor-pointer items-center gap-2 text-text">
@@ -150,7 +150,7 @@ export function ResultFilters({ value, onChange, facets, showHeading = true }: {
                   onChange={() => onChange({ ...value, amenities: toggle(value.amenities, a.code) })}
                   className="h-4 w-4 rounded accent-[var(--yb-color-primary)]"
                 />
-                {a.icon && <span aria-hidden>{a.icon}</span>} {a.name}
+                {a.name}
               </label>
             ))}
           </div>

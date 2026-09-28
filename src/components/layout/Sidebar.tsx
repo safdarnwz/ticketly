@@ -104,7 +104,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <div className="flex flex-col leading-tight">
           <span className="font-display text-xl text-text">Ticketly</span>
           {!isSuperAdmin && SURFACE_TENANT_SLUG && (
-            <span className="text-[11px] text-text-muted">{SURFACE_TENANT_SLUG}</span>
+            <span className="text-xs text-text-muted">{SURFACE_TENANT_SLUG}</span>
           )}
         </div>
       </div>
@@ -136,7 +136,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           </NavLink>
         ))}
       </nav>
-      <div className="border-t border-border p-4 text-[11px] leading-relaxed text-text-muted">
+      <div className="border-t border-border p-4 text-xs leading-relaxed text-text-muted">
         {FOOTER[kind]} · v1.0
       </div>
     </>

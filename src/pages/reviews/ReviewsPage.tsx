@@ -61,7 +61,7 @@ export function ReviewsPage() {
       <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card>
           <CardBody className="flex items-center gap-4">
-            <div className="text-4xl font-semibold text-text">{summary ? summary.average.toFixed(1) : '–'}</div>
+            <div className="text-3xl font-semibold text-text">{summary ? summary.average.toFixed(1) : '–'}</div>
             <div>
               <Stars value={summary?.average ?? 0} />
               <div className="text-sm text-text-muted">{total} review{total === 1 ? '' : 's'}{vehicleId ? ' for this bus' : routeId ? ' on this route' : ''}</div>
@@ -126,7 +126,7 @@ export function ReviewsPage() {
                     {r.busNumber && r.vehicleId ? <><button type="button" title="Only this bus's reviews" className="font-mono font-semibold text-text hover:underline" onClick={() => setVehicleId(r.vehicleId!)}>{r.busNumber}</button> · </> : null}{r.routeName ?? 'Route'}{r.journeyDate ? ` · travelled ${formatDateLabel(r.journeyDate, { day: '2-digit', month: 'short' })}` : ''} · <Link className="font-mono text-primary hover:underline" to={`/bookings/${r.pnr}`}>{r.pnr}</Link> · {formatDateTime(r.createdAt)}
                   </div>
                 </div>
-                {r.body ? <p className="whitespace-pre-line text-sm text-text">{r.body}</p> : <p className="text-sm italic text-text-muted">Stars only, no comment.</p>}
+                {r.body ? <p className="whitespace-pre-line text-sm text-text">{r.body}</p> : <p className="text-sm text-text-muted">Stars only, no comment.</p>}
                 {r.reply && (
                   <div className="rounded-md border-l-4 border-primary bg-surface-muted p-3 text-sm">
                     <div className="mb-1 text-xs font-semibold text-text-muted">Your answer · {r.repliedAt ? formatDateTime(r.repliedAt) : ''}</div>

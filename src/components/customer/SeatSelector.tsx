@@ -21,7 +21,7 @@ export interface SeatSelection {
 function StopList({ title, stops, value, onPick }: { title: string; stops: TripStop[]; value?: string; onPick: (s: TripStop) => void }) {
   return (
     <fieldset>
-      <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">{title}</legend>
+      <legend className="mb-2 text-xs font-semibold text-text-muted">{title}</legend>
       <div className="flex max-h-56 flex-col gap-1 overflow-y-auto pr-1">
         {stops.map((s) => (
           <label

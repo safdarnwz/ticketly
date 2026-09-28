@@ -97,7 +97,7 @@ export function AppearancePage() {
     <>
       <PageHeader
         title="Appearance"
-        subtitle="Customize the design system for the WHOLE platform — the super-admin console, every operator's own console, and the customer site. Per-role overrides layer on top of the platform default."
+        subtitle="Customize the design system for the whole platform — the super-admin console, every operator's own console, and the customer site. Per-role overrides layer on top of the platform default."
         action={
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setThemeState(DEFAULT_THEME)} leftIcon={<RotateCcw className="h-4 w-4" />}>
@@ -156,7 +156,9 @@ export function AppearancePage() {
               <NumberField label="Base font size" value={theme.font.sizeBase} min={12} max={18} onChange={(v) => setFont('sizeBase', v)} suffix="px" />
               <div className="flex flex-col gap-1.5 sm:col-span-2">
                 <span className="text-xs font-medium text-text-muted">Font family</span>
-                <Input value={theme.font.family} onChange={(e) => setFont('family', e.target.value)} />
+                {/* One family for the whole platform, bundled with the app — not a free choice. */}
+                <p className="text-sm text-text">Inter — regular 400, medium 500, headings 600</p>
+                <p className="text-xs text-text-muted">The same font on every screen for passengers, operators, agents and crew.</p>
               </div>
             </CardBody>
           </Card>

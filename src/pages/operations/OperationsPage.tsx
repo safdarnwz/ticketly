@@ -67,7 +67,7 @@ function OnTheRoad() {
   const columns: Column<BusOnRoad>[] = [
     { key: 'bus', header: 'Bus', render: (r) => <div><Link className="font-medium text-primary hover:underline" to={`/trips/${r.tripId}`}>{r.routeName}</Link><div className="font-mono text-xs text-text-muted">{r.bus ?? 'no bus assigned'} · left {formatTime(r.departsAt)}</div></div> },
     { key: 'where', header: 'Where', render: (r) => r.lat == null || r.lng == null ? <span className="text-text-muted">No GPS yet</span>
-      : <a className="text-primary underline" href={`https://www.google.com/maps?q=${r.lat},${r.lng}`} target="_blank" rel="noreferrer">{Number(r.lat).toFixed(4)}, {Number(r.lng).toFixed(4)}</a> },
+      : <a className="text-primary" href={`https://www.google.com/maps?q=${r.lat},${r.lng}`} target="_blank" rel="noreferrer">{Number(r.lat).toFixed(4)}, {Number(r.lng).toFixed(4)}</a> },
     { key: 'speed', header: 'Speed', render: (r) => (r.speedKmph == null ? '—' : `${Math.round(Number(r.speedKmph))} km/h`) },
     { key: 'next', header: 'Next stop', render: (r) => r.nextStop ? <span>{r.nextStop}{r.nextStopEtaAt ? <span className="text-text-muted"> · {formatTime(r.nextStopEtaAt)}</span> : null}</span> : '—' },
     { key: 'late', header: 'Running', render: (r) => { const d = Number(r.delayMinutes); return d > 0 && d < 1440 ? <Badge tone="warning">{d} min late</Badge> : d < -5 && d > -1440 ? <Badge tone="success">{-d} min early</Badge> : <span className="text-text-muted">on time</span>; } },

@@ -307,7 +307,7 @@ function StopsTab() {
   const openEdit = (s: Stop) => { setEditing(s); setForm({ cityId: s.cityId ?? '', name: s.name, kind: s.kind, landmark: s.landmark ?? '', address: s.address ?? '', pincode: s.pincode ?? '' }); };
 
   const columns: Column<Stop>[] = [
-    { key: 'name', header: 'Stop', render: (s) => <button className="font-medium text-text underline decoration-dotted" onClick={() => openEdit(s)}>{s.name}</button> },
+    { key: 'name', header: 'Stop', render: (s) => <button className="font-medium text-text decoration-dotted" onClick={() => openEdit(s)}>{s.name}</button> },
     { key: 'kind', header: 'Type', render: (s) => <Badge>{s.kind}</Badge> },
     { key: 'landmark', header: 'Landmark', render: (s) => s.landmark ?? '—' },
     { key: 'pincode', header: 'Pincode', render: (s) => s.pincode ?? '—' },

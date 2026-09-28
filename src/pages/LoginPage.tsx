@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Phone, Lock, Eye, EyeOff, Bus, ShieldCheck, Sparkles } from 'lucide-react';
+import { Phone, Lock, Eye, EyeOff, Bus, ShieldCheck } from 'lucide-react';
 
 import { Button, useToast } from '@/components/ui';
 import { useAuth, homeForRoles } from '@/stores/auth';
@@ -46,10 +46,7 @@ export function LoginPage() {
         </div>
 
         <div className="max-w-md">
-          <p className="mb-4 inline-flex items-center gap-2 rounded-pill border border-white/20 px-3 py-1 text-xs font-medium text-white/80">
-            <Sparkles className="h-3.5 w-3.5" /> Enterprise bus distribution platform
-          </p>
-          <h2 className="font-display text-4xl leading-tight xl:text-[2.7rem]">
+          <h2 className="text-3xl font-semibold leading-tight">
             The command centre for modern bus travel.
           </h2>
           <p className="mt-4 text-[15px] leading-relaxed text-white/65">
@@ -73,7 +70,7 @@ export function LoginPage() {
             <span className="font-display text-xl text-text">Ticketly</span>
           </div>
 
-          <h1 className="font-display text-4xl tracking-tight text-text">Welcome back</h1>
+          <h1 className="text-2xl font-semibold text-text">Welcome back</h1>
           <p className="mt-2 text-text-muted">Sign in to continue to your Ticketly workspace.</p>
 
           <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">

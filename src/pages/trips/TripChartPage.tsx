@@ -442,7 +442,7 @@ function LiveLocation({ tripId, stops }: { tripId: string; stops: { stopId: stri
           <p className="text-text-muted">No GPS signal from this bus yet — the crew app sends it once the trip starts.</p>
         ) : (
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-            <a className="text-primary underline" href={`https://www.google.com/maps?q=${l.lat},${l.lng}`} target="_blank" rel="noreferrer">{Number(l.lat).toFixed(5)}, {Number(l.lng).toFixed(5)}</a>
+            <a className="text-primary" href={`https://www.google.com/maps?q=${l.lat},${l.lng}`} target="_blank" rel="noreferrer">{Number(l.lat).toFixed(5)}, {Number(l.lng).toFixed(5)}</a>
             {l.speedKmph != null && <span>{Math.round(Number(l.speedKmph))} km/h</span>}
             {l.nextStopId && <span>Next: {stops.find((s) => s.stopId === l.nextStopId)?.name ?? 'next stop'}{l.nextStopEtaAt ? ` at ${formatTime(l.nextStopEtaAt)}` : ''}</span>}
             {Number(l.delayMinutes) > 0 && Number(l.delayMinutes) < 24 * 60 ? <Badge tone="warning">{l.delayMinutes} min late</Badge> : Number(l.delayMinutes) < -5 && Number(l.delayMinutes) > -24 * 60 ? <Badge tone="success">{-Number(l.delayMinutes)} min early</Badge> : null}

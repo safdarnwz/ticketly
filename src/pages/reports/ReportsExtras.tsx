@@ -95,7 +95,7 @@ export function DispatchTab({ from, to }: { from: string; to: string }) {
         <h3 className="mb-2 text-sm font-semibold text-text">Late departures</h3>
         {delayed.length === 0 ? <EmptyState title="No trip left more than 10 minutes late" /> : (
           <Table rows={delayed} columns={[
-            { key: 'route', header: 'Route', render: (r) => <Link className="text-primary underline" to={`/trips/${r.tripId}`}>{r.routeName}</Link> },
+            { key: 'route', header: 'Route', render: (r) => <Link className="text-primary" to={`/trips/${r.tripId}`}>{r.routeName}</Link> },
             { key: 'sched', header: 'Scheduled', render: (r) => formatDateTime(r.scheduled) },
             { key: 'actual', header: 'Left at', render: (r) => formatDateTime(r.actual) },
             { key: 'late', header: 'Late by', render: (r) => <span className="text-danger">{minutesToHm(r.delayMin)}</span> },
@@ -138,7 +138,7 @@ export function ForecastTab() {
   const weak = useQuery({ queryKey: ['report-weak', suggestDays, maxPct], queryFn: () => reportsApi.cancelSuggestions(suggestDays, maxPct) });
   const pct = (r: ForecastRow) => (r.forecastPct == null ? <span className="text-text-muted">not enough history</span> : <span className={r.forecastPct < maxPct ? 'text-danger' : 'text-text'}>{r.forecastPct}% ({r.forecastSeats} seats)</span>);
   const base: Column<ForecastRow>[] = [
-    { key: 'trip', header: 'Trip', render: (r) => <Link className="text-primary underline" to={`/trips/${r.tripId}`}>{r.routeName} · {formatDateLabel(r.journeyDate)}</Link> },
+    { key: 'trip', header: 'Trip', render: (r) => <Link className="text-primary" to={`/trips/${r.tripId}`}>{r.routeName} · {formatDateLabel(r.journeyDate)}</Link> },
     { key: 'sold', header: 'Sold now', render: (r) => `${r.currentSold} / ${r.totalSeats}` },
     { key: 'fc', header: 'Expected at departure', render: pct },
     { key: 'conf', header: 'Confidence', render: (r) => <Badge tone={CONF_TONE[r.confidence]}>{r.confidence}</Badge> },

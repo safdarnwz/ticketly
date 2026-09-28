@@ -105,8 +105,8 @@ function PartnerSyncCard({ tripId, own, locked, onChanged }: { tripId: string; o
             <li key={i.code} className="flex flex-wrap items-center justify-between gap-2 rounded bg-warning/10 px-2 py-1 text-xs text-text">
               <span>{i.message}</span>
               {i.code === 'closed_on_trip' && !locked && <Button size="sm" variant="outline" loading={reopen.isPending} disabled={reopen.isPending} onClick={() => reopen.mutate()}>Reopen for partners</Button>}
-              {(i.code === 'no_partner') && <Link className="text-primary underline" to="/distribution">Distribution → Partners</Link>}
-              {i.code === 'closed_on_service' && <Link className="text-primary underline" to="/schedule">Open the service</Link>}
+              {(i.code === 'no_partner') && <Link className="text-primary" to="/distribution">Distribution → Partners</Link>}
+              {i.code === 'closed_on_service' && <Link className="text-primary" to="/schedule">Open the service</Link>}
             </li>
           ))}
         </ul>

@@ -1,7 +1,6 @@
 import { ArrowLeft } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-import { Button } from '@/components/ui';
 import { isCustomer, isSuperAdmin } from '@/lib/host';
 
 /**
@@ -37,8 +36,10 @@ export function BackButton({ to, label = 'Back' }: { to?: string; label?: string
   };
 
   return (
-    <Button variant="ghost" size="sm" onClick={onClick} leftIcon={<ArrowLeft className="h-4 w-4" />}>
+    // Flush with the content below it: no side padding, so the arrow lines up with the heading.
+    <button type="button" onClick={onClick} className="-ml-0.5 inline-flex items-center gap-1.5 rounded-md py-1 text-sm text-text-muted hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border">
+      <ArrowLeft className="h-4 w-4" />
       {label}
-    </Button>
+    </button>
   );
 }

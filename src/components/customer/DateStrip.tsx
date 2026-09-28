@@ -60,14 +60,14 @@ export function DateStrip({ label, value, min, max, days = 21, onChange, error }
                 on ? 'bg-accent text-white shadow-md' : 'bg-surface-muted text-text-muted hover:bg-border',
               )}
             >
-              <span className={cn('w-full truncate text-[10px] font-semibold', on ? 'text-white/90' : '')}>{p.weekday}</span>
-              <span className={cn('font-display text-[30px] leading-none', on ? 'text-white' : 'text-text-muted/70')}>{p.day}</span>
+              <span className={cn('w-full truncate text-xs font-semibold', on ? 'text-white/90' : '')}>{p.weekday}</span>
+              <span className={cn('text-xl font-medium leading-none', on ? 'text-white' : 'text-text-muted/70')}>{p.day}</span>
             </button>
           );
         })}
         <label className="relative flex h-[84px] w-[74px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-border text-text-muted hover:bg-surface-muted">
           <CalendarDays className="h-5 w-5" />
-          <span className="text-[11px] font-semibold">Other date</span>
+          <span className="text-xs font-semibold">Other date</span>
           <input
             ref={picker}
             type="date"

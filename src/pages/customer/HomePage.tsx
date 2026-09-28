@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Copy, MapPinned, ShieldCheck, Ticket, UserRound, X } from 'lucide-react';
+import { Copy, MapPinned, ShieldCheck, Ticket, X } from 'lucide-react';
 
 import { Skeleton, useToast } from '@/components/ui';
 import { SearchForm } from '@/components/customer/SearchForm';
@@ -29,12 +28,12 @@ function RecentTripCard({ r, first, onPick }: { r: RecentSearch; first: boolean;
       onClick={onPick}
       aria-label={`Search ${r.from.name} to ${r.to.name} again`}
       className={cn(
-        'flex h-[168px] w-[136px] shrink-0 flex-col rounded-[20px] p-4 text-left transition hover:-translate-y-0.5',
+        'flex h-[168px] w-[136px] shrink-0 flex-col rounded-[20px] p-4 text-left transition',
         first ? 'bg-surface shadow-md' : 'bg-surface-muted',
       )}
     >
       <span className="text-[13px] text-text-muted">{p ? p.month : 'Any day'}</span>
-      <span className={cn('font-display text-[40px] leading-none', first ? 'text-price' : 'text-text')}>{p ? p.day : '—'}</span>
+      <span className={cn('text-2xl font-medium leading-none', first ? 'text-price' : 'text-text')}>{p ? p.day : '—'}</span>
       <span className="mt-auto flex flex-col gap-1 text-[13px] font-semibold text-text">
         <span className="flex items-center gap-2"><span className="dot-from !h-2.5 !w-2.5" /> <span className="truncate">{r.from.name}</span></span>
         <span className="ml-[4px] h-2 dot-line" />
@@ -58,7 +57,6 @@ export function HomePage() {
   }, []);
 
   const today = todayLocal();
-  const t = dayParts(today);
   const firstName = user?.fullName?.split(' ')[0];
 
   const copy = async (code: string) => {
@@ -84,24 +82,11 @@ export function HomePage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-12 pt-4 lg:pt-8">
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_480px] lg:items-start">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_480px] lg:grid-rows-[auto_1fr] lg:items-start">
         <div className="flex min-w-0 flex-col gap-8 lg:col-start-1 lg:row-start-1">
-          {/* Greeting: today's date, big and pink, and the account avatar. */}
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="font-display text-[44px] leading-none text-accent">{t.day}</div>
-              <div className="mt-1 text-2xl text-text">{t.weekday}</div>
-              <p className="mt-3 max-w-md text-[15px] text-text-muted">
-                {firstName ? `Hi ${firstName}, where to next?` : 'Compare buses from every operator, pick your seat and get an instant e-ticket.'}
-              </p>
-            </div>
-            <Link
-              to={user ? '/account' : '/login'}
-              aria-label={user ? 'My account' : 'Sign in'}
-              className="flex h-12 w-12 items-center justify-center rounded-full sm:hidden bg-gradient-to-br from-accent to-secondary text-base font-bold text-white shadow-md"
-            >
-              {firstName ? firstName[0]!.toUpperCase() : <UserRound className="h-5 w-5" />}
-            </Link>
+          <div>
+            <h1 className="text-2xl font-semibold text-text">{firstName ? `Hi ${firstName}, where to next?` : 'Book bus tickets'}</h1>
+            <p className="mt-2 max-w-md text-text-muted">Compare buses from every operator, pick your seat and get an e-ticket straight away.</p>
           </div>
 
           {recent.length > 0 && (
@@ -123,7 +108,7 @@ export function HomePage() {
         <section
           id="search-sheet"
           aria-label="Search buses"
-          className="-mx-4 min-w-0 scroll-mt-20 bg-surface px-5 pb-6 pt-7 shadow-lg sheet-top sm:mx-0 sm:rounded-[32px] lg:sticky lg:top-24 lg:col-start-2 lg:row-span-2 lg:row-start-1"
+          className="-mx-4 min-w-0 scroll-mt-20 border-y border-border bg-surface px-5 pb-6 pt-6 sm:mx-0 sm:rounded-2xl sm:border lg:sticky lg:top-24 lg:col-start-2 lg:row-span-2 lg:row-start-1"
         >
           <SearchForm />
         </section>
@@ -137,10 +122,10 @@ export function HomePage() {
               <h2 className="mb-3 font-display text-lg text-text">Offers for you</h2>
               <div className="flex flex-col gap-3">
                 {offerItems.map((o) => (
-                  <div key={o.code} className="flex items-center gap-4 rounded-[28px] bg-gradient-to-r from-accent to-accent/70 px-5 py-3.5 text-white shadow-md">
+                  <div key={o.code} className="flex items-center gap-4 rounded-xl border border-border bg-surface px-5 py-3.5 text-text">
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-display text-[17px]">{o.title}</div>
-                      <div className="truncate text-[11px] text-white/85">
+                      <div className="truncate font-medium">{o.title}</div>
+                      <div className="truncate text-xs text-text-muted">
                         {o.description ? `${o.description} · ` : ''}till {formatDateLabel(localDateOf(o.validTo), { day: '2-digit', month: 'short' })}
                       </div>
                     </div>
@@ -148,7 +133,7 @@ export function HomePage() {
                       <button
                         type="button"
                         onClick={() => void copy(o.couponCode!)}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-pill bg-white/20 px-3 py-1.5 font-mono text-xs font-semibold hover:bg-white/30"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-mono text-xs font-medium hover:bg-surface-muted"
                       >
                         {o.couponCode} <Copy className="h-3 w-3" />
                       </button>

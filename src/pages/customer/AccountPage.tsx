@@ -30,15 +30,15 @@ function TripRow({ bk, highlight }: { bk: Booking; highlight: boolean }) {
   const [from, to] = bk.fromName && bk.toName ? [bk.fromName, bk.toName] : (bk.routeName ?? '').split(/\s*(?:→|->|-)\s*/);
   return (
     <Link to={`/bookings/${bk.id}/manage`} className="block">
-      <div className={cn('flex items-stretch gap-4 rounded-[20px] p-3 pr-4 transition hover:-translate-y-0.5', highlight ? 'bg-surface shadow-md' : 'bg-surface shadow-sm')}>
+      <div className={cn('flex items-stretch gap-4 rounded-[20px] p-3 pr-4 transition', highlight ? 'bg-surface shadow-md' : 'bg-surface shadow-sm')}>
         <div className={cn('flex w-[68px] shrink-0 flex-col items-center justify-center rounded-2xl', highlight ? 'bg-accent text-white' : 'bg-surface-muted text-text')}>
-          <span className={cn('text-[11px] font-semibold', !highlight && 'text-text-muted')}>{month}</span>
-          <span className="font-display text-[28px] leading-none">{day}</span>
+          <span className={cn('text-xs font-semibold', !highlight && 'text-text-muted')}>{month}</span>
+          <span className="text-xl font-medium leading-none">{day}</span>
         </div>
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 py-1">
           <span className="flex items-center gap-2 text-sm font-semibold text-text"><span className="dot-from !h-2.5 !w-2.5" /><span className="truncate">{from || `PNR ${bk.pnr}`}</span></span>
           {to && <span className="flex items-center gap-2 text-sm font-semibold text-text"><span className="dot-to !h-2.5 !w-2.5" /><span className="truncate">{to}</span></span>}
-          <span className="truncate text-[11px] text-text-muted">
+          <span className="truncate text-xs text-text-muted">
             {d ? `${formatTime(bk.departsAt!)} · ` : ''}{bk.operatorName ? `${bk.operatorName} · ` : ''}PNR {bk.pnr} · {bk.seatCount} seat{bk.seatCount === 1 ? '' : 's'}
           </span>
         </div>

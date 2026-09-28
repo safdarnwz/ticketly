@@ -192,7 +192,7 @@ export function LiveBookingsPage() {
       key: 'status', header: 'Status', render: (b) => b.liveHold ? (
         <span className="inline-flex flex-col">
           <Badge tone="warning">Paying now</Badge>
-          {b.holdExpiresAt && <span className="mt-0.5 text-[11px] text-text-muted">hold ends {Math.max(0, Math.ceil((new Date(b.holdExpiresAt).getTime() - now) / 60000))} min</span>}
+          {b.holdExpiresAt && <span className="mt-0.5 text-xs text-text-muted">hold ends {Math.max(0, Math.ceil((new Date(b.holdExpiresAt).getTime() - now) / 60000))} min</span>}
         </span>
       ) : <Badge tone={statusTone(b.status)}>{b.status === 'completed' ? 'travelled' : b.status}</Badge>,
     },

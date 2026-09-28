@@ -151,7 +151,7 @@ function RoleEditor({ role, groups, onClose, onDone }: { role: Role | null; grou
         <div className="grid max-h-[55vh] grid-cols-1 gap-3 overflow-y-auto md:grid-cols-2">
           {groups.map((g) => (
             <fieldset key={g.group} className="rounded-md border border-border p-2">
-              <legend className="px-1 text-xs font-semibold uppercase text-text-muted">{g.group}</legend>
+              <legend className="px-1 text-xs font-semibold text-text-muted">{g.group}</legend>
               {g.items.map((i) => (
                 <label key={i.code} className={cn('flex items-start gap-2 py-0.5', !i.grantable && 'opacity-50')} title={i.grantable ? i.code : 'You do not hold this yourself, so you cannot hand it out'}>
                   <input type="checkbox" className="mt-0.5" checked={picked.has(i.code)} disabled={!i.grantable || save.isPending} onChange={() => toggle(i.code)} />

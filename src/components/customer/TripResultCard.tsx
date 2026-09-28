@@ -76,7 +76,7 @@ function JourneyTripCard({ trip, onSelect, actionLabel = 'View seats', selected 
 
           <div className="flex items-center justify-between gap-4 rounded-2xl bg-surface-muted/60 px-3 py-2 sm:justify-end sm:bg-transparent sm:p-0">
             <div className="text-left sm:text-right">
-              <div className="text-[11px] text-text-muted">Starts from</div>
+              <div className="text-xs text-text-muted">Starts from</div>
               <div className="font-display text-2xl text-price">{formatMoney(trip.fromPriceMinor, trip.currency)}</div>
               <div className={cn('text-xs', fewLeft ? 'font-semibold text-danger' : 'text-text-muted')}>
                 {trip.availableSeats} seat{trip.availableSeats === 1 ? '' : 's'} left
@@ -186,26 +186,26 @@ function ClassicTripCard({ trip, onSelect, actionLabel = 'View seats', selected 
 }
 
 /** The small phone card in a bus-type carousel: operator, type, time, duration, price. */
-export function CompactTripCard({ trip, onSelect, muted }: { trip: SearchResult; onSelect: (trip: SearchResult) => void; muted?: boolean }) {
+export function CompactTripCard({ trip, onSelect }: { trip: SearchResult; onSelect: (trip: SearchResult) => void }) {
   return (
     <button
       type="button"
       onClick={() => onSelect(trip)}
       aria-label={`${trip.operatorName}, ${formatTime(trip.departsAt)}, from ${formatMoney(trip.fromPriceMinor, trip.currency)}`}
-      className={cn('flex w-[176px] shrink-0 snap-start flex-col gap-3 rounded-[20px] p-4 text-left transition active:scale-[0.98]', muted ? 'bg-surface-muted' : 'bg-surface shadow-md')}
+      className="flex w-full flex-col gap-3 rounded-xl border border-border bg-surface p-4 text-left active:bg-surface-muted"
     >
       <div className="min-w-0">
-        <div className="truncate font-display text-[15px] text-text">{trip.operatorName}</div>
-        <div className="truncate text-[11px] text-text-muted">{trip.boardingStop.name}</div>
+        <div className="truncate font-medium text-text">{trip.operatorName}</div>
+        <div className="truncate text-xs text-text-muted">{trip.boardingStop.name}</div>
       </div>
       <div className="flex items-end justify-between gap-2">
         <div className="flex flex-col gap-1 text-xs text-text-muted">
-          <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5 text-accent" />{formatTime(trip.departsAt)}</span>
-          <span className="flex items-center gap-1"><ArrowRight className="h-3.5 w-3.5 text-secondary" />{minutesToHm(trip.durationMin)}</span>
+          <span className="text-sm text-text">{formatTime(trip.departsAt)} → {formatTime(trip.arrivesAt)}</span>
+          <span>{minutesToHm(trip.durationMin)}</span>
         </div>
-        <span className="font-display text-lg leading-none text-price">{formatMoney(trip.fromPriceMinor, trip.currency).replace(/\.00$/, '')}</span>
+        <span className="text-lg font-semibold leading-none text-text">{formatMoney(trip.fromPriceMinor, trip.currency).replace(/\.00$/, '')}</span>
       </div>
-      <span className={cn('text-[11px]', trip.availableSeats <= 5 ? 'font-semibold text-danger' : 'text-text-muted')}>{trip.availableSeats} seats left</span>
+      <span className={cn('text-xs', trip.availableSeats <= 5 ? 'font-semibold text-danger' : 'text-text-muted')}>{trip.availableSeats} seats left</span>
     </button>
   );
 }

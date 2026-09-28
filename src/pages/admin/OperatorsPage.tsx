@@ -62,7 +62,7 @@ export function OperatorsPage() {
     { key: 'kyc', header: 'KYC', render: (r) => <KycStatusCell applicationId={r.id} /> },
     {
       key: 'console', header: 'Console', render: (r) => r.consoleUrl ? (
-        <a href={r.consoleUrl} target="_blank" rel="noreferrer" className="font-mono text-xs text-primary underline">{r.consoleUrl}</a>
+        <a href={r.consoleUrl} target="_blank" rel="noreferrer" className="font-mono text-xs text-primary">{r.consoleUrl}</a>
       ) : <span className="text-text-muted">—</span>,
     },
     {

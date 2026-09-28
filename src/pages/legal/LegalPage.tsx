@@ -28,7 +28,7 @@ function renderMarkdown(md: string) {
       if (!m) { parts.push(rest); break; }
       if (m.index > 0) parts.push(rest.slice(0, m.index));
       if (m[1]) parts.push(<b key={key++} className="text-text">{m[2]}</b>);
-      else if (m[3]) parts.push(m[5].startsWith('/') ? <Link key={key++} to={m[5]} className="text-primary underline">{m[4]}</Link> : <a key={key++} href={m[5]} className="text-primary underline" target="_blank" rel="noreferrer">{m[4]}</a>);
+      else if (m[3]) parts.push(m[5].startsWith('/') ? <Link key={key++} to={m[5]} className="text-primary">{m[4]}</Link> : <a key={key++} href={m[5]} className="text-primary" target="_blank" rel="noreferrer">{m[4]}</a>);
       rest = rest.slice(m.index + m[0].length);
     }
     return parts;
