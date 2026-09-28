@@ -54,10 +54,10 @@ export function CustomersPage() {
       <PageHeader title="Customers" subtitle="Everyone who booked with you — accounts and guests, their trips and spend" />
       <Card className="mb-4">
         <CardBody className="flex flex-wrap items-end justify-between gap-3">
-          <div className="flex overflow-hidden rounded-md border border-border text-sm" role="tablist">
+          <div className="flex flex-wrap gap-1 text-sm" role="tablist">
             {FILTERS.map((f) => (
               <button key={f.key} role="tab" aria-selected={filter === f.key} onClick={() => { setFilter(f.key); setPage(1); }}
-                className={cn('px-3 py-2', filter === f.key ? 'bg-primary text-white' : 'bg-surface text-text hover:bg-surface-muted')}>{f.label}</button>
+                className={cn('rounded-md border px-3 py-1.5', filter === f.key ? 'border-primary bg-primary text-white' : 'border-border bg-surface text-text hover:bg-surface-muted')}>{f.label}</button>
             ))}
           </div>
           <div className="w-80"><Input aria-label="Search customers" placeholder="Name, mobile, email or PNR" leftIcon={<Search className="h-4 w-4" />} value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} /></div>

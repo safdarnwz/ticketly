@@ -9,8 +9,8 @@ export interface TabItem<K extends string> {
 }
 
 /**
- * The one tab strip for console pages: underlined tabs on a hairline, which
- * scroll sideways on a phone instead of pushing the page wider.
+ * The one tab strip for console pages: underlined tabs on a hairline. On a
+ * narrow screen the tabs wrap to a second line; nothing scrolls sideways.
  */
 export function TabBar<K extends string>({ items, value, onChange, className, label }: {
   items: readonly TabItem<K>[];
@@ -20,7 +20,7 @@ export function TabBar<K extends string>({ items, value, onChange, className, la
   label?: string;
 }) {
   return (
-    <div role="tablist" aria-label={label} className={cn('no-scrollbar flex gap-2 overflow-x-auto border-b border-border', className)}>
+    <div role="tablist" aria-label={label} className={cn('flex flex-wrap gap-x-2 border-b border-border', className)}>
       {items.map(({ key, label: text, icon: Icon }) => (
         <button
           key={key}
@@ -29,7 +29,7 @@ export function TabBar<K extends string>({ items, value, onChange, className, la
           aria-selected={value === key}
           onClick={() => onChange(key)}
           className={cn(
-            'flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium',
+            '-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium',
             value === key ? 'border-primary text-text' : 'border-transparent text-text-muted hover:text-text',
           )}
         >

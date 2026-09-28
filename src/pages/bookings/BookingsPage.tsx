@@ -170,7 +170,7 @@ export function BookingsPage() {
               <button type="button" className="text-primary hover:underline" onClick={() => { setDraft(''); set({ q: undefined }); }}>Back to the list</button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 items-end gap-3 md:grid-cols-4 xl:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] items-end gap-3">
               <Select label="Date is" value={basis} onChange={(e) => set({ basis: e.target.value === 'booked' ? undefined : e.target.value })} options={[{ value: 'booked', label: 'Booked on' }, { value: 'journey', label: 'Travelling on' }]} />
               <Input label="From" type="date" value={from} onChange={(e) => set({ from: e.target.value || undefined })} error={rangeError && from > to ? rangeError : undefined} />
               <Input label="To" type="date" value={to} onChange={(e) => set({ to: e.target.value || undefined })} error={rangeError && !(from > to) ? rangeError : undefined} />
@@ -183,7 +183,7 @@ export function BookingsPage() {
                 <Select label="Agent" value={agentId} onChange={(e) => set({ agent: e.target.value || undefined })}
                   options={[{ value: '', label: agents.isLoading ? 'Loading…' : 'All agents' }, ...(agents.data?.items ?? []).map((a) => ({ value: a.id, label: `${a.name}${a.status !== 'active' ? ` (${a.status})` : ''}` }))]} />
               )}
-              <div className="col-span-2 flex items-end gap-2 md:col-span-4 xl:col-span-1">
+              <div className="col-span-full flex flex-wrap items-end gap-2">
                 <Button variant="outline" onClick={() => set({ from: undefined, to: undefined })} disabled={from === today && to === today}>Today</Button>
                 <Button variant="outline" onClick={() => set({ from: addDaysIso(today, -6), to: today })}>7 days</Button>
               </div>

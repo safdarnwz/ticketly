@@ -204,13 +204,21 @@ export function ResultsPage() {
         </div>
       )}
 
-      {/* Date strip (onward date) */}
+      {/* Travel date: a row of days that fits the width; the arrows sit above it so every row starts at the same left edge. */}
       {leg === 'onward' && (
-        <div className="mb-4 flex items-center gap-1">
-          <button type="button" aria-label="Earlier dates" disabled={stripStart <= today} onClick={() => setDate(addDaysIso(date, -1) < today ? today : addDaysIso(date, -1))} className="rounded-full p-1.5 text-text-muted hover:bg-surface-muted disabled:opacity-30">
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <div className="grid flex-1 grid-cols-4 gap-2 sm:grid-cols-7">
+        <div className="mb-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm text-text-muted">Travel date</span>
+            <div className="flex gap-1">
+              <button type="button" aria-label="Earlier dates" disabled={stripStart <= today} onClick={() => setDate(addDaysIso(date, -1) < today ? today : addDaysIso(date, -1))} className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-surface text-text-muted hover:text-text disabled:opacity-40">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button type="button" aria-label="Later dates" onClick={() => setDate(addDaysIso(date, 1))} className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-surface text-text-muted hover:text-text">
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
             {strip.map((d, i) => (
               <button
                 key={d}
@@ -218,19 +226,16 @@ export function ResultsPage() {
                 onClick={() => setDate(d)}
                 aria-pressed={d === date}
                 className={cn(
-                  'flex flex-col items-start rounded-2xl px-3 py-2 text-left transition',
+                  'flex min-w-0 flex-col items-start rounded-lg border px-2.5 py-2 text-left',
                   i >= 4 && 'hidden sm:flex',
-                  d === date ? 'bg-accent text-white shadow-md' : 'bg-surface-muted text-text-muted hover:bg-border',
+                  d === date ? 'border-primary bg-primary text-primary-fg' : 'border-border bg-surface text-text hover:bg-surface-muted',
                 )}
               >
-                <span className="text-xs font-semibold">{formatDateLabel(d, { weekday: 'short' })}</span>
-                <span className={cn('font-display text-xl leading-tight', d !== date && 'text-text')}>{formatDateLabel(d, { day: 'numeric' })}<span className="ml-1 text-xs font-semibold">{formatDateLabel(d, { month: 'short' })}</span></span>
+                <span className={cn('text-xs', d === date ? 'text-primary-fg/80' : 'text-text-muted')}>{formatDateLabel(d, { weekday: 'short' })}</span>
+                <span className="text-base font-medium leading-tight">{formatDateLabel(d, { day: 'numeric' })} <span className="text-xs font-normal">{formatDateLabel(d, { month: 'short' })}</span></span>
               </button>
             ))}
           </div>
-          <button type="button" aria-label="Later dates" onClick={() => setDate(addDaysIso(date, 1))} className="rounded-full p-1.5 text-text-muted hover:bg-surface-muted">
-            <ChevronRight className="h-4 w-4" />
-          </button>
         </div>
       )}
 
@@ -253,14 +258,25 @@ export function ResultsPage() {
               <Button variant="outline" size="sm" className="lg:hidden" leftIcon={<SlidersHorizontal className="h-3.5 w-3.5" />} onClick={() => setFiltersOpen(true)}>
                 Filters{filterCount ? ` (${filterCount})` : ''}
               </Button>
-              <div className="flex overflow-x-auto rounded-pill bg-surface-muted p-1 text-xs no-scrollbar" role="group" aria-label="Sort">
+              {/* Phones: a plain select, so nothing scrolls sideways; wider screens: the buttons. */}
+              <label className="sm:hidden">
+                <span className="sr-only">Sort by</span>
+                <select
+                  value={sort}
+                  onChange={(e) => update((p) => (e.target.value === 'departure' ? p.delete('sort') : p.set('sort', e.target.value)))}
+                  className="h-9 rounded-md border border-border bg-surface px-2 text-sm text-text"
+                >
+                  {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </select>
+              </label>
+              <div className="hidden rounded-lg bg-surface-muted p-1 text-xs sm:flex" role="group" aria-label="Sort">
                 {SORTS.map((s) => (
                   <button
                     key={s.key}
                     type="button"
                     aria-pressed={sort === s.key}
                     onClick={() => update((p) => (s.key === 'departure' ? p.delete('sort') : p.set('sort', s.key)))}
-                    className={cn('whitespace-nowrap rounded-pill px-3 py-1.5 font-semibold', sort === s.key ? 'bg-surface text-text shadow-sm' : 'text-text-muted hover:text-text')}
+                    className={cn('whitespace-nowrap rounded-md px-3 py-1.5 font-medium', sort === s.key ? 'bg-surface text-text shadow-sm' : 'text-text-muted hover:text-text')}
                   >
                     {s.label}
                   </button>

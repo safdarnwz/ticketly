@@ -43,10 +43,10 @@ export function EscalationsPage() {
   return (
     <>
       <PageHeader title="Support escalations" subtitle="Problems operators could not solve themselves — waiting on us first, most urgent and oldest on top" />
-      <div className="mb-4 flex overflow-hidden rounded-md border border-border text-sm" role="tablist">
+      <div className="mb-4 flex flex-wrap gap-1 text-sm" role="tablist">
         {VIEWS.map((v) => (
           <button key={v.key} role="tab" aria-selected={view.key === v.key} onClick={() => setParams(v.key === 'active' ? {} : { view: v.key }, { replace: true })}
-            className={cn('px-3 py-2', view.key === v.key ? 'bg-primary text-white' : 'bg-surface text-text hover:bg-surface-muted')}>{v.label}</button>
+            className={cn('rounded-md border px-3 py-1.5', view.key === v.key ? 'border-primary bg-primary text-white' : 'border-border bg-surface text-text hover:bg-surface-muted')}>{v.label}</button>
         ))}
       </div>
       {list.isLoading ? <PageLoader /> : list.isError ? <ErrorState error={list.error} onRetry={list.refetch} /> : rows.length === 0 ? (

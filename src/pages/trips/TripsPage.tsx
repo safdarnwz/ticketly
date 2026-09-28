@@ -68,12 +68,18 @@ export function TripsPage() {
     <>
       <PageHeader title="Trips" subtitle="Each day’s buses — open one for its reservation chart, passengers and operations" />
       <Card className="mb-4">
-        <CardBody className="flex flex-wrap items-end gap-2">
-          <Button variant="outline" aria-label="Previous day" onClick={() => setDate(addDaysIso(date, -1))} disabled={!valid}><ChevronLeft className="h-4 w-4" /></Button>
-          <div className="w-44"><Input label="Journey date" type="date" value={date} onChange={(e) => setDate(e.target.value)} error={valid ? undefined : 'Pick a date'} /></div>
-          <Button variant="outline" aria-label="Next day" onClick={() => setDate(addDaysIso(date, 1))} disabled={!valid}><ChevronRight className="h-4 w-4" /></Button>
-          <Button variant="outline" onClick={() => setDate(today)} disabled={date === today}>Today</Button>
-          <Button variant="outline" onClick={() => setDate(addDaysIso(today, 1))}>Tomorrow</Button>
+        <CardBody className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex min-w-0 items-end gap-2">
+              <Button variant="outline" aria-label="Previous day" onClick={() => setDate(addDaysIso(date, -1))} disabled={!valid}><ChevronLeft className="h-4 w-4" /></Button>
+              <div className="w-40 min-w-0 sm:w-44"><Input label="Journey date" type="date" value={date} onChange={(e) => setDate(e.target.value)} error={valid ? undefined : 'Pick a date'} /></div>
+              <Button variant="outline" aria-label="Next day" onClick={() => setDate(addDaysIso(date, 1))} disabled={!valid}><ChevronRight className="h-4 w-4" /></Button>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setDate(today)} disabled={date === today}>Today</Button>
+              <Button variant="outline" onClick={() => setDate(addDaysIso(today, 1))}>Tomorrow</Button>
+            </div>
+          </div>
           <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Show">
             {FILTERS.map((f) => {
               const n = all.filter(f.match).length;
@@ -82,7 +88,7 @@ export function TripsPage() {
             })}
           </div>
           {valid && rows.length > 0 && (
-            <div className="ml-auto text-sm text-text-muted">{formatDateLabel(date, { weekday: 'long', day: '2-digit', month: 'short' })} · {rows.length} bus{rows.length === 1 ? '' : 'es'} · {sold}/{capacity} seats sold</div>
+            <div className="text-sm text-text-muted">{formatDateLabel(date, { weekday: 'long', day: '2-digit', month: 'short' })} · {rows.length} bus{rows.length === 1 ? '' : 'es'} · {sold}/{capacity} seats sold</div>
           )}
         </CardBody>
       </Card>

@@ -41,10 +41,10 @@ export function AgentBookingsPage() {
     <>
       <PageHeader title="My bookings" subtitle="Everything you sold — tap one to change or cancel it" />
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div className="flex overflow-hidden rounded-md border border-border text-sm" role="tablist">
+        <div className="flex flex-wrap gap-1 text-sm" role="tablist">
           {PERIODS.map((p) => (
             <button key={p.key} role="tab" aria-selected={period.key === p.key} onClick={() => setParams(p.key === 'all' ? {} : { period: p.key }, { replace: true })}
-              className={cn('px-3 py-2', period.key === p.key ? 'bg-primary text-white' : 'bg-surface text-text hover:bg-surface-muted')}>{p.label}</button>
+              className={cn('rounded-md border px-3 py-1.5', period.key === p.key ? 'border-primary bg-primary text-white' : 'border-border bg-surface text-text hover:bg-surface-muted')}>{p.label}</button>
           ))}
         </div>
         <div className="w-72"><Input aria-label="Find a booking" placeholder="PNR or passenger mobile" leftIcon={<Search className="h-4 w-4" />} value={q} onChange={(e) => setQ(e.target.value)} /></div>

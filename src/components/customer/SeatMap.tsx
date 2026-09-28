@@ -151,17 +151,17 @@ export function SeatMap({
   return (
     <div className="flex flex-col gap-3" style={style}>
       {onPriceFilter && prices.length > 1 && (
-        <div className="flex flex-wrap items-center justify-center gap-2" role="group" aria-label="Filter seats by price">
-          <button type="button" onClick={() => onPriceFilter(null)} className={cn('rounded-pill border px-3 py-1 text-xs font-semibold', priceFilter == null ? 'border-[#e8508a] bg-[#fff5f8] text-[#e8508a]' : 'border-border bg-surface text-text')}>All</button>
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter seats by price">
+          <button type="button" onClick={() => onPriceFilter(null)} className={cn('rounded-pill border px-3 py-1 text-xs font-medium', priceFilter == null ? 'border-primary bg-primary/5 text-primary' : 'border-border bg-surface text-text')}>All</button>
           {prices.map((p) => (
-            <button key={p} type="button" aria-pressed={priceFilter === p} onClick={() => onPriceFilter(priceFilter === p ? null : p)} className={cn('rounded-pill border px-3 py-1 text-xs font-semibold', priceFilter === p ? 'border-[#e8508a] bg-[#fff5f8] text-[#e8508a]' : 'border-border bg-surface text-text')}>
+            <button key={p} type="button" aria-pressed={priceFilter === p} onClick={() => onPriceFilter(priceFilter === p ? null : p)} className={cn('rounded-pill border px-3 py-1 text-xs font-medium', priceFilter === p ? 'border-primary bg-primary/5 text-primary' : 'border-border bg-surface text-text')}>
               {rupees(p)}
             </button>
           ))}
         </div>
       )}
 
-      <div className="flex justify-center gap-2 sm:gap-4">
+      <div className="flex max-w-full gap-2 sm:gap-4">
         {decks.map((deck) => {
           const seats = map.seats.filter((s) => s.deck === deck);
           const { rows, columns } = gridOf(deck);

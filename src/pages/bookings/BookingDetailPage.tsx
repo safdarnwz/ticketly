@@ -150,8 +150,8 @@ export function BookingDetailPage() {
           <CardHeader title="Passengers" />
           <CardBody>
             {passengers.length ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="min-w-0">
+                <table className="w-full text-sm [overflow-wrap:anywhere]">
                   <thead><tr className="text-left text-text-muted"><th className="py-2">Seat</th><th>Name</th><th>Age</th><th>Gender</th></tr></thead>
                   <tbody>
                     {passengers.map((p) => (
@@ -174,9 +174,9 @@ export function BookingDetailPage() {
             ) : tickets.isLoading ? <PageLoader /> : tickets.isError ? <ErrorState error={tickets.error} onRetry={tickets.refetch} /> : (
               <div className="flex flex-col gap-2">
                 {tickets.data?.tickets.map((t) => (
-                  <div key={t.seat} className="flex items-center justify-between rounded-md border border-border p-3">
-                    <div className="font-medium text-text">Seat {t.seat} <span className="text-text-muted">· {passengers.find((p) => p.seatNumber === t.seat)?.fullName ?? ''}</span></div>
-                    <div className="flex gap-2">
+                  <div key={t.seat} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border p-3">
+                    <div className="min-w-0 font-medium text-text [overflow-wrap:anywhere]">Seat {t.seat} <span className="text-text-muted">· {passengers.find((p) => p.seatNumber === t.seat)?.fullName ?? ''}</span></div>
+                    <div className="flex flex-wrap gap-2">
                       {t.ticketId && booking.status === 'confirmed' && <Button variant="ghost" size="sm" leftIcon={<ArrowUpCircle className="h-4 w-4" />} onClick={() => { setUpgrading({ ticketId: t.ticketId!, seat: t.seat }); setToSeat(''); }}>Upgrade</Button>}
                       <VerifyButton token={t.boardingToken} />
                       {t.ticketId && d && new Date(d.departsAt).getTime() <= Date.now() && booking.status === 'confirmed' && <NoShowButton ticketId={t.ticketId} onDone={() => void qc.invalidateQueries({ queryKey: ['tickets', id] })} />}

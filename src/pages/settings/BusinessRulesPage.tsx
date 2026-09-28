@@ -59,17 +59,22 @@ function GstCard({ slabs }: { slabs: GstSlab[] }) {
   return (
     <Card>
       <CardHeader title={<span className="flex items-center gap-2"><Receipt className="h-4 w-4" /> GST slabs</span>} subtitle="Rates used on tickets and platform fees" />
-      <CardBody className="flex flex-col gap-2 overflow-x-auto text-sm">
-        <div className="grid min-w-[640px] grid-cols-[11rem_1fr_6rem_10rem_2.5rem] gap-2 text-xs font-medium text-text-muted">
+      <CardBody className="flex flex-col gap-2 text-sm">
+        {/* Wide screens: one row per slab under a header; narrower: each slab as its own labelled group. */}
+        <div className="hidden grid-cols-[11rem_minmax(0,1fr)_6rem_10rem_2.5rem] gap-2 text-xs font-medium text-text-muted lg:grid">
           <span>Code</span><span>Name</span><span>Rate %</span><span>Applies to</span><span />
         </div>
         {rows.map((r, i) => (
-          <div key={i} className="grid min-w-[640px] grid-cols-[11rem_1fr_6rem_10rem_2.5rem] items-start gap-2">
-            <Input aria-label="Code" placeholder="code" value={r.code} error={rowErr[i].code} onChange={(e) => set(i, 'code', e.target.value)} />
-            <Input aria-label="Name" placeholder="Name" value={r.label} error={rowErr[i].label} onChange={(e) => set(i, 'label', e.target.value)} />
-            <Input aria-label="Rate %" type="number" value={r.ratePct} error={rowErr[i].rate} onChange={(e) => set(i, 'ratePct', e.target.value)} />
-            <Input aria-label="Applies to" placeholder="ticket" value={r.appliesTo} error={rowErr[i].applies} onChange={(e) => set(i, 'appliesTo', e.target.value)} />
-            <Button variant="ghost" size="sm" aria-label="Remove slab" disabled={rows.length === 1} onClick={() => setRows(rows.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
+          <div key={i} className="grid grid-cols-2 items-start gap-2 rounded-md border border-border p-3 lg:grid-cols-[11rem_minmax(0,1fr)_6rem_10rem_2.5rem] lg:border-0 lg:p-0">
+            {([['code', 'Code', 'code', rowErr[i].code], ['label', 'Name', 'Name', rowErr[i].label], ['ratePct', 'Rate %', '', rowErr[i].rate], ['appliesTo', 'Applies to', 'ticket', rowErr[i].applies]] as const).map(([k, label, ph, err]) => (
+              <div key={k} className="min-w-0">
+                <span className="mb-1 block text-xs text-text-muted lg:hidden">{label}</span>
+                <Input aria-label={label} placeholder={ph || undefined} type={k === 'ratePct' ? 'number' : undefined} value={r[k]} error={err} onChange={(e) => set(i, k, e.target.value)} />
+              </div>
+            ))}
+            <div className="col-span-2 flex justify-end lg:col-span-1">
+              <Button variant="ghost" size="sm" aria-label="Remove slab" disabled={rows.length === 1} onClick={() => setRows(rows.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
+            </div>
           </div>
         ))}
         <div className="flex gap-2">

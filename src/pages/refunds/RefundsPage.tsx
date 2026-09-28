@@ -133,10 +133,10 @@ export function RefundsPage() {
 
       <Card className="mb-4">
         <CardBody className="flex flex-wrap items-end justify-between gap-3">
-          <div className="flex overflow-hidden rounded-md border border-border text-sm" role="tablist">
+          <div className="flex flex-wrap gap-1 text-sm" role="tablist">
             {TABS.map((t) => (
               <button key={t.key} role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}
-                className={cn('flex items-center gap-1.5 px-3 py-2', tab === t.key ? 'bg-primary text-white' : 'bg-surface text-text hover:bg-surface-muted')}>
+                className={cn('flex items-center gap-1.5 rounded-md border px-3 py-1.5', tab === t.key ? 'border-primary bg-primary text-white' : 'border-border bg-surface text-text hover:bg-surface-muted')}>
                 {t.label}
                 {t.key === 'action' && needsAction > 0 && <span className={cn('rounded-full px-1.5 text-xs', tab === t.key ? 'bg-white/25' : 'bg-danger text-white')}>{needsAction}</span>}
               </button>

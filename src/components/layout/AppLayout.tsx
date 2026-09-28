@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 
-import { Sidebar, SidebarContent, useConsoleNav } from './Sidebar';
+import { Sidebar, SidebarContent } from './Sidebar';
+import { useConsoleNav } from './consoleNav';
 import { Topbar } from './Topbar';
 import { AnnouncementBanner } from './AnnouncementBanner';
 import { BackButton } from './BackButton';

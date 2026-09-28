@@ -93,8 +93,8 @@ export function LedgerTab({ from, to }: { from: string; to: string }) {
           {q.isLoading ? <PageLoader /> : q.isError ? <ErrorState error={q.error} onRetry={q.refetch} /> : items.length === 0 ? (
             <EmptyState title={pnr || type ? 'No entries match' : 'No money moved in this period'} description={pnr ? `Nothing for PNR ${pnr} in these dates — widen the dates above.` : undefined} />
           ) : (
-            <div className="overflow-x-auto rounded-md border border-border">
-              <table className="w-full text-sm">
+            <div className="overflow-hidden rounded-md border border-border">
+              <table className="w-full text-sm [overflow-wrap:anywhere]">
                 <thead className="bg-surface-muted text-left text-xs text-text-muted">
                   <tr><th className="w-8" /><th className="px-3 py-2">When</th><th className="px-3 py-2">Entry</th><th className="px-3 py-2">For</th><th className="px-3 py-2 text-right">Amount</th></tr>
                 </thead>
@@ -106,7 +106,7 @@ export function LedgerTab({ from, to }: { from: string; to: string }) {
                       <Fragment key={e.id}>
                         <tr className="cursor-pointer border-t border-border hover:bg-surface-muted" onClick={() => toggle(e.id)}>
                           <td className="px-2">{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</td>
-                          <td className="whitespace-nowrap px-3 py-2">{formatDateTime(e.createdAt)}</td>
+                          <td className="px-3 py-2">{formatDateTime(e.createdAt)}</td>
                           <td className="px-3 py-2"><Badge tone={e.type.startsWith('refund') ? 'warning' : e.type.startsWith('settlement') ? 'info' : 'success'}>{TYPE_LABEL[e.type] ?? e.type}</Badge></td>
                           <td className="px-3 py-2">{e.pnr ? <Link className="font-mono text-primary hover:underline" to={`/bookings/${e.pnr}`} onClick={(ev) => ev.stopPropagation()}>{e.pnr}</Link> : <span className="text-text-muted">{e.sourceType} {e.sourceId.slice(0, 8)}</span>}</td>
                           <td className="px-3 py-2 text-right font-medium">{money(amount)}</td>

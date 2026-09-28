@@ -11,15 +11,15 @@ import { SEAT_TYPE_LABEL, cn, formatMoney } from '@/lib/utils';
 
 const TABS = [
   ['highlights', 'Highlights'],
-  ['cancellation', 'Cancellation policy'],
-  ['route', 'Bus route'],
-  ['boarding', 'Boarding points'],
-  ['dropping', 'Dropping points'],
-  ['features', 'Bus features'],
+  ['cancellation', 'Cancellation'],
+  ['route', 'Route'],
+  ['boarding', 'Boarding'],
+  ['dropping', 'Dropping'],
+  ['features', 'Features'],
   ['reviews', 'Reviews'],
-  ['safety', 'Bus safety'],
+  ['safety', 'Safety'],
   ['about', 'About bus'],
-  ['policies', 'Other policies'],
+  ['policies', 'Policies'],
 ] as const;
 type TabKey = (typeof TABS)[number][0];
 
@@ -50,9 +50,6 @@ export function BusDetails({ tripId, fromStopId, toStopId, tenantId }: { tripId:
     Object.values(refs.current).forEach((el) => el && io.observe(el));
     return () => io.disconnect();
   }, [q.data]);
-  useEffect(() => {
-    tabBar.current?.querySelector(`[data-key="${active}"]`)?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
-  }, [active]);
 
   if (q.isLoading) return <Skeleton className="h-64 w-full" />;
   if (q.isError) return <ErrorState error={q.error} onRetry={q.refetch} />;
@@ -68,10 +65,19 @@ export function BusDetails({ tripId, fromStopId, toStopId, tenantId }: { tripId:
 
   return (
     <div className="rounded-2xl border border-border bg-surface">
-      <div ref={tabBar} role="tablist" aria-label="About this bus" className="sticky top-16 z-10 flex gap-1 overflow-x-auto rounded-t-2xl border-b border-border bg-surface px-2 [scrollbar-width:none]">
+      {/* Phones: one "jump to" picker; wider screens: tabs that wrap instead of scrolling sideways. */}
+      <div className="sticky top-16 z-10 rounded-t-2xl border-b border-border bg-surface px-4 py-2 md:hidden">
+        <label className="flex items-center gap-3 text-sm">
+          <span className="shrink-0 text-text-muted">Jump to</span>
+          <select value={active} onChange={(e) => go(e.target.value as TabKey)} className="h-9 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-text">
+            {TABS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+          </select>
+        </label>
+      </div>
+      <div ref={tabBar} role="tablist" aria-label="About this bus" className="sticky top-16 z-10 hidden flex-wrap gap-x-1 rounded-t-2xl border-b border-border bg-surface px-2 md:flex">
         {TABS.map(([k, label]) => (
           <button key={k} data-key={k} role="tab" aria-selected={active === k} onClick={() => go(k)}
-            className={cn('shrink-0 border-b-2 px-3 py-3 text-sm font-medium', active === k ? 'border-text text-text' : 'border-transparent text-text-muted hover:text-text')}>
+            className={cn('-mb-px border-b-2 px-3 py-3 text-sm font-medium', active === k ? 'border-text text-text' : 'border-transparent text-text-muted hover:text-text')}>
             {label}
           </button>
         ))}
@@ -148,8 +154,8 @@ export function BusDetails({ tripId, fromStopId, toStopId, tenantId }: { tripId:
       {section('about', 'About bus', d.bus ? (
         <div className="flex flex-col gap-4">
           {d.bus.photos.length > 0 ? (
-            <div className="flex snap-x gap-3 overflow-x-auto pb-1">
-              {d.bus.photos.map((p, i) => <img key={i} src={p.url} alt={p.caption ?? `${d.bus!.name} photo ${i + 1}`} className="h-44 w-72 shrink-0 snap-start rounded-2xl object-cover" loading="lazy" />)}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {d.bus.photos.map((p, i) => <img key={i} src={p.url} alt={p.caption ?? `${d.bus!.name} photo ${i + 1}`} className="aspect-[4/3] w-full rounded-lg object-cover" loading="lazy" />)}
             </div>
           ) : <div className="flex h-32 items-center justify-center rounded-2xl bg-surface-muted text-sm text-text-muted"><BusIcon className="mr-2 h-5 w-5" /> No photos yet</div>}
           <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">

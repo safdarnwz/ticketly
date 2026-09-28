@@ -19,7 +19,7 @@ const dayParts = (iso: string) => {
   };
 };
 
-/** A past search as a trip card: month, big day, the pink "from" and purple "to" dots. */
+/** A past search, one row: from → to and the day searched. */
 function RecentTripCard({ r, first, onPick }: { r: RecentSearch; first: boolean; onPick: () => void }) {
   const p = r.date ? dayParts(r.date) : null;
   return (
@@ -27,18 +27,10 @@ function RecentTripCard({ r, first, onPick }: { r: RecentSearch; first: boolean;
       type="button"
       onClick={onPick}
       aria-label={`Search ${r.from.name} to ${r.to.name} again`}
-      className={cn(
-        'flex h-[168px] w-[136px] shrink-0 flex-col rounded-[20px] p-4 text-left transition',
-        first ? 'bg-surface shadow-md' : 'bg-surface-muted',
-      )}
+      className={cn('flex w-full min-w-0 items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-3 text-left hover:bg-surface-muted', first && 'border-text-muted/40')}
     >
-      <span className="text-[13px] text-text-muted">{p ? p.month : 'Any day'}</span>
-      <span className={cn('text-2xl font-medium leading-none', first ? 'text-price' : 'text-text')}>{p ? p.day : '—'}</span>
-      <span className="mt-auto flex flex-col gap-1 text-[13px] font-semibold text-text">
-        <span className="flex items-center gap-2"><span className="dot-from !h-2.5 !w-2.5" /> <span className="truncate">{r.from.name}</span></span>
-        <span className="ml-[4px] h-2 dot-line" />
-        <span className="flex items-center gap-2"><span className="dot-to !h-2.5 !w-2.5" /> <span className="truncate">{r.to.name}</span></span>
-      </span>
+      <span className="min-w-0 truncate text-sm text-text">{r.from.name} → {r.to.name}</span>
+      <span className="shrink-0 text-xs text-text-muted">{p ? `${p.day} ${p.month}` : 'Any day'}</span>
     </button>
   );
 }
@@ -92,12 +84,12 @@ export function HomePage() {
           {recent.length > 0 && (
             <section>
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="font-display text-lg text-text">Recent trips</h2>
+                <h2 className="text-base font-semibold text-text">Recent trips</h2>
                 <button type="button" onClick={() => { clearRecent(); setRecent([]); }} className="flex items-center gap-1 text-xs text-text-muted hover:text-text" aria-label="Clear recent searches">
                   <X className="h-3.5 w-3.5" /> Clear
                 </button>
               </div>
-              <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-3 pt-1">
+              <div className="flex flex-col gap-2">
                 {recent.map((r, i) => <RecentTripCard key={`${r.from.id}-${r.to.id}`} r={r} first={i === 0} onPick={() => pickRecent(r)} />)}
               </div>
             </section>
@@ -147,11 +139,11 @@ export function HomePage() {
           {banners.isLoading ? (
             <Skeleton className="h-40 w-full rounded-card" />
           ) : bannerItems.length > 0 && (
-            <div className="no-scrollbar -mx-4 flex snap-x gap-4 overflow-x-auto px-4 pb-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {bannerItems.map((bn) => {
-                const img = <img src={bn.imageUrl} alt={bn.title} loading="lazy" className="h-40 w-full rounded-card object-cover shadow-sm sm:h-44" />;
+                const img = <img src={bn.imageUrl} alt={bn.title} loading="lazy" className="aspect-[2/1] w-full rounded-lg object-cover" />;
                 return (
-                  <div key={bn.id} className="w-[85%] shrink-0 snap-start sm:w-[60%]">
+                  <div key={bn.id} className="min-w-0">
                     {bn.linkUrl ? <a href={bn.linkUrl} rel="noopener noreferrer">{img}</a> : img}
                   </div>
                 );

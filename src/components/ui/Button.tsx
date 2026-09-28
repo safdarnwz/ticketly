@@ -1,4 +1,4 @@
-import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { forwardRef, isValidElement, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -32,10 +32,18 @@ const sizes: Record<Size, string> = {
   lg: 'h-12 px-7 text-[15px] min-w-[120px] gap-2',
 };
 
+const iconSizes: Record<Size, string> = {
+  sm: 'min-w-0 w-9 px-0',
+  md: 'min-w-0 w-[var(--yb-btn-height)] px-0',
+  lg: 'min-w-0 w-12 px-0',
+};
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   { variant = 'primary', size = 'md', loading, fullWidth, leftIcon, rightIcon, className, children, disabled, ...rest },
   ref,
 ) {
+  // A lone icon (‹ › ✕) is a square button, not a 104px-wide one.
+  const iconOnly = !leftIcon && !rightIcon && isValidElement(children) && typeof children.type !== 'string';
   return (
     <button
       ref={ref}
@@ -46,6 +54,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         'focus-visible:focus-ring',
         variants[variant],
         sizes[size],
+        iconOnly && iconSizes[size],
         fullWidth && 'w-full',
         className,
       )}

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { CalendarDays } from 'lucide-react';
 
 import { addDaysIso, cn } from '@/lib/utils';
@@ -11,11 +11,11 @@ const parts = (iso: string) => {
 };
 
 /**
- * "Pick a date" — a row of day cards (weekday, big day number) that scrolls
- * sideways, the chosen day in the accent colour. The last card opens the
- * calendar for any other allowed date; a date chosen there joins the row.
+ * "Pick a date" — six days in a grid that always fits the width (no sideways
+ * scrolling), the chosen day filled. The last tile opens the calendar for any
+ * other allowed date; a later date chosen there starts the six days.
  */
-export function DateStrip({ label, value, min, max, days = 21, onChange, error }: {
+export function DateStrip({ label, value, min, max, days = 6, onChange, error }: {
   label: string;
   value: string;
   min: string;
@@ -24,27 +24,23 @@ export function DateStrip({ label, value, min, max, days = 21, onChange, error }
   onChange: (iso: string) => void;
   error?: string;
 }) {
-  const row = useRef<HTMLDivElement>(null);
   const picker = useRef<HTMLInputElement>(null);
+  // Start at the first allowed day, or at the chosen day once it is beyond the first six.
+  const start = value && value >= min && value > addDaysIso(min, days - 1) && value <= max ? value : min;
   const list: string[] = [];
   for (let i = 0; i < days; i++) {
-    const d = addDaysIso(min, i);
+    const d = addDaysIso(start, i);
     if (d > max) break;
     list.push(d);
   }
-  if (value && value >= min && value <= max && !list.includes(value)) list.push(value);
-
-  useEffect(() => {
-    row.current?.querySelector<HTMLElement>('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }, [value]);
 
   return (
     <div className="min-w-0">
-      <div className="mb-2 flex items-baseline justify-between">
-        <span className="font-display text-lg text-text">{label}</span>
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <span className="font-medium text-text">{label}</span>
         {value && <span className="text-xs text-text-muted">{parts(value).weekday}, {parts(value).day} {parts(value).month}</span>}
       </div>
-      <div ref={row} role="group" aria-label={label} className="no-scrollbar -mx-1 flex gap-2.5 overflow-x-auto px-1 pb-2 pt-1">
+      <div role="group" aria-label={label} className="grid grid-cols-4 gap-2 sm:grid-cols-7">
         {list.map((d) => {
           const p = parts(d);
           const on = d === value;
@@ -56,18 +52,18 @@ export function DateStrip({ label, value, min, max, days = 21, onChange, error }
               aria-label={`${p.weekday} ${p.day} ${p.month}`}
               onClick={() => onChange(d)}
               className={cn(
-                'flex h-[84px] w-[74px] shrink-0 flex-col items-start justify-between rounded-2xl px-2.5 py-2 text-left transition',
-                on ? 'bg-accent text-white shadow-md' : 'bg-surface-muted text-text-muted hover:bg-border',
+                'flex min-w-0 flex-col items-start gap-1 rounded-lg border px-2.5 py-2 text-left',
+                on ? 'border-primary bg-primary text-primary-fg' : 'border-border bg-surface text-text hover:bg-surface-muted',
               )}
             >
-              <span className={cn('w-full truncate text-xs font-semibold', on ? 'text-white/90' : '')}>{p.weekday}</span>
-              <span className={cn('text-xl font-medium leading-none', on ? 'text-white' : 'text-text-muted/70')}>{p.day}</span>
+              <span className={cn('w-full truncate text-xs', on ? 'text-primary-fg/80' : 'text-text-muted')}>{p.weekday.slice(0, 3)}</span>
+              <span className="text-base font-medium leading-none">{p.day} <span className="text-xs font-normal">{p.month}</span></span>
             </button>
           );
         })}
-        <label className="relative flex h-[84px] w-[74px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-border text-text-muted hover:bg-surface-muted">
-          <CalendarDays className="h-5 w-5" />
-          <span className="text-xs font-semibold">Other date</span>
+        <label className="relative flex min-w-0 cursor-pointer flex-col items-start justify-center gap-1 rounded-lg border border-dashed border-border px-2.5 py-2 text-text-muted hover:bg-surface-muted">
+          <CalendarDays className="h-4 w-4" />
+          <span className="text-xs">Other date</span>
           <input
             ref={picker}
             type="date"

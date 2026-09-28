@@ -1,94 +1,10 @@
 import { NavLink } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import {
-  Activity,
-  LayoutDashboard, Search, Ticket, RotateCcw, Star, LifeBuoy,
-  Megaphone, ShieldAlert, Bus, Building2, ClipboardList, Settings as SettingsIcon,
-  Route as RouteIcon, BusFront, Network, Receipt, HeartPulse, Truck, Calendar, IndianRupee, TrendingUp, Radio, Users, BarChart3, UserCog, Wallet, FileText,
-} from 'lucide-react';
+import { Bus } from 'lucide-react';
 
-import { authApi } from '@/lib/api/auth';
 import { cn } from '@/lib/utils';
 import { isSuperAdmin, SURFACE_TENANT_SLUG } from '@/lib/host';
 
-/** app.<slug>.ticketly.com — one operator's own console. Purely their own trading operations. */
-const tenantAdminNav: { to: string; label: string; icon: typeof Bus; needs: string[] }[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, needs: [] },
-  { to: '/trips', label: 'Trips & Charts', icon: Bus, needs: ['service:read', 'trip:manage', 'trip:operate'] },
-  { to: '/routes', label: 'Routes & Stops', icon: RouteIcon, needs: ['route:read', 'stop:manage'] },
-  { to: '/fleet', label: 'Fleet & Crew', icon: Truck, needs: ['vehicle:read', 'crew:manage'] },
-  { to: '/operations', label: 'Operations', icon: ShieldAlert, needs: ['trip:operate'] },
-  { to: '/schedule', label: 'Schedule', icon: Calendar, needs: ['service:read'] },
-  { to: '/pricing', label: 'Pricing', icon: IndianRupee, needs: ['fare:read'] },
-  { to: '/distribution', label: 'Distribution', icon: Radio, needs: ['agent:read'] },
-  { to: '/promotions', label: 'Promotions', icon: TrendingUp, needs: ['route:manage'] },
-  { to: '/branches', label: 'Branches', icon: Building2, needs: ['tenant:read'] },
-  { to: '/staff', label: 'Staff', icon: UserCog, needs: ['user:read', 'role:manage', 'report:read'] },
-  { to: '/customers', label: 'Customers', icon: Users, needs: ['booking:read'] },
-  { to: '/reports', label: 'Reports', icon: BarChart3, needs: ['report:read'] },
-  { to: '/search', label: 'Search & Book', icon: Search, needs: ['booking:create'] },
-  { to: '/bookings', label: 'Bookings', icon: Ticket, needs: ['booking:read'] },
-  { to: '/refunds', label: 'Refunds', icon: RotateCcw, needs: ['payment:read', 'payment:refund'] },
-  { to: '/reviews', label: 'Reviews', icon: Star, needs: ['tenant:read'] },
-  { to: '/support', label: 'Support', icon: LifeBuoy, needs: ['booking:read'] },
-  { to: '/settings', label: 'Settings', icon: SettingsIcon, needs: ['tenant:read'] },
-];
-
-/**
- * app.ticketly.com — platform/super-admin console. Cross-tenant operator
- * management PLUS everything that's platform-wide, not per-operator (see
- * migration 0018): the one central storefront's content/offers, the shared
- * fraud-review queue, the one translation/FX catalog, DPDP privacy requests
- * (customers are tenant-less), and the console's own theme.
- */
-const superAdminNav = [
-  { to: '/admin/tenants', label: 'Operators', icon: Building2 },
-  { to: '/admin/operators', label: 'Applications', icon: ClipboardList },
-  { to: '/admin/bookings', label: 'Live bookings', icon: Activity },
-  { to: '/admin/escalations', label: 'Support escalations', icon: LifeBuoy },
-  { to: '/admin/vehicles', label: 'Bus approvals', icon: BusFront },
-  { to: '/admin/partners', label: 'OTA partners', icon: Network },
-  { to: '/admin/analytics', label: 'Analytics & Plans', icon: TrendingUp },
-  { to: '/admin/billing', label: 'Billing', icon: Receipt },
-  { to: '/admin/health', label: 'Platform health', icon: HeartPulse },
-  { to: '/cms', label: 'CMS & Offers', icon: Megaphone },
-  { to: '/fraud', label: 'Risk & Fraud', icon: ShieldAlert },
-  { to: '/announcements', label: 'Announcements', icon: Megaphone },
-  { to: '/settings', label: 'Settings', icon: SettingsIcon },
-];
-
-/** A travel agent's own portal on the operator's console: sell, manage own bookings, own money. */
-const agentNav = [
-  { to: '/agent', label: 'My account', icon: Wallet },
-  { to: '/search', label: 'Book seats', icon: Search },
-  { to: '/agent/bookings', label: 'My bookings', icon: Ticket },
-  { to: '/agent/statement', label: 'Statement', icon: FileText },
-  { to: '/agent/help', label: 'Help & support', icon: LifeBuoy },
-];
-
-/** A conductor / driver: the crew app. */
-const crewNav = [
-  { to: '/crew', label: 'My duties', icon: ClipboardList },
-  { to: '/me', label: 'My account', icon: UserCog },
-];
-
-type NavItem = { to: string; label: string; icon: typeof Bus };
-
-/** The menu this login sees: platform, agent, crew, or the staff items their roles open. */
-export function useConsoleNav(): { nav: NavItem[]; kind: 'platform' | 'agent' | 'crew' | 'operator' } {
-  // Staff only see the menus their roles open (any one of `needs`); the API refuses the rest anyway.
-  const me = useQuery({ queryKey: ['auth-me'], queryFn: authApi.me, enabled: !isSuperAdmin, staleTime: 60_000 });
-  const held = new Set(me.data?.permissions ?? []);
-  const agent = (me.data?.roles ?? []).length === 1 && me.data?.roles.includes('agent') === true;
-  const crew = (me.data?.roles ?? []).length === 1 && me.data?.roles[0] === 'crew';
-  if (isSuperAdmin) return { nav: superAdminNav, kind: 'platform' };
-  if (agent) return { nav: agentNav, kind: 'agent' };
-  if (crew) return { nav: crewNav, kind: 'crew' };
-  return {
-    nav: tenantAdminNav.filter((n) => n.needs.length === 0 || held.has('*') || n.needs.some((p) => held.has(p))),
-    kind: 'operator',
-  };
-}
+import { useConsoleNav } from './consoleNav';
 
 const FOOTER = { platform: 'Ticketly Platform Admin', agent: 'Ticketly Agent Portal', crew: 'Ticketly Crew App', operator: 'Ticketly Console' };
 

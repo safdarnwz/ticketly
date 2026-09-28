@@ -149,6 +149,8 @@ body {
   color: var(--yb-color-text);
   background-color: var(--yb-color-bg);
   line-height: 1.5;
+  /* Long words, IDs and URLs wrap inside their box instead of widening it. */
+  overflow-wrap: break-word;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
