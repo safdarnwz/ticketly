@@ -1,0 +1,123 @@
+import { del, get, patch, post, put, withIdempotency } from './client';
+
+export interface ServiceRow {
+  id: string; code: string; routeId: string; vehicleTypeId: string; status: string;
+  /** Minutes after midnight the bus leaves its origin. */
+  startMinute?: number;
+  /** weekdays are ISO: 1 = Monday … 7 = Sunday. */
+  recurrence?: { frequency: 'daily' | 'weekly'; weekdays?: number[]; interval?: number; startDate: string; endDate: string };
+}
+export interface TripRow {
+  id: string; routeId: string; routeName: string; journeyDate: string;
+  departsAt: string; arrivesAt: string; totalSeats: number; status: string; occupancyPct: number;
+  /** Paid seats, and seats a customer is paying for right now. */
+  bookedSeats: number; heldSeats: number;
+  /** The service's name (DEL-PAT-1500) — the trip is that service on this date; null for a one-off. */
+  serviceCode?: string | null;
+  /** The bus on this trip today; it can be a different one tomorrow. */
+  busNumber?: string | null;
+}
+
+/**
+ * How service codes look: letters, digits and single hyphens, 2–40 long —
+ * the same rule the API applies (it upper-cases what is typed).
+ */
+export const SERVICE_CODE_RE = /^[A-Z0-9](?:[A-Z0-9]|-(?=[A-Z0-9])){1,39}$/;
+export const normaliseServiceCode = (c: string) => c.trim().toUpperCase().replace(/\s+/g, '-');
+
+export type Recurrence = NonNullable<ServiceRow['recurrence']> & { exceptions?: string[]; additions?: string[] };
+export interface CategoryQuota { seats?: number; pct?: number; releaseHours: number }
+export interface SalesRules { otaReleasePct?: number | null; categoryQuotas?: { female?: CategoryQuota; senior?: CategoryQuota } }
+export interface ServiceVersion { versionNumber: number; snapshot: { recurrence: Recurrence; startMinute: number; vehicleTypeId: string; defaultVehicleId: string | null }; note: string; createdAt: string }
+export interface ExtraTripSuggestion { tripId: string; journeyDate: string; departsAt: string; routeName: string; serviceId: string; totalSeats: number; sold: number; waitingSeats: number }
+export interface Blackout { date: string; reason: string; [k: string]: unknown }
+
+/** Service upkeep: timetable edits (versioned), copies, extra trips, sales rules, route blackouts. */
+export const serviceAdminApi = {
+  update: (id: string, body: { startTime?: string; recurrence?: Recurrence; vehicleTypeId?: string; note?: string }) =>
+    patch<{ version: number }>(`/v1/scheduling/services/${id}`, body),
+  versions: (id: string) => get<{ items: ServiceVersion[] }>(`/v1/scheduling/services/${id}/versions`),
+  restore: (id: string, versionNumber: number) => post<{ version: number }>(`/v1/scheduling/services/${id}/versions/${versionNumber}/restore`, {}),
+  clone: (id: string, body: { code?: string; startDate: string; endDate: string; startTime?: string; weekdays?: number[]; season?: boolean }, key: string) =>
+    post<{ id: string; code: string }>(`/v1/scheduling/services/${id}/clone`, body, withIdempotency(key)),
+  remove: (id: string) => del<{ tripsDeleted: number }>(`/v1/scheduling/services/${id}`),
+  salesRules: (id: string) => get<SalesRules>(`/v1/scheduling/services/${id}/sales-rules`),
+  setSalesRules: (id: string, rules: SalesRules) => put<SalesRules>(`/v1/scheduling/services/${id}/sales-rules`, rules),
+  extraTrips: (id: string, body: { journeyDates: string[]; departureTime?: string; reason: string; openForSale?: boolean; ladiesSpecial?: boolean }, key: string) =>
+    post<{ created: { tripId: string; journeyDate: string }[]; skipped: { journeyDate: string; reason: string }[] }>(`/v1/scheduling/services/${id}/extra-trips`, body, withIdempotency(key)),
+  suggestions: () => get<{ items: ExtraTripSuggestion[] }>('/v1/scheduling/extra-trip-suggestions'),
+  releaseForSale: (tripId: string) => post<{ ok: boolean }>(`/v1/scheduling/trips/${tripId}/release-inventory`, {}),
+  blackouts: (routeId: string) => get<{ items: Blackout[] }>(`/v1/scheduling/routes/${routeId}/blackouts`),
+  addBlackouts: (routeId: string, dates: string[], reason: string) =>
+    post<{ dates: string[]; tripsCancelled: number; tripsWithBookings: unknown[] }>(`/v1/scheduling/routes/${routeId}/blackouts`, { dates, reason }),
+  removeBlackouts: (routeId: string, dates: string[]) => post<{ removed: number }>(`/v1/scheduling/routes/${routeId}/blackouts/remove`, { dates }),
+};
+
+export const schedulingApi = {
+  listServices: () => get<{ services: ServiceRow[] }>('/v1/scheduling/services'),
+  /** Without a code the service is named from its route and time: DEL-PAT-1500, or -A / -B when two leave together. */
+  createService: (input: {
+    code?: string; routeId: string; vehicleTypeId: string; defaultVehicleId?: string; startTime: string;
+    recurrence: { frequency: 'daily' | 'weekly'; weekdays?: number[]; interval?: number; startDate: string; endDate: string };
+  }, key: string) => post<{ id: string; code: string; renamed?: { from: string; to: string } }>('/v1/scheduling/services', input, withIdempotency(key)),
+  /** The name a new service on this route at this time would get, before saving. */
+  codePreview: (routeId: string, startTime: string) =>
+    get<{ code: string; renames?: { from: string; to: string } }>(`/v1/scheduling/services/code-preview?routeId=${routeId}&startTime=${encodeURIComponent(startTime)}`),
+  activate: (id: string) => post<{ trips: number }>(`/v1/scheduling/services/${id}/activate`, {}),
+  pause: (id: string) => post<{ ok: boolean }>(`/v1/scheduling/services/${id}/pause`, {}),
+  materialise: (id: string) => post<{ trips: number }>(`/v1/scheduling/services/${id}/materialise`, {}),
+  previewDates: (input: { recurrence: unknown; from: string; to: string }) =>
+    post<{ dates: string[] }>('/v1/scheduling/services/preview-dates', input),
+
+  /** One journey date (any status), or — no date — every trip still to leave. */
+  listTrips: (date?: string) => get<{ items: TripRow[] }>(`/v1/scheduling/trips${date ? `?date=${date}` : ''}`),
+};
+
+export interface ChartOccupant {
+  seatNumber: string; name: string; age: number | null; gender: string | null;
+  bookingId: string; pnr: string; status: string;
+  /** A customer is paying for this seat right now. */
+  onHold: boolean; holdExpiresAt: string | null;
+  fromSeq: number; toSeq: number; from: string | null; to: string | null;
+  contactPhone: string | null; channel: string;
+  ticketStatus: string | null;
+}
+export interface ChartSeat {
+  seatNumber: string; seatType: string; deck: number; row: number; column: number; rowSpan: number; colSpan: number;
+  ladiesOnly: boolean; blocked: boolean; bookable: boolean;
+  occupants: ChartOccupant[];
+}
+export interface TripChart {
+  trip: { id: string; routeId: string; journeyDate: string; departsAt: string; arrivesAt: string; totalSeats: number; status: string; vehicleId: string | null; hasRun: boolean; closedOnTrip?: string[]; closedByService?: string[]; serviceCode?: string | null };
+  stops: { sequence: number; stopId: string; name: string | null; arrivesAt: string; departsAt: string; canBoard: boolean; canAlight: boolean }[];
+  layout: { decks: number; rows: number; columns: number };
+  seats: ChartSeat[];
+  totals: { seats: number; seatsWithPassengers: number; passengers: number; bookings: number; onHold: number; blocked: number; boarded: number; free: number };
+}
+
+export const tripOpsApi = {
+  /** The reservation chart: layout, passengers seat by seat, holds, blocked seats, totals. */
+  chart: (tripId: string) => get<TripChart>(`/v1/bookings/trips/${tripId}/chart`),
+  blockSeats: (tripId: string, input: { seatNumbers: string[]; fromStopId: string; toStopId: string; block: boolean }) =>
+    post<{ affected: number }>(`/v1/scheduling/trips/${tripId}/block-seats`, input),
+  releaseHolds: (tripId: string, includePhoneHolds = false) =>
+    post<{ released: number }>(`/v1/scheduling/trips/${tripId}/release-holds`, { includePhoneHolds }),
+  remarks: (tripId: string) => get<{ items: { id: string; remark: string; createdAt: string; by: string | null }[] }>(`/v1/scheduling/trips/${tripId}/remarks`),
+  addRemark: (tripId: string, remark: string) => post<{ ok: boolean }>(`/v1/scheduling/trips/${tripId}/remarks`, { remark }),
+  /** Put another bus on the trip; passengers keep their seat type if the layout differs. */
+  /** Last GPS position of the bus (null until the first ping). */
+  live: (tripId: string) => get<{ lat: number; lng: number; speedKmph: number | null; nextStopId: string | null; nextStopEtaAt: string | null; delayMinutes: number | null; status: string | null; lastPingAt: string } | null>(`/v1/tracking/trips/${tripId}/live`),
+  busHistory: (tripId: string) => get<{ items: { id: string; reason: string; seatMoves: { from: string; to: string }[] | null; bookingsAffected: number; createdAt: string; fromBus: string | null; toBus: string; changedBy: string | null }[] }>(`/v1/trips/${tripId}/vehicle/history`),
+  changeBus: (tripId: string, vehicleId: string, reason: string) =>
+    post<{ changed: boolean; layoutChanged: boolean; seatMoves: { from: string; to: string; seatType: string }[]; bookingsAffected: number }>(
+      `/v1/trips/${tripId}/vehicle`, { vehicleId, reason }, withIdempotency(`bus-${tripId}-${vehicleId}`),
+    ),
+  retime: (tripId: string, newDepartsAt: string, reason: string) =>
+    post<{ oldDepartsAt: string; newDepartsAt: string; shiftMinutes: number }>(`/v1/scheduling/trips/${tripId}/retime`, { newDepartsAt, reason }),
+  cancel: (tripId: string, reason: string) =>
+    post<{ cancelledBookings: number; failed: number }>(`/v1/bookings/trips/${tripId}/cancel`, { reason }, withIdempotency(`cancel-trip-${tripId}`)),
+  /** Mark the bus departed (from 2 hours before its time) or arrived (only after it left). */
+  setRunStatus: (tripId: string, status: 'departed' | 'closed') => post<{ ok: boolean }>(`/v1/crew/trips/${tripId}/status`, { status }),
+  stopSales: (tripId: string) => post<{ ok: boolean }>(`/v1/bookings/trips/${tripId}/stop-sales`, {}),
+  resumeSales: (tripId: string) => post<{ ok: boolean }>(`/v1/bookings/trips/${tripId}/resume-sales`, {}),
+};

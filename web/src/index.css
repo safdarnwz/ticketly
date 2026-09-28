@@ -1,0 +1,245 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * ============================================================================
+ *  Ticketly — clean, flat, minimal design system
+ * ============================================================================
+ *  Near-black primary, a single crimson accent (#CB2957), calm neutral grays
+ *  on white. No gradients, no glass, no gold. Flat surfaces separated by
+ *  hairline borders. Standard system sans (ChatGPT-like), light weights.
+ *  These --yb-* tokens mirror the backend DEFAULT_THEME and are overridden at
+ *  runtime from GET /v1/appearance.
+ */
+:root {
+  --seat-on: #1f9d55;
+  --seat-free: #1f9d55;
+  --seat-on-soft: #e3f4ea;
+  --yb-color-primary: #000000;
+  --yb-color-primary-fg: #ffffff;
+  --yb-color-secondary: #000000;
+  --yb-color-secondary-fg: #ffffff;
+  --yb-color-accent: #cb2957;
+  --yb-color-bg: #ffffff;
+  --yb-color-surface: #ffffff;
+  --yb-color-surface-muted: #eeeeee;
+  --yb-color-border: #dddddd;
+  --yb-color-text: #000000;
+  --yb-color-text-muted: #6e6e6e;
+  --yb-color-success: #16a34a;
+  --yb-color-warning: #d97706;
+  --yb-color-danger: #dc2626;
+  --yb-color-info: #3f72af;
+
+  --yb-radius-sm: 6px;
+  --yb-radius-md: 8px;
+  --yb-radius-lg: 12px;
+  --yb-radius-xl: 16px;
+  --yb-radius-pill: 999px;
+
+  --yb-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --yb-shadow-md: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --yb-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  --yb-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --yb-font-family-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --yb-font-size-base: 15px;
+  --yb-font-scale: 1.2;
+  --yb-font-weight-normal: 400;
+  --yb-font-weight-medium: 500;
+  --yb-font-weight-bold: 600;
+
+  --yb-spacing-unit: 4px;
+
+  --yb-btn-height: 44px;
+  --yb-btn-padding-x: 18px;
+  --yb-btn-radius: 8px;
+  --yb-btn-font-weight: 500;
+
+  --yb-input-height: 44px;
+  --yb-input-padding-x: 14px;
+  --yb-input-radius: 8px;
+  --yb-input-border-width: 1px;
+
+  --yb-card-radius: 12px;
+  --yb-card-padding: 20px;
+  --yb-card-shadow: var(--yb-shadow-sm);
+
+  --yb-dropdown-radius: 8px;
+  --yb-dropdown-shadow: var(--yb-shadow-md);
+
+  --yb-modal-radius: 16px;
+  --yb-modal-shadow: var(--yb-shadow-lg);
+  --yb-card-border: var(--yb-color-border);
+  --yb-display-weight: 600;
+}
+
+/*
+ * The customer storefront (people booking tickets) — a clean, current travel-app
+ * look: pure white, ink-black text and pill buttons, one electric-violet accent
+ * for selection and highlights, grey filled fields instead of boxes, hairline
+ * cards with no shadows, generous rounding and tight large headings.
+ * Operator, platform and staff consoles keep the flat black-and-white look
+ * above. Set on <body> for the customer host (ThemeProvider), so dialogs and
+ * toasts get it too.
+ */
+.theme-customer {
+  --yb-color-primary: #0f0f12;
+  --yb-color-primary-fg: #ffffff;
+  --yb-color-secondary: #5b3df5;
+  --yb-color-secondary-fg: #ffffff;
+  --yb-color-accent: #5b3df5;
+  --yb-color-bg: #ffffff;
+  --yb-color-surface: #ffffff;
+  --yb-color-surface-muted: #f4f4f6;
+  --yb-color-border: #ebebef;
+  --yb-color-text: #0f0f12;
+  --yb-color-text-muted: #6f6f7a;
+  --yb-color-success: #12a150;
+  --yb-color-warning: #e8890c;
+  --yb-color-danger: #e5383b;
+  --yb-color-info: #5b3df5;
+
+  --yb-radius-sm: 10px;
+  --yb-radius-md: 14px;
+  --yb-radius-lg: 18px;
+  --yb-radius-xl: 24px;
+  --yb-radius-pill: 999px;
+
+  --yb-shadow-sm: none;
+  --yb-shadow-md: 0 1px 2px rgba(15, 15, 18, 0.04);
+  --yb-shadow-lg: 0 12px 40px rgba(15, 15, 18, 0.12);
+
+  --yb-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --yb-font-family-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --yb-font-size-base: 15px;
+  --yb-font-scale: 1.2;
+  --yb-font-weight-normal: 400;
+  --yb-font-weight-medium: 500;
+  --yb-font-weight-bold: 600;
+
+  --yb-spacing-unit: 4px;
+
+  --yb-btn-height: 48px;
+  --yb-btn-padding-x: 22px;
+  --yb-btn-radius: 999px;
+  --yb-btn-font-weight: 500;
+
+  --yb-input-height: 50px;
+  --yb-input-padding-x: 16px;
+  --yb-input-radius: 14px;
+  --yb-input-border-width: 1px;
+
+  --yb-card-radius: 20px;
+  --yb-card-padding: 20px;
+  --yb-card-shadow: none;
+
+  --yb-dropdown-radius: 16px;
+  --yb-dropdown-shadow: var(--yb-shadow-lg);
+
+  --yb-modal-radius: 24px;
+  --yb-modal-shadow: var(--yb-shadow-lg);
+  --yb-card-border: var(--yb-color-border);
+  --yb-display-weight: 600;
+
+  /* Seats: free seats in a quiet grey outline, your seats filled ink. */
+  --seat-on: #0f0f12;
+  --seat-free: #8b8b96;
+  --seat-on-soft: #ececf0;
+}
+/* Tight, confident headings on the storefront. */
+.theme-customer h1, .theme-customer h2, .theme-customer .font-display { letter-spacing: -0.02em; }
+
+html { font-size: var(--yb-font-size-base); }
+
+body {
+  margin: 0;
+  font-family: var(--yb-font-family);
+  font-weight: var(--yb-font-weight-normal);
+  color: var(--yb-color-text);
+  background-color: var(--yb-color-bg);
+  line-height: 1.5;
+  /* Long words, IDs and URLs wrap inside their box instead of widening it. */
+  overflow-wrap: break-word;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Headings stay light — standard, not heavy. */
+h1, h2, h3, h4 {
+  font-family: var(--yb-font-family-heading);
+  font-weight: var(--yb-font-weight-bold);
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+  margin: 0;
+}
+
+::selection { background: color-mix(in srgb, var(--yb-color-accent) 18%, transparent); }
+
+/* Restrained, purposeful transitions only. */
+a, button, input, select, textarea {
+  transition-property: background-color, border-color, color, box-shadow, opacity;
+  transition-duration: 140ms;
+  transition-timing-function: ease;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--yb-color-text-muted) 30%, transparent);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--yb-color-text-muted) 50%, transparent);
+  background-clip: content-box;
+}
+
+@layer components {
+  /* Flat button surfaces — solid fills, no gradients. */
+  .btn-primary-flat {
+    background: var(--yb-color-primary);
+    color: var(--yb-color-primary-fg);
+  }
+  .btn-primary-flat:hover { background: color-mix(in srgb, var(--yb-color-primary) 88%, #fff); }
+  .btn-accent-flat {
+    background: var(--yb-color-accent);
+    color: #ffffff;
+  }
+  .btn-accent-flat:hover { background: color-mix(in srgb, var(--yb-color-accent) 88%, #000); }
+}
+
+@layer utilities {
+  /* No serif display face — the same standard sans, medium weight. */
+  .font-display { font-family: var(--yb-font-family-heading); font-weight: var(--yb-display-weight, 600); letter-spacing: -0.005em; }
+  .hairline { border: 1px solid var(--yb-color-border); }
+  .text-accent-c { color: var(--yb-color-accent); }
+  .elev-1 { box-shadow: var(--yb-shadow-sm); }
+  .elev-2 { box-shadow: var(--yb-shadow-md); }
+  .elev-3 { box-shadow: var(--yb-shadow-lg); }
+  /* Subtle, flat hover — border emphasis, not lift/shadow theatrics. */
+  .lift { transition: border-color .14s ease, background-color .14s ease, box-shadow .18s ease, transform .18s ease; }
+  .lift:hover { border-color: var(--yb-color-text-muted); }
+  /* The customer look lifts cards on soft shadows instead. */
+  .theme-customer .lift:hover { border-color: var(--yb-color-text); }
+  /* Journey pieces from the customer design: a soft floating card, the pink
+     "from" and purple "to" ring dots joined by a dotted line, and a sheet that
+     rises from the bottom with a big rounded top. */
+  .soft-card { background: var(--yb-color-surface); border-radius: var(--yb-card-radius); box-shadow: var(--yb-shadow-md); }
+  .soft-muted { background: var(--yb-color-surface-muted); border-radius: var(--yb-card-radius); }
+  .dot-from, .dot-to { display: inline-block; width: 12px; height: 12px; border-radius: 999px; border: 2.5px solid; background: var(--yb-color-surface); flex: none; }
+  .dot-from { border-color: var(--yb-color-accent); }
+  .dot-to { border-color: var(--yb-color-secondary); }
+  .dot-line { width: 0; border-left: 1.5px dashed color-mix(in srgb, var(--yb-color-text-muted) 60%, transparent); }
+  .sheet-top { border-top-left-radius: 20px; border-top-right-radius: 20px; }
+  .text-price { color: var(--yb-color-text); }
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .pb-safe { padding-bottom: calc(env(safe-area-inset-bottom) + 72px); }
+  .focus-ring:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--yb-color-primary) 16%, transparent); }
+}
+
+/* Storefront journey dots: violet start, ink end. */
+.theme-customer .dot-to { border-color: var(--yb-color-text); }

@@ -20,6 +20,8 @@ import prettier from 'eslint-config-prettier';
 export default tseslint.config(
   {
     ignores: [
+      // The web app has its own lint setup (web/eslint.config.js).
+      'web/**',
       'dist/**',
       'coverage/**',
       'node_modules/**',
