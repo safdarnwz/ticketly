@@ -145,4 +145,69 @@ describe('state rules: set by the platform, carried by every route, shown to pas
       ).status,
     ).toBe(404);
   });
+
+  it('a route through several states carries every state’s rules, in the order the bus reaches them', async () => {
+    // Delhi → Jaipur (Rajasthan) → Bangalore (Karnataka): one stop in each city.
+    const cities = await sqlOne<{ ids: { id: string; state: string }[] }>(
+      app,
+      `SELECT json_agg(json_build_object('id', c.id, 'state', s.id) ORDER BY x.ord) AS ids
+         FROM unnest(ARRAY['Delhi', 'Jaipur', 'Bangalore']) WITH ORDINALITY AS x(name, ord)
+         JOIN LATERAL (SELECT * FROM cities WHERE name = x.name ORDER BY created_at LIMIT 1) c ON true
+         JOIN states s ON s.id = c.state_id`,
+    );
+    expect(cities.ids).toHaveLength(3);
+    const stopIds: string[] = [];
+    for (const [i, c] of cities.ids.entries()) {
+      const stop = await app.post(
+        '/master-data/stops',
+        { cityId: c.id, name: `E2E multi ${run} ${i}`, kind: 'both' },
+        op,
+      );
+      expect(stop.status, JSON.stringify(stop.body)).toBe(201);
+      stopIds.push(stop.body.id);
+    }
+    const route = await app.post(
+      '/master-data/routes',
+      {
+        code: `E2E-MS-${run}`,
+        name: `Multi-state ${run}`,
+        originCityId: cities.ids[0].id,
+        destCityId: cities.ids[2].id,
+        startTime: '06:00',
+        stops: stopIds.map((stopId, i) => ({
+          stopId,
+          sequence: i,
+          distanceFromOriginM: i * 300_000,
+          departOffsetMin: i * 360,
+        })),
+      },
+      op,
+    );
+    expect(route.status, JSON.stringify(route.body)).toBe(201);
+
+    // A rule in the last state only: it still shows, under that state.
+    const last = cities.ids[2].state;
+    const rule = await add({
+      stateId: last,
+      category: 'other',
+      title: `Far end rule ${run}`,
+      body: 'Applies only in the last state of the route.',
+    });
+    expect(rule.status).toBe(201);
+    made.push(rule.body.id);
+
+    const got = (await app.get(`/master-data/routes/${route.body.id}/state-norms`, op)).body
+      .states as { stateId: string; norms: { id: string }[] }[];
+    expect(got.map((s) => s.stateId)).toEqual(cities.ids.map((c) => c.state));
+    expect(got[2].norms.map((n) => n.id)).toContain(rule.body.id);
+    expect(got[0].norms.map((n) => n.id)).not.toContain(rule.body.id);
+    // The same while the route is being drawn, from its cities.
+    const drawing = await app.get(
+      `/master-data/state-norms?cityIds=${cities.ids.map((c) => c.id).join(',')}`,
+      op,
+    );
+    expect(drawing.body.states.map((s: { stateId: string }) => s.stateId)).toEqual(
+      cities.ids.map((c) => c.state),
+    );
+  });
 });
