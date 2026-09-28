@@ -15,6 +15,12 @@ import { RouteRepository } from './infrastructure/persistence/route.repository';
 import { RouteService } from './application/services/route.service';
 import { SeatLayoutRepository } from './infrastructure/persistence/seat-layout.repository';
 import { SeatLayoutService } from './application/services/seat-layout.service';
+import { StateNormRepository } from './infrastructure/persistence/state-norm.repository';
+import { StateNormService } from './application/services/state-norm.service';
+import {
+  StateNormsAdminController,
+  StateNormsController,
+} from './presentation/state-norms.controller';
 
 /**
  * Master data: geography, stops, seat layouts, vehicle types, amenities and
@@ -27,7 +33,7 @@ import { SeatLayoutService } from './application/services/seat-layout.service';
  */
 @Module({
   imports: [DatabaseModule, CacheModule, MessagingModule, EntitlementsModule],
-  controllers: [MasterDataController],
+  controllers: [MasterDataController, StateNormsController, StateNormsAdminController],
   providers: [
     GeographyRepository,
     StopRepository,
@@ -37,6 +43,8 @@ import { SeatLayoutService } from './application/services/seat-layout.service';
     AmenityRepository,
     RouteRepository,
     RouteService,
+    StateNormRepository,
+    StateNormService,
   ],
   exports: [
     GeographyRepository,
@@ -45,6 +53,7 @@ import { SeatLayoutService } from './application/services/seat-layout.service';
     VehicleTypeRepository,
     AmenityRepository,
     RouteRepository,
+    StateNormService,
   ],
 })
 export class MasterDataModule {}

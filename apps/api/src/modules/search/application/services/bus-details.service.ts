@@ -4,7 +4,7 @@ import { AppError, ErrorCode, type SeatLayoutId, type VehicleId } from '@kernel'
 
 import { DEFAULT_REFUND_POLICY, type RefundPolicy } from '../../../booking';
 import { FleetService, VehicleVerificationService } from '../../../fleet';
-import { AmenityRepository, SeatLayoutRepository } from '../../../master-data';
+import { AmenityRepository, SeatLayoutRepository, StateNormService } from '../../../master-data';
 import { ReviewService } from '../../../reviews';
 import { BusDetailsRepository, type StopRow } from '../../infrastructure/bus-details.repository';
 
@@ -62,17 +62,19 @@ export class BusDetailsService {
     private readonly reviews: ReviewService,
     private readonly fleet: FleetService,
     private readonly vehicles: VehicleVerificationService,
+    private readonly stateNorms: StateNormService,
   ) {}
 
   async forTrip(tripId: string, fromStopId?: string, toStopId?: string) {
     const trip = await this.repo.trip(tripId);
     if (!trip) throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Trip not found' });
-    const [stops, policies, layout, drivers, bus] = await Promise.all([
+    const [stops, policies, layout, drivers, bus, stateRules] = await Promise.all([
       this.repo.stops(tripId),
       this.repo.policies(),
       this.layouts.getById(trip.seatLayoutId as SeatLayoutId),
       this.repo.driverCount(tripId),
       trip.vehicleId ? this.repo.bus(trip.vehicleId) : Promise.resolve(null),
+      this.stateNorms.forRoute(trip.routeId),
     ]);
     if (stops.length < 2)
       throw new AppError(ErrorCode.COMMON_NOT_FOUND, 404, { message: 'Trip not found' });
@@ -226,6 +228,9 @@ export class BusDetailsService {
           detail: codes.has(code) ? 'On this bus' : 'Not listed',
         })),
       ],
+      // Government rules of every state on the route, set by the platform —
+      // they apply whatever the operator's own policies below say.
+      stateRules: stateRules.filter((s) => s.norms.length > 0),
       policies: [
         {
           key: 'child',
