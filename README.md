@@ -31,15 +31,20 @@ npm run dev:worker   # second terminal: SMS / email / refunds / invoices / sched
 `127.0.0.1:5432`, database `ticketly`). Change them there if yours differ and run it again.
 It is safe to re-run.
 
-**Demo data (optional):** `npm run db:seed:full` wipes the database and loads three demo
-operators with routes, buses, trips and bookings:
+**Two seeds.** `npm run setup` runs the first; the second is optional.
+
+| Seed | What it loads |
+|---|---|
+| `npm run db:seed` — the system | Permissions, roles, plans, India's states and corridor cities, and **one login: the super admin** from `.env`. No operator, bus or customer. |
+| `npm run db:seed:demo` — one demo operator | Demo Travels with its admin, a manager, a booking clerk, a support agent and a Delhi counter; 10 approved buses (6 AC seaters, 4 AC sleepers) with their documents; Delhi → Alwar → Jaipur and back with fares; 10 daily services with trips for 60 days; 6 crew; 5 customers, each with a paid booking. Runs once — `npm run db:seed:full` starts over (reset, migrate, both seeds). |
 
 | Login | Password | Header to send |
 |---|---|---|
-| super admin from `.env` (`admin@ticketly.local`) | `Admin@12345` | `X-Debug-Surface: superAdmin` |
-| `admin@demo-travels.example` | `pass@123` | `X-Debug-Surface: tenantAdmin`, `X-Tenant-Slug: demo-travels` |
-| `admin@maharaja-yatra.example` | `pass@123` | same, slug `maharaja-yatra` |
-| `admin@golden-arrow.example` | `pass@123` | same, slug `golden-arrow` |
+| super admin from `.env` (`admin@ticketly.local`) | from `.env` (`Admin@12345`) | `X-Debug-Surface: superAdmin` |
+| `admin@demo-travels.example` (operator admin) | `pass@123` | `X-Debug-Surface: tenantAdmin`, `X-Tenant-Slug: demo-travels` |
+| `manager@` / `clerk@` / `support@demo-travels.example` | `Staff-pass-2026` | same as the operator admin |
+| crew app: `9830000301` (driver), `9830000305` (conductor) | `Crew-pass-2026` | `X-Tenant-Slug: demo-travels` |
+| customers: `aarav.mehta@example.com`, `sneha.reddy@`, `vikram.singh@`, `pooja.nair@`, `karan.patel@example.com` | `Customer-pass-2026` | `X-Debug-Surface: customer` |
 
 Logins are host-bound (a super admin may only sign in on the platform host). Calling
 `http://localhost:3000` directly looks like the customer site, so for Postman / curl /
@@ -65,9 +70,10 @@ Health: `GET /health`, `/health/live`, `/health/ready`. Metrics: `GET /metrics`.
 | `npm run check:boundaries` | Module-boundary ratchet |
 | `npm run db:migrate` / `db:migrate:down` / `db:migrate:status` | Migrations |
 | `npm run db:new <name>` | New migration file |
-| `npm run db:seed` | Permissions, roles, plans, super admin |
+| `npm run db:seed` | System seed: permissions, roles, plans, geography, super admin |
+| `npm run db:seed:demo` | Demo seed: one operator with buses, trips, staff, crew and 5 customers |
 | `npm run db:reset` | Drop the schema (refuses in production) |
-| `npm run db:seed:full` | Reset + migrate + seed + demo operators and bookings |
+| `npm run db:seed:full` | Reset + migrate + both seeds |
 
 ## Layout
 
@@ -78,9 +84,9 @@ apps/worker/     Background worker: outbox dispatch, notifications, schedulers
 libs/            kernel (pure domain primitives), config, database, cache, http,
                  messaging, observability, security, contracts, testing
 db/migrations/   Plain SQL migrations, checksum-tracked
-db/seeds/        Permissions, roles, plans, geography, demo operators
+db/seeds/        The system seed: permissions, roles, plans, geography
 deploy/          systemd units, nginx, PgBouncer, PM2, release script
-scripts/         migrate / seed / setup / release packaging
+scripts/         migrate / seeds (seed.ts, seed-demo.ts) / setup / release packaging
 test/            architecture tests and end-to-end tests
 load-tests/      k6 load test
 docs/            architecture, per-domain notes, deployment, runbook

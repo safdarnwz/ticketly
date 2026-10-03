@@ -84,8 +84,8 @@ export default tseslint.config(
     },
   },
   {
-    // scripts/scale drives the HTTP API like the e2e suite does (untyped JSON in and out).
-    files: ['**/*.spec.ts', '**/*.e2e-spec.ts', 'libs/testing/**', 'test/**', 'scripts/scale/**'],
+    // scripts/seed-demo.ts drives the HTTP API like the e2e suite does (untyped JSON in and out).
+    files: ['**/*.spec.ts', '**/*.e2e-spec.ts', 'libs/testing/**', 'test/**', 'scripts/seed-demo.ts', 'scripts/lib/**'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',

@@ -7,7 +7,7 @@ import { confirmedBooking, heldBooking, sqlOne, type TripLeg } from './support/f
  * Round-trip discount (#283): an operator takes a % off the return journey
  * when it is booked against a confirmed onward booking with them — back the
  * way it came, leaving later, by the same customer or booking mobile — once.
- * Demo Travels' way back is JAI-DEL-01 (demo-return-route.seed.sql).
+ * Demo Travels' way back is JAI-DEL-01 (the demo seed, npm run db:seed:demo).
  */
 describe('round-trip discount (e2e)', () => {
   let app: TestApp;
@@ -17,13 +17,13 @@ describe('round-trip discount (e2e)', () => {
   const setPct = (discountPct: number, opts: object = op) =>
     app.put('/concessions/round-trip', { discountPct }, opts);
 
-  /** A free seat on a trip: not ladies-only, nobody on it, nobody holding it. */
+  /** A free seat on a trip: not ladies-only or kept for accessibility, nobody on it, nobody holding it. */
   const freeSeat = async (tripId: string) =>
     (
       await sqlOne<{ seat_number: string }>(
         app,
         `SELECT ts.seat_number FROM trip_seats ts
-          WHERE ts.trip_id = $1 AND ts.is_bookable AND NOT ts.ladies_only
+          WHERE ts.trip_id = $1 AND ts.is_bookable AND NOT ts.ladies_only AND NOT ts.accessible
             AND ts.occupied_legs = 0 AND ts.blocked_legs = 0
             AND NOT EXISTS (SELECT 1 FROM booking_seats bs JOIN bookings b ON b.id = bs.booking_id
                              WHERE bs.trip_id = ts.trip_id AND bs.seat_number = ts.seat_number
@@ -77,7 +77,7 @@ describe('round-trip discount (e2e)', () => {
         ORDER BY t.journey_date LIMIT 1`,
       [f.journeyDate],
     );
-    expect(row?.id, 'run demo-return-route.seed.sql and materialise JAI-DEL-0800').toBeTruthy();
+    expect(row?.id, 'run npm run db:seed:demo (it creates the JAI-DEL-01 trips)').toBeTruthy();
     back = { tripId: row.id, fromStopId: row.from_stop, toStopId: row.to_stop };
     const seat = await freeSeat(f.tripId);
     onward = await confirmedBooking(app, seat, {

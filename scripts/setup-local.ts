@@ -5,10 +5,10 @@
  *      JWT_SECRET and ENCRYPTION_KEY filled in where they are empty;
  *   2. the database, created if it does not exist;
  *   3. migrations;
- *   4. seed: permissions, roles, plans and the super admin.
+ *   4. the system seed: permissions, roles, plans, geography and the super admin.
  *
- * Safe to re-run. Demo operators and bookings are a separate, optional step:
- * `npm run db:seed:full` (drops everything first).
+ * Safe to re-run. The demo operator (buses, trips, staff, customers) is a
+ * separate, optional step: `npm run db:seed:demo`.
  */
 import { execSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -99,7 +99,7 @@ async function main(): Promise<void> {
   step('Migrations');
   run('db:migrate');
 
-  step('Seed (permissions, roles, plans, super admin)');
+  step('System seed (permissions, roles, plans, geography, super admin)');
   run('db:seed');
 
   process.stdout.write(
@@ -107,7 +107,7 @@ async function main(): Promise<void> {
       `  npm run dev          API    → http://localhost:${env.HTTP_PORT || 3000}/docs\n` +
       `  npm run dev:worker   worker (SMS / email / refunds / schedulers) — second terminal\n\n` +
       `  Super admin: ${env.SUPER_ADMIN_EMAIL} / ${env.SUPER_ADMIN_PASSWORD}\n` +
-      `  Optional demo operators + bookings: npm run db:seed:full\n`,
+      `  Optional demo operator (buses, trips, staff, customers): npm run db:seed:demo\n`,
   );
 }
 

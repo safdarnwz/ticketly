@@ -4,7 +4,7 @@
 -- An operator pays to have a route's trips bubble into the TOP 3 of search
 -- results for that route's origin/destination, regardless of how the
 -- customer sorts or filters (price, departure time, rating, AC-only, etc.)
--- — the same "sponsored slot" model major travel booking sites
+-- — the same "sponsored slot" model every major Indian OTA (redBus, AbhiBus)
 -- and most e-commerce search results use.
 --
 -- Pricing is PLATFORM-WIDE (super-admin sets one rate card for everyone —

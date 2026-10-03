@@ -76,13 +76,15 @@ describe('bus details under the seat map; reviews stay with the bus (e2e)', () =
       authorization: `Bearer ${login.body.accessToken}`,
       'x-tenant-slug': 'maharaja-yatra',
     };
-    // Two open trips of the fixture route with no bus yet, a few days apart
-    // (the middle of the range: other suites take the earliest and latest).
+    // Two open trips of the fixture route a few days apart, which this test gives
+    // buses of its own (the middle of the range: other suites take the earliest and latest).
     const { ids: spare } = await sqlOne<{ ids: string[] }>(
       app,
       `SELECT coalesce(array_agg(id), '{}') AS ids FROM (
          SELECT t.id FROM trips t
-          WHERE t.route_id = $1 AND t.id <> $2 AND t.status = 'open' AND t.vehicle_id IS NULL
+          WHERE t.route_id = $1 AND t.id <> $2 AND t.status = 'open'
+            -- a seater bus (the booking helpers quote seater seats)
+            AND EXISTS (SELECT 1 FROM trip_seats ts WHERE ts.trip_id = t.id AND ts.seat_type = 'seater')
             AND t.journey_date BETWEEN current_date + 3 AND current_date + 20
             AND t.departs_at > now() + interval '2 days'
             AND (SELECT count(*) FROM booking_seats bs JOIN bookings b ON b.id = bs.booking_id
@@ -90,7 +92,7 @@ describe('bus details under the seat map; reviews stay with the bus (e2e)', () =
           ORDER BY random() LIMIT 2) x`,
       [routeId, f.tripId],
     );
-    expect(spare.length, 'two open trips of the fixture route without a bus').toBe(2);
+    expect(spare.length, 'two open trips of the fixture route').toBe(2);
     ran = await legOf(spare[0]);
     next = await legOf(spare[1]);
     abcd = await newBus(`AB${run}CD`, ran.tripId);

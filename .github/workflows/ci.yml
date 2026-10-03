@@ -139,7 +139,7 @@ jobs:
         with: { node-version-file: .nvmrc, cache: npm }
       - run: npm ci --no-audit --no-fund
       - run: npm run db:migrate
-      - run: npm run db:seed && npm run db:seed:geography && npm run db:seed:demo
+      - run: npm run db:seed && npm run db:seed:demo
       - run: npm run test:e2e
 
   build:

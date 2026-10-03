@@ -59,9 +59,20 @@ describe('reviews (e2e)', () => {
       fromStopId: chart.stops[0].stopId,
       toStopId: chart.stops[chart.stops.length - 1].stopId,
     };
-    const seat = chart.seats.find(
-      (s: { blocked: boolean; occupants: unknown[] }) => !s.blocked && s.occupants.length === 0,
-    ).seatNumber as string;
+    // A seat anyone may take: free, not for women only, not kept for accessibility.
+    const map = await app.get(
+      `/scheduling/trips/${leg.tripId}/availability?from=${leg.fromStopId}&to=${leg.toStopId}`,
+      { headers: { 'x-tenant-id': f.tenantId } },
+    );
+    const seat = (
+      map.body.seats as {
+        seatNumber: string;
+        available: boolean;
+        ladiesOnly: boolean;
+        accessible: boolean;
+        reservedFor: string | null;
+      }[]
+    ).find((s) => s.available && !s.ladiesOnly && !s.accessible && !s.reservedFor)!.seatNumber;
     travelled = await confirmedBooking(app, seat, { fullName: 'Happy Traveller', age: 29 }, leg);
     upcoming = await confirmedBooking(app, f.seatNumbers[2], {
       fullName: 'Soon Traveller',

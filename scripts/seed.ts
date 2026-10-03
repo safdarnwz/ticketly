@@ -1,19 +1,19 @@
 /**
- * Complete DB seed — structural/system data + the ONE super-admin account.
- * Deliberately does NOT seed any demo tenant, operator, route, or booking —
- * "remove everything, seed only the super admin" per how this project runs.
+ * Seed 1 of 2 — the system: everything the platform needs before its first
+ * operator signs up, and exactly one login, the super admin.
  *
- * Order matters: permissions → roles (grants reference permissions) → plans
- * → super-admin user + role grant. Runs as ONE transaction — partial seeding
- * is impossible; either everything above exists or nothing does.
+ *   permissions → roles (grants reference permissions) → plans → geography
+ *   (India's states and corridor cities) → the super-admin user + role.
  *
- * The user/role step reuses the app's REAL `PasswordHasher` and
- * `FieldEncryptor` (constructed directly from the same `AppConfig` the app
- * boots with) instead of a hand-crafted SQL `INSERT` — email/phone are
- * encrypted with a blind index and the password cost parameters come from
- * env, so a raw SQL guess would silently drift from whatever this
- * environment is actually configured with. This script IS that source of
- * truth, so it always matches.
+ * No operator, bus, route or customer — those come from the operators
+ * themselves, or from the demo seed (npm run db:seed:demo). Runs as ONE
+ * transaction: either everything above exists or nothing does. Safe to run
+ * again (existing rows are kept; the super admin's password is reset to the
+ * one in .env).
+ *
+ * The super admin comes from SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD /
+ * SUPER_ADMIN_NAME in .env and is written with the app's own PasswordHasher
+ * and FieldEncryptor, so the login matches exactly what the API expects.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -36,8 +36,7 @@ async function seedSuperAdmin(client: PoolClient, config: AppConfig): Promise<vo
   const email = process.env.SUPER_ADMIN_EMAIL?.trim().toLowerCase();
   const password = process.env.SUPER_ADMIN_PASSWORD;
   if (!email || !password) {
-    process.stdout.write('… SUPER_ADMIN_EMAIL/PASSWORD not set — skipping super-admin seed\n');
-    return;
+    throw new Error('SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD must be set in .env');
   }
 
   const hasher = new PasswordHasher(config);
@@ -105,9 +104,12 @@ async function main(): Promise<void> {
     await runSqlFile(client, 'permissions.seed.sql');
     await runSqlFile(client, 'roles.seed.sql');
     await runSqlFile(client, 'platform.seed.sql');
+    await runSqlFile(client, 'geography.seed.sql');
     await seedSuperAdmin(client, config);
     await client.query('COMMIT');
-    process.stdout.write('✓ seed complete — permissions, roles, plans + super admin only\n');
+    process.stdout.write(
+      '✓ system seed complete — permissions, roles, plans, geography and the super admin\n',
+    );
   } catch (error) {
     await client.query('ROLLBACK');
     process.stderr.write(`✖ seed failed: ${(error as Error).message}\n`);

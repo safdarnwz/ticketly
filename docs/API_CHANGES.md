@@ -520,5 +520,5 @@ an unknown id is now 404 (was 200).
   otherwise 422 with the reason; a second live return on the same onward booking is 409. The discount comes off every
   seat after concessions (GST in proportion); the hold returns `roundTripDiscountMinor`. With no discount set,
   `returnOf` is ignored.
-- **Demo data:** `npm run db:seed:demo` also seeds Demo Travels' way back, JAI-DEL-01 (08:00 daily,
-  `db/seeds/demo-return-route.seed.sql`, safe to re-run) — materialise its service like the onward one.
+- **Demo data:** `npm run db:seed:demo` seeds Demo Travels' routes both ways, DEL-JAI-01 and JAI-DEL-01,
+  with daily services and their trips already created.

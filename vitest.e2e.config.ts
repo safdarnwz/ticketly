@@ -6,7 +6,7 @@ import { defineConfig } from 'vitest/config';
  * End-to-end tests boot the real Nest app, so the TypeScript must be compiled
  * by SWC (esbuild — vitest's default — emits no decorator metadata, and Nest
  * dependency injection depends on it). Needs a migrated + seeded Postgres:
- *   npm run db:migrate && npm run db:seed && npm run db:seed:geography && npm run db:seed:demo
+ *   npm run db:migrate && npm run db:seed && npm run db:seed:demo
  */
 export default defineConfig({
   plugins: [tsconfigPaths(), swc.vite({ module: { type: 'es6' } })],

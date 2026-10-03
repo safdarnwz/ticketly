@@ -149,6 +149,10 @@ export class FieldEncryptor {
 
 function parseKey(b64: string, name: string): Buffer {
   const key = Buffer.from(b64, 'base64');
-  if (key.length !== 32) throw new Error(`${name} must be a base64-encoded 32-byte (256-bit) key`);
+  if (key.length !== 32)
+    throw new Error(
+      `${name} must be a base64-encoded 32-byte (256-bit) key — make one with: ` +
+        `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`,
+    );
   return key;
 }
