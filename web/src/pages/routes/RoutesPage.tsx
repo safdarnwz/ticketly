@@ -8,6 +8,7 @@ import { StateRulesForCities, StateRulesModal } from './StateRulesPanel';
 import { Button, Card, CardBody, Badge, statusTone, Table, type Column, Modal, Input, Select, PageLoader, ErrorState, EmptyState, useToast, TabBar } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { masterDataApi, type RouteRow, type City, type Stop } from '@/lib/api/masterData';
+import { PincodeInput } from '@/components/forms/LookupInputs';
 import { parseCsv } from '@/lib/csv';
 
 interface StopDraft { stopId: string; stopName: string; sequence: number; distanceFromOriginM: number; departOffsetMin: number; cityId?: string }
@@ -354,7 +355,18 @@ function StopsTab() {
             options={[{ label: 'Both', value: 'both' }, { label: 'Boarding only', value: 'boarding' }, { label: 'Dropping only', value: 'dropping' }]} />
           <Input label="Landmark" value={form.landmark} onChange={(e) => setForm((f) => ({ ...f, landmark: e.target.value }))} placeholder="Near Metro station" />
           <Input label="Address" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
-          <Input label="Pincode" value={form.pincode} onChange={(e) => setForm((f) => ({ ...f, pincode: e.target.value }))} />
+          <PincodeInput
+            value={form.pincode}
+            onChange={(v) => setForm((f) => ({ ...f, pincode: v }))}
+            onResolved={(p) => {
+              // A new stop with no city yet takes the PIN's city, when the platform has it.
+              if (!editing && !pickedCity && p.cityId) {
+                setPickedCity({ id: p.cityId, name: p.city });
+                setCityQuery(p.city);
+                setCityResults([]);
+              }
+            }}
+          />
         </div>
       </Modal>
 

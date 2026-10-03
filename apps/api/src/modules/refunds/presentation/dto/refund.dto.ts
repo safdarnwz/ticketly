@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { ifscSchema } from '@http';
+
 export const AltAccountDetailsSchema = z.object({
   accountHolder: z.string().trim().min(2, 'Enter the name on the account').max(120),
   /** Indian bank accounts are 9–18 digits; spaces are dropped. */
@@ -7,11 +9,7 @@ export const AltAccountDetailsSchema = z.object({
     .string()
     .transform((v) => v.replace(/\s/g, ''))
     .pipe(z.string().regex(/^\d{9,18}$/, 'An account number is 9 to 18 digits')),
-  ifsc: z
-    .string()
-    .trim()
-    .transform((v) => v.toUpperCase())
-    .pipe(z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'An IFSC is 11 characters, like SBIN0001234')),
+  ifsc: ifscSchema,
   bankName: z.string().trim().max(120).optional(),
 });
 

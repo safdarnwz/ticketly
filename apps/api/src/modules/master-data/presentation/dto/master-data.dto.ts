@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { searchText } from '@http';
+import { pincodeSchema, searchText } from '@http';
 import { ROUTE_STATUSES } from '../../domain/route';
 
 /** Shared master-data request schemas. Zod = validation + inferred types. */
@@ -12,7 +12,7 @@ export const CreateStopSchema = z.object({
   kind: z.enum(['boarding', 'dropping', 'both']).default('both'),
   landmark: z.string().max(200).optional(),
   address: z.string().max(500).optional(),
-  pincode: z.string().max(12).optional(),
+  pincode: pincodeSchema.optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
   contactPhone: z.string().max(20).optional(),

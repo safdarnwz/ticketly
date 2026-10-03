@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { ApiError } from '@/lib/api/client';
 import { bookingsApi } from '@/lib/api/bookings';
 import { refundsApi, type RefundQueue, type RefundQueueRow, type RefundStatus } from '@/lib/api/ops';
+import { IfscInput } from '@/components/forms/LookupInputs';
 import { cn, formatDateTime, formatMoney, idempotencyKey } from '@/lib/utils';
 
 const TABS: { key: RefundQueue; label: string }[] = [
@@ -277,8 +278,8 @@ function NewRefundModal({ onClose, onDone }: { onClose: () => void; onDone: () =
                     <p className="col-span-2 text-xs text-text-muted">The gateway can only refund the card or UPI that paid. For another account, you send a bank transfer and then mark the refund paid.</p>
                     <Input label="Account holder" value={acct.accountHolder} error={err('accountHolder')} onChange={(e) => setAcct((a) => ({ ...a, accountHolder: e.target.value }))} />
                     <Input label="Account number" inputMode="numeric" value={acct.accountNumber} error={err('accountNumber')} onChange={(e) => setAcct((a) => ({ ...a, accountNumber: e.target.value }))} />
-                    <Input label="IFSC" placeholder="SBIN0001234" value={acct.ifsc} error={err('ifsc')} onChange={(e) => setAcct((a) => ({ ...a, ifsc: e.target.value.toUpperCase() }))} />
-                    <Input label="Bank name (optional)" value={acct.bankName} onChange={(e) => setAcct((a) => ({ ...a, bankName: e.target.value }))} />
+                    <IfscInput label="IFSC" value={acct.ifsc} error={err('ifsc')} onChange={(v) => setAcct((a) => ({ ...a, ifsc: v }))} onResolved={(b) => setAcct((a) => ({ ...a, bankName: b.bank }))} />
+                    <Input label="Bank name" value={acct.bankName} onChange={(e) => setAcct((a) => ({ ...a, bankName: e.target.value }))} hint="Filled from the IFSC" />
                   </div>
                 )}
               </>

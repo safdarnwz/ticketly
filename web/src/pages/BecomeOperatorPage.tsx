@@ -5,6 +5,7 @@ import { Building2, CheckCircle2 } from 'lucide-react';
 import { Button, Card, CardBody, CardHeader, Input, useToast } from '@/components/ui';
 import { onboardingApi, type OperatorApplication } from '@/lib/api/onboarding';
 import { KycVerificationSection } from '@/components/onboarding/KycVerificationSection';
+import { IfscInput, PincodeInput } from '@/components/forms/LookupInputs';
 import { ApiError } from '@/lib/api/client';
 
 const empty: OperatorApplication = {
@@ -24,6 +25,7 @@ export function BecomeOperatorPage() {
   const [done, setDone] = useState(false);
   const [applicationId, setApplicationId] = useState<string | null>(null);
   const set = (patch: Partial<OperatorApplication>) => setF((s) => ({ ...s, ...patch }));
+  const [localities, setLocalities] = useState<string[]>([]);
 
   const submit = async () => {
     setBusy(true);
@@ -99,12 +101,18 @@ export function BecomeOperatorPage() {
 
         <Card><CardHeader title="Address" />
           <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Input label="Address line 1" value={f.addressLine1} onChange={(e) => set({ addressLine1: e.target.value })} />
-            <Input label="Address line 2" value={f.addressLine2} onChange={(e) => set({ addressLine2: e.target.value })} />
+            {/* The PIN first: it fills the city and state. */}
+            <PincodeInput
+              value={f.pinCode ?? ''}
+              onChange={(v) => set({ pinCode: v })}
+              onResolved={(p) => { set({ city: p.city, state: p.state, country: 'India' }); setLocalities(p.localities); }}
+            />
+            <Input label="Address line 1" value={f.addressLine1} onChange={(e) => set({ addressLine1: e.target.value })} placeholder="Building, street" />
+            <Input label="Area / locality" list="apply-localities" value={f.addressLine2} onChange={(e) => set({ addressLine2: e.target.value })} />
+            <datalist id="apply-localities">{localities.map((l) => <option key={l} value={l} />)}</datalist>
             <Input label="City" value={f.city} onChange={(e) => set({ city: e.target.value })} />
             <Input label="State" value={f.state} onChange={(e) => set({ state: e.target.value })} />
             <Input label="Country" value={f.country} onChange={(e) => set({ country: e.target.value })} />
-            <Input label="PIN code" value={f.pinCode} onChange={(e) => set({ pinCode: e.target.value })} />
           </CardBody>
         </Card>
 
@@ -122,8 +130,8 @@ export function BecomeOperatorPage() {
           <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input label="Account holder name" value={f.bankAccountHolder} onChange={(e) => set({ bankAccountHolder: e.target.value })} placeholder="As per bank records" />
             <Input label="Account number" value={f.bankAccountNumber} onChange={(e) => set({ bankAccountNumber: e.target.value.replace(/\D/g, '') })} />
-            <Input label="IFSC code" value={f.bankIfsc} onChange={(e) => set({ bankIfsc: e.target.value.toUpperCase() })} placeholder="HDFC0001234" maxLength={11} />
-            <Input label="Bank name (optional)" value={f.bankName} onChange={(e) => set({ bankName: e.target.value })} />
+            <IfscInput value={f.bankIfsc ?? ''} onChange={(v) => set({ bankIfsc: v })} onResolved={(b) => set({ bankName: b.bank })} />
+            <Input label="Bank name" value={f.bankName} onChange={(e) => set({ bankName: e.target.value })} hint="Filled from the IFSC" />
           </CardBody>
         </Card>
 

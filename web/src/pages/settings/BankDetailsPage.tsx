@@ -6,6 +6,7 @@ import { Button, Card, CardBody, Input, PageLoader, ErrorState, useToast } from 
 import { ApiError } from '@/lib/api/client';
 import { PageHeader } from '@/components/common/PageHeader';
 import { bankDetailsApi } from '@/lib/api/payouts';
+import { IfscInput } from '@/components/forms/LookupInputs';
 import { formatDateLabel, localDateOf } from '@/lib/utils';
 
 export function BankDetailsPage() {
@@ -79,8 +80,8 @@ export function BankDetailsPage() {
           <Input label="Account holder name" value={form.accountHolder} error={err('accountHolder')} onChange={(e) => setForm((f) => ({ ...f, accountHolder: e.target.value }))} placeholder="As per bank records" />
           <Input label="Account number" inputMode="numeric" value={form.accountNumber} error={err('accountNumber')} onChange={(e) => setForm((f) => ({ ...f, accountNumber: e.target.value.replace(/\D/g, '').slice(0, 18) }))} />
           <Input label="Re-enter account number" inputMode="numeric" value={form.confirmNumber} error={err('confirmNumber')} onPaste={(e) => e.preventDefault()} onChange={(e) => setForm((f) => ({ ...f, confirmNumber: e.target.value.replace(/\D/g, '').slice(0, 18) }))} hint="Type it again — pasting is off so a typo is caught" />
-          <Input label="IFSC code" value={form.ifsc} error={err('ifsc')} onChange={(e) => setForm((f) => ({ ...f, ifsc: e.target.value.toUpperCase() }))} placeholder="HDFC0001234" maxLength={11} />
-          <Input label="Bank name (optional)" value={form.bankName} onChange={(e) => setForm((f) => ({ ...f, bankName: e.target.value }))} />
+          <IfscInput value={form.ifsc} error={err('ifsc')} onChange={(v) => setForm((f) => ({ ...f, ifsc: v }))} onResolved={(b) => setForm((f) => ({ ...f, bankName: b.bank }))} />
+          <Input label="Bank name" value={form.bankName} onChange={(e) => setForm((f) => ({ ...f, bankName: e.target.value }))} hint="Filled from the IFSC" />
           <Button className="mt-1 self-start" loading={save.isPending} disabled={save.isPending || (tried && Object.keys(errors).length > 0)} onClick={submit}>{details.data?.onFile ? 'Submit for review' : 'Save'}</Button>
           <p className="text-xs text-text-muted">
             {details.data?.onFile

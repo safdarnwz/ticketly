@@ -4,6 +4,7 @@ import { Building2 } from 'lucide-react';
 
 import { Button, Card, CardBody, ErrorState, Input, PageLoader, Select, useToast } from '@/components/ui';
 import { ApiError } from '@/lib/api/client';
+import { PincodeInput } from '@/components/forms/LookupInputs';
 import { operatorProfileApi, type OperatorProfile } from '@/lib/api/operatorProfile';
 
 const MOBILE = /^(\+?91)?[6-9]\d{9}$/;
@@ -27,6 +28,7 @@ function ProfileForm({ profile }: { profile: OperatorProfile }) {
     line1: profile.address?.line1 ?? '', line2: profile.address?.line2 ?? '', city: profile.address?.city ?? '', state: profile.address?.state ?? '', pincode: profile.address?.pincode ?? '',
   });
   const [f, setF] = useState(init);
+  const [localities, setLocalities] = useState<string[]>([]);
   useEffect(() => setF(init()), [profile]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (k: keyof ReturnType<typeof init>, v: string) => setF((x) => ({ ...x, [k]: v }));
   const hasSecondary = !!(f.secName || f.secPhone || f.secEmail);
@@ -80,11 +82,17 @@ function ProfileForm({ profile }: { profile: OperatorProfile }) {
       </CardBody></Card>
       <Card><CardBody className="grid grid-cols-2 gap-3">
         <div className="col-span-2 font-semibold text-text">Registered address <span className="text-xs font-normal text-text-muted">— printed on your tax invoices</span></div>
+        {/* The PIN first: it fills the city and state. */}
+        <div className="col-span-2 sm:col-span-1">
+          <PincodeInput value={f.pincode} error={err('pincode', 'address.pincode')} onChange={(v) => set('pincode', v)}
+            onResolved={(p) => { setF((x) => ({ ...x, city: p.city, state: p.state })); setLocalities(p.localities); }} />
+        </div>
+        <div className="hidden sm:block" />
         <Input label="Building and street" value={f.line1} error={err('line1', 'address.line1')} onChange={(x) => set('line1', x.target.value)} />
-        <Input label="Area / landmark (optional)" value={f.line2} onChange={(x) => set('line2', x.target.value)} />
+        <Input label="Area / locality (optional)" list="profile-localities" value={f.line2} onChange={(x) => set('line2', x.target.value)} />
+        <datalist id="profile-localities">{localities.map((l) => <option key={l} value={l} />)}</datalist>
         <Input label="City" value={f.city} error={err('city', 'address.city')} onChange={(x) => set('city', x.target.value)} />
         <Input label="State" value={f.state} error={err('state', 'address.state')} onChange={(x) => set('state', x.target.value)} />
-        <Input label="PIN code" value={f.pincode} maxLength={6} error={err('pincode', 'address.pincode')} onChange={(x) => set('pincode', x.target.value)} />
         {!profile.address && profile.registeredAddress && <p className="col-span-2 text-xs text-text-muted">On file: {profile.registeredAddress}</p>}
       </CardBody></Card>
       <div className="flex justify-end gap-2">

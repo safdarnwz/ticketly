@@ -15,3 +15,4 @@ export * from './dto/query.dto';
 export * from './decorators';
 export * from './swagger';
 export * from './http.module';
+export * from './dto/india.dto';

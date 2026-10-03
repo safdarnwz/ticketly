@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { localDateQuery, queryFlag } from '@http';
+import { ifscSchema, localDateQuery, queryFlag } from '@http';
 
 const uuid = z.string().uuid();
 
@@ -47,7 +47,7 @@ export type ConfirmDto = z.infer<typeof ConfirmSchema>;
 const AltAccountDetailsSchema = z.object({
   accountHolder: z.string().min(1).max(120),
   accountNumber: z.string().min(4).max(34),
-  ifsc: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'Invalid IFSC code'),
+  ifsc: ifscSchema,
   bankName: z.string().max(120).optional(),
 });
 

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { ifscSchema, pincodeSchema } from '@http';
+
 export const ProvisionTenantSchema = z.object({
   slug: z.string().min(2).max(63),
   legalName: z.string().min(1).max(200),
@@ -58,10 +60,7 @@ export const UpdateTenantSchema = z
         line2: z.string().trim().max(200).optional(),
         city: z.string().trim().min(2, 'City').max(80),
         state: z.string().trim().min(2, 'State').max(80),
-        pincode: z
-          .string()
-          .trim()
-          .regex(/^[1-9]\d{5}$/, 'A 6-digit PIN code'),
+        pincode: pincodeSchema,
       })
       .optional(),
     timezone: z.string().refine(knownTimeZone, 'Not a known time zone').optional(),
@@ -81,11 +80,7 @@ export const SetBankDetailsSchema = z.object({
     .string()
     .transform((v) => v.replace(/\s/g, ''))
     .pipe(z.string().regex(/^\d{9,18}$/, 'An account number is 9 to 18 digits')),
-  ifsc: z
-    .string()
-    .trim()
-    .transform((v) => v.toUpperCase())
-    .pipe(z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'An IFSC is 11 characters, like HDFC0001234')),
+  ifsc: ifscSchema,
   bankName: z.string().trim().max(120).optional(),
 });
 export type SetBankDetailsDto = z.infer<typeof SetBankDetailsSchema>;

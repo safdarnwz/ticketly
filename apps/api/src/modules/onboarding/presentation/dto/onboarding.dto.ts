@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { fileNameQuery } from '@http';
+import { fileNameQuery, ifscSchema, pincodeSchema } from '@http';
 import { APPLICATION_STATUSES } from '../../domain/application-status';
 
 export const APPLICATION_DOC_TYPES = [
@@ -35,7 +35,7 @@ export const ApplyOperatorSchema = z.object({
   city: z.string().max(80).optional(),
   state: z.string().max(80).optional(),
   country: z.string().max(80).optional(),
-  pinCode: z.string().max(12).optional(),
+  pinCode: pincodeSchema.optional(),
   // Business
   business: z
     .object({
@@ -60,11 +60,7 @@ export const ApplyOperatorSchema = z.object({
     .max(34)
     .regex(/^[0-9]+$/)
     .optional(),
-  bankIfsc: z
-    .string()
-    .length(11)
-    .regex(/^[A-Z]{4}0[A-Z0-9]{6}$/i)
-    .optional(),
+  bankIfsc: ifscSchema.optional(),
   bankName: z.string().max(120).optional(),
   // Documents (uploaded references / URLs)
   /** docType → fileId from POST /operators/apply/documents (URLs are no longer accepted). */

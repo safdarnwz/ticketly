@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { ifscSchema } from '@http';
+
 export const CheckPanFormatSchema = z.object({
   operatorApplicationId: z.string().uuid(),
   pan: z.string().min(10).max(10),
@@ -28,6 +30,6 @@ export type SubmitAadhaarOtpDto = z.infer<typeof SubmitAadhaarOtpSchema>;
 export const VerifyBankAccountSchema = z.object({
   operatorApplicationId: z.string().uuid(),
   accountNumber: z.string().min(4).max(34),
-  ifsc: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'Invalid IFSC code'),
+  ifsc: ifscSchema,
 });
 export type VerifyBankAccountDto = z.infer<typeof VerifyBankAccountSchema>;

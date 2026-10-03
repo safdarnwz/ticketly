@@ -61,6 +61,8 @@
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.39.3",
     "fastify": "^5.2.1",
+    "ifsc": "2.0.50",
+    "india-pincode-lookup": "1.0.3",
     "ioredis": "^5.5.0",
     "lru-cache": "^11.0.2",
     "nodemailer": "^6.9.14",

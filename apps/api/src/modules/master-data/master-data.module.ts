@@ -6,6 +6,7 @@ import { CacheModule } from '@cache';
 import { DatabaseModule } from '@database';
 import { MessagingModule } from '@messaging';
 
+import { LookupsController } from './presentation/lookups.controller';
 import { MasterDataController } from './presentation/master-data.controller';
 import { AmenityRepository } from './infrastructure/persistence/amenity.repository';
 import { VehicleTypeRepository } from './infrastructure/persistence/vehicle-type.repository';
@@ -33,7 +34,12 @@ import {
  */
 @Module({
   imports: [DatabaseModule, CacheModule, MessagingModule, EntitlementsModule],
-  controllers: [MasterDataController, StateNormsController, StateNormsAdminController],
+  controllers: [
+    MasterDataController,
+    LookupsController,
+    StateNormsController,
+    StateNormsAdminController,
+  ],
   providers: [
     GeographyRepository,
     StopRepository,
