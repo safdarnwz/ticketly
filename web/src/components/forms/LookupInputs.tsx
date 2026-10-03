@@ -49,7 +49,8 @@ export function PincodeInput({
   }, [q.data, onResolved]);
 
   const lookupError = ready && q.isError ? errText(q.error, 'No post office has this PIN code') : undefined;
-  const notYet = pin.length > 0 && !ready ? (pin.length === 6 ? 'A PIN code is 6 digits and does not start with 0' : undefined) : undefined;
+  const notYet =
+    pin.length > 0 && !ready ? (pin.length === 6 ? 'A PIN code is 6 digits and does not start with 0' : undefined) : undefined;
   return (
     <div className="flex flex-col gap-1">
       <Input
@@ -64,11 +65,17 @@ export function PincodeInput({
         error={error ?? lookupError ?? notYet}
         placeholder="6 digits"
       />
-      {ready && !error && (q.isFetching ? (
-        <span className="flex items-center gap-1 text-xs text-text-muted"><Loader2 className="h-3 w-3 animate-spin" /> Finding the city…</span>
-      ) : q.data ? (
-        <span className="flex items-center gap-1 text-xs text-success"><CheckCircle2 className="h-3 w-3" /> {q.data.city}, {q.data.state}</span>
-      ) : null)}
+      {ready &&
+        !error &&
+        (q.isFetching ? (
+          <span className="flex items-center gap-1 text-xs text-text-muted">
+            <Loader2 className="h-3 w-3 animate-spin" /> Finding the city…
+          </span>
+        ) : q.data ? (
+          <span className="flex items-center gap-1 text-xs text-success">
+            <CheckCircle2 className="h-3 w-3" /> {q.data.city}, {q.data.state}
+          </span>
+        ) : null)}
     </div>
   );
 }
@@ -110,7 +117,8 @@ export function IfscInput({
     }
   }, [q.data, onResolved]);
 
-  const lookupError = ready && q.isError ? errText(q.error, 'No bank branch has this IFSC — check it on the cheque book') : undefined;
+  const lookupError =
+    ready && q.isError ? errText(q.error, 'No bank branch has this IFSC — check it on the cheque book') : undefined;
   const shape = code.length === 11 && !ready ? 'An IFSC is 11 characters, like HDFC0001234' : undefined;
   return (
     <div className="flex flex-col gap-1">
@@ -121,18 +129,31 @@ export function IfscInput({
         value={value}
         disabled={disabled}
         leftIcon={<Landmark className="h-4 w-4" />}
-        onChange={(e) => onChange(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11))}
+        onChange={(e) =>
+          onChange(
+            e.target.value
+              .toUpperCase()
+              .replace(/[^A-Z0-9]/g, '')
+              .slice(0, 11),
+          )
+        }
         error={error ?? lookupError ?? shape}
         placeholder="HDFC0001234"
       />
-      {ready && !error && (q.isFetching ? (
-        <span className="flex items-center gap-1 text-xs text-text-muted"><Loader2 className="h-3 w-3 animate-spin" /> Finding the bank…</span>
-      ) : q.data ? (
-        <span className="flex items-center gap-1 text-xs text-success">
-          <CheckCircle2 className="h-3 w-3 shrink-0" />
-          {q.data.bank}{q.data.branch ? ` · ${q.data.branch}` : ''}{q.data.city ? `, ${q.data.city}` : ''}
-        </span>
-      ) : null)}
+      {ready &&
+        !error &&
+        (q.isFetching ? (
+          <span className="flex items-center gap-1 text-xs text-text-muted">
+            <Loader2 className="h-3 w-3 animate-spin" /> Finding the bank…
+          </span>
+        ) : q.data ? (
+          <span className="flex items-center gap-1 text-xs text-success">
+            <CheckCircle2 className="h-3 w-3 shrink-0" />
+            {q.data.bank}
+            {q.data.branch ? ` · ${q.data.branch}` : ''}
+            {q.data.city ? `, ${q.data.city}` : ''}
+          </span>
+        ) : null)}
     </div>
   );
 }

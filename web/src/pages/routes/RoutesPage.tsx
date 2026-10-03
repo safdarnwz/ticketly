@@ -9,12 +9,13 @@ import { Button, Card, CardBody, Badge, statusTone, Table, type Column, Modal, I
 import { PageHeader } from '@/components/common/PageHeader';
 import { masterDataApi, type RouteRow, type City, type Stop } from '@/lib/api/masterData';
 import { PincodeInput } from '@/components/forms/LookupInputs';
+import { useTabParam } from '@/lib/useTabParam';
 import { parseCsv } from '@/lib/csv';
 
 interface StopDraft { stopId: string; stopName: string; sequence: number; distanceFromOriginM: number; departOffsetMin: number; cityId?: string }
 
 export function RoutesPage() {
-  const [view, setView] = useState<'routes' | 'stops'>('routes');
+  const [view, setView] = useTabParam<'routes' | 'stops'>(['routes', 'stops'], 'routes', 'view');
   return (
     <>
       <PageHeader title="Routes & Stops" subtitle="Your network — origins, destinations, and boarding/dropping points" />

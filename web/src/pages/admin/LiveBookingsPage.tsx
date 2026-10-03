@@ -301,12 +301,12 @@ export function LiveBookingsPage() {
             <ErrorState error={feed.error} onRetry={feed.refetch} />
           ) : (
             <>
-              <Table columns={feedColumns} rows={rows} empty={pnr ? `No booking with PNR ${pnr} in this period.` : 'No bookings match these filters.'} />
-              {feed.hasNextPage && (
-                <div className="flex justify-center">
-                  <Button variant="outline" onClick={() => void feed.fetchNextPage()} loading={feed.isFetchingNextPage} disabled={feed.isFetchingNextPage}>Load more</Button>
-                </div>
-              )}
+              <Table
+                columns={feedColumns}
+                rows={rows}
+                empty={pnr ? `No booking with PNR ${pnr} in this period.` : 'No bookings match these filters.'}
+                more={{ hasMore: !!feed.hasNextPage, loading: feed.isFetchingNextPage, onMore: () => void feed.fetchNextPage() }}
+              />
               {pages > 1 && live && <p className="text-center text-xs text-text-muted">Showing older pages — auto-refresh is paused until you change a filter.</p>}
             </>
           )}

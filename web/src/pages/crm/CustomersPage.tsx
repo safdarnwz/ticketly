@@ -68,12 +68,8 @@ export function CustomersPage() {
         <EmptyState title={query ? 'No customer matches' : filter === 'blocked' ? 'Nobody is blocked' : 'No customers yet'} description={query ? 'Try part of the name, 4+ digits of the mobile, the exact email or a PNR.' : 'Customers appear once they book with you.'} icon={<Users className="h-10 w-10" />} />
       ) : (
         <>
-          <Table columns={columns} rows={rows} onRowClick={(c) => setOpen(c.key)} />
-          <div className="mt-3 flex items-center justify-center gap-2">
-            <Button variant="outline" size="sm" disabled={page === 1 || list.isFetching} onClick={() => setPage((p) => p - 1)}>Previous</Button>
-            <span className="text-sm text-text-muted">Page {page}</span>
-            <Button variant="outline" size="sm" disabled={!list.data?.hasMore || list.isFetching} onClick={() => setPage((p) => p + 1)}>Next</Button>
-          </div>
+          <Table columns={columns} rows={rows} onRowClick={(c) => setOpen(c.key)}
+            server={{ page, hasNext: !!list.data?.hasMore, loading: list.isFetching, onPage: setPage }} />
         </>
       )}
 

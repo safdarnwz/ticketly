@@ -5,6 +5,7 @@ import { CreditCard, MessageSquare, Trophy } from 'lucide-react';
 import { Card, CardBody, CardHeader, EmptyState, ErrorState, Input, PageLoader, Select, Table, type Column } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
 import { platformAdminApi, type MessageHealthRow, type PaymentHealthRow, type RankingRow } from '@/lib/api/platformAdmin';
+import { SectionTabs } from '@/components/common/SectionTabs';
 import { formatMoney, todayLocal } from '@/lib/utils';
 
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
@@ -59,21 +60,27 @@ export function HealthPage() {
         <div className="w-44"><Input label="To" type="date" value={to} min={from} error={bad ? 'After the start' : undefined} onChange={(e) => setTo(e.target.value)} /></div>
         {totalPay.attempts > 0 && <div className="pb-2 text-sm text-text-muted">Booking payment success: <b className={tone(totalPay.captured / totalPay.attempts)}>{pct(totalPay.captured / totalPay.attempts)}</b> · error rate {pct(1 - totalPay.captured / totalPay.attempts)}</div>}
       </div>
-      <div className="flex flex-col gap-4">
-        <Card>
+      <SectionTabs sections={[
+        { key: 'payments', label: 'Payments', render: () => (
+          <Card>
           <CardHeader title={<span className="flex items-center gap-2"><CreditCard className="h-4 w-4" /> Payments by gateway</span>} />
           <CardBody className="p-0">{payments.isLoading ? <PageLoader /> : payments.isError ? <ErrorState error={payments.error} onRetry={payments.refetch} /> : (payments.data?.items.length ?? 0) === 0 ? <EmptyState title="No payments in this period" /> : <Table columns={payCols} rows={payments.data!.items} />}</CardBody>
         </Card>
-        <Card>
+        ) },
+        { key: 'messages', label: 'SMS, WhatsApp & email', render: () => (
+          <Card>
           <CardHeader title={<span className="flex items-center gap-2"><MessageSquare className="h-4 w-4" /> SMS, WhatsApp and email</span>} />
           <CardBody className="p-0">{messages.isLoading ? <PageLoader /> : messages.isError ? <ErrorState error={messages.error} onRetry={messages.refetch} /> : (messages.data?.items.length ?? 0) === 0 ? <EmptyState title="No messages in this period" /> : <Table columns={msgCols} rows={messages.data!.items} />}</CardBody>
         </Card>
-        <Card>
+        ) },
+        { key: 'ranking', label: 'Operator ranking', render: () => (
+          <Card>
           <CardHeader title={<span className="flex items-center gap-2"><Trophy className="h-4 w-4" /> Operator ranking</span>}
             action={<div className="w-48"><Select aria-label="Rank by" value={sortBy} onChange={(e) => setSortBy(e.target.value)} options={[{ value: 'revenue', label: 'By revenue' }, { value: 'bookings', label: 'By bookings' }, { value: 'seats', label: 'By seats' }, { value: 'cancellationRate', label: 'By cancellation rate' }]} /></div>} />
           <CardBody className="p-0">{ranking.isLoading ? <PageLoader /> : ranking.isError ? <ErrorState error={ranking.error} onRetry={ranking.refetch} /> : (ranking.data?.items.length ?? 0) === 0 ? <EmptyState title="No bookings in this period" /> : <Table columns={rankCols} rows={ranking.data!.items} />}</CardBody>
         </Card>
-      </div>
+        ) },
+      ]} />
     </>
   );
 }

@@ -161,8 +161,7 @@ export function RefundsPage() {
         <EmptyState title={tab === 'action' ? 'Nothing needs you' : 'No refunds here'} description={tab === 'action' ? 'Failed refunds and bank transfers to send show up here.' : filter ? `No refunds for PNR ${filter}.` : 'Refunds appear as bookings are cancelled.'} icon={<RotateCcw className="h-10 w-10" />} />
       ) : (
         <>
-          <Table columns={columns} rows={rows} />
-          {queue.hasNextPage && <div className="mt-3 flex justify-center"><Button variant="outline" loading={queue.isFetchingNextPage} onClick={() => void queue.fetchNextPage()}>Load more</Button></div>}
+          <Table columns={columns} rows={rows} more={{ hasMore: !!queue.hasNextPage, loading: queue.isFetchingNextPage, onMore: () => void queue.fetchNextPage() }} />
         </>
       )}
 

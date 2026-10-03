@@ -3,7 +3,19 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Search, Ticket, Phone, List, ChevronRight } from 'lucide-react';
 
-import { Button, Card, CardBody, Input, Badge, statusTone, useToast, EmptyState, ErrorState, PageLoader } from '@/components/ui';
+import {
+  Button,
+  Card,
+  CardBody,
+  Input,
+  Badge,
+  statusTone,
+  useToast,
+  EmptyState,
+  ErrorState,
+  PageLoader,
+  usePaged,
+} from '@/components/ui';
 import { bookingsApi } from '@/lib/api/bookings';
 import { useAuth } from '@/stores/auth';
 import { formatMoney, formatTime, cn } from '@/lib/utils';
@@ -19,7 +31,26 @@ function splitTrips(list: Booking[]): [string, Booking[]][] {
   const at = (b: Booking) => (b.departsAt ? Date.parse(b.departsAt) : 0);
   const upcoming = list.filter((b) => at(b) >= now && !INACTIVE.has(b.status)).sort((x, y) => at(x) - at(y));
   const rest = list.filter((b) => !upcoming.includes(b)).sort((x, y) => at(y) - at(x));
-  return [['Upcoming', upcoming], ['Past & cancelled', rest]];
+  return [
+    ['Upcoming', upcoming],
+    ['Past & cancelled', rest],
+  ];
+}
+
+/** Upcoming, or past and cancelled — ten trips a page. */
+function TripSection({ title, list }: { title: string; list: Booking[] }) {
+  const { page, pageItems, pager } = usePaged(list);
+  return (
+    <section>
+      <h2 className="mb-3 font-display text-lg text-text">{title}</h2>
+      <div className="flex flex-col gap-3">
+        {pageItems.map((bk, i) => (
+          <TripRow key={bk.id} bk={bk} highlight={title === 'Upcoming' && page === 1 && i === 0} />
+        ))}
+      </div>
+      {pager}
+    </section>
+  );
 }
 
 /** One trip: a date block (month, big day) and the journey with its ring dots. */
@@ -30,21 +61,43 @@ function TripRow({ bk, highlight }: { bk: Booking; highlight: boolean }) {
   const [from, to] = bk.fromName && bk.toName ? [bk.fromName, bk.toName] : (bk.routeName ?? '').split(/\s*(?:→|->|-)\s*/);
   return (
     <Link to={`/bookings/${bk.id}/manage`} className="block">
-      <div className={cn('flex items-stretch gap-4 rounded-[20px] p-3 pr-4 transition', highlight ? 'bg-surface shadow-md' : 'bg-surface shadow-sm')}>
-        <div className={cn('flex w-[68px] shrink-0 flex-col items-center justify-center rounded-2xl', highlight ? 'bg-accent text-white' : 'bg-surface-muted text-text')}>
+      <div
+        className={cn(
+          'flex items-stretch gap-4 rounded-[20px] p-3 pr-4 transition',
+          highlight ? 'bg-surface shadow-md' : 'bg-surface shadow-sm',
+        )}
+      >
+        <div
+          className={cn(
+            'flex w-[68px] shrink-0 flex-col items-center justify-center rounded-2xl',
+            highlight ? 'bg-accent text-white' : 'bg-surface-muted text-text',
+          )}
+        >
           <span className={cn('text-xs font-semibold', !highlight && 'text-text-muted')}>{month}</span>
           <span className="text-xl font-medium leading-none">{day}</span>
         </div>
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 py-1">
-          <span className="flex items-center gap-2 text-sm font-semibold text-text"><span className="dot-from !h-2.5 !w-2.5" /><span className="truncate">{from || `PNR ${bk.pnr}`}</span></span>
-          {to && <span className="flex items-center gap-2 text-sm font-semibold text-text"><span className="dot-to !h-2.5 !w-2.5" /><span className="truncate">{to}</span></span>}
+          <span className="flex items-center gap-2 text-sm font-semibold text-text">
+            <span className="dot-from !h-2.5 !w-2.5" />
+            <span className="truncate">{from || `PNR ${bk.pnr}`}</span>
+          </span>
+          {to && (
+            <span className="flex items-center gap-2 text-sm font-semibold text-text">
+              <span className="dot-to !h-2.5 !w-2.5" />
+              <span className="truncate">{to}</span>
+            </span>
+          )}
           <span className="truncate text-xs text-text-muted">
-            {d ? `${formatTime(bk.departsAt!)} · ` : ''}{bk.operatorName ? `${bk.operatorName} · ` : ''}PNR {bk.pnr} · {bk.seatCount} seat{bk.seatCount === 1 ? '' : 's'}
+            {d ? `${formatTime(bk.departsAt!)} · ` : ''}
+            {bk.operatorName ? `${bk.operatorName} · ` : ''}PNR {bk.pnr} · {bk.seatCount} seat{bk.seatCount === 1 ? '' : 's'}
           </span>
         </div>
         <div className="flex shrink-0 flex-col items-end justify-between py-1">
           <Badge tone={statusTone(bk.status)}>{bk.status}</Badge>
-          <span className="flex items-center gap-1 font-display text-base text-price">{formatMoney(bk.totalMinor, bk.currency)}<ChevronRight className="h-4 w-4 text-text-muted" /></span>
+          <span className="flex items-center gap-1 font-display text-base text-price">
+            {formatMoney(bk.totalMinor, bk.currency)}
+            <ChevronRight className="h-4 w-4 text-text-muted" />
+          </span>
         </div>
       </div>
     </Link>
@@ -86,8 +139,15 @@ export function AccountPage() {
   };
 
   const tab = (m: Mode, label: string, Icon: typeof Ticket) => (
-    <button type="button" onClick={() => setMode(m)} aria-pressed={mode === m}
-      className={cn('flex items-center gap-1.5 rounded-pill px-3.5 py-1.5 text-xs font-semibold transition', mode === m ? 'bg-surface text-text shadow-sm' : 'text-text-muted hover:text-text')}>
+    <button
+      type="button"
+      onClick={() => setMode(m)}
+      aria-pressed={mode === m}
+      className={cn(
+        'flex items-center gap-1.5 rounded-pill px-3.5 py-1.5 text-xs font-semibold transition',
+        mode === m ? 'bg-surface text-text shadow-sm' : 'text-text-muted hover:text-text',
+      )}
+    >
       <Icon className="h-3.5 w-3.5" /> {label}
     </button>
   );
@@ -106,28 +166,77 @@ export function AccountPage() {
         <Card>
           <CardBody>
             <form onSubmit={onSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-start">
-              <div className="flex-1"><Input label="PNR" placeholder="e.g. YB12AB" value={pnr} error={tried ? errors.pnr : undefined} onChange={(e) => setPnr(e.target.value)} leftIcon={<Ticket className="h-4 w-4" />} /></div>
-              <div className="flex-1"><Input label="Mobile number" placeholder="98…" value={mobile} error={tried ? errors.mobile : undefined} onChange={(e) => setMobile(e.target.value)} leftIcon={<Phone className="h-4 w-4" />} /></div>
-              <Button type="submit" className="sm:mt-6" loading={lookup.isPending} disabled={lookup.isPending} leftIcon={<Search className="h-4 w-4" />}>Find</Button>
+              <div className="flex-1">
+                <Input
+                  label="PNR"
+                  placeholder="e.g. YB12AB"
+                  value={pnr}
+                  error={tried ? errors.pnr : undefined}
+                  onChange={(e) => setPnr(e.target.value)}
+                  leftIcon={<Ticket className="h-4 w-4" />}
+                />
+              </div>
+              <div className="flex-1">
+                <Input
+                  label="Mobile number"
+                  placeholder="98…"
+                  value={mobile}
+                  error={tried ? errors.mobile : undefined}
+                  onChange={(e) => setMobile(e.target.value)}
+                  leftIcon={<Phone className="h-4 w-4" />}
+                />
+              </div>
+              <Button
+                type="submit"
+                className="sm:mt-6"
+                loading={lookup.isPending}
+                disabled={lookup.isPending}
+                leftIcon={<Search className="h-4 w-4" />}
+              >
+                Find
+              </Button>
             </form>
-            <p className="mt-2 text-xs text-text-muted">The mobile number it was booked with — this confirms the booking is yours.</p>
+            <p className="mt-2 text-xs text-text-muted">
+              The mobile number it was booked with — this confirms the booking is yours.
+            </p>
           </CardBody>
         </Card>
       ) : !signedIn ? (
-        <EmptyState title="Sign in to see all your trips" description="Or find one booking by its PNR and mobile number." icon={<List className="h-10 w-10" />}
-          action={<div className="flex gap-2"><Link to="/login?next=/account"><Button>Sign in</Button></Link><Button variant="outline" onClick={() => setMode('pnr')}>Find by PNR</Button></div>} />
-      ) : mine.isLoading ? <PageLoader /> : mine.isError ? <ErrorState error={mine.error} onRetry={mine.refetch} /> : (mine.data?.bookings.length ?? 0) === 0 ? (
-        <EmptyState title="No trips yet" description="Bookings made while signed in show up here." icon={<List className="h-10 w-10" />} action={<Link to="/"><Button>Book a bus</Button></Link>} />
+        <EmptyState
+          title="Sign in to see all your trips"
+          description="Or find one booking by its PNR and mobile number."
+          icon={<List className="h-10 w-10" />}
+          action={
+            <div className="flex gap-2">
+              <Link to="/login?next=/account">
+                <Button>Sign in</Button>
+              </Link>
+              <Button variant="outline" onClick={() => setMode('pnr')}>
+                Find by PNR
+              </Button>
+            </div>
+          }
+        />
+      ) : mine.isLoading ? (
+        <PageLoader />
+      ) : mine.isError ? (
+        <ErrorState error={mine.error} onRetry={mine.refetch} />
+      ) : (mine.data?.bookings.length ?? 0) === 0 ? (
+        <EmptyState
+          title="No trips yet"
+          description="Bookings made while signed in show up here."
+          icon={<List className="h-10 w-10" />}
+          action={
+            <Link to="/">
+              <Button>Book a bus</Button>
+            </Link>
+          }
+        />
       ) : (
         <div className="flex flex-col gap-6">
-          {splitTrips(mine.data!.bookings).map(([title, list]) => list.length > 0 && (
-            <section key={title}>
-              <h2 className="mb-3 font-display text-lg text-text">{title}</h2>
-              <div className="flex flex-col gap-3">
-                {list.map((bk, i) => <TripRow key={bk.id} bk={bk} highlight={title === 'Upcoming' && i === 0} />)}
-              </div>
-            </section>
-          ))}
+          {splitTrips(mine.data!.bookings).map(
+            ([title, list]) => list.length > 0 && <TripSection key={title} title={title} list={list} />,
+          )}
         </div>
       )}
     </div>

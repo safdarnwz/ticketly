@@ -30,7 +30,7 @@ export interface StaffImportResult { imported: number; failed: { row: number; er
 
 export const staffApi = {
   list: (f: { q?: string; status?: string; branchId?: string; roleId?: string; page: number }) => {
-    const q = new URLSearchParams({ page: String(f.page) });
+    const q = new URLSearchParams({ page: String(f.page), limit: '10' });
     for (const k of ['q', 'status', 'branchId', 'roleId'] as const) if (f[k]) q.set(k, f[k]!);
     return get<{ items: Staff[]; page: number; hasMore: boolean }>(`/v1/users?${q}`);
   },

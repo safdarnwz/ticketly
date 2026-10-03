@@ -3,12 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowUpRight, BarChart3, CheckCircle2, IndianRupee, RotateCcw, Search, Star, Ticket, Timer, XCircle } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { Badge, Card, CardBody, CardHeader, ErrorState, PageLoader, Skeleton, Table, statusTone, type Column } from '@/components/ui';
+import { Badge, Card, CardBody, CardHeader, type Column, ErrorState, PageLoader, Skeleton, statusTone, TabBar, Table } from '@/components/ui';
 import { useIsAgent, useIsCrew } from '@/lib/useAgent';
 import { useAuth } from '@/stores/auth';
 import { reportsApi } from '@/lib/api/reports';
 import { schedulingApi, type TripRow } from '@/lib/api/scheduling';
 import { bookingsApi, type StaffBookingRow } from '@/lib/api/bookings';
+import { useTabParam } from '@/lib/useTabParam';
 import { addDaysIso, cn, formatMoney, formatTime, todayLocal } from '@/lib/utils';
 
 const REFRESH_MS = 30_000;
@@ -65,7 +66,17 @@ export function DashboardPage() {
   return isAgent ? <Navigate to="/agent" replace /> : isCrew ? <Navigate to="/crew" replace /> : <StaffDashboard />;
 }
 
+type Section = 'departures' | 'bookings' | 'hourly' | 'routes' | 'shortcuts';
+const SECTIONS = [
+  { key: 'departures', label: 'Today’s departures' },
+  { key: 'bookings', label: 'Latest bookings' },
+  { key: 'hourly', label: 'Bookings by hour' },
+  { key: 'routes', label: 'Routes, 30 days' },
+  { key: 'shortcuts', label: 'Shortcuts' },
+] as const;
+
 function StaffDashboard() {
+  const [section, setSection] = useTabParam<Section>(SECTIONS.map((x) => x.key), 'departures', 'section');
   const navigate = useNavigate();
   const user = useAuth((s) => s.user);
   const today = todayLocal();
@@ -118,8 +129,10 @@ function StaffDashboard() {
         </div>
       )}
 
-      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-5">
-        <Card className="xl:col-span-3">
+      <TabBar className="mb-6" label="Dashboard" value={section} onChange={setSection} items={SECTIONS} />
+
+      {section === 'departures' && (
+        <Card>
           <CardHeader title="Today’s departures" subtitle="Click a bus for its reservation chart" />
           <CardBody>
             {trips.isLoading ? <Skeleton className="h-40" /> : trips.isError ? <ErrorState error={trips.error} onRetry={trips.refetch} /> : (
@@ -132,7 +145,9 @@ function StaffDashboard() {
             )}
           </CardBody>
         </Card>
-        <Card className="xl:col-span-2">
+      )}
+      {section === 'bookings' && (
+        <Card>
           <CardHeader title="Latest bookings" subtitle="Booked today" action={<Link to="/bookings" className="text-sm text-primary hover:underline">All bookings</Link>} />
           <CardBody>
             {recent.isLoading ? <Skeleton className="h-40" /> : recent.isError ? <ErrorState error={recent.error} onRetry={recent.refetch} /> : (
@@ -140,24 +155,24 @@ function StaffDashboard() {
             )}
           </CardBody>
         </Card>
-      </div>
-
-      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-5">
-        <Card className="xl:col-span-3">
+      )}
+      {section === 'hourly' && (
+        <Card>
           <CardHeader title="Bookings by hour" subtitle="Today, by the hour they were made" />
           <CardBody>
             {hourly.isLoading ? <Skeleton className="h-40" /> : hourly.isError ? <ErrorState error={hourly.error} onRetry={hourly.refetch} /> : <HourlyChart items={hourly.data?.items ?? []} />}
           </CardBody>
         </Card>
-        <Card className="xl:col-span-2">
+      )}
+      {section === 'routes' && (
+        <Card>
           <CardHeader title="Routes, last 30 days" subtitle="By seats filled" action={<Link to="/reports" className="text-sm text-primary hover:underline">Reports</Link>} />
           <CardBody>
             {occupancy30.isLoading ? <Skeleton className="h-40" /> : occupancy30.isError ? <ErrorState error={occupancy30.error} onRetry={occupancy30.refetch} /> : <RouteRanking series={occupancy30.data?.series ?? []} />}
           </CardBody>
         </Card>
-      </div>
-
-      <h2 className="mb-3 text-xs font-semibold text-text-muted">Quick actions</h2>
+      )}
+      {section === 'shortcuts' && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {shortcuts.map(({ to, label, desc, icon: Icon }) => (
           <Link key={to} to={to}>
@@ -173,6 +188,7 @@ function StaffDashboard() {
           </Link>
         ))}
       </div>
+      )}
     </>
   );
 }

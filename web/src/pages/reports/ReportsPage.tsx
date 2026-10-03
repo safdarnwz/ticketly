@@ -8,6 +8,7 @@ import { authApi } from '@/lib/api/auth';
 import { reportsApi } from '@/lib/api/reports';
 import { DispatchTab, ForecastTab, PnlTab } from './ReportsExtras';
 import { LedgerTab } from './LedgerTab';
+import { useTabParam } from '@/lib/useTabParam';
 import { addDaysIso, cn, dayDiff, formatDateLabel, formatMoney, todayLocal } from '@/lib/utils';
 
 type Tab = 'revenue' | 'occupancy' | 'routes' | 'cancellations' | 'peak-hours' | 'pnl' | 'dispatch' | 'forecast' | 'ledger';
@@ -26,7 +27,7 @@ const PRESETS = [
 const day = (d: string) => formatDateLabel(d, { weekday: 'short', day: '2-digit', month: 'short' });
 
 export function ReportsPage() {
-  const [tab, setTab] = useState<Tab>('revenue');
+  const [tab, setTab] = useTabParam<Tab>(['revenue', 'occupancy', 'routes', 'cancellations', 'peak-hours', 'pnl', 'dispatch', 'forecast', 'ledger'], 'revenue');
   // The ledger is for whoever handles settlements; the API refuses everyone else anyway.
   const me = useQuery({ queryKey: ['auth-me'], queryFn: authApi.me, staleTime: 60_000 });
   const held = new Set(me.data?.permissions ?? []);

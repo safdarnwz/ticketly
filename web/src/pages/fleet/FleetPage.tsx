@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Bus, Users, LayoutGrid, ListChecks, Upload, CalendarClock } from 'lucide-react';
 
@@ -11,14 +11,13 @@ import { SeatLayoutsTab } from './SeatLayoutsTab';
 import { CrewTab } from './CrewTab';
 import { RenewalsTab } from './RenewalsTab';
 import { isRegistration, normReg } from '@/lib/vehicle';
+import { useTabParam } from '@/lib/useTabParam';
 import { parseCsv } from '@/lib/csv';
 
 type Tab = 'vehicles' | 'layouts' | 'setup' | 'crew' | 'renewals';
 
 export function FleetPage() {
-  const [params, setParams] = useSearchParams();
-  const tab = (['vehicles', 'layouts', 'setup', 'crew', 'renewals'].includes(params.get('tab') ?? '') ? params.get('tab') : 'vehicles') as Tab;
-  const setTab = (t: Tab) => setParams(t === 'vehicles' ? {} : { tab: t }, { replace: true });
+  const [tab, setTab] = useTabParam<Tab>(['vehicles', 'layouts', 'setup', 'crew', 'renewals'], 'vehicles');
   const tabs: { key: Tab; label: string; icon: typeof Bus }[] = [
     { key: 'vehicles', label: 'Vehicles', icon: Bus },
     { key: 'layouts', label: 'Seat Layouts', icon: LayoutGrid },
@@ -53,7 +52,7 @@ function VehiclesTab() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
-  const pageSize = 20;
+  const pageSize = 10;
   const [form, setForm] = useState({ registrationNo: '', vehicleTypeId: '', seatLayoutId: '', make: '', model: '' });
 
   const vehicles = useQuery({ queryKey: ['vehicles', search, statusFilter, page], queryFn: () => fleetApi.listVehicles({ search: search || undefined, status: statusFilter || undefined, page, pageSize }) });
@@ -153,15 +152,10 @@ function VehiclesTab() {
       </div>
 
       {vehicles.isLoading ? <PageLoader /> : vehicles.isError ? <ErrorState error={vehicles.error} onRetry={vehicles.refetch} /> :
-        (vehicles.data?.items.length ? <Table columns={columns} rows={vehicles.data.items} /> : <EmptyState title="No vehicles yet" icon={<Bus className="h-10 w-10" />} />)}
-
-      {total > pageSize && (
-        <div className="mt-4 flex items-center justify-center gap-3 text-sm">
-          <Button size="sm" variant="ghost" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Previous</Button>
-          <span className="text-text-muted">Page {page} of {totalPages}</span>
-          <Button size="sm" variant="ghost" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</Button>
-        </div>
-      )}
+        (vehicles.data?.items.length ? (
+          <Table columns={columns} rows={vehicles.data.items}
+            server={{ page, total, hasNext: page < totalPages, loading: vehicles.isFetching, onPage: setPage }} />
+        ) : <EmptyState title="No vehicles yet" icon={<Bus className="h-10 w-10" />} />)}
 
       <Modal open={adding} onClose={() => setAdding(false)} title="Add a vehicle"
         footer={<><Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button><Button loading={create.isPending} disabled={create.isPending} onClick={() => { setTriedVehicle(true); if (!vehicleErrors.reg && !vehicleErrors.type) create.mutate(); }}>Add</Button></>}>

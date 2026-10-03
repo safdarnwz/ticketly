@@ -10,6 +10,7 @@ import { RolesTab } from './RolesTab';
 import { TargetProgress, TargetSection, UploadStaffModal, WarningsSection } from './StaffTeamTools';
 import { staffApi, type Staff, type StaffPerformance } from '@/lib/api/staff';
 import { useAuth } from '@/stores/auth';
+import { useTabParam } from '@/lib/useTabParam';
 import { addDaysIso, cn, formatDateTime, formatMoney, fromAppDateTimeInput, toAppDateTimeInput, todayLocal } from '@/lib/utils';
 
 type Tab = 'directory' | 'roles' | 'performance';
@@ -20,7 +21,7 @@ type Tab = 'directory' | 'roles' | 'performance';
  * disables themselves or removes the last person who can manage staff.
  */
 export function StaffPage() {
-  const [tab, setTab] = useState<Tab>('directory');
+  const [tab, setTab] = useTabParam<Tab>(['directory', 'roles', 'performance'], 'directory');
   return (
     <>
       <PageHeader title="Staff" subtitle="Your team — roles, branches, access and counter sales" />
@@ -81,12 +82,8 @@ function Directory() {
         <EmptyState title="No staff here" description={q ? 'Nobody matches — email and mobile must be exact.' : 'Add your team to give them access.'} icon={<UserCog className="h-10 w-10" />} />
       ) : (
         <>
-          <Table columns={columns} rows={rows} onRowClick={(s) => setOpen(s.id)} />
-          <div className="mt-3 flex items-center justify-center gap-2">
-            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>Previous</Button>
-            <span className="text-sm text-text-muted">Page {page}</span>
-            <Button variant="outline" size="sm" disabled={!list.data?.hasMore} onClick={() => setPage((p) => p + 1)}>Next</Button>
-          </div>
+          <Table columns={columns} rows={rows} onRowClick={(s) => setOpen(s.id)}
+            server={{ page, hasNext: !!list.data?.hasMore, loading: list.isFetching, onPage: setPage }} />
         </>
       )}
 

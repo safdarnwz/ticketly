@@ -10,3 +10,6 @@ export { ToastProvider } from './Toast';
 export { useToast } from './toast-context';
 export { Spinner, Skeleton, PageLoader, EmptyState, ErrorState } from './feedback';
 export { TabBar, type TabItem } from './TabBar';
+export { Pager } from './Pager';
+export { usePaged } from './usePaged';
+export { PAGE_SIZE } from './paging';

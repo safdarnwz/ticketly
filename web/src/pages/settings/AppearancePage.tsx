@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { appearanceApi } from '@/lib/api/platform';
 import { useTheme } from '@/theme/theme-context';
 import { DEFAULT_THEME } from '@/theme/defaultTheme';
+import { SectionTabs } from '@/components/common/SectionTabs';
 import type { Theme, ThemePatch } from '@/theme/types';
 
 const ROLE_SCOPES = [
@@ -24,13 +25,20 @@ const ROLE_SCOPES = [
 ];
 
 const COLOR_FIELDS: { key: keyof Theme['colors']; label: string }[] = [
-  { key: 'primary', label: 'Primary' }, { key: 'primaryFg', label: 'Primary text' },
-  { key: 'secondary', label: 'Secondary' }, { key: 'accent', label: 'Accent' },
-  { key: 'bg', label: 'Background' }, { key: 'surface', label: 'Surface' },
-  { key: 'surfaceMuted', label: 'Surface muted' }, { key: 'border', label: 'Border' },
-  { key: 'text', label: 'Text' }, { key: 'textMuted', label: 'Text muted' },
-  { key: 'success', label: 'Success' }, { key: 'warning', label: 'Warning' },
-  { key: 'danger', label: 'Danger' }, { key: 'info', label: 'Info' },
+  { key: 'primary', label: 'Primary' },
+  { key: 'primaryFg', label: 'Primary text' },
+  { key: 'secondary', label: 'Secondary' },
+  { key: 'accent', label: 'Accent' },
+  { key: 'bg', label: 'Background' },
+  { key: 'surface', label: 'Surface' },
+  { key: 'surfaceMuted', label: 'Surface muted' },
+  { key: 'border', label: 'Border' },
+  { key: 'text', label: 'Text' },
+  { key: 'textMuted', label: 'Text muted' },
+  { key: 'success', label: 'Success' },
+  { key: 'warning', label: 'Warning' },
+  { key: 'danger', label: 'Danger' },
+  { key: 'info', label: 'Info' },
 ];
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -116,67 +124,178 @@ export function AppearancePage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Editors */}
-        <div className="flex flex-col gap-6 lg:col-span-2">
-          <Card>
-            <CardHeader title={<span className="flex items-center gap-2"><Palette className="h-4 w-4" /> Colors</span>} />
-            <CardBody className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-              {COLOR_FIELDS.map(({ key, label }) => (
-                <div key={key} className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium text-text-muted">{label}</span>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color" value={theme.colors[key]} onChange={(e) => setColor(key, e.target.value.toUpperCase())}
-                      className="h-9 w-9 cursor-pointer rounded-md border border-border bg-surface"
+        <div className="lg:col-span-2">
+          <SectionTabs
+            sections={[
+              {
+                key: 'colors',
+                label: 'Colors',
+                render: () => (
+                  <Card>
+                    <CardHeader
+                      title={
+                        <span className="flex items-center gap-2">
+                          <Palette className="h-4 w-4" /> Colors
+                        </span>
+                      }
                     />
-                    <input
-                      value={theme.colors[key]} onChange={(e) => setColor(key, e.target.value)}
-                      className="h-9 w-full rounded-md border border-border bg-surface px-2 text-xs text-text focus-ring"
+                    <CardBody className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                      {COLOR_FIELDS.map(({ key, label }) => (
+                        <div key={key} className="flex flex-col gap-1.5">
+                          <span className="text-xs font-medium text-text-muted">{label}</span>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={theme.colors[key]}
+                              onChange={(e) => setColor(key, e.target.value.toUpperCase())}
+                              className="h-9 w-9 cursor-pointer rounded-md border border-border bg-surface"
+                            />
+                            <input
+                              value={theme.colors[key]}
+                              onChange={(e) => setColor(key, e.target.value)}
+                              className="h-9 w-full rounded-md border border-border bg-surface px-2 text-xs text-text focus-ring"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </CardBody>
+                  </Card>
+                ),
+              },
+              {
+                key: 'components',
+                label: 'Components',
+                render: () => (
+                  <Card>
+                    <CardHeader
+                      title={
+                        <span className="flex items-center gap-2">
+                          <Square className="h-4 w-4" /> Components
+                        </span>
+                      }
                     />
-                  </div>
-                </div>
-              ))}
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardHeader title={<span className="flex items-center gap-2"><Square className="h-4 w-4" /> Components</span>} />
-            <CardBody className="grid grid-cols-2 gap-5 sm:grid-cols-3">
-              <NumberField label="Button height" value={theme.components.button.height} min={28} max={64} onChange={(v) => setComponent('button', 'height', v)} suffix="px" />
-              <NumberField label="Button radius" value={theme.components.button.radius} min={0} max={40} onChange={(v) => setComponent('button', 'radius', v)} suffix="px" />
-              <NumberField label="Input height" value={theme.components.input.height} min={28} max={64} onChange={(v) => setComponent('input', 'height', v)} suffix="px" />
-              <NumberField label="Input radius" value={theme.components.input.radius} min={0} max={40} onChange={(v) => setComponent('input', 'radius', v)} suffix="px" />
-              <NumberField label="Card radius" value={theme.components.card.radius} min={0} max={40} onChange={(v) => setComponent('card', 'radius', v)} suffix="px" />
-              <NumberField label="Card padding" value={theme.components.card.padding} min={8} max={40} onChange={(v) => setComponent('card', 'padding', v)} suffix="px" />
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardHeader title={<span className="flex items-center gap-2"><Type className="h-4 w-4" /> Typography</span>} />
-            <CardBody className="grid grid-cols-2 gap-5 sm:grid-cols-3">
-              <NumberField label="Base font size" value={theme.font.sizeBase} min={12} max={18} onChange={(v) => setFont('sizeBase', v)} suffix="px" />
-              <div className="flex flex-col gap-1.5 sm:col-span-2">
-                <span className="text-xs font-medium text-text-muted">Font family</span>
-                {/* One family for the whole platform, bundled with the app — not a free choice. */}
-                <p className="text-sm text-text">Inter — regular 400, medium 500, headings 600</p>
-                <p className="text-xs text-text-muted">The same font on every screen for passengers, operators, agents and crew.</p>
-              </div>
-            </CardBody>
-          </Card>
+                    <CardBody className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+                      <NumberField
+                        label="Button height"
+                        value={theme.components.button.height}
+                        min={28}
+                        max={64}
+                        onChange={(v) => setComponent('button', 'height', v)}
+                        suffix="px"
+                      />
+                      <NumberField
+                        label="Button radius"
+                        value={theme.components.button.radius}
+                        min={0}
+                        max={40}
+                        onChange={(v) => setComponent('button', 'radius', v)}
+                        suffix="px"
+                      />
+                      <NumberField
+                        label="Input height"
+                        value={theme.components.input.height}
+                        min={28}
+                        max={64}
+                        onChange={(v) => setComponent('input', 'height', v)}
+                        suffix="px"
+                      />
+                      <NumberField
+                        label="Input radius"
+                        value={theme.components.input.radius}
+                        min={0}
+                        max={40}
+                        onChange={(v) => setComponent('input', 'radius', v)}
+                        suffix="px"
+                      />
+                      <NumberField
+                        label="Card radius"
+                        value={theme.components.card.radius}
+                        min={0}
+                        max={40}
+                        onChange={(v) => setComponent('card', 'radius', v)}
+                        suffix="px"
+                      />
+                      <NumberField
+                        label="Card padding"
+                        value={theme.components.card.padding}
+                        min={8}
+                        max={40}
+                        onChange={(v) => setComponent('card', 'padding', v)}
+                        suffix="px"
+                      />
+                    </CardBody>
+                  </Card>
+                ),
+              },
+              {
+                key: 'type',
+                label: 'Typography',
+                render: () => (
+                  <Card>
+                    <CardHeader
+                      title={
+                        <span className="flex items-center gap-2">
+                          <Type className="h-4 w-4" /> Typography
+                        </span>
+                      }
+                    />
+                    <CardBody className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+                      <NumberField
+                        label="Base font size"
+                        value={theme.font.sizeBase}
+                        min={12}
+                        max={18}
+                        onChange={(v) => setFont('sizeBase', v)}
+                        suffix="px"
+                      />
+                      <div className="flex flex-col gap-1.5 sm:col-span-2">
+                        <span className="text-xs font-medium text-text-muted">Font family</span>
+                        {/* One family for the whole platform, bundled with the app — not a free choice. */}
+                        <p className="text-sm text-text">Inter — regular 400, medium 500, headings 600</p>
+                        <p className="text-xs text-text-muted">
+                          The same font on every screen for passengers, operators, agents and crew.
+                        </p>
+                      </div>
+                    </CardBody>
+                  </Card>
+                ),
+              },
+            ]}
+          />
         </div>
 
         {/* Live preview */}
         <div className="lg:col-span-1">
           <Card className="sticky top-4">
-            <CardHeader title={<span className="flex items-center gap-2"><Layers className="h-4 w-4" /> Live preview</span>} subtitle="Reflects your edits instantly" />
+            <CardHeader
+              title={
+                <span className="flex items-center gap-2">
+                  <Layers className="h-4 w-4" /> Live preview
+                </span>
+              }
+              subtitle="Reflects your edits instantly"
+            />
             <CardBody className="flex flex-col gap-4">
               <div className="flex flex-wrap gap-2">
                 <Button size="sm">Primary</Button>
-                <Button size="sm" variant="secondary">Secondary</Button>
-                <Button size="sm" variant="outline">Outline</Button>
-                <Button size="sm" variant="danger">Danger</Button>
+                <Button size="sm" variant="secondary">
+                  Secondary
+                </Button>
+                <Button size="sm" variant="outline">
+                  Outline
+                </Button>
+                <Button size="sm" variant="danger">
+                  Danger
+                </Button>
               </div>
               <Input label="Sample input" placeholder="Type here…" />
-              <Select label="Sample dropdown" options={[{ label: 'Option A', value: 'a' }, { label: 'Option B', value: 'b' }]} />
+              <Select
+                label="Sample dropdown"
+                options={[
+                  { label: 'Option A', value: 'a' },
+                  { label: 'Option B', value: 'b' },
+                ]}
+              />
               <div className="flex flex-wrap gap-2">
                 <Badge tone="success">Confirmed</Badge>
                 <Badge tone="warning">Pending</Badge>
@@ -186,7 +305,9 @@ export function AppearancePage() {
               <Card>
                 <CardBody>
                   <div className="font-semibold text-text">Card title</div>
-                  <p className="mt-1 text-sm text-text-muted">This card, its radius, padding and shadow all follow your tokens.</p>
+                  <p className="mt-1 text-sm text-text-muted">
+                    This card, its radius, padding and shadow all follow your tokens.
+                  </p>
                 </CardBody>
               </Card>
             </CardBody>
@@ -197,15 +318,37 @@ export function AppearancePage() {
   );
 }
 
-function NumberField({ label, value, min, max, onChange, suffix }: {
-  label: string; value: number; min: number; max: number; onChange: (v: number) => void; suffix?: string;
+function NumberField({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+  suffix,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (v: number) => void;
+  suffix?: string;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-xs font-medium text-text-muted">{label}</span>
       <div className="flex items-center gap-2">
-        <input type="range" min={min} max={max} value={value} onChange={(e) => onChange(Number(e.target.value))} className="flex-1 accent-[var(--yb-color-primary)]" />
-        <span className="w-12 text-right text-xs tabular-nums text-text">{value}{suffix}</span>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="flex-1 accent-[var(--yb-color-primary)]"
+        />
+        <span className="w-12 text-right text-xs tabular-nums text-text">
+          {value}
+          {suffix}
+        </span>
       </div>
     </div>
   );

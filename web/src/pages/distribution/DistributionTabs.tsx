@@ -1,10 +1,10 @@
-import { useState } from 'react';
 import { TabBar } from '@/components/ui';
 import { Handshake, KeyRound, Users, Webhook } from 'lucide-react';
 
 import { PageHeader } from '@/components/common/PageHeader';
 import { AgentsTab } from './AgentsTab';
 import { ApiKeysTab, PartnersTab } from './PartnersTab';
+import { useTabParam } from '@/lib/useTabParam';
 import { WebhooksTab } from './DistributionPage';
 
 const TABS = [
@@ -17,7 +17,7 @@ type Tab = (typeof TABS)[number]['key'];
 
 /** Everyone who sells your seats besides you: travel agents, OTAs, and the systems that talk to yours. */
 export function DistributionPage() {
-  const [tab, setTab] = useState<Tab>('agents');
+  const [tab, setTab] = useTabParam<Tab>(TABS.map((t) => t.key), 'agents');
   return (
     <>
       <PageHeader title="Distribution" subtitle="Travel agents, OTA partners and integrations that sell your seats" />

@@ -19,7 +19,7 @@ export type CustomerFilter = 'all' | 'frequent' | 'blocked';
 
 export const crmApi = {
   list: (opts: { q?: string; filter: CustomerFilter; page: number }) => {
-    const q = new URLSearchParams({ filter: opts.filter, page: String(opts.page) });
+    const q = new URLSearchParams({ filter: opts.filter, page: String(opts.page), limit: '10' });
     if (opts.q) q.set('q', opts.q);
     return get<{ items: Customer[]; page: number; hasMore: boolean }>(`/v1/customers?${q}`);
   },

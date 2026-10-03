@@ -1,6 +1,9 @@
-import { Fragment, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
+
+import { Pager } from './Pager';
+import { PAGE_SIZE } from './paging';
 
 /**
  * How a column's text reads:
@@ -61,12 +64,63 @@ export function Table<T>({
   rows,
   onRowClick,
   empty,
+  pageSize = PAGE_SIZE,
+  server,
+  more,
 }: {
   columns: Column<T>[];
   rows: T[];
   onRowClick?: (row: T) => void;
   empty?: ReactNode;
+  /** Rows a page (ten everywhere). */
+  pageSize?: number;
+  /** The server sent one page of a longer list; the pager asks it for another. */
+  server?: {
+    page: number;
+    hasNext: boolean;
+    total?: number;
+    loading?: boolean;
+    onPage: (page: number) => void;
+  };
+  /** A list that loads further rows as it goes; the pager fetches them when they are needed. */
+  more?: { hasMore: boolean; loading?: boolean; onMore: () => void };
 }) {
+  // Ten rows a page. A new list (another filter, a fresh search) starts again at page 1.
+  const [page, setPage] = useState(1);
+  const first = useRef<T | undefined>(rows[0]);
+  useEffect(() => {
+    if (rows[0] !== first.current) setPage(1);
+    first.current = rows[0];
+  }, [rows]);
+  const localPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const current = server ? server.page : Math.min(page, localPages);
+  const shownRows = server ? rows : rows.slice((current - 1) * pageSize, current * pageSize);
+  const goTo = (p: number) => {
+    if (server) return server.onPage(p);
+    if (more && p > localPages) more.onMore();
+    setPage(p);
+  };
+  const pager = server ? (
+    server.page > 1 || server.hasNext ? (
+      <Pager
+        page={server.page}
+        pageSize={pageSize}
+        total={server.total}
+        hasNext={server.hasNext}
+        loading={server.loading}
+        onPage={goTo}
+      />
+    ) : null
+  ) : rows.length > pageSize || more?.hasMore ? (
+    <Pager
+      page={current}
+      pageSize={pageSize}
+      total={more?.hasMore ? undefined : rows.length}
+      hasNext={current < localPages || !!more?.hasMore}
+      loading={more?.loading}
+      onPage={goTo}
+    />
+  ) : null;
   const box = useRef<HTMLDivElement>(null);
   const table = useRef<HTMLTableElement>(null);
   const [level, setLevel] = useState<Level>(0);
@@ -126,85 +180,85 @@ export function Table<T>({
   const right = (c: Column<T>) => !!c.look && RIGHT.includes(c.look);
 
   return (
-    <div ref={box} className="overflow-hidden rounded-card border border-border bg-surface">
-      <table ref={table} className="w-full table-auto text-sm">
-        <thead>
-          <tr className="border-b border-border bg-surface-muted/60">
-            {layout.map(({ c, subs: all }) => {
-              const subs = all.filter((s) => s.header !== '' && s.header != null);
-              return (
-                <th
-                  key={c.key}
-                  className={cn(
-                    'py-3 text-left align-bottom font-medium text-text-muted',
-                    PAD[level],
-                    level < 2 && 'whitespace-nowrap',
-                    right(c) && 'text-right',
-                    c.className,
-                  )}
-                >
-                  {c.header}
-                  {subs.length > 0 && (
-                    <span className="block text-xs font-normal">
-                      {subs.map((s, i) => (
-                        <Fragment key={s.key}>
-                          {i > 0 && ' · '}
-                          {s.header}
-                        </Fragment>
-                      ))}
-                    </span>
-                  )}
-                </th>
-              );
-            })}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr
-              key={i}
-              onClick={() => onRowClick?.(row)}
-              className={cn(
-                'border-b border-border last:border-0',
-                onRowClick && 'cursor-pointer hover:bg-surface-muted/50',
-              )}
-            >
-              {layout.map(({ c, subs }) => (
-                <td
-                  key={c.key}
-                  className={cn(
-                    'py-3 align-top text-text [overflow-wrap:break-word]',
-                    PAD[level],
-                    c.look && LOOK[c.look],
-                    level >= 2 && '[overflow-wrap:anywhere]',
-                    c.header === '' && '[&_div]:flex-wrap',
-                    c.className,
-                  )}
-                >
-                  {value(c, row)}
-                  {subs.map((s) => {
-                    const v = value(s, row);
-                    if (v == null || v === '' || v === false) return null;
-                    return (
-                      <div
-                        key={s.key}
-                        className={cn(
-                          'mt-0.5 text-xs font-normal text-text-muted',
-                          s.look === 'note' && 'italic',
-                          s.look === 'figure' && 'font-medium tabular-nums',
-                          s.look === 'count' && 'tabular-nums',
-                        )}
-                      >
-                        {v}
-                      </div>
-                    );
-                  })}
-                </td>
-              ))}
+    <div>
+      <div ref={box} className="overflow-hidden rounded-card border border-border bg-surface">
+        <table ref={table} className="w-full table-auto text-sm">
+          <thead>
+            <tr className="border-b border-border bg-surface-muted/60">
+              {layout.map(({ c, subs: all }) => {
+                const subs = all.filter((s) => s.header !== '' && s.header != null);
+                return (
+                  <th
+                    key={c.key}
+                    className={cn(
+                      'py-3 text-left align-bottom font-medium text-text-muted',
+                      PAD[level],
+                      level < 2 && 'whitespace-nowrap',
+                      right(c) && 'text-right',
+                      c.className,
+                    )}
+                  >
+                    {c.header}
+                    {subs.length > 0 && (
+                      <span className="block text-xs font-normal">
+                        {subs.map((s, i) => (
+                          <Fragment key={s.key}>
+                            {i > 0 && ' · '}
+                            {s.header}
+                          </Fragment>
+                        ))}
+                      </span>
+                    )}
+                  </th>
+                );
+              })}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {shownRows.map((row, i) => (
+              <tr
+                key={i}
+                onClick={() => onRowClick?.(row)}
+                className={cn('border-b border-border last:border-0', onRowClick && 'cursor-pointer hover:bg-surface-muted/50')}
+              >
+                {layout.map(({ c, subs }) => (
+                  <td
+                    key={c.key}
+                    className={cn(
+                      'py-3 align-top text-text [overflow-wrap:break-word]',
+                      PAD[level],
+                      c.look && LOOK[c.look],
+                      level >= 2 && '[overflow-wrap:anywhere]',
+                      c.header === '' && '[&_div]:flex-wrap',
+                      c.className,
+                    )}
+                  >
+                    {value(c, row)}
+                    {subs.map((s) => {
+                      const v = value(s, row);
+                      if (v == null || v === '' || v === false) return null;
+                      return (
+                        <div
+                          key={s.key}
+                          className={cn(
+                            'mt-0.5 text-xs font-normal text-text-muted',
+                            s.look === 'note' && 'italic',
+                            s.look === 'figure' && 'font-medium tabular-nums',
+                            s.look === 'count' && 'tabular-nums',
+                          )}
+                        >
+                          {v}
+                        </div>
+                      );
+                    })}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {pager}
     </div>
   );
 }

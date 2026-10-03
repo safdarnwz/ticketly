@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowUpCircle, Mail, MailWarning, Send, ShieldCheck, Ticket, XCircle } from 'lucide-react';
 
-import { Badge, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Input, Modal, PageLoader, statusTone, useToast } from '@/components/ui';
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState, ErrorState, Input, Modal, PageLoader, statusTone, TabBar, useToast } from '@/components/ui';
 import { CancelBookingModal } from '@/components/booking/CancelBookingModal';
 import { amendmentsApi } from '@/lib/api/amendments';
 import { BookingChangeModal, type ChangeKind } from './BookingChanges';
@@ -15,6 +15,7 @@ import { ApiError } from '@/lib/api/client';
 import { openRazorpayCheckout, paymentsApi } from '@/lib/api/payments';
 import { refundsApi } from '@/lib/api/ops';
 import { isEmail } from '@/lib/checkout';
+import { useTabParam } from '@/lib/useTabParam';
 import { formatMoney, formatTime, formatDateLabel, localDateOf } from '@/lib/utils';
 
 const CHANNEL_LABEL: Record<string, string> = { direct_web: 'Website', direct_app: 'Mobile app', ota: 'OTA partner', backoffice: 'Counter', phone: 'Phone booking', agent: 'Travel agent' };
@@ -28,7 +29,16 @@ const errText = (e: unknown, fallback: string) => (e instanceof ApiError || e in
  * refunds and GST invoices — and cancelling all or some seats, with the
  * refund shown before anything is done.
  */
+type Section = 'overview' | 'passengers' | 'tickets' | 'refunds';
+const SECTIONS = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'passengers', label: 'Passengers' },
+  { key: 'tickets', label: 'Tickets' },
+  { key: 'refunds', label: 'Refunds & invoices' },
+] as const;
+
 export function BookingDetailPage() {
+  const [section, setSection] = useTabParam<Section>(SECTIONS.map((x) => x.key), 'overview', 'section');
   const { pnr = '' } = useParams();
   const qc = useQueryClient();
   const toast = useToast();
@@ -106,6 +116,9 @@ export function BookingDetailPage() {
         }
       />
 
+      <TabBar className="mb-6" label="Booking" value={section} onChange={setSection} items={SECTIONS} />
+
+      {section === 'overview' && (
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card>
           <CardHeader title="Overview" />
@@ -146,7 +159,11 @@ export function BookingDetailPage() {
           </CardBody>
         </Card>
 
-        <Card className="lg:col-span-3">
+      </div>
+      )}
+
+      {section === 'passengers' && (
+        <Card>
           <CardHeader title="Passengers" />
           <CardBody>
             {passengers.length ? (
@@ -166,7 +183,10 @@ export function BookingDetailPage() {
           </CardBody>
         </Card>
 
-        <Card className="lg:col-span-3">
+      )}
+
+      {section === 'tickets' && (
+        <Card>
           <CardHeader title={<span className="flex items-center gap-2"><Ticket className="h-4 w-4" /> Tickets</span>} action={id && confirmed ? <PrintTicketButton bookingId={id} /> : null} />
           <CardBody>
             {!confirmed ? (
@@ -188,7 +208,10 @@ export function BookingDetailPage() {
           </CardBody>
         </Card>
 
-        <Card className="lg:col-span-3">
+      )}
+
+      {section === 'refunds' && (
+        <Card>
           <CardHeader title="Refunds & invoices" />
           <CardBody className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div>
@@ -221,7 +244,7 @@ export function BookingDetailPage() {
             </div>
           </CardBody>
         </Card>
-      </div>
+      )}
 
       {changing && id && d && (
         <BookingChangeModal kind={changing} bookingId={id} pnr={booking.pnr} tripId={d.tripId} seats={d.seats} passengers={passengers}

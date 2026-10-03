@@ -241,12 +241,8 @@ export function BookingsPage() {
             rows={rows}
             onRowClick={(b) => navigate(`/bookings/${b.pnr}`)}
             empty={byId ? `No booking found for ${byId.value}.` : 'No bookings match these filters.'}
+            more={{ hasMore: !!list.hasNextPage, loading: list.isFetchingNextPage, onMore: () => void list.fetchNextPage() }}
           />
-          {list.hasNextPage && (
-            <div className="mt-4 flex justify-center">
-              <Button variant="outline" onClick={() => void list.fetchNextPage()} loading={list.isFetchingNextPage} disabled={list.isFetchingNextPage}>Load more</Button>
-            </div>
-          )}
         </>
       )}
     </>
