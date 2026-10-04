@@ -41,13 +41,23 @@ function decode(payload) {
   return rows;
 }
 
-const normalize = (url) => String(url || '').trim().replace(/\/+$/, '');
+const normalize = (url) => {
+  const u = String(url || '').trim().replace(/\/+$/, '');
+  if (!u) return '';
+  return /^https?:\/\//i.test(u) ? u : `https://${u}`;
+};
+
+/** A server on this computer (fast, free) vs. one reached through a public tunnel. */
+export const isLocalUrl = (url) => !url || /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(url);
+
+// ngrok's free plan answers browser requests with a warning page unless this header is sent.
+const tunnelHeaders = (base) => (isLocalUrl(base) ? {} : { 'ngrok-skip-browser-warning': '1' });
 
 async function probe(base, timeoutMs = 3500) {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(`${base ? base + '/' : ''}api/status`, { cache: 'no-store', signal: controller.signal, credentials: base ? 'omit' : 'same-origin' });
+    const res = await fetch(`${base ? base + '/' : ''}api/status`, { cache: 'no-store', signal: controller.signal, credentials: base ? 'omit' : 'same-origin', headers: tunnelHeaders(base) });
     return res.ok && (res.headers.get('content-type') || '').includes('json');
   } catch {
     return false;
@@ -63,7 +73,7 @@ function serverBackend(base) {
   let session = store.get(sessionKey);
   let etag = null;
 
-  const headers = (extra = {}) => ({ ...(session ? { 'X-Session': session } : {}), ...extra });
+  const headers = (extra = {}) => ({ ...tunnelHeaders(base), ...(session ? { 'X-Session': session } : {}), ...extra });
   const call = async (path, opts = {}) => {
     let res;
     try {
@@ -88,6 +98,8 @@ function serverBackend(base) {
     kind: 'server',
     base: base || location.origin,
     remote: Boolean(base),
+    // Reached through a public tunnel (ngrok etc.): requests are metered, so poll gently.
+    viaTunnel: !isLocalUrl(base),
     canChangeRange: true,
     async status() {
       const res = await call('api/status');
@@ -153,8 +165,21 @@ export function getServerUrl(cfg = {}) {
   return normalize(store.get('server') || cfg.serverUrl || DEFAULT_SERVER);
 }
 
+/** Remember a server the user chose (Retry / Change / ?server= link). */
 export function setServerUrl(url) {
   store.set('server', normalize(url) || null);
+}
+
+// Chrome asks before a public website may reach localhost ("devices on your local network").
+// Only try localhost when that is already allowed (or the browser has no such prompt), so
+// other people's laptops go straight to the public address without a confusing prompt.
+async function localhostWithoutPrompt() {
+  try {
+    const st = await navigator.permissions.query({ name: 'local-network-access' });
+    return st.state === 'granted';
+  } catch {
+    return true;
+  }
 }
 
 export async function hasSnapshot() {
@@ -185,18 +210,34 @@ function serverFromLink() {
   }
 }
 
+/**
+ * Order: ?server= link / server picked by hand -> localhost (this computer) -> the public
+ * address in config.json (e.g. the ngrok domain). Returns { backend } or { offline: true, url }.
+ */
 export async function connect({ forceUrl, snapshot } = {}) {
   if (snapshot) return { backend: snapshotBackend() };
   const linked = serverFromLink();
-  if (linked) {
-    setServerUrl(linked);
-    forceUrl = linked;
+  if (linked) forceUrl = linked;
+  if (forceUrl) {
+    const url = normalize(forceUrl);
+    if (await probe(url)) {
+      setServerUrl(url);
+      return { backend: serverBackend(url) };
+    }
+    return { offline: true, url };
   }
-  if (!forceUrl && (await probe(''))) return { backend: serverBackend('') };
-  const url = normalize(forceUrl) || getServerUrl(await siteConfig());
-  if (await probe(url)) {
-    setServerUrl(url);
-    return { backend: serverBackend(url) };
+  if (await probe('')) return { backend: serverBackend('') };
+
+  const cfg = await siteConfig();
+  const chosen = normalize(store.get('server'));
+  const local = normalize(cfg.serverUrl || DEFAULT_SERVER);
+  const pub = normalize(cfg.publicServer);
+  const candidates = [];
+  if (chosen) candidates.push(chosen);
+  if (!pub || (await localhostWithoutPrompt())) candidates.push(local);
+  if (pub) candidates.push(pub);
+  for (const url of [...new Set(candidates)]) {
+    if (await probe(url, isLocalUrl(url) ? 2500 : 8000)) return { backend: serverBackend(url) };
   }
-  return { offline: true, url };
+  return { offline: true, url: pub || chosen || local };
 }

@@ -20,6 +20,13 @@ loadEnvFile(path.join(__dirname, '..', '.env'));
 
 const env = process.env;
 
+// "abc.ngrok-free.app" -> "https://abc.ngrok-free.app"
+function withScheme(url) {
+  const u = String(url).trim().replace(/\/+$/, '');
+  if (!u) return '';
+  return /^https?:\/\//i.test(u) ? u : `https://${u}`;
+}
+
 module.exports = {
   port: Number(env.PORT || 8080),
   host: env.HOST || '0.0.0.0',
@@ -51,7 +58,7 @@ module.exports = {
   // Public https address of this server, so other computers can use the website too.
   // Either set it directly (ngrok, named tunnel, reverse proxy) or let the bundled
   // Cloudflare quick tunnel report it (docker compose --profile share up -d).
-  publicUrl: (env.PUBLIC_URL || '').trim().replace(/\/+$/, ''),
+  publicUrl: withScheme(env.PUBLIC_URL || env.NGROK_URL || ''),
   tunnelMetricsUrl: (env.TUNNEL_METRICS_URL || '').trim().replace(/\/+$/, ''),
   // Set both to require a login (recommended whenever the dashboard is on a public URL).
   basicAuth: env.DASHBOARD_USER && env.DASHBOARD_PASSWORD ? `${env.DASHBOARD_USER}:${env.DASHBOARD_PASSWORD}` : null,

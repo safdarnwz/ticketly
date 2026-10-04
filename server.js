@@ -321,8 +321,10 @@ const server = http.createServer(async (req, res) => {
     }
     res.writeHead(204, {
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, X-Session, If-None-Match',
-      'Access-Control-Max-Age': '600',
+      // ngrok-skip-browser-warning: lets the website through ngrok's free-plan warning page.
+      'Access-Control-Allow-Headers': 'Content-Type, X-Session, If-None-Match, ngrok-skip-browser-warning',
+      // Cache the preflight for 2 h: fewer requests through a metered tunnel.
+      'Access-Control-Max-Age': '7200',
       // Chrome asks before a public site (github.io) may talk to localhost.
       ...(req.headers['access-control-request-private-network'] ? { 'Access-Control-Allow-Private-Network': 'true' } : {}),
     });
