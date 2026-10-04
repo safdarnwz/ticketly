@@ -3,8 +3,8 @@
 const crypto = require('crypto');
 const config = require('./config');
 
-// In-memory sessions: the SalesDiary token (and, for silent renewal, the password) never
-// leave the server and are gone when the process restarts.
+// In-memory sessions: the pasted SalesDiary token stays on the server (never echoed back to
+// the browser) and is gone when the process restarts.
 const sessions = new Map();
 const COOKIE = 'sw_sid';
 
@@ -59,15 +59,4 @@ setInterval(() => {
   for (const [id, s] of sessions) if (s.lastSeen < cutoff) sessions.delete(id);
 }, 10 * 60 * 1000).unref();
 
-// Simple brute-force guard for the login endpoint: 10 attempts per IP per 5 minutes.
-const attempts = new Map();
-function allowAttempt(req) {
-  const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
-  const now = Date.now();
-  const list = (attempts.get(ip) || []).filter((t) => now - t < 5 * 60 * 1000);
-  list.push(now);
-  attempts.set(ip, list);
-  return list.length <= 10;
-}
-
-module.exports = { get, create, destroy, allowAttempt };
+module.exports = { get, create, destroy };

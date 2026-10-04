@@ -35,48 +35,29 @@
         <p class="auth-note">If Chrome or Edge asks to allow access to <b>devices on your local network</b>, choose Allow. That is how this page reaches your computer.</p>
       </form>
 
-      <ol class="auth-steps" id="authSteps" aria-hidden="true"><li id="stepOne" class="on">Company</li><li id="stepTwo">Sign in</li></ol>
-
-      <form id="companyForm" class="auth-form" autocomplete="on">
-        <h1>Sign in with SalesDiary</h1>
-        <p class="auth-lead">Start with your company key, the same one you use on app.salesdiary.in.</p>
-        <label class="field"><span>Company key</span><input id="companyKey" name="company" placeholder="e.g. glenmark" autocomplete="organization" autocapitalize="off" spellcheck="false" required></label>
-        <button class="btn btn-primary btn-lg" type="submit" id="companyBtn">Continue</button>
-      </form>
-
-      <form id="loginForm" class="auth-form" autocomplete="on" hidden>
-        <div class="company-chip">
-          <span class="company-logo" id="companyLogo"></span>
-          <span class="company-text"><b id="companyName">—</b><small id="companyInstance"></small></span>
-          <button class="btn-link" type="button" id="changeCompany">Change</button>
-        </div>
-        <label class="field"><span>Username</span><input id="username" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" required></label>
-        <label class="field"><span>Password</span>
-          <span class="pw"><input id="password" name="password" type="password" autocomplete="current-password" required><button type="button" class="btn-link" id="pwToggle">Show</button></span>
-        </label>
-        <label class="check"><input type="checkbox" id="remember" checked> Keep me signed in <small>(renews the token automatically)</small></label>
-        <button class="btn btn-primary btn-lg" type="submit" id="loginBtn">Sign in</button>
-      </form>
-
-      <form id="tokenForm" class="auth-form" hidden>
-        <h1>Sign in with a token</h1>
-        <p class="auth-lead">Paste the <code>authorization</code> header from a SalesDiary request (DevTools → Network). Tokens expire after about 16 hours.</p>
-        <label class="field"><span>Token</span><textarea id="tokenLogin" rows="5" placeholder="eyJhbGciOi…" spellcheck="false"></textarea></label>
-        <button class="btn btn-primary btn-lg" type="submit">Sign in</button>
-      </form>
-
       <p class="auth-error" id="authError" role="alert"></p>
 
       <div class="auth-alt">
-        <button class="btn-link" type="button" id="tokenToggle">Use a token instead</button>
-        <span id="altSep">·</span>
-        <button class="btn-link" type="button" id="demoBtn">Explore with demo data</button>
+        <button class="btn-link" type="button" id="demoBtn">View the demo snapshot</button>
       </div>
     </div>
-    <p class="auth-foot">Your password goes only to SalesDiary through this server. It is never stored in the browser.</p>
+    <p class="auth-foot">Your SalesDiary token is sent only to the Shelfwise server on your own computer.</p>
   </div>
 
   <div class="site" id="shell">
+    <form class="tokenbar" id="tokenBar" autocomplete="off">
+      <div class="wrap tokenbar-row">
+        <label class="tokenbar-label" for="tokenField">SalesDiary token</label>
+        <div class="token-input">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>
+          <input id="tokenField" name="token" type="password" placeholder="Paste the authorization token (eyJhbGciOi…)" spellcheck="false" autocapitalize="off">
+          <button type="button" class="btn-link" id="tokenShow">Show</button>
+        </div>
+        <button class="btn btn-primary" type="submit" id="tokenSubmit">Load data</button>
+        <span class="tokenbar-status" id="tokenStatus" role="status"></span>
+      </div>
+    </form>
+
     <header class="site-header">
       <div class="wrap header-row">
         <a class="logo" href="#overview" aria-label="Shelfwise home">
@@ -184,17 +165,8 @@
     <div class="drawer-body">
       <dl class="kv" id="connInfo"></dl>
       <div class="row-gap">
-        <button class="btn" id="signOut" type="button">Sign out</button>
+        <button class="btn" id="signOut" type="button">Remove token</button>
       </div>
-      <details class="advanced" id="tokenSection">
-        <summary>Replace token manually</summary>
-        <label class="field">
-          <span>SalesDiary token</span>
-          <textarea id="tokenInput" rows="5" placeholder="Paste the authorization token (eyJhbGciOi…)"></textarea>
-          <small>Only needed if automatic renewal is off. Kept in server memory for this session.</small>
-        </label>
-        <button class="btn btn-primary" id="saveToken" type="button">Save &amp; reconnect</button>
-      </details>
       <p class="form-msg" id="tokenMsg"></p>
     </div>
   </aside>

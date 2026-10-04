@@ -5,8 +5,7 @@
 // data/report.json is a fallback snapshot shown when that server isn't running.
 //
 //   node scripts/build-static.js                 -> demo data (safe to publish)
-//   SNAPSHOT_SOURCE=live SD_COMPANY_KEY=.. SD_USERNAME=.. SD_PASSWORD=.. node ...
-//                                                -> real SalesDiary data (public to anyone with the URL!)
+//   SNAPSHOT_SOURCE=live SD_TOKEN=eyJ... node ...  -> real SalesDiary data (public to anyone with the URL!)
 //   SNAPSHOT_START=2026-10-01 SNAPSHOT_END=2026-10-04 to pin the range (default: month to date)
 
 const fs = require('fs');
@@ -42,15 +41,8 @@ function today() {
   const started = Date.now();
   let res;
   if (live) {
-    // Prefer signing in (tokens expire every ~16 h); fall back to a pasted SD_TOKEN.
-    let creds = { token: config.token, apiBase: config.apiBase };
-    const { SD_COMPANY_KEY: companyKey, SD_USERNAME: username, SD_PASSWORD: password } = process.env;
-    if (companyKey && username && password) {
-      const company = await upstream.findCompany(companyKey);
-      const { token } = await upstream.login({ ...company, username, password });
-      creds = { token, apiBase: company.apiBase };
-    }
-    if (!creds.token) throw new Error('SNAPSHOT_SOURCE=live needs SD_COMPANY_KEY + SD_USERNAME + SD_PASSWORD (or SD_TOKEN)');
+    const creds = { token: config.token, apiBase: config.apiBase };
+    if (!creds.token) throw new Error('SNAPSHOT_SOURCE=live needs SD_TOKEN');
     res = await upstream.fetchReport(start, end, creds);
   } else {
     res = await fetchMockReport(start, end);

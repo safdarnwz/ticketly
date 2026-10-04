@@ -4,7 +4,7 @@ import * as C from './charts.js';
 import * as A from './analytics.js';
 import { ago, num, esc, rangeLabel } from './format.js';
 import { toast } from './ui.js';
-import { initAuth, logoHtml } from './auth.js';
+import { initAuth } from './auth.js';
 import { connect, hasSnapshot } from './backend.js';
 
 const store = {
@@ -55,7 +55,7 @@ async function load({ reset = false } = {}) {
   } catch (err) {
     state.error = err;
     if (err.status === 401 && (err.code === 'login_required' || err.code === 'token')) {
-      signedOut(err.code === 'token' ? 'Your SalesDiary session expired. Please sign in again.' : '');
+      needToken(err.code === 'token' ? 'SalesDiary rejected this token. It has probably expired, so paste a fresh one.' : '');
       return;
     }
     if (err.code === 'offline' && !state.all.length) {
@@ -130,8 +130,9 @@ function schedule() {
 function updateLive() {
   const dot = $('liveDot');
   const text = $('liveText');
-  dot.className = 'live-dot' + (state.error ? ' err' : state.interval ? ' on' : '');
-  if (state.error && !state.lastOk) text.textContent = 'Offline';
+  dot.className = 'live-dot' + (!state.authed ? '' : state.error ? ' err' : state.interval ? ' on' : '');
+  if (!state.authed) text.textContent = 'Waiting';
+  else if (state.error && !state.lastOk) text.textContent = 'Offline';
   else if (!state.lastOk) text.textContent = 'Connecting';
   else text.textContent = state.interval ? ago(state.lastOk) : 'Paused';
 }
@@ -163,7 +164,8 @@ function context(rows) {
 }
 
 function eyebrow(rows) {
-  const who = state.status?.company?.name || (isSnapshot() ? 'Published snapshot' : state.status?.mode === 'mock' ? 'Demo data' : 'SalesDiary');
+  const t = state.status?.token;
+  const who = isSnapshot() ? 'Published snapshot' : state.status?.mode === 'mock' ? 'Demo data' : t?.instance ? `SalesDiary · ${t.instance}` : 'SalesDiary';
   const range = state.range.start ? rangeLabel(state.range.start, state.range.end) : '';
   const count = rows.length === state.all.length ? `${num(rows.length)} records` : `${num(rows.length)} of ${num(state.all.length)} records`;
   return [who, range, count].filter(Boolean).map(esc).join('<span class="sep">/</span>');
@@ -244,22 +246,19 @@ async function refreshStatus() {
   }
   state.status = s;
   const demo = s.source === 'mock' || s.source === 'snapshot';
-  $('sourceDot').className = 'dot ' + (state.error ? 'err' : demo ? 'demo' : 'ok');
-  if (s.user) {
-    $('sourceTitle').innerHTML = `<span class="avatar">${logoHtml({ ...s.company, key: s.company?.key })}</span>${esc(s.user.name || s.user.username)}`;
-  } else {
-    $('sourceTitle').textContent = s.source === 'snapshot' ? 'Snapshot' : demo ? 'Demo' : 'Shared';
-  }
-  $('brandSub').textContent = s.company?.name || '';
-  $('brandSub').hidden = !s.company?.name;
+  $('sourceDot').className = 'dot ' + (!s.authenticated ? '' : state.error ? 'err' : demo ? 'demo' : 'ok');
+  $('sourceTitle').textContent = s.source === 'snapshot' ? 'Snapshot' : s.mode === 'mock' ? 'Demo' : s.token?.instance || (s.authenticated ? 'Connected' : 'No token');
+  $('brandSub').textContent = s.token?.instance || '';
+  $('brandSub').hidden = !s.token?.instance;
   $('dateBtn').disabled = !state.backend.canChangeRange;
+  auth.update(s);
 
   const b = $('banner');
-  if (demo && (b.hidden || b.classList.contains('info'))) {
+  if (demo && s.authenticated && (b.hidden || b.classList.contains('info'))) {
     b.className = 'banner info';
-    b.innerHTML = `${WARN_ICON}<span class="grow">${s.source === 'snapshot' ? 'This is the snapshot published with the website, not live data.' : 'You’re looking at generated demo data, not your SalesDiary numbers.'}</span>${s.requireLogin || s.source === 'snapshot' ? '<button class="btn btn-sm" data-signin type="button">Sign in for live data</button>' : ''}`;
+    b.innerHTML = `${WARN_ICON}<span class="grow">${s.source === 'snapshot' ? 'This is the snapshot published with the website, not live data.' : 'You’re looking at generated demo data, not your SalesDiary numbers.'}</span>${s.source === 'snapshot' ? '' : '<button class="btn btn-sm" data-paste type="button">Paste a token</button>'}`;
     b.hidden = false;
-    b.querySelector('[data-signin]')?.addEventListener('click', signOut);
+    b.querySelector('[data-paste]')?.addEventListener('click', () => auth.focus());
   } else if (!demo && b.classList.contains('info')) b.hidden = true;
   return s;
 }
@@ -271,16 +270,15 @@ function openSettings() {
   const fetched = m.fetchedAt ? `${new Date(m.fetchedAt).toLocaleTimeString()} · ${num(m.rows)} rows · ${m.pages || 1} page(s) · ${m.durationMs ?? '—'} ms` : '—';
   $('connInfo').innerHTML = isSnapshot()
     ? `<dt>Mode</dt><dd>Snapshot published with the website</dd><dt>Generated</dt><dd>${esc(m.fetchedAt ? new Date(m.fetchedAt).toLocaleString() : '—')}</dd><dt>Rows</dt><dd>${num(state.all.length)}</dd>`
-    : `<dt>Signed in as</dt><dd>${esc(s.user ? `${s.user.name || ''} (${s.user.username})` : s.mode === 'mock' ? 'Demo session' : s.mode === 'shared' ? 'Shared server token' : '—')}</dd>
-       <dt>Company</dt><dd>${esc(s.company ? `${s.company.name} · ${s.company.instance || s.company.key}` : '—')}</dd>
-       <dt>Data server</dt><dd>${esc(state.backend.base)}</dd>
-       <dt>SalesDiary API</dt><dd>${esc(s.apiBase || '—')}</dd>
+    : `<dt>Data</dt><dd>${esc(s.mode === 'mock' ? 'Demo data' : s.mode === 'shared' ? 'Shared server token' : s.mode === 'live' ? 'Your pasted token' : 'No token yet')}</dd>
+       <dt>Instance</dt><dd>${esc(s.token?.instance || '—')}</dd>
        <dt>Profile</dt><dd>${esc(s.token?.profile || '—')}</dd>
-       <dt>Token expiry</dt><dd>${esc(exp)}${s.token?.expired ? ' (expired)' : ''}${s.autoRenew ? ' · renews automatically' : ''}</dd>
+       <dt>Token expiry</dt><dd>${esc(exp)}${s.token?.expired ? ' (expired)' : ''}</dd>
+       <dt>Data server</dt><dd>${esc(state.backend?.base || '—')}</dd>
+       <dt>SalesDiary API</dt><dd>${esc(s.apiBase || '—')}</dd>
        <dt>Last fetch</dt><dd>${fetched}</dd>`;
-  $('signOut').hidden = s.mode === 'shared';
-  $('signOut').textContent = s.user ? 'Sign out' : 'Sign in with SalesDiary';
-  $('tokenSection').hidden = isSnapshot() || s.allowTokenUpdate === false || s.mode !== 'live';
+  $('signOut').hidden = isSnapshot() || s.mode === 'shared' || !s.authenticated;
+  $('signOut').textContent = s.mode === 'mock' ? 'Leave demo data' : 'Remove token';
   $('tokenMsg').textContent = '';
   $('settingsDrawer').hidden = false;
   $('drawerBackdrop').hidden = false;
@@ -289,20 +287,6 @@ function openSettings() {
 function closeSettings() {
   $('settingsDrawer').hidden = true;
   $('drawerBackdrop').hidden = true;
-}
-
-async function saveToken(token) {
-  $('tokenMsg').textContent = 'Saving…';
-  try {
-    await state.backend.loginToken(token);
-    $('tokenMsg').textContent = 'Token replaced';
-    $('tokenInput').value = '';
-    await refreshStatus();
-    load({ reset: true });
-    setTimeout(closeSettings, 900);
-  } catch (e) {
-    $('tokenMsg').textContent = e.message;
-  }
 }
 
 // ---------------------------------------------------------------- connect / sign in / out
@@ -330,33 +314,35 @@ async function offline(message) {
   auth.showOffline(url || 'http://localhost:8080', await hasSnapshot(), message);
 }
 
-function signedOut(message) {
+/** No usable token: keep the site visible, point at the box at the top. */
+function needToken(message) {
   state.authed = false;
   resetData();
   closeSettings();
-  auth.show(state.status, message);
+  $('loading')?.remove();
+  content.insertAdjacentHTML('beforeend', `<div class="empty-state"><h3>Paste your SalesDiary token to load the report</h3>Copy the <code>authorization</code> request header from SalesDiary (F12 → Network → any API request) and paste it in the box at the top of this page.</div>`);
+  $('pageEyebrow').innerHTML = '&nbsp;';
+  $('pageSub').textContent = PAGES[state.page].sub || '';
+  $('footStatus').textContent = '';
+  updateLive();
+  auth.update(state.status, message);
+  auth.focus();
 }
 
 async function signOut() {
-  if (isSnapshot()) {
-    const conn = await connect();
-    if (conn.offline) return offline();
-    state.backend = conn.backend;
-    state.status = await state.backend.status().catch(() => null);
-    return signedOut();
-  }
+  if (isSnapshot()) return start(await connect());
   await state.backend.logout();
   const s = await refreshStatus();
+  closeSettings();
   if (s?.authenticated) {
-    // This server doesn't require a login: it falls back to shared/demo data.
+    // This server has a shared token or demo fallback.
     state.authed = true;
-    closeSettings();
     load({ reset: true });
-  } else signedOut();
+  } else needToken();
 }
 
 async function signedIn() {
-  auth.hide();
+  auth.hideOffline();
   state.authed = true;
   resetData();
   await refreshStatus();
@@ -377,17 +363,22 @@ async function start(conn) {
     auth.showOffline(state.backend.base, await hasSnapshot());
     return false;
   }
-  if (!s.authenticated) {
-    auth.show(s);
-    return true;
+  auth.hideOffline();
+  if (s.authenticated) await signedIn();
+  else {
+    await refreshStatus();
+    needToken();
   }
-  await signedIn();
   return true;
 }
 
 const auth = initAuth({
   getBackend: () => state.backend,
-  onSignedIn: signedIn,
+  onToken: signedIn,
+  async onDemo() {
+    await state.backend.demo();
+    await signedIn();
+  },
   async onRetry(url) {
     const conn = await connect({ forceUrl: url });
     if (conn.offline) return false;
@@ -447,11 +438,6 @@ $('themeBtn').addEventListener('click', toggleTheme);
 $('sourceCard').addEventListener('click', openSettings);
 $('closeSettings').addEventListener('click', closeSettings);
 $('drawerBackdrop').addEventListener('click', closeSettings);
-$('saveToken').addEventListener('click', () => {
-  const v = $('tokenInput').value.trim();
-  if (v) saveToken(v);
-  else $('tokenMsg').textContent = 'Paste a token first.';
-});
 $('signOut').addEventListener('click', signOut);
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
   if (!document.documentElement.dataset.theme) {

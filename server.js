@@ -53,31 +53,13 @@ function isDate(s) {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + 'T00:00:00Z'));
 }
 
-// Re-login with the stored credentials when the 16-hour token runs out.
-async function renew(session) {
-  if (!session.password) return false;
-  const { token } = await upstream.login({ ...session.company, apiBase: session.company.apiBase, username: session.username, password: session.password });
-  session.token = token;
-  return true;
-}
-
-async function fetchLive(src, start, end) {
+function fetchLive(src, start, end) {
   if (src.mode === 'shared') return upstream.fetchReport(start, end, src.creds);
-  const s = src.session;
-  const exp = upstream.decodeToken(s.token)?.exp;
-  if (exp && exp - Date.now() < 60 * 1000) await renew(s).catch(() => {});
-  try {
-    return await upstream.fetchReport(start, end, { token: s.token, apiBase: s.company.apiBase });
-  } catch (err) {
-    if (err.code === 'token' && (await renew(s).catch(() => false))) {
-      return upstream.fetchReport(start, end, { token: s.token, apiBase: s.company.apiBase });
-    }
-    throw err;
-  }
+  return upstream.fetchReport(start, end, { token: src.session.token, apiBase: config.apiBase });
 }
 
 async function loadReport(src, start, end) {
-  const scope = src.mode === 'mock' ? 'mock' : src.mode === 'shared' ? `shared|${hash(src.creds.token)}` : `live|${src.session.company.apiBase}|${src.session.id}`;
+  const scope = src.mode === 'mock' ? 'mock' : src.mode === 'shared' ? `shared|${hash(src.creds.token)}` : `live|${src.session.id}|${hash(src.session.token)}`;
   const key = `${scope}|${start}|${end}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < config.cacheTtlMs) return hit.promise;
@@ -189,24 +171,17 @@ async function jsonBody(req) {
   }
 }
 
-// Company lookups are cached server-side so the login step never trusts an API url sent
-// by the browser.
-const companies = new Map();
-
 function statusPayload(session) {
   const src = resolveSource(session);
   const tokenInfo = src?.mode === 'live' ? upstream.decodeToken(session.token) : src?.mode === 'shared' ? upstream.decodeToken(config.token) : null;
   return {
-    requireLogin: config.requireLogin && config.dataSource !== 'mock',
+    // true = each browser pastes its own SalesDiary token in the box at the top of the page
+    needsToken: config.requireLogin && config.dataSource !== 'mock',
     authenticated: Boolean(src),
     source: src ? (src.mode === 'mock' ? 'mock' : 'live') : null,
     mode: src?.mode || null,
-    user: session && session.mode === 'live' ? { username: session.username, name: session.displayName } : null,
-    company: session?.company ? { key: session.company.companyKey, name: session.company.name, logo: session.company.logo, instance: session.company.instance } : null,
-    apiBase: src?.mode === 'live' ? session.company.apiBase : src?.mode === 'shared' ? config.apiBase : null,
+    apiBase: src && src.mode !== 'mock' ? config.apiBase : null,
     token: tokenInfo,
-    autoRenew: Boolean(session?.password),
-    defaultCompany: config.defaultCompany,
     allowTokenUpdate: config.allowTokenUpdate,
     cacheTtlMs: config.cacheTtlMs,
   };
@@ -220,48 +195,6 @@ async function handleApi(req, res, url) {
 
   if (p === '/api/status') return send(req, res, 200, statusPayload(session));
 
-  if (p === '/api/auth/company' && req.method === 'POST') {
-    const body = await jsonBody(req);
-    const companyKey = String(body?.companyKey || '').trim().toLowerCase();
-    if (!/^[a-z0-9._-]{2,60}$/.test(companyKey)) return send(req, res, 400, { error: 'Enter a valid company key.' });
-    try {
-      const company = await upstream.findCompany(companyKey);
-      companies.set(companyKey, { ...company, at: Date.now() });
-      return send(req, res, 200, { companyKey, name: company.name, logo: company.logo, instance: company.instance });
-    } catch (err) {
-      console.error(`[company] ${companyKey} -> ${err.message}`);
-      return send(req, res, err.status || 500, { error: err.message });
-    }
-  }
-
-  if (p === '/api/auth/login' && req.method === 'POST') {
-    if (!sessions.allowAttempt(req)) return send(req, res, 429, { error: 'Too many attempts. Wait a few minutes and try again.' });
-    const body = await jsonBody(req);
-    const companyKey = String(body?.companyKey || '').trim().toLowerCase();
-    const username = String(body?.username || '').trim();
-    const password = String(body?.password || '');
-    if (!companyKey || !username || !password) return send(req, res, 400, { error: 'Company, username and password are required.' });
-    try {
-      let company = companies.get(companyKey);
-      if (!company || Date.now() - company.at > 3600 * 1000) {
-        company = { ...(await upstream.findCompany(companyKey)), at: Date.now() };
-        companies.set(companyKey, company);
-      }
-      const { token, displayName } = await upstream.login({ ...company, username, password });
-      if (session) sessions.destroy(req);
-      const { session: created, cookie } = sessions.create(req, {
-        mode: 'live', company, username, displayName, token,
-        // Kept in memory only, to renew the token silently when it expires.
-        password: body.remember === false ? null : password,
-      });
-      console.log(`[login] ${username}@${companyKey} signed in`);
-      return send(req, res, 200, { ok: true, session: created.id }, { 'Set-Cookie': cookie });
-    } catch (err) {
-      console.error(`[login] ${username}@${companyKey} -> ${err.message}`);
-      return send(req, res, err.status === 401 ? 401 : err.status || 500, { error: err.message });
-    }
-  }
-
   if (p === '/api/auth/demo' && req.method === 'POST') {
     if (session) sessions.destroy(req);
     const { session: created, cookie } = sessions.create(req, { mode: 'demo' });
@@ -273,24 +206,23 @@ async function handleApi(req, res, url) {
     return send(req, res, 200, { ok: true }, { 'Set-Cookie': sessions.destroy(req) });
   }
 
-  // Fallback: sign in by pasting a token copied from the SalesDiary web app.
+  // The token box at the top of the page: paste the SalesDiary "authorization" token.
   if (p === '/api/auth/token' && req.method === 'POST') {
-    if (!config.allowTokenUpdate) return send(req, res, 403, { error: 'Token sign-in is disabled on this server.' });
+    if (!config.allowTokenUpdate) return send(req, res, 403, { error: 'Pasting a token is disabled on this server.' });
     const body = await jsonBody(req);
-    const token = String(body?.token || '').replace(/^Bearer\s+/i, '').trim();
-    if (!upstream.JWT_RE.test(token)) return send(req, res, 400, { error: 'That does not look like a SalesDiary token (eyJ…).' });
+    const token = String(body?.token || '').replace(/^(Bearer|authorization:?)\s+/i, '').replace(/^['"]|['"]$/g, '').trim();
+    if (!upstream.JWT_RE.test(token)) return send(req, res, 400, { error: 'That doesn’t look like a SalesDiary token. It should start with eyJ…' });
     const info = upstream.decodeToken(token);
+    if (info?.expired) return send(req, res, 400, { error: `This token expired at ${new Date(info.exp).toLocaleString('en-IN')}. Copy a fresh one from SalesDiary.` });
     if (session?.mode === 'live') {
       session.token = token;
       clearCacheFor(session);
-      return send(req, res, 200, { ok: true });
+      return send(req, res, 200, { ok: true, token: info });
     }
     if (session) sessions.destroy(req);
-    const { session: created, cookie } = sessions.create(req, {
-      mode: 'live', token, username: info?.userId ? `user ${info.userId}` : 'token', displayName: info?.profile || 'Token user', password: null,
-      company: { companyKey: info?.instance || '', instance: info?.instance || '', name: info?.instance || 'SalesDiary', logo: null, apiBase: config.apiBase },
-    });
-    return send(req, res, 200, { ok: true, session: created.id }, { 'Set-Cookie': cookie });
+    const { session: created, cookie } = sessions.create(req, { mode: 'live', token });
+    console.log(`[token] new session${info?.instance ? ` for ${info.instance}` : ''}${info?.exp ? `, valid till ${new Date(info.exp).toISOString()}` : ''}`);
+    return send(req, res, 200, { ok: true, session: created.id, token: info }, { 'Set-Cookie': cookie });
   }
 
   if (p === '/api/report') {
@@ -299,7 +231,7 @@ async function handleApi(req, res, url) {
     if (!isDate(start) || !isDate(end)) return send(req, res, 400, { error: 'start and end must be YYYY-MM-DD' });
     if (start > end) return send(req, res, 400, { error: 'start must be on or before end' });
     const src = resolveSource(session);
-    if (!src) return send(req, res, 401, { error: 'Please sign in.', code: 'login_required' });
+    if (!src) return send(req, res, 401, { error: 'Paste your SalesDiary token in the box at the top.', code: 'login_required' });
     try {
       const report = await loadReport(src, start, end);
       const headers = { ETag: report.etag, 'Cache-Control': 'no-cache, private', 'X-Fetched-At': report.meta.fetchedAt };
@@ -383,7 +315,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(config.port, config.host, () => {
-  const mode = config.dataSource === 'mock' ? 'DEMO data only' : config.requireLogin ? 'users sign in with SalesDiary' : config.token ? `shared token, ${config.apiBase}` : 'DEMO data (no SD_TOKEN set)';
+  const mode = config.dataSource === 'mock' ? 'DEMO data only' : config.requireLogin ? `paste a token on the page · ${config.apiBase}` : config.token ? `shared token, ${config.apiBase}` : 'DEMO data (no SD_TOKEN set)';
   console.log(`Shelfwise running on http://localhost:${config.port}  ·  ${mode}${config.basicAuth ? '  ·  password protected' : ''}`);
   console.log(config.serveUi ? `UI also served here: http://localhost:${config.port}` : `API only. Dashboard: ${config.dashboardUrl}  (allowed origins: ${config.corsOrigins.join(', ')})`);
 });
