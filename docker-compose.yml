@@ -3,10 +3,28 @@ services:
     build: .
     image: shelfwise:latest
     container_name: shelfwise
-    # Bound to this computer only: the dashboard on GitHub Pages talks to http://localhost:8080
+    # Bound to this computer only: the website on GitHub Pages talks to http://localhost:8080.
+    # Other computers reach it through the optional tunnel below.
     ports:
       - "127.0.0.1:${HOST_PORT:-8080}:8080"
     env_file:
       - path: .env
         required: false
+    environment:
+      # Lets the server find the tunnel's public address and print a share link.
+      TUNNEL_METRICS_URL: ${TUNNEL_METRICS_URL:-http://tunnel:2000}
+    restart: unless-stopped
+
+  # Optional: a free Cloudflare quick tunnel that gives this server a public https address,
+  # so the website works on other laptops and phones too.
+  #   docker compose --profile share up -d
+  #   docker compose logs shelfwise      -> "Open on any computer: https://safdarnwz.github.io/ticketly/?server=..."
+  # The address changes whenever the tunnel restarts.
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: shelfwise-tunnel
+    profiles: ["share"]
+    command: tunnel --no-autoupdate --metrics 0.0.0.0:2000 --url http://shelfwise:8080
+    depends_on:
+      - shelfwise
     restart: unless-stopped

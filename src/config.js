@@ -48,6 +48,11 @@ module.exports = {
   dashboardUrl: env.DASHBOARD_URL || 'https://safdarnwz.github.io/ticketly/',
   // Also serve the UI from this server (handy for local development). Docker runs API-only.
   serveUi: process.argv.includes('--ui') || (env.SERVE_UI || 'false') === 'true',
+  // Public https address of this server, so other computers can use the website too.
+  // Either set it directly (ngrok, named tunnel, reverse proxy) or let the bundled
+  // Cloudflare quick tunnel report it (docker compose --profile share up -d).
+  publicUrl: (env.PUBLIC_URL || '').trim().replace(/\/+$/, ''),
+  tunnelMetricsUrl: (env.TUNNEL_METRICS_URL || '').trim().replace(/\/+$/, ''),
   // Set both to require a login (recommended whenever the dashboard is on a public URL).
   basicAuth: env.DASHBOARD_USER && env.DASHBOARD_PASSWORD ? `${env.DASHBOARD_USER}:${env.DASHBOARD_PASSWORD}` : null,
 };

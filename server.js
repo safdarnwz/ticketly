@@ -171,7 +171,34 @@ async function jsonBody(req) {
   }
 }
 
-function statusPayload(session) {
+// ---------- public address (Cloudflare quick tunnel or PUBLIC_URL) ----------
+
+let tunnel = { url: null, at: 0 };
+async function publicUrl() {
+  if (config.publicUrl) return config.publicUrl;
+  if (!config.tunnelMetricsUrl) return null;
+  if (Date.now() - tunnel.at < 15000) return tunnel.url;
+  tunnel.at = Date.now();
+  try {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 1500);
+    const res = await fetch(`${config.tunnelMetricsUrl}/quicktunnel`, { signal: controller.signal });
+    clearTimeout(t);
+    const json = await res.json();
+    tunnel.url = json.hostname ? `https://${json.hostname}` : null;
+  } catch {
+    tunnel.url = null;
+  }
+  return tunnel.url;
+}
+
+function shareLink(url) {
+  if (!url) return null;
+  const base = config.dashboardUrl.replace(/\/?$/, '/');
+  return `${base}?server=${url}`;
+}
+
+async function statusPayload(session) {
   const src = resolveSource(session);
   const tokenInfo = src?.mode === 'live' ? upstream.decodeToken(session.token) : src?.mode === 'shared' ? upstream.decodeToken(config.token) : null;
   return {
@@ -184,6 +211,8 @@ function statusPayload(session) {
     token: tokenInfo,
     allowTokenUpdate: config.allowTokenUpdate,
     cacheTtlMs: config.cacheTtlMs,
+    publicUrl: await publicUrl(),
+    shareLink: shareLink(await publicUrl()),
   };
 }
 
@@ -193,7 +222,7 @@ async function handleApi(req, res, url) {
 
   if (p === '/api/health') return send(req, res, 200, { ok: true, uptime: process.uptime() });
 
-  if (p === '/api/status') return send(req, res, 200, statusPayload(session));
+  if (p === '/api/status') return send(req, res, 200, await statusPayload(session));
 
   if (p === '/api/auth/demo' && req.method === 'POST') {
     if (session) sessions.destroy(req);
@@ -318,6 +347,18 @@ server.listen(config.port, config.host, () => {
   const mode = config.dataSource === 'mock' ? 'DEMO data only' : config.requireLogin ? `paste a token on the page · ${config.apiBase}` : config.token ? `shared token, ${config.apiBase}` : 'DEMO data (no SD_TOKEN set)';
   console.log(`Shelfwise running on http://localhost:${config.port}  ·  ${mode}${config.basicAuth ? '  ·  password protected' : ''}`);
   console.log(config.serveUi ? `UI also served here: http://localhost:${config.port}` : `API only. Dashboard: ${config.dashboardUrl}  (allowed origins: ${config.corsOrigins.join(', ')})`);
+  announcePublicUrl();
 });
+
+// Print the link for other computers once the tunnel (if any) has an address.
+async function announcePublicUrl(tries = 0) {
+  if (!config.publicUrl && !config.tunnelMetricsUrl) return;
+  tunnel.at = 0;
+  const url = await publicUrl();
+  if (url) {
+    console.log(`Public server address: ${url}`);
+    console.log(`Open on any computer:  ${shareLink(url)}`);
+  } else if (tries < 40) setTimeout(() => announcePublicUrl(tries + 1), 3000);
+}
 
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => server.close(() => process.exit(0)));

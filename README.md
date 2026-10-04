@@ -36,8 +36,8 @@ you can open **http://localhost:8080** instead.
 1. Copy your SalesDiary token. Open app.salesdiary.in, press **F12** and go to **Network**. Click any
    API request (for example `getStockAvailablityReport`) and copy the value of the
    **`authorization`** request header (it starts with `eyJ…`).
-2. Paste it into the **SalesDiary token** box at the top of the page and press **Load data**.
-   Pasting a whole token loads the data straight away.
+2. Paste it into the **SalesDiary token** box at the top of the page (the token stays visible so
+   you can check it) and press **Load data**. Nothing is sent until you press the button.
 
 The box then shows the instance, the profile and when the token expires. A token lasts about
 16 hours. When it expires, the box turns red; paste a fresh token. **Remove token** is in the account
@@ -47,6 +47,30 @@ If the server isn't running, the website asks you to start it and shows a **Retr
 Chrome and Edge may ask to allow access to *devices on your local network*. Choose **Allow**.
 
 > Use Chrome, Edge or Firefox. Safari may block an `https://` website from calling `http://localhost`.
+
+## Using the website on other laptops or phones
+
+The website looks for the server at `http://localhost:8080` on **the computer it is opened on**.
+On another laptop there is no server, so it shows "Connect to a Shelfwise server". To use one
+server (on your laptop) from anywhere, give it a public https address with the bundled tunnel:
+
+```bash
+docker compose --profile share up -d --build
+docker compose logs shelfwise
+#  Public server address: https://something.trycloudflare.com
+#  Open on any computer:  https://safdarnwz.github.io/ticketly/?server=https://something.trycloudflare.com
+```
+
+Open that **"Open on any computer"** link on the other laptop. The website remembers the server,
+and each person pastes their own SalesDiary token. The same link is shown in the account menu
+(top right → *Open on another computer → Copy*).
+
+- The tunnel is a free Cloudflare "quick tunnel" and needs no account. Its address **changes every
+  time the tunnel restarts**, so share the new link after a restart. For a permanent address, use a
+  named Cloudflare tunnel or ngrok and put that address in `PUBLIC_URL`.
+- Your laptop must stay on, with Docker running, for the other computers to get data.
+- To stop sharing, run `docker compose --profile share down`, then `docker compose up -d` to keep
+  only the local server.
 
 ### Publishing the website (one-time)
 
@@ -72,7 +96,9 @@ Each visitor can also change the server address on the site.
 | **Pivot** | Any metric by any two dimensions |
 | **Raw data** | Every record, with a column picker, sorting and CSV export |
 
-Every table can be sorted, searched and exported to CSV. Clicking any bar, slice or row filters the
+Every action you take (loading a token, changing the date range, applying a filter, switching
+pages, refreshing) shows a spinner until the data is ready. The automatic 5-second refresh runs
+quietly in the background. Every table can be sorted, searched and exported to CSV. Clicking any bar, slice or row filters the
 whole site, and filters are cross-filtered. The date range is passed to the API. The site has light
 and dark themes and works on mobile.
 
@@ -101,6 +127,7 @@ Copy `.env.example` to `.env`. Docker Compose reads it automatically.
 | `CORS_ORIGINS` | `https://safdarnwz.github.io` | Websites allowed to use this server (localhost is always allowed) |
 | `DASHBOARD_URL` | `https://safdarnwz.github.io/ticketly/` | Link shown on the server's own page |
 | `SERVE_UI` | `false` | Also serve the UI from the server (`--ui` does the same) |
+| `PUBLIC_URL` | — | Public https address of this server. Leave empty with the `share` tunnel, which reports its own |
 | `REQUIRE_TOKEN` | `true` | Each browser pastes its own token. If `false`, everyone sees `SD_TOKEN` data (or demo data) |
 | `SD_TOKEN` | — | Shared token, only used when `REQUIRE_TOKEN=false` |
 | `SESSION_HOURS` | `12` | How long a pasted token stays active while idle |
