@@ -29,6 +29,11 @@ export function initAuth({ getBackend, onToken, onDemo, onRetry, onSnapshot }) {
     bar.classList.toggle('is-ok', kind === 'ok');
   };
 
+  const syncClear = () => {
+    $('tokenClear').hidden = !field.value;
+  };
+
+  // The API is called only when the user presses Load data (or Enter), never on paste.
   bar.addEventListener('submit', async (e) => {
     e.preventDefault();
     const token = field.value.trim();
@@ -39,32 +44,40 @@ export function initAuth({ getBackend, onToken, onDemo, onRetry, onSnapshot }) {
     }
     const btn = $('tokenSubmit');
     btn.disabled = true;
-    btn.textContent = 'Checking…';
+    btn.classList.add('is-busy');
+    btn.querySelector('.label').textContent = 'Loading…';
+    setStatus('Checking the token…');
     try {
       await getBackend().loginToken(token);
       field.value = '';
-      field.type = 'password';
-      $('tokenShow').textContent = 'Show';
+      syncClear();
       await onToken();
     } catch (err) {
       setStatus(err.message, 'error');
       field.select();
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Load data';
+      btn.classList.remove('is-busy');
+      btn.querySelector('.label').textContent = 'Load data';
     }
   });
 
-  // Submit straight away when a whole token is pasted.
+  field.addEventListener('input', () => {
+    syncClear();
+    if (bar.classList.contains('is-error')) setStatus('Press Load data when ready.');
+  });
   field.addEventListener('paste', () => {
     setTimeout(() => {
-      if (/^\s*(Bearer\s+)?eyJ[\w-]+\.[\w-]+\.[\w-]+\s*$/.test(field.value)) bar.requestSubmit();
+      // Strip "Bearer " or quotes copied along with the header value, but leave it visible.
+      field.value = field.value.trim().replace(/^(Bearer|authorization:?)\s+/i, '').replace(/^['"]|['"]$/g, '');
+      syncClear();
+      setStatus('Token pasted. Press <b>Load data</b> to fetch the report.');
     }, 0);
   });
-
-  $('tokenShow').addEventListener('click', () => {
-    field.type = field.type === 'password' ? 'text' : 'password';
-    $('tokenShow').textContent = field.type === 'password' ? 'Show' : 'Hide';
+  $('tokenClear').addEventListener('click', () => {
+    field.value = '';
+    syncClear();
+    field.focus();
   });
 
   statusEl.addEventListener('click', (e) => {

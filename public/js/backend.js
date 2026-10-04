@@ -170,8 +170,28 @@ export async function hasSnapshot() {
  * Same origin first (UI served by the server), then the configured local server.
  * Returns { backend } or { offline: true, url }.
  */
+/** A shared link like ?server=https://abc.trycloudflare.com points this browser at that server. */
+function serverFromLink() {
+  try {
+    const params = new URLSearchParams(location.search);
+    const url = normalize(params.get('server'));
+    if (!url || !/^https?:\/\//i.test(url)) return null;
+    params.delete('server');
+    const rest = params.toString();
+    history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
+    return url;
+  } catch {
+    return null;
+  }
+}
+
 export async function connect({ forceUrl, snapshot } = {}) {
   if (snapshot) return { backend: snapshotBackend() };
+  const linked = serverFromLink();
+  if (linked) {
+    setServerUrl(linked);
+    forceUrl = linked;
+  }
   if (!forceUrl && (await probe(''))) return { backend: serverBackend('') };
   const url = normalize(forceUrl) || getServerUrl(await siteConfig());
   if (await probe(url)) {

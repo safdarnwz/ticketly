@@ -37,11 +37,57 @@ const isSnapshot = () => state.backend?.kind === 'snapshot';
 
 // ---------------------------------------------------------------- data
 
-async function load({ reset = false } = {}) {
-  if (state.loading || !state.backend) return;
+// ---------------------------------------------------------------- busy indicator
+
+let busyCount = 0;
+let busyShownAt = 0;
+function busy(on, text = 'Loading data…') {
+  if (on) {
+    busyCount++;
+    if (busyCount === 1) busyShownAt = Date.now();
+    $('busyText').textContent = text;
+    document.body.classList.add('is-busy');
+    $('busy').hidden = false;
+    return;
+  }
+  busyCount = Math.max(0, busyCount - 1);
+  if (busyCount) return;
+  // Keep it on screen long enough to register, so quick actions don't flicker.
+  const wait = Math.max(0, 280 - (Date.now() - busyShownAt));
+  setTimeout(() => {
+    if (busyCount) return;
+    document.body.classList.remove('is-busy');
+    $('busy').hidden = true;
+  }, wait);
+}
+
+const nextFrame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+/** Client-side work (filters, page switch): show the spinner, let it paint, then do the work. */
+async function withBusy(text, fn) {
+  busy(true, text);
+  try {
+    await nextFrame();
+    fn();
+  } finally {
+    busy(false);
+  }
+}
+
+/**
+ * quiet = background refresh (no spinner); anything the user triggers shows the spinner.
+ * A user request made while a fetch is running is queued, never dropped.
+ */
+async function load({ reset = false, quiet = false, text } = {}) {
+  if (!state.backend) return;
+  if (state.loading) {
+    if (!quiet) state.queued = { reset: reset || state.queued?.reset, text };
+    return;
+  }
   state.loading = true;
   clearTimeout(state.timer);
   $('refreshBtn').classList.add('spin');
+  if (!quiet) busy(true, text || (reset ? 'Loading data…' : 'Refreshing…'));
   if (reset) {
     state.backend.resetCache();
     showLoading();
@@ -66,10 +112,14 @@ async function load({ reset = false } = {}) {
     if (!state.all.length) renderEmpty(err);
   } finally {
     state.loading = false;
+    if (!quiet) busy(false);
     $('refreshBtn').classList.remove('spin');
     updateLive();
     updateFooter();
-    schedule();
+    const queued = state.queued;
+    state.queued = null;
+    if (queued) load(queued);
+    else schedule();
   }
 }
 
@@ -124,7 +174,7 @@ function schedule() {
     tick.style.transitionDuration = `${secs}s`;
     tick.style.width = '100%';
   });
-  state.timer = setTimeout(() => load(), secs * 1000);
+  state.timer = setTimeout(() => load({ quiet: true }), secs * 1000);
 }
 
 function updateLive() {
@@ -140,7 +190,7 @@ setInterval(updateLive, 1000);
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) clearTimeout(state.timer);
-  else if (state.interval && state.authed) load();
+  else if (state.interval && state.authed) load({ quiet: true });
 });
 
 // ---------------------------------------------------------------- rendering
@@ -277,6 +327,9 @@ function openSettings() {
        <dt>Data server</dt><dd>${esc(state.backend?.base || '—')}</dd>
        <dt>SalesDiary API</dt><dd>${esc(s.apiBase || '—')}</dd>
        <dt>Last fetch</dt><dd>${fetched}</dd>`;
+  const share = s.shareLink;
+  $('shareBox').hidden = !share;
+  if (share) $('shareLink').value = share;
   $('signOut').hidden = isSnapshot() || s.mode === 'shared' || !s.authenticated;
   $('signOut').textContent = s.mode === 'mock' ? 'Leave demo data' : 'Remove token';
   $('tokenMsg').textContent = '';
@@ -397,8 +450,9 @@ function go(page) {
   state.page = page;
   document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('active', a.dataset.page === page));
   document.querySelector('#nav a.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  render();
   window.scrollTo({ top: 0 });
+  if (state.meta.columns.length) withBusy(`Opening ${PAGES[page].title}…`, render);
+  else render();
 }
 
 window.addEventListener('hashchange', () => go(location.hash.slice(1)));
@@ -414,14 +468,14 @@ function toggleTheme() {
 
 // ---------------------------------------------------------------- boot
 
-const filterBar = new FilterBar({ state: state.filters, getRows: () => state.all, onChange: () => render() });
+const filterBar = new FilterBar({ state: state.filters, getRows: () => state.all, onChange: () => withBusy('Applying filters…', render) });
 
 const dateRange = new DateRange({
   range: state.range,
   onChange: (range) => {
     state.range = range;
     store.set('range', { preset: range.preset, start: range.start, end: range.end });
-    load({ reset: true });
+    load({ reset: true, text: `Loading ${rangeLabel(range.start, range.end)}…` });
   },
 });
 
@@ -430,15 +484,26 @@ $('intervalSelect').addEventListener('change', (e) => {
   state.interval = Number(e.target.value);
   store.set('interval', state.interval);
   updateLive();
-  if (state.interval) load();
+  if (state.interval) load({ quiet: true });
   else schedule();
 });
-$('refreshBtn').addEventListener('click', () => load());
+$('refreshBtn').addEventListener('click', () => load({ text: 'Refreshing…' }));
 $('themeBtn').addEventListener('click', toggleTheme);
 $('sourceCard').addEventListener('click', openSettings);
 $('closeSettings').addEventListener('click', closeSettings);
 $('drawerBackdrop').addEventListener('click', closeSettings);
 $('signOut').addEventListener('click', signOut);
+$('copyShare').addEventListener('click', async () => {
+  const input = $('shareLink');
+  try {
+    await navigator.clipboard.writeText(input.value);
+  } catch {
+    input.select();
+    document.execCommand('copy');
+  }
+  $('copyShare').textContent = 'Copied';
+  setTimeout(() => ($('copyShare').textContent = 'Copy'), 1500);
+});
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
   if (!document.documentElement.dataset.theme) {
     C.resetTheme();

@@ -27,10 +27,11 @@
       </div>
 
       <form id="offlineForm" class="auth-form" hidden>
-        <h1>Start your Shelfwise server</h1>
-        <p class="auth-lead">This website shows the reports, but the data comes from the Shelfwise server running in Docker on your computer. Start it, then press Retry.</p>
+        <h1>Connect to a Shelfwise server</h1>
+        <p class="auth-lead">This website shows the reports, but the data comes from a Shelfwise server. On the computer that has the code, start it and press Retry:</p>
         <pre class="cmd"><code>docker compose up -d</code></pre>
-        <label class="field"><span>Server address</span><input id="serverUrl" placeholder="http://localhost:8080" autocapitalize="off" spellcheck="false"></label>
+        <p class="auth-lead">On any other computer, open the share link from that server (it ends in <code>?server=https://…</code>), or paste its public address here.</p>
+        <label class="field"><span>Server address</span><input id="serverUrl" placeholder="http://localhost:8080 or https://….trycloudflare.com" autocapitalize="off" spellcheck="false"></label>
         <button class="btn btn-primary btn-lg" type="submit" id="retryBtn">Retry</button>
         <p class="auth-note">If Chrome or Edge asks to allow access to <b>devices on your local network</b>, choose Allow. That is how this page reaches your computer.</p>
       </form>
@@ -50,10 +51,10 @@
         <label class="tokenbar-label" for="tokenField">SalesDiary token</label>
         <div class="token-input">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>
-          <input id="tokenField" name="token" type="password" placeholder="Paste the authorization token (eyJhbGciOi…)" spellcheck="false" autocapitalize="off">
-          <button type="button" class="btn-link" id="tokenShow">Show</button>
+          <input id="tokenField" name="token" type="text" placeholder="Paste the authorization token (eyJhbGciOi…)" spellcheck="false" autocapitalize="off" autocomplete="off">
+          <button type="button" class="btn-link" id="tokenClear" hidden>Clear</button>
         </div>
-        <button class="btn btn-primary" type="submit" id="tokenSubmit">Load data</button>
+        <button class="btn btn-primary" type="submit" id="tokenSubmit"><span class="spinner" aria-hidden="true"></span><span class="label">Load data</span></button>
         <span class="tokenbar-status" id="tokenStatus" role="status"></span>
       </div>
     </form>
@@ -164,6 +165,11 @@
     </div>
     <div class="drawer-body">
       <dl class="kv" id="connInfo"></dl>
+      <div class="share-box" id="shareBox" hidden>
+        <span class="share-title">Open on another computer</span>
+        <div class="share-row"><input id="shareLink" class="input" readonly><button class="btn btn-sm" id="copyShare" type="button">Copy</button></div>
+        <small>Anyone with this link reaches your server, and still needs their own SalesDiary token to see data.</small>
+      </div>
       <div class="row-gap">
         <button class="btn" id="signOut" type="button">Remove token</button>
       </div>
@@ -171,6 +177,7 @@
     </div>
   </aside>
 
+  <div class="busy" id="busy" hidden role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span id="busyText">Loading data…</span></div>
   <div class="toast-stack" id="toasts"></div>
   <div class="tooltip-pop" id="cellTip" hidden></div>
 
