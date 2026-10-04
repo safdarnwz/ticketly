@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shelfwise · Stock Availability</title>
+  <meta name="description" content="Live stock availability, outlet and field-team analytics.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="vendor/inter/index.css">
+  <link rel="stylesheet" href="css/styles.css">
+  <script>
+    try { const t = localStorage.getItem('sw-theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+  </script>
+</head>
+<body>
+  <div class="auth" id="auth" hidden>
+    <div class="auth-card">
+      <div class="brand auth-brand">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="13" width="4" height="8" rx="1"/><rect x="10" y="8" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>
+        <div><div class="brand-name">Shelfwise</div><div class="brand-sub">Stock availability</div></div>
+      </div>
+
+      <div class="server-line" id="serverLine" hidden>
+        <span class="dot" id="serverDot"></span>
+        <span class="grow">Data server <b id="serverLabel">localhost:8080</b></span>
+        <button class="btn-link" type="button" id="serverChange">Change</button>
+      </div>
+
+      <form id="offlineForm" class="auth-form" hidden>
+        <h1>Start your Shelfwise server</h1>
+        <p class="auth-lead">This website shows the reports, but the data comes from the Shelfwise server running in Docker on your computer. Start it, then press Retry.</p>
+        <pre class="cmd"><code>docker compose up -d</code></pre>
+        <label class="field"><span>Server address</span><input id="serverUrl" placeholder="http://localhost:8080" autocapitalize="off" spellcheck="false"></label>
+        <button class="btn btn-primary btn-lg" type="submit" id="retryBtn">Retry</button>
+        <p class="auth-note">If Chrome or Edge asks to allow access to <b>devices on your local network</b>, choose Allow. That is how this page reaches your computer.</p>
+      </form>
+
+      <ol class="auth-steps" id="authSteps" aria-hidden="true"><li id="stepOne" class="on">Company</li><li id="stepTwo">Sign in</li></ol>
+
+      <form id="companyForm" class="auth-form" autocomplete="on">
+        <h1>Sign in with SalesDiary</h1>
+        <p class="auth-lead">Start with your company key, the same one you use on app.salesdiary.in.</p>
+        <label class="field"><span>Company key</span><input id="companyKey" name="company" placeholder="e.g. glenmark" autocomplete="organization" autocapitalize="off" spellcheck="false" required></label>
+        <button class="btn btn-primary btn-lg" type="submit" id="companyBtn">Continue</button>
+      </form>
+
+      <form id="loginForm" class="auth-form" autocomplete="on" hidden>
+        <div class="company-chip">
+          <span class="company-logo" id="companyLogo"></span>
+          <span class="company-text"><b id="companyName">—</b><small id="companyInstance"></small></span>
+          <button class="btn-link" type="button" id="changeCompany">Change</button>
+        </div>
+        <label class="field"><span>Username</span><input id="username" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" required></label>
+        <label class="field"><span>Password</span>
+          <span class="pw"><input id="password" name="password" type="password" autocomplete="current-password" required><button type="button" class="btn-link" id="pwToggle">Show</button></span>
+        </label>
+        <label class="check"><input type="checkbox" id="remember" checked> Keep me signed in <small>(renews the token automatically)</small></label>
+        <button class="btn btn-primary btn-lg" type="submit" id="loginBtn">Sign in</button>
+      </form>
+
+      <form id="tokenForm" class="auth-form" hidden>
+        <h1>Sign in with a token</h1>
+        <p class="auth-lead">Paste the <code>authorization</code> header from a SalesDiary request (DevTools → Network). Tokens expire after about 16 hours.</p>
+        <label class="field"><span>Token</span><textarea id="tokenLogin" rows="5" placeholder="eyJhbGciOi…" spellcheck="false"></textarea></label>
+        <button class="btn btn-primary btn-lg" type="submit">Sign in</button>
+      </form>
+
+      <p class="auth-error" id="authError" role="alert"></p>
+
+      <div class="auth-alt">
+        <button class="btn-link" type="button" id="tokenToggle">Use a token instead</button>
+        <span id="altSep">·</span>
+        <button class="btn-link" type="button" id="demoBtn">Explore with demo data</button>
+      </div>
+    </div>
+    <p class="auth-foot">Your password goes only to SalesDiary through this server. It is never stored in the browser.</p>
+  </div>
+
+  <div class="site" id="shell">
+    <header class="site-header">
+      <div class="wrap header-row">
+        <a class="logo" href="#overview" aria-label="Shelfwise home">
+          <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="13" width="4" height="8" rx="1"/><rect x="10" y="8" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>
+          <span class="brand-name">Shelfwise</span>
+          <span class="brand-sub" id="brandSub"></span>
+        </a>
+        <nav class="site-nav" id="nav" aria-label="Reports">
+          <a href="#overview" data-page="overview">Overview</a>
+          <a href="#availability" data-page="availability">SKUs</a>
+          <a href="#outlets" data-page="outlets">Outlets</a>
+          <a href="#team" data-page="team">Field team</a>
+          <a href="#geography" data-page="geography">Geography</a>
+          <a href="#opportunities" data-page="opportunities">Opportunities</a>
+          <span class="nav-sep" aria-hidden="true"></span>
+          <a href="#pivot" data-page="pivot">Pivot</a>
+          <a href="#explorer" data-page="explorer">Raw data</a>
+        </nav>
+        <div class="header-actions">
+          <div class="live" id="liveBox" title="Auto refresh">
+            <span class="live-dot" id="liveDot"></span>
+            <span class="live-text" id="liveText">Live</span>
+            <select id="intervalSelect" aria-label="Refresh interval">
+              <option value="5">5s</option>
+              <option value="15">15s</option>
+              <option value="30">30s</option>
+              <option value="60">1m</option>
+              <option value="0">Off</option>
+            </select>
+          </div>
+          <button class="icon-btn" id="refreshBtn" type="button" title="Refresh now" aria-label="Refresh now"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button>
+          <button class="icon-btn" id="themeBtn" type="button" title="Light / dark" aria-label="Toggle theme"><svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
+          <button class="account" id="sourceCard" type="button" aria-label="Account">
+            <span class="dot" id="sourceDot"></span>
+            <span class="account-name" id="sourceTitle">…</span>
+            <span class="sr-only" id="sourceSub"></span>
+          </button>
+          <button class="icon-btn" id="settingsBtn" type="button" hidden aria-hidden="true"></button>
+        </div>
+      </div>
+      <div class="tick" id="tick"></div>
+    </header>
+
+    <div class="toolbar">
+      <div class="wrap">
+        <section class="filterbar" id="filterbar">
+          <div class="date-control" id="dateControl">
+            <button class="chip chip-date" id="dateBtn" type="button">
+              <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+              <span id="dateLabel">—</span>
+            </button>
+            <div class="popover date-pop" id="datePop" hidden>
+              <div class="preset-list" id="presetList"></div>
+              <div class="custom-range">
+                <label>From<input type="date" id="startInput"></label>
+                <label>To<input type="date" id="endInput"></label>
+                <button class="btn btn-primary" id="applyDate" type="button">Apply</button>
+              </div>
+            </div>
+          </div>
+          <div class="search">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
+            <input id="globalSearch" type="search" placeholder="Search outlet, SKU, rep or code" autocomplete="off">
+          </div>
+          <div class="dim-filters" id="dimFilters"></div>
+          <button class="chip chip-ghost" id="moreFilters" type="button">More filters</button>
+          <button class="chip chip-ghost" id="clearFilters" type="button" hidden>Clear all</button>
+        </section>
+        <div class="active-filters" id="activeFilters"></div>
+      </div>
+    </div>
+
+    <main class="wrap page-main">
+      <section class="hero">
+        <p class="eyebrow" id="pageEyebrow">&nbsp;</p>
+        <h1 id="pageTitle">Overview</h1>
+        <p class="lede" id="pageSub">&nbsp;</p>
+      </section>
+      <div class="banner" id="banner" hidden></div>
+      <div class="content" id="content">
+        <div class="loading" id="loading">
+          <div class="skeleton-row"><span></span><span></span><span></span><span></span></div>
+          <div class="skeleton-block"></div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap footer-row">
+        <div>
+          <b>Shelfwise</b> · stock availability reporting on SalesDiary data.
+          <span class="foot-tip">Click any bar, slice or table row to filter the whole site.</span>
+        </div>
+        <div class="foot-status" id="footStatus"></div>
+      </div>
+    </footer>
+  </div>
+
+  <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+  <aside class="drawer" id="settingsDrawer" hidden aria-label="Account">
+    <div class="drawer-head">
+      <h2>Account &amp; connection</h2>
+      <button class="icon-btn" id="closeSettings" type="button" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="drawer-body">
+      <dl class="kv" id="connInfo"></dl>
+      <div class="row-gap">
+        <button class="btn" id="signOut" type="button">Sign out</button>
+      </div>
+      <details class="advanced" id="tokenSection">
+        <summary>Replace token manually</summary>
+        <label class="field">
+          <span>SalesDiary token</span>
+          <textarea id="tokenInput" rows="5" placeholder="Paste the authorization token (eyJhbGciOi…)"></textarea>
+          <small>Only needed if automatic renewal is off. Kept in server memory for this session.</small>
+        </label>
+        <button class="btn btn-primary" id="saveToken" type="button">Save &amp; reconnect</button>
+      </details>
+      <p class="form-msg" id="tokenMsg"></p>
+    </div>
+  </aside>
+
+  <div class="toast-stack" id="toasts"></div>
+  <div class="tooltip-pop" id="cellTip" hidden></div>
+
+  <script src="vendor/chart/chart.umd.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
