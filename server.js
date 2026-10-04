@@ -1,0 +1,352 @@
+'use strict';
+
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const zlib = require('zlib');
+const crypto = require('crypto');
+
+const config = require('./src/config');
+const upstream = require('./src/upstream');
+const { fetchMockReport } = require('./src/mock');
+const { toColumnar } = require('./src/columnar');
+const sessions = require('./src/sessions');
+
+const PUBLIC_DIR = path.join(__dirname, 'public');
+const STATIC_ROOTS = {
+  '/vendor/chart/': path.join(__dirname, 'node_modules', 'chart.js', 'dist'),
+  '/vendor/inter/': path.join(__dirname, 'node_modules', '@fontsource-variable', 'inter'),
+};
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
+  '.map': 'application/json',
+};
+
+// Which data a request may see:
+//   mock   - demo data (no SalesDiary call)
+//   live   - the signed-in user's own SalesDiary session
+//   shared - SD_TOKEN from .env, only when REQUIRE_LOGIN=false
+function resolveSource(session) {
+  if (config.dataSource === 'mock') return { mode: 'mock' };
+  if (session) return session.mode === 'demo' ? { mode: 'mock' } : { mode: 'live', session };
+  if (!config.requireLogin) {
+    if (config.token && config.dataSource !== 'mock') return { mode: 'shared', creds: { token: config.token, apiBase: config.apiBase } };
+    if (config.dataSource !== 'live') return { mode: 'mock' };
+  }
+  return null;
+}
+
+const hash = (s) => crypto.createHash('sha1').update(String(s)).digest('base64url').slice(0, 12);
+
+// ---------- report cache: one upstream call per range + token per TTL ----------
+
+const cache = new Map();
+
+function isDate(s) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + 'T00:00:00Z'));
+}
+
+// Re-login with the stored credentials when the 16-hour token runs out.
+async function renew(session) {
+  if (!session.password) return false;
+  const { token } = await upstream.login({ ...session.company, apiBase: session.company.apiBase, username: session.username, password: session.password });
+  session.token = token;
+  return true;
+}
+
+async function fetchLive(src, start, end) {
+  if (src.mode === 'shared') return upstream.fetchReport(start, end, src.creds);
+  const s = src.session;
+  const exp = upstream.decodeToken(s.token)?.exp;
+  if (exp && exp - Date.now() < 60 * 1000) await renew(s).catch(() => {});
+  try {
+    return await upstream.fetchReport(start, end, { token: s.token, apiBase: s.company.apiBase });
+  } catch (err) {
+    if (err.code === 'token' && (await renew(s).catch(() => false))) {
+      return upstream.fetchReport(start, end, { token: s.token, apiBase: s.company.apiBase });
+    }
+    throw err;
+  }
+}
+
+async function loadReport(src, start, end) {
+  const scope = src.mode === 'mock' ? 'mock' : src.mode === 'shared' ? `shared|${hash(src.creds.token)}` : `live|${src.session.company.apiBase}|${src.session.id}`;
+  const key = `${scope}|${start}|${end}`;
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < config.cacheTtlMs) return hit.promise;
+
+  const started = Date.now();
+  const promise = (src.mode === 'mock' ? fetchMockReport(start, end) : fetchLive(src, start, end)).then((res) => {
+    const table = toColumnar(res.rows);
+    const meta = {
+      source: src.mode === 'mock' ? 'mock' : 'live',
+      start,
+      end,
+      rows: res.rows.length,
+      total: res.total,
+      pages: res.pages,
+      upstreamTime: res.upstreamTime,
+      fetchedAt: new Date().toISOString(),
+      durationMs: Date.now() - started,
+    };
+    const body = JSON.stringify({ meta, ...table });
+    // ETag ignores meta, so an unchanged dataset is answered with 304.
+    const etag = '"' + crypto.createHash('sha1').update(JSON.stringify(table)).digest('base64url') + '"';
+    return { body, etag, meta };
+  });
+
+  cache.set(key, { at: Date.now(), promise });
+  promise.catch(() => cache.delete(key));
+  if (cache.size > 50) cache.delete(cache.keys().next().value);
+  return promise;
+}
+
+function clearCacheFor(session) {
+  for (const k of cache.keys()) if (k.includes(`|${session.id}|`)) cache.delete(k);
+}
+
+// ---------- http helpers ----------
+
+function send(req, res, status, body, headers = {}) {
+  const buf = Buffer.isBuffer(body) ? body : Buffer.from(typeof body === 'string' ? body : JSON.stringify(body));
+  const type = headers['Content-Type'] || 'application/json; charset=utf-8';
+  const accepts = String(req.headers['accept-encoding'] || '');
+  const compressible = /json|text|javascript|svg/.test(type) && buf.length > 1024;
+  const out = { 'Content-Type': type, ...headers };
+  let payload = buf;
+  if (compressible && accepts.includes('br')) {
+    payload = zlib.brotliCompressSync(buf, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 } });
+    out['Content-Encoding'] = 'br';
+  } else if (compressible && accepts.includes('gzip')) {
+    payload = zlib.gzipSync(buf, { level: 6 });
+    out['Content-Encoding'] = 'gzip';
+  }
+  out['Content-Length'] = payload.length;
+  if (compressible) out.Vary = 'Accept-Encoding';
+  res.writeHead(status, out);
+  res.end(req.method === 'HEAD' ? undefined : payload);
+}
+
+function readBody(req, limit = 64 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > limit) {
+        reject(new Error('Body too large'));
+        req.destroy();
+      } else chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
+
+function serveStatic(req, res, pathname) {
+  let file = null;
+  for (const [prefix, dir] of Object.entries(STATIC_ROOTS)) {
+    if (pathname.startsWith(prefix)) file = path.join(dir, pathname.slice(prefix.length));
+  }
+  if (!file) file = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
+  const allowed = [PUBLIC_DIR, ...Object.values(STATIC_ROOTS)].some((root) => file.startsWith(root + path.sep));
+  if (!allowed) return send(req, res, 403, { error: 'Forbidden' });
+
+  fs.stat(file, (err, stat) => {
+    if (err || !stat.isFile()) {
+      // Unknown non-asset routes fall back to the app shell.
+      if (!path.extname(pathname)) return serveStatic(req, res, '/');
+      return send(req, res, 404, { error: 'Not found' });
+    }
+    const type = MIME[path.extname(file)] || 'application/octet-stream';
+    const etag = `"${stat.size.toString(36)}-${stat.mtimeMs.toString(36)}"`;
+    if (req.headers['if-none-match'] === etag) {
+      res.writeHead(304, { ETag: etag });
+      return res.end();
+    }
+    const cacheControl = pathname.startsWith('/vendor/') ? 'public, max-age=604800' : 'no-cache';
+    fs.readFile(file, (readErr, data) => {
+      if (readErr) return send(req, res, 500, { error: 'Read failed' });
+      send(req, res, 200, data, { 'Content-Type': type, ETag: etag, 'Cache-Control': cacheControl });
+    });
+  });
+}
+
+// ---------- routes ----------
+
+async function jsonBody(req) {
+  try {
+    return JSON.parse((await readBody(req)) || '{}');
+  } catch {
+    return null;
+  }
+}
+
+// Company lookups are cached server-side so the login step never trusts an API url sent
+// by the browser.
+const companies = new Map();
+
+function statusPayload(session) {
+  const src = resolveSource(session);
+  const tokenInfo = src?.mode === 'live' ? upstream.decodeToken(session.token) : src?.mode === 'shared' ? upstream.decodeToken(config.token) : null;
+  return {
+    requireLogin: config.requireLogin && config.dataSource !== 'mock',
+    authenticated: Boolean(src),
+    source: src ? (src.mode === 'mock' ? 'mock' : 'live') : null,
+    mode: src?.mode || null,
+    user: session && session.mode === 'live' ? { username: session.username, name: session.displayName } : null,
+    company: session?.company ? { key: session.company.companyKey, name: session.company.name, logo: session.company.logo, instance: session.company.instance } : null,
+    apiBase: src?.mode === 'live' ? session.company.apiBase : src?.mode === 'shared' ? config.apiBase : null,
+    token: tokenInfo,
+    autoRenew: Boolean(session?.password),
+    defaultCompany: config.defaultCompany,
+    allowTokenUpdate: config.allowTokenUpdate,
+    cacheTtlMs: config.cacheTtlMs,
+  };
+}
+
+async function handleApi(req, res, url) {
+  const p = url.pathname;
+  const session = sessions.get(req);
+
+  if (p === '/api/health') return send(req, res, 200, { ok: true, uptime: process.uptime() });
+
+  if (p === '/api/status') return send(req, res, 200, statusPayload(session));
+
+  if (p === '/api/auth/company' && req.method === 'POST') {
+    const body = await jsonBody(req);
+    const companyKey = String(body?.companyKey || '').trim().toLowerCase();
+    if (!/^[a-z0-9._-]{2,60}$/.test(companyKey)) return send(req, res, 400, { error: 'Enter a valid company key.' });
+    try {
+      const company = await upstream.findCompany(companyKey);
+      companies.set(companyKey, { ...company, at: Date.now() });
+      return send(req, res, 200, { companyKey, name: company.name, logo: company.logo, instance: company.instance });
+    } catch (err) {
+      console.error(`[company] ${companyKey} -> ${err.message}`);
+      return send(req, res, err.status || 500, { error: err.message });
+    }
+  }
+
+  if (p === '/api/auth/login' && req.method === 'POST') {
+    if (!sessions.allowAttempt(req)) return send(req, res, 429, { error: 'Too many attempts. Wait a few minutes and try again.' });
+    const body = await jsonBody(req);
+    const companyKey = String(body?.companyKey || '').trim().toLowerCase();
+    const username = String(body?.username || '').trim();
+    const password = String(body?.password || '');
+    if (!companyKey || !username || !password) return send(req, res, 400, { error: 'Company, username and password are required.' });
+    try {
+      let company = companies.get(companyKey);
+      if (!company || Date.now() - company.at > 3600 * 1000) {
+        company = { ...(await upstream.findCompany(companyKey)), at: Date.now() };
+        companies.set(companyKey, company);
+      }
+      const { token, displayName } = await upstream.login({ ...company, username, password });
+      if (session) sessions.destroy(req);
+      const { cookie } = sessions.create(req, {
+        mode: 'live', company, username, displayName, token,
+        // Kept in memory only, to renew the token silently when it expires.
+        password: body.remember === false ? null : password,
+      });
+      console.log(`[login] ${username}@${companyKey} signed in`);
+      return send(req, res, 200, { ok: true }, { 'Set-Cookie': cookie });
+    } catch (err) {
+      console.error(`[login] ${username}@${companyKey} -> ${err.message}`);
+      return send(req, res, err.status === 401 ? 401 : err.status || 500, { error: err.message });
+    }
+  }
+
+  if (p === '/api/auth/demo' && req.method === 'POST') {
+    if (session) sessions.destroy(req);
+    const { cookie } = sessions.create(req, { mode: 'demo' });
+    return send(req, res, 200, { ok: true }, { 'Set-Cookie': cookie });
+  }
+
+  if (p === '/api/auth/logout' && req.method === 'POST') {
+    if (session) clearCacheFor(session);
+    return send(req, res, 200, { ok: true }, { 'Set-Cookie': sessions.destroy(req) });
+  }
+
+  // Fallback: sign in by pasting a token copied from the SalesDiary web app.
+  if (p === '/api/auth/token' && req.method === 'POST') {
+    if (!config.allowTokenUpdate) return send(req, res, 403, { error: 'Token sign-in is disabled on this server.' });
+    const body = await jsonBody(req);
+    const token = String(body?.token || '').replace(/^Bearer\s+/i, '').trim();
+    if (!upstream.JWT_RE.test(token)) return send(req, res, 400, { error: 'That does not look like a SalesDiary token (eyJ…).' });
+    const info = upstream.decodeToken(token);
+    if (session?.mode === 'live') {
+      session.token = token;
+      clearCacheFor(session);
+      return send(req, res, 200, { ok: true });
+    }
+    if (session) sessions.destroy(req);
+    const { cookie } = sessions.create(req, {
+      mode: 'live', token, username: info?.userId ? `user ${info.userId}` : 'token', displayName: info?.profile || 'Token user', password: null,
+      company: { companyKey: info?.instance || '', instance: info?.instance || '', name: info?.instance || 'SalesDiary', logo: null, apiBase: config.apiBase },
+    });
+    return send(req, res, 200, { ok: true }, { 'Set-Cookie': cookie });
+  }
+
+  if (p === '/api/report') {
+    const start = url.searchParams.get('start');
+    const end = url.searchParams.get('end');
+    if (!isDate(start) || !isDate(end)) return send(req, res, 400, { error: 'start and end must be YYYY-MM-DD' });
+    if (start > end) return send(req, res, 400, { error: 'start must be on or before end' });
+    const src = resolveSource(session);
+    if (!src) return send(req, res, 401, { error: 'Please sign in.', code: 'login_required' });
+    try {
+      const report = await loadReport(src, start, end);
+      const headers = { ETag: report.etag, 'Cache-Control': 'no-cache, private', 'X-Fetched-At': report.meta.fetchedAt };
+      if (req.headers['if-none-match'] === report.etag) {
+        res.writeHead(304, headers);
+        return res.end();
+      }
+      return send(req, res, 200, report.body, headers);
+    } catch (err) {
+      const status = err.status || 500;
+      console.error(`[report] ${start}..${end} -> ${status} ${err.message}`);
+      return send(req, res, status, { error: err.message, code: err.code });
+    }
+  }
+
+  return send(req, res, 404, { error: 'Unknown endpoint' });
+}
+
+// Optional password gate for when the dashboard is exposed on a public URL.
+function authorized(req) {
+  if (!config.basicAuth) return true;
+  const header = String(req.headers.authorization || '');
+  if (!header.startsWith('Basic ')) return false;
+  const given = Buffer.from(header.slice(6), 'base64');
+  const expected = Buffer.from(config.basicAuth);
+  return given.length === expected.length && crypto.timingSafeEqual(given, expected);
+}
+
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, 'http://localhost');
+  if (url.pathname !== '/api/health' && !authorized(req)) {
+    res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Shelfwise", charset="UTF-8"', 'Content-Type': 'text/plain' });
+    return res.end('Authentication required');
+  }
+  try {
+    if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
+    if (req.method !== 'GET' && req.method !== 'HEAD') return send(req, res, 405, { error: 'Method not allowed' });
+    serveStatic(req, res, decodeURIComponent(url.pathname));
+  } catch (err) {
+    console.error(err);
+    if (!res.headersSent) send(req, res, 500, { error: 'Internal error' });
+  }
+});
+
+server.listen(config.port, config.host, () => {
+  const mode = config.dataSource === 'mock' ? 'DEMO data only' : config.requireLogin ? 'users sign in with SalesDiary' : config.token ? `shared token, ${config.apiBase}` : 'DEMO data (no SD_TOKEN set)';
+  console.log(`Shelfwise running on http://localhost:${config.port}  ·  ${mode}${config.basicAuth ? '  ·  password protected' : ''}`);
+});
+
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => server.close(() => process.exit(0)));

@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shelfwise · Stock Availability</title>
+  <meta name="description" content="Live stock availability, outlet and field-team analytics.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="vendor/inter/index.css">
+  <link rel="stylesheet" href="css/styles.css">
+  <script>
+    try { const t = localStorage.getItem('sw-theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+  </script>
+</head>
+<body>
+  <div class="auth" id="auth" hidden>
+    <div class="auth-card">
+      <div class="brand auth-brand">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="13" width="4" height="8" rx="1"/><rect x="10" y="8" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>
+        <div><div class="brand-name">Shelfwise</div><div class="brand-sub">Stock availability</div></div>
+      </div>
+
+      <ol class="auth-steps" aria-hidden="true"><li id="stepOne" class="on">Company</li><li id="stepTwo">Sign in</li></ol>
+
+      <form id="companyForm" class="auth-form" autocomplete="on">
+        <h1>Sign in with SalesDiary</h1>
+        <p class="auth-lead">Start with your company key, the same one you use on app.salesdiary.in.</p>
+        <label class="field"><span>Company key</span><input id="companyKey" name="company" placeholder="e.g. glenmark" autocomplete="organization" autocapitalize="off" spellcheck="false" required></label>
+        <button class="btn btn-primary btn-lg" type="submit" id="companyBtn">Continue</button>
+      </form>
+
+      <form id="loginForm" class="auth-form" autocomplete="on" hidden>
+        <div class="company-chip">
+          <span class="company-logo" id="companyLogo"></span>
+          <span class="company-text"><b id="companyName">—</b><small id="companyInstance"></small></span>
+          <button class="btn-link" type="button" id="changeCompany">Change</button>
+        </div>
+        <label class="field"><span>Username</span><input id="username" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" required></label>
+        <label class="field"><span>Password</span>
+          <span class="pw"><input id="password" name="password" type="password" autocomplete="current-password" required><button type="button" class="btn-link" id="pwToggle">Show</button></span>
+        </label>
+        <label class="check"><input type="checkbox" id="remember" checked> Keep me signed in <small>(renews the token automatically)</small></label>
+        <button class="btn btn-primary btn-lg" type="submit" id="loginBtn">Sign in</button>
+      </form>
+
+      <form id="tokenForm" class="auth-form" hidden>
+        <h1>Sign in with a token</h1>
+        <p class="auth-lead">Paste the <code>authorization</code> header from a SalesDiary request (DevTools → Network). Tokens expire after about 16 hours.</p>
+        <label class="field"><span>Token</span><textarea id="tokenLogin" rows="5" placeholder="eyJhbGciOi…" spellcheck="false"></textarea></label>
+        <button class="btn btn-primary btn-lg" type="submit">Sign in</button>
+      </form>
+
+      <p class="auth-error" id="authError" role="alert"></p>
+
+      <div class="auth-alt">
+        <button class="btn-link" type="button" id="tokenToggle">Use a token instead</button>
+        <span>·</span>
+        <button class="btn-link" type="button" id="demoBtn">Explore with demo data</button>
+      </div>
+    </div>
+    <p class="auth-foot">Your password goes only to SalesDiary through this server. It is never stored in the browser.</p>
+  </div>
+
+  <div class="shell" id="shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="13" width="4" height="8" rx="1"/><rect x="10" y="8" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>
+        <div>
+          <div class="brand-name">Shelfwise</div>
+          <div class="brand-sub" id="brandSub">Stock availability</div>
+        </div>
+      </div>
+
+      <nav class="nav" id="nav">
+        <div class="nav-label">Reports</div>
+        <a href="#overview" data-page="overview"><svg viewBox="0 0 24 24"><path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-4H4zM14 4v4h6V4z"/></svg>Overview</a>
+        <a href="#availability" data-page="availability"><svg viewBox="0 0 24 24"><path d="M20 7 9.5 17.5 4 12"/></svg>SKU availability</a>
+        <a href="#outlets" data-page="outlets"><svg viewBox="0 0 24 24"><path d="M3 9.5 5 4h14l2 5.5M4 10v10h16V10M9 20v-6h6v6"/></svg>Outlets</a>
+        <a href="#team" data-page="team"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.4 3.2-5.5 6.5-5.5s5.9 2.1 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18 14.8c1.9.8 3.1 2.6 3.5 5.2"/></svg>Field team</a>
+        <a href="#geography" data-page="geography"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>Geography</a>
+        <a href="#opportunities" data-page="opportunities"><svg viewBox="0 0 24 24"><path d="M4 19 10 13l4 4 6-8"/><path d="M15 9h5v5"/></svg>Opportunities</a>
+        <div class="nav-label">Analyse</div>
+        <a href="#pivot" data-page="pivot"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M3.5 9h17M9 3.5v17"/></svg>Pivot builder</a>
+        <a href="#explorer" data-page="explorer"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Data explorer</a>
+      </nav>
+
+      <div class="sidebar-foot">
+        <button class="source-card" id="sourceCard" type="button">
+          <span class="dot" id="sourceDot"></span>
+          <span>
+            <span class="source-title" id="sourceTitle">Connecting…</span>
+            <span class="source-sub" id="sourceSub">&nbsp;</span>
+          </span>
+        </button>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <button class="icon-btn only-mobile" id="menuBtn" type="button" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <div class="page-heading">
+          <h1 id="pageTitle">Overview</h1>
+          <p id="pageSub">&nbsp;</p>
+        </div>
+        <div class="topbar-actions">
+          <div class="live" id="liveBox">
+            <span class="live-dot" id="liveDot"></span>
+            <span class="live-text" id="liveText">Live</span>
+            <select id="intervalSelect" aria-label="Refresh interval">
+              <option value="5">every 5s</option>
+              <option value="15">every 15s</option>
+              <option value="30">every 30s</option>
+              <option value="60">every 1m</option>
+              <option value="0">paused</option>
+            </select>
+          </div>
+          <button class="icon-btn" id="refreshBtn" type="button" title="Refresh now"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button>
+          <button class="icon-btn" id="themeBtn" type="button" title="Toggle theme"><svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
+          <button class="icon-btn" id="settingsBtn" type="button" title="Connection settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+        </div>
+        <div class="tick" id="tick"></div>
+      </header>
+
+      <section class="filterbar" id="filterbar">
+        <div class="date-control" id="dateControl">
+          <button class="chip chip-date" id="dateBtn" type="button">
+            <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+            <span id="dateLabel">—</span>
+          </button>
+          <div class="popover date-pop" id="datePop" hidden>
+            <div class="preset-list" id="presetList"></div>
+            <div class="custom-range">
+              <label>From<input type="date" id="startInput"></label>
+              <label>To<input type="date" id="endInput"></label>
+              <button class="btn btn-primary" id="applyDate" type="button">Apply</button>
+            </div>
+          </div>
+        </div>
+        <div class="search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
+          <input id="globalSearch" type="search" placeholder="Search outlet, SKU, rep, code…" autocomplete="off">
+        </div>
+        <div class="dim-filters" id="dimFilters"></div>
+        <button class="chip chip-ghost" id="moreFilters" type="button">More filters</button>
+        <button class="chip chip-ghost" id="clearFilters" type="button" hidden>Clear all</button>
+      </section>
+      <div class="active-filters" id="activeFilters"></div>
+
+      <div class="banner" id="banner" hidden></div>
+
+      <main class="content" id="content">
+        <div class="loading" id="loading">
+          <div class="skeleton-row"><span></span><span></span><span></span><span></span></div>
+          <div class="skeleton-block"></div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+  <aside class="drawer" id="settingsDrawer" hidden aria-label="Account">
+    <div class="drawer-head">
+      <h2>Account &amp; connection</h2>
+      <button class="icon-btn" id="closeSettings" type="button" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="drawer-body">
+      <dl class="kv" id="connInfo"></dl>
+      <div class="row-gap">
+        <button class="btn" id="signOut" type="button">Sign out</button>
+      </div>
+      <details class="advanced" id="tokenSection">
+        <summary>Replace token manually</summary>
+        <label class="field">
+          <span>SalesDiary token</span>
+          <textarea id="tokenInput" rows="5" placeholder="Paste the authorization token (eyJhbGciOi…)"></textarea>
+          <small>Only needed if automatic renewal is off. Kept in server memory for this session.</small>
+        </label>
+        <button class="btn btn-primary" id="saveToken" type="button">Save &amp; reconnect</button>
+      </details>
+      <p class="form-msg" id="tokenMsg"></p>
+    </div>
+  </aside>
+
+  <div class="toast-stack" id="toasts"></div>
+  <div class="tooltip-pop" id="cellTip" hidden></div>
+
+  <script src="vendor/chart/chart.umd.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

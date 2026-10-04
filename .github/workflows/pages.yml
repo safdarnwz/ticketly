@@ -1,0 +1,57 @@
+name: Publish dashboard to GitHub Pages
+
+# Builds a static snapshot of the dashboard and publishes it to GitHub Pages.
+#
+# By default the snapshot uses DEMO data, so nothing confidential is published.
+# To publish real SalesDiary numbers (visible to ANYONE with the URL):
+#   1. Settings -> Secrets and variables -> Actions -> Secrets:
+#        SD_COMPANY_KEY, SD_USERNAME, SD_PASSWORD   (the build signs in, so tokens never go stale)
+#   2. Settings -> Secrets and variables -> Actions -> Variables:  PAGES_LIVE_DATA = true
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *" # GitHub runs this at best every ~30 min, often later
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build static snapshot
+        run: npm run build:static
+        env:
+          SNAPSHOT_SOURCE: ${{ vars.PAGES_LIVE_DATA == 'true' && 'live' || 'mock' }}
+          SD_COMPANY_KEY: ${{ vars.PAGES_LIVE_DATA == 'true' && secrets.SD_COMPANY_KEY || '' }}
+          SD_USERNAME: ${{ vars.PAGES_LIVE_DATA == 'true' && secrets.SD_USERNAME || '' }}
+          SD_PASSWORD: ${{ vars.PAGES_LIVE_DATA == 'true' && secrets.SD_PASSWORD || '' }}
+          SD_TOKEN: ${{ vars.PAGES_LIVE_DATA == 'true' && secrets.SD_TOKEN || '' }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

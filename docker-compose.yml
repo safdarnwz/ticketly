@@ -1,0 +1,11 @@
+services:
+  shelfwise:
+    build: .
+    image: shelfwise:latest
+    container_name: shelfwise
+    ports:
+      - "${HOST_PORT:-8080}:8080"
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped

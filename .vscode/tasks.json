@@ -1,0 +1,10 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "Install", "type": "shell", "command": "npm install", "problemMatcher": [] },
+    { "label": "Run (dev)", "type": "shell", "command": "npm run dev", "isBackground": true, "problemMatcher": [] },
+    { "label": "Docker: build & run", "type": "shell", "command": "docker compose up --build -d", "problemMatcher": [] },
+    { "label": "Docker: stop", "type": "shell", "command": "docker compose down", "problemMatcher": [] },
+    { "label": "Build static site (dist/)", "type": "shell", "command": "npm run build:static", "problemMatcher": [] }
+  ]
+}
