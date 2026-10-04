@@ -28,3 +28,18 @@ services:
     depends_on:
       - shelfwise
     restart: unless-stopped
+
+  # Optional: ngrok with your free, permanent dev domain (e.g. https://xyz.ngrok-free.app).
+  # Put NGROK_AUTHTOKEN and NGROK_URL in .env, then:
+  #   docker compose --profile ngrok up -d --build
+  # Free plan: 20,000 requests and 1 GB per month, so the website refreshes every 2 min via ngrok.
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: shelfwise-ngrok
+    profiles: ["ngrok"]
+    command: http shelfwise:8080 --url ${NGROK_URL:-missing-NGROK_URL-in-.env} --log stdout
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    depends_on:
+      - shelfwise
+    restart: unless-stopped

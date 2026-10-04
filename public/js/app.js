@@ -327,6 +327,7 @@ function openSettings() {
        <dt>Data server</dt><dd>${esc(state.backend?.base || '—')}</dd>
        <dt>SalesDiary API</dt><dd>${esc(s.apiBase || '—')}</dd>
        <dt>Last fetch</dt><dd>${fetched}</dd>`;
+  $('localBox').hidden = !state.backend?.viaTunnel;
   const share = s.shareLink;
   $('shareBox').hidden = !share;
   if (share) $('shareLink').value = share;
@@ -396,6 +397,7 @@ async function signOut() {
 
 async function signedIn() {
   auth.hideOffline();
+  applyInterval();
   state.authed = true;
   resetData();
   await refreshStatus();
@@ -410,6 +412,7 @@ async function start(conn) {
     return false;
   }
   state.backend = conn.backend;
+  applyInterval();
   const s = await state.backend.status().catch(() => null);
   state.status = s;
   if (!s) {
@@ -479,10 +482,24 @@ const dateRange = new DateRange({
   },
 });
 
+// Through a metered tunnel (ngrok free: 20k requests a month) refresh every 2 min by default;
+// on this computer, every 5 s. Each mode remembers its own choice.
+const intervalKey = () => (state.backend?.viaTunnel ? 'interval-tunnel' : 'interval');
+function applyInterval() {
+  state.interval = store.get(intervalKey(), state.backend?.viaTunnel ? 120 : 5);
+  $('intervalSelect').value = String(state.interval);
+  $('liveBox').title = state.backend?.viaTunnel
+    ? 'Auto refresh. Through ngrok it defaults to every 2 minutes so the free monthly request limit lasts.'
+    : 'Auto refresh';
+}
+
 $('intervalSelect').value = String(state.interval);
 $('intervalSelect').addEventListener('change', (e) => {
   state.interval = Number(e.target.value);
-  store.set('interval', state.interval);
+  store.set(intervalKey(), state.interval);
+  if (state.backend?.viaTunnel && state.interval && state.interval < 60) {
+    toast('Heads-up: through ngrok’s free plan, refreshing this often can use up the monthly request limit in a day.', 6000);
+  }
   updateLive();
   if (state.interval) load({ quiet: true });
   else schedule();
@@ -493,6 +510,20 @@ $('sourceCard').addEventListener('click', openSettings);
 $('closeSettings').addEventListener('click', closeSettings);
 $('drawerBackdrop').addEventListener('click', closeSettings);
 $('signOut').addEventListener('click', signOut);
+$('useLocal').addEventListener('click', async () => {
+  const btn = $('useLocal');
+  btn.disabled = true;
+  btn.textContent = 'Connecting…';
+  const conn = await connect({ forceUrl: 'http://localhost:8080' });
+  btn.disabled = false;
+  btn.textContent = "Use this computer's server";
+  if (conn.offline) {
+    toast('No Shelfwise server on this computer (http://localhost:8080). Start Docker here, or keep using the public address.', 6000);
+    return;
+  }
+  closeSettings();
+  await start(conn);
+});
 $('copyShare').addEventListener('click', async () => {
   const input = $('shareLink');
   try {

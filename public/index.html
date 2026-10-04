@@ -86,6 +86,8 @@
               <option value="15">15s</option>
               <option value="30">30s</option>
               <option value="60">1m</option>
+              <option value="120">2m</option>
+              <option value="300">5m</option>
               <option value="0">Off</option>
             </select>
           </div>
@@ -169,6 +171,11 @@
         <span class="share-title">Open on another computer</span>
         <div class="share-row"><input id="shareLink" class="input" readonly><button class="btn btn-sm" id="copyShare" type="button">Copy</button></div>
         <small>Anyone with this link reaches your server, and still needs their own SalesDiary token to see data.</small>
+      </div>
+      <div class="share-box" id="localBox" hidden>
+        <span class="share-title">Connected through the public address</span>
+        <small>On the computer that runs Docker? Use it directly: it's faster and doesn't count towards ngrok's monthly limit.</small>
+        <div class="share-row"><button class="btn btn-sm" id="useLocal" type="button">Use this computer's server</button></div>
       </div>
       <div class="row-gap">
         <button class="btn" id="signOut" type="button">Remove token</button>

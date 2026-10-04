@@ -48,7 +48,48 @@ Chrome and Edge may ask to allow access to *devices on your local network*. Choo
 
 > Use Chrome, Edge or Firefox. Safari may block an `https://` website from calling `http://localhost`.
 
-## Using the website on other laptops or phones
+## Open the website on any computer (ngrok, permanent address)
+
+The website looks for the server at `http://localhost:8080` on **the computer it is opened on**.
+To make `https://safdarnwz.github.io/ticketly/` work on every laptop and phone while the code
+keeps running on yours, give your server a permanent public address with ngrok (free):
+
+1. Sign up at https://dashboard.ngrok.com/signup.
+2. Copy your **authtoken** from https://dashboard.ngrok.com/get-started/your-authtoken.
+3. Copy your free **dev domain** from https://dashboard.ngrok.com/domains (it looks like
+   `something.ngrok-free.app`).
+4. Add both to `.env` on your laptop:
+   ```
+   NGROK_AUTHTOKEN=your-authtoken
+   NGROK_URL=something.ngrok-free.app
+   ```
+5. Start the server together with ngrok:
+   ```bash
+   docker compose --profile ngrok up -d --build
+   docker compose logs ngrok        # look for: started tunnel ... url=https://something.ngrok-free.app
+   ```
+6. Put the same domain in **`site.config.json`** in this repository and push it (or edit the file
+   on GitHub):
+   ```json
+   { "publicServer": "https://something.ngrok-free.app" }
+   ```
+   The Pages workflow republishes the site. From then on the plain website URL works anywhere.
+
+How the website picks a server:
+- On your own laptop it uses `localhost` (fast, and it doesn't count towards ngrok's limits).
+- Everywhere else it uses the ngrok address.
+- If your laptop ends up on the ngrok address anyway, open the account menu and choose
+  **Use this computer's server**.
+
+**ngrok free plan limits:** 20,000 requests and 1 GB per month. Through ngrok the website refreshes
+**every 2 minutes** by default instead of every 5 seconds, so the quota lasts the month. You can
+change this in the refresh menu, but 5 seconds would use up the quota in about a day. For heavier
+use, take a paid ngrok plan or use Tailscale Funnel.
+
+Your laptop must be on, with Docker running. Anyone with the URL reaches your server, but they
+still need their own SalesDiary token to see any data.
+
+## Using the website on other laptops or phones (temporary link)
 
 The website looks for the server at `http://localhost:8080` on **the computer it is opened on**.
 On another laptop there is no server, so it shows "Connect to a Shelfwise server". To use one
@@ -65,9 +106,9 @@ Open that **"Open on any computer"** link on the other laptop. The website remem
 and each person pastes their own SalesDiary token. The same link is shown in the account menu
 (top right → *Open on another computer → Copy*).
 
-- The tunnel is a free Cloudflare "quick tunnel" and needs no account. Its address **changes every
-  time the tunnel restarts**, so share the new link after a restart. For a permanent address, use a
-  named Cloudflare tunnel or ngrok and put that address in `PUBLIC_URL`.
+- This uses a free Cloudflare "quick tunnel" and needs no account. Its address **changes every
+  time the tunnel restarts**, so share the new link after a restart. For a permanent address, use
+  the ngrok setup above.
 - Your laptop must stay on, with Docker running, for the other computers to get data.
 - To stop sharing, run `docker compose --profile share down`, then `docker compose up -d` to keep
   only the local server.
@@ -127,6 +168,7 @@ Copy `.env.example` to `.env`. Docker Compose reads it automatically.
 | `CORS_ORIGINS` | `https://safdarnwz.github.io` | Websites allowed to use this server (localhost is always allowed) |
 | `DASHBOARD_URL` | `https://safdarnwz.github.io/ticketly/` | Link shown on the server's own page |
 | `SERVE_UI` | `false` | Also serve the UI from the server (`--ui` does the same) |
+| `NGROK_AUTHTOKEN` / `NGROK_URL` | — | ngrok authtoken and free dev domain, used by `docker compose --profile ngrok` |
 | `PUBLIC_URL` | — | Public https address of this server. Leave empty with the `share` tunnel, which reports its own |
 | `REQUIRE_TOKEN` | `true` | Each browser pastes its own token. If `false`, everyone sees `SD_TOKEN` data (or demo data) |
 | `SD_TOKEN` | — | Shared token, only used when `REQUIRE_TOKEN=false` |

@@ -71,7 +71,17 @@ function today() {
   fs.writeFileSync(path.join(out, 'data', 'report.json'), JSON.stringify({ meta, ...table }));
   fs.writeFileSync(path.join(out, '.nojekyll'), '');
   // Where the published UI looks for the Shelfwise server (users can change it on the site).
-  fs.writeFileSync(path.join(out, 'config.json'), JSON.stringify({ serverUrl: process.env.PAGES_SERVER_URL || 'http://localhost:8080' }));
+  // publicServer (e.g. the ngrok domain) lets the site work on any computer, not just this one.
+  let site = {};
+  try {
+    site = JSON.parse(fs.readFileSync(path.join(root, 'site.config.json'), 'utf8'));
+  } catch {
+    /* optional */
+  }
+  fs.writeFileSync(path.join(out, 'config.json'), JSON.stringify({
+    serverUrl: process.env.PAGES_SERVER_URL || 'http://localhost:8080',
+    publicServer: process.env.PAGES_PUBLIC_SERVER || site.publicServer || '',
+  }));
 
   console.log(`dist/ ready · ${meta.source} data · ${start}..${end} · ${meta.rows} rows`);
 })().catch((err) => {
