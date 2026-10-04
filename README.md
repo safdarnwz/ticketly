@@ -1,127 +1,132 @@
-# Shelfwise — live stock availability dashboard
+# Shelfwise — live stock availability reporting
 
-Shelfwise is a dashboard for the SalesDiary `getStockAvailablityReport` API. Users sign in with
-their SalesDiary account. The dashboard turns the raw rows (one row = one SKU checked at one outlet
-visit) into reports, charts and action lists. It refreshes every 5 seconds and runs from VS Code or
-Docker.
+Shelfwise turns the SalesDiary `getStockAvailablityReport` data into a reporting website. It covers
+shelf availability, outlets, field team performance, geography and a list of next actions. It
+refreshes every 5 seconds.
+
+It has two parts:
+
+| Part | Where it runs | What it does |
+|---|---|---|
+| **Website** (UI) | GitHub Pages: `https://safdarnwz.github.io/ticketly/` | Reports, charts, filters, sign-in screen |
+| **Server** (backend) | Docker on your own computer: `http://localhost:8080` | Signs in to SalesDiary, keeps the token, fetches and caches the report |
 
 ```
-browser ──login──▶ Node server ──findcompanyinstancewithlogo──▶ sdlogin.salesdiary.in   (company key → instance, API url, logo)
-                              ──instance_pwa_login──────────▶ <instance API>           (username + password → token)
-browser ─every 5s▶ Node server ──getStockAvailablityReport───▶ <instance API>           (token, cached 4 s, paginated)
+ GitHub Pages website  ──(your browser, every 5 s)──▶  Shelfwise server in Docker (localhost:8080)
+                                                          │  company key → findcompanyinstancewithlogo
+                                                          │  username/password → instance_pwa_login → token
+                                                          └▶ getStockAvailablityReport (paginated, cached 4 s)
 ```
 
-The browser never talks to SalesDiary directly and never sees the token. The server keeps each
-user's token in an in-memory session tied to an HttpOnly cookie. When a token expires (about every
-16 hours), the server signs in again on its own if "Keep me signed in" was ticked. The server also
-follows the pagination, caches each response for 4 seconds, and answers `304 Not Modified` when
-nothing has changed.
+Your browser fetches the data from the server on your own machine. Nothing is sent to GitHub, and
+the SalesDiary token never reaches the browser.
 
-## Sign in
+## 1. Start the server (Docker)
 
-1. **Company key** (for example `glenmark`): the server looks up the company instance, API URL and logo.
-2. **Username and password**: the server signs in to that instance and keeps the token.
+```bash
+git clone https://github.com/safdarnwz/ticketly && cd ticketly
+docker compose up -d --build
+```
 
-The login screen also has **Use a token instead** (paste an `authorization` header from DevTools)
-and **Explore with demo data**. **Sign out** is in the account panel (the gear icon or the user card
-at the bottom left).
+The server listens only on this computer, at `127.0.0.1:8080`. Opening http://localhost:8080
+shows a short page with a link to the website. To stop it, run `docker compose down`.
+
+## 2. Open the website
+
+Go to **https://safdarnwz.github.io/ticketly/** and follow the three steps:
+
+1. The site finds your server at `http://localhost:8080`. If the server isn't running, the site
+   says so and shows a **Retry** button. Chrome and Edge may ask to allow access to
+   *devices on your local network*. Choose **Allow**.
+2. Enter the **company key** (for example `glenmark`). The server looks up the company, its logo
+   and its API address.
+3. Enter your **username and password**. The server signs in to SalesDiary and keeps the token.
+   If you tick "Keep me signed in", the server renews the token on its own when it expires.
+
+Also on the sign-in screen: **Use a token instead** (paste the `authorization` header from
+DevTools), **Explore with demo data**, and **View the demo snapshot** (when no server is running).
+
+> Use Chrome, Edge or Firefox. Safari may block an `https://` website from calling `http://localhost`.
+
+### Publishing the website (one-time)
+
+1. Merge this branch into `main`.
+2. Go to **Settings → Pages → Build and deployment → Source** and choose **GitHub Actions**.
+3. The workflow `.github/workflows/pages.yml` runs on every push to `main`. You can also start it
+   from the Actions tab. After about a minute the site is live at `https://safdarnwz.github.io/ticketly/`.
+
+If your fork or username is different, set `CORS_ORIGINS` in `.env` to that Pages origin. If the
+server runs on a different address, set the repository variable `PAGES_SERVER_URL` before the build.
+Each visitor can also change the server address on the site.
 
 ## Reports
 
 | Page | What it answers |
 |---|---|
-| **Overview** | 8 KPIs: availability, OOS, visits, orders, strike rate, SKUs per visit, well-stocked visits, active reps. Trends, brand and outlet-type donuts, a top-SKU chart and a live feed of the latest visits |
-| **SKU availability** | Availability by category and brand, a region × category heatmap (any dimension), the lowest-availability SKUs, an OOS chart and an SKU scorecard |
-| **Outlets** | Availability bands, outlet type and class, and an outlet scorecard with the missing SKUs from each outlet's latest visit |
-| **Field team** | Orders by rep, a visits vs availability scatter, a rep leaderboard, a team summary and a daily coverage heatmap |
+| **Overview** | One written summary of the day, 8 KPIs, availability trend, visits and orders per day, brand and outlet-type split, best sellers and the latest visits |
+| **SKUs** | Availability by category and brand, a "where each line is missing" heatmap, the hardest SKUs to find, an out-of-stock chart and an SKU scorecard |
+| **Outlets** | Availability bands, outlet type and class, and an outlet scorecard with the SKUs missing at each outlet's latest visit |
+| **Field team** | Units by rep, visits vs availability, a rep leaderboard, a team summary and a daily coverage grid |
 | **Geography** | Region, cluster, territory, state, city and RSM breakdowns |
-| **Opportunities** | Auto-generated insights, each with a suggested action, plus a restock list, an upsell list (in stock but not ordered) and stock movement |
-| **Pivot builder** | Any metric by any two dimensions |
-| **Data explorer** | Every raw row, with a column picker, sorting and CSV export |
+| **Opportunities** | Ranked actions (which SKUs to fix first, critical outlets, upsell headroom, coaching), plus a restock list and an upsell list |
+| **Pivot** | Any metric by any two dimensions |
+| **Raw data** | Every record, with a column picker, sorting and CSV export |
 
-Every table can be sorted, filtered and exported to CSV. Clicking a chart bar, a donut slice or a
-table row filters the whole dashboard. Filters are cross-filtered, so each dropdown only shows
-values that exist under the other filters. Changing the date range calls the API again. The
-dashboard has light and dark themes and a mobile layout.
+Every table can be sorted, searched and exported to CSV. Clicking any bar, slice or row filters the
+whole site, and filters are cross-filtered. The date range is passed to the API. The site has light
+and dark themes and works on mobile.
 
-**Metric definitions:** availability % = checks with `avail > 0` / all checks · visit = one
+**Metric definitions:** availability = checks with `avail > 0` / all checks · visit = one
 `session_id` · strike rate = visits with any `o_qty > 0` / visits · well-stocked visit = at least 80%
 of SKUs on shelf.
 
-## Run in VS Code
-
-1. Install [Node.js 18+](https://nodejs.org) and open this folder in VS Code.
-2. Open a terminal and run `npm install`.
-3. Optional: copy `.env.example` to `.env`. The defaults work as they are.
-4. Press **F5** and choose "Shelfwise: live" (or "demo data"). The browser opens at
-   http://localhost:8080 on the sign-in screen.
-
-You can also run `npm run dev`, or `npm run demo` for demo data with no login.
-
-## Run with Docker
+## Local development (VS Code)
 
 ```bash
-cp .env.example .env        # optional
-docker compose up -d --build
-# open http://localhost:8080
+npm install
+npm run dev      # server + UI together at http://localhost:8080
+npm run demo     # same, with generated demo data and no sign-in
+npm run api      # server only, for use with the GitHub Pages site
 ```
 
-To use a different host port, run `HOST_PORT=9000 docker compose up -d`. To stop it, run `docker compose down`.
+You can also press **F5** in VS Code and pick a launch configuration.
+`npm run build:static` builds the website into `dist/`, which is exactly what GitHub Pages serves.
 
-## Making it public (a URL anyone can open)
+## Configuration (`.env`, optional)
 
-There are two ways. Choose based on whether the dashboard has to be **live**:
-
-### A) Live, every 5 s: host the Docker container (recommended)
-
-Deploy the Docker image to any host that runs containers, such as Render, Railway, Fly.io, a VPS or
-an office server. Anyone can open the URL, but they only see data after signing in with their own
-SalesDiary account. Serve it over **HTTPS** (all of these hosts do), because passwords are sent to
-the server. For an extra gate in front of the login screen, set `DASHBOARD_USER` and
-`DASHBOARD_PASSWORD`.
-
-### B) GitHub Pages: static snapshot, not live
-
-`.github/workflows/pages.yml` builds a static copy of the dashboard and publishes it to
-`https://<user>.github.io/<repo>/`. The page detects that there is no server behind it and reads
-`data/report.json` instead. Limits:
-
-- GitHub Pages only serves files, so it cannot refresh every 5 s. The workflow rebuilds about
-  every 30 minutes, and GitHub often runs scheduled workflows late.
-- There is no login. **By default it publishes demo data.** To publish real numbers, add the
-  repository secrets `SD_COMPANY_KEY`, `SD_USERNAME` and `SD_PASSWORD`, and the repository variable
-  `PAGES_LIVE_DATA=true`. Each build signs in, so the token never goes stale. Those numbers are
-  then **public to anyone who has the URL**.
-
-To enable it, go to Settings → Pages → Source and choose **GitHub Actions**. Then push to `main`
-or run the workflow manually. To build locally, run `npm run build:static`; the output goes to `dist/`.
-
-## Configuration (`.env`)
+Copy `.env.example` to `.env`. Docker Compose reads it automatically.
 
 | Variable | Default | Purpose |
 |---|---|---|
+| `CORS_ORIGINS` | `https://safdarnwz.github.io` | Websites allowed to use this server (localhost is always allowed) |
+| `DASHBOARD_URL` | `https://safdarnwz.github.io/ticketly/` | Link shown on the server's own page |
+| `SERVE_UI` | `false` | Also serve the UI from the server (`--ui` does the same) |
 | `REQUIRE_LOGIN` | `true` | Each viewer signs in. If `false`, everyone sees `SD_TOKEN` data (or demo data) |
-| `SD_COMPANY_KEY` | — | Pre-fills the company key on the login screen |
-| `SESSION_HOURS` | `12` | How long an idle session stays signed in |
+| `SD_COMPANY_KEY` | — | Pre-fills the company key |
+| `SESSION_HOURS` | `12` | How long an idle sign-in lasts |
 | `SD_LOGIN_BASE` | `https://sdlogin.salesdiary.in:2001` | Company lookup host |
-| `SD_PWA_VERSION` | `293` | `pwa_version` sent with the login |
-| `SD_TOKEN` | — | Shared token, only used when `REQUIRE_LOGIN=false` |
-| `SD_API_BASE` | `https://inx11.salesdiary.in:4071` | Fallback API host (the company lookup normally provides it) |
-| `SD_PAGE_SIZE` | `5000` | Rows per call (`offset` in the request) |
-| `SD_PAGINATION` | `id` | How the next page is requested: `id` (offsetID = last row id), `offset` (offsetID = row count) or `none` |
-| `DATA_SOURCE` | `auto` | `auto`, `live` or `mock` |
-| `CACHE_TTL_MS` | `4000` | How long an upstream response is reused |
-| `DASHBOARD_USER` / `DASHBOARD_PASSWORD` | — | Extra browser password prompt in front of everything |
-| `ALLOW_TOKEN_UPDATE` | `true` | Allow token sign-in and token replacement in the UI |
+| `SD_API_BASE` | `https://inx11.salesdiary.in:4071` | Fallback API host (normally from the company lookup) |
+| `SD_PWA_VERSION` | `293` | `pwa_version` sent at sign-in |
+| `SD_PAGE_SIZE` / `SD_PAGINATION` | `5000` / `id` | Rows per call, and how the next page is requested (`id`, `offset` or `none`) |
+| `CACHE_TTL_MS` | `4000` | How long one SalesDiary response is reused |
+| `ALLOW_TOKEN_UPDATE` | `true` | Allow token sign-in and token replacement |
+
+### The fallback snapshot on GitHub Pages
+
+The website also ships `data/report.json`, which is shown when "View the demo snapshot" is chosen.
+It contains **demo data** unless you add the repository secrets `SD_COMPANY_KEY`, `SD_USERNAME` and
+`SD_PASSWORD` and the variable `PAGES_LIVE_DATA=true`. With those set, real numbers are published,
+and **anyone with the URL can see them**.
 
 ## Project layout
 
 ```
-server.js              HTTP server: static files, /api/auth/*, /api/report, /api/status
-src/upstream.js        SalesDiary calls: company lookup, login, report pagination
-src/sessions.js        in-memory sessions (HttpOnly cookie) and login rate limiting
-src/mock.js            demo data in the same shape as the API
-src/columnar.js        flattens rows and sends them column-wise (small payloads)
-public/                the dashboard and sign-in screen: plain HTML, CSS and ES modules, with Chart.js
-scripts/build-static.js  static build for GitHub Pages
+server.js                HTTP server: /api/auth/*, /api/report, /api/status, CORS
+src/upstream.js          SalesDiary calls: company lookup, login, report pagination
+src/sessions.js          in-memory sessions (X-Session header or cookie), login rate limiting
+src/mock.js              demo data in the API's exact shape
+src/columnar.js          compact column-wise payloads for 5-second polling
+public/                  the website: HTML, CSS, ES modules, Chart.js
+public/js/backend.js     finds the local server and talks to it
+scripts/build-static.js  builds the website for GitHub Pages
 ```

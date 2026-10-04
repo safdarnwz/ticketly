@@ -1,7 +1,8 @@
 'use strict';
 
-// Builds a static copy of the dashboard into dist/ for GitHub Pages (or any static host).
-// The page detects there is no /api and reads dist/data/report.json instead.
+// Builds the website (UI) into dist/ for GitHub Pages. The published site talks to the
+// Shelfwise server running in Docker on the viewer's computer (config.json -> serverUrl).
+// data/report.json is a fallback snapshot shown when that server isn't running.
 //
 //   node scripts/build-static.js                 -> demo data (safe to publish)
 //   SNAPSHOT_SOURCE=live SD_COMPANY_KEY=.. SD_USERNAME=.. SD_PASSWORD=.. node ...
@@ -77,6 +78,8 @@ function today() {
   fs.mkdirSync(path.join(out, 'data'), { recursive: true });
   fs.writeFileSync(path.join(out, 'data', 'report.json'), JSON.stringify({ meta, ...table }));
   fs.writeFileSync(path.join(out, '.nojekyll'), '');
+  // Where the published UI looks for the Shelfwise server (users can change it on the site).
+  fs.writeFileSync(path.join(out, 'config.json'), JSON.stringify({ serverUrl: process.env.PAGES_SERVER_URL || 'http://localhost:8080' }));
 
   console.log(`dist/ ready · ${meta.source} data · ${start}..${end} · ${meta.rows} rows`);
 })().catch((err) => {

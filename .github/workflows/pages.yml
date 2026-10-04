@@ -1,8 +1,11 @@
 name: Publish dashboard to GitHub Pages
 
-# Builds a static snapshot of the dashboard and publishes it to GitHub Pages.
+# Publishes the Shelfwise website (the UI) to GitHub Pages. Visitors' browsers fetch live data
+# from the Shelfwise server running in Docker on their own computer (http://localhost:8080 by
+# default; override with the repository variable PAGES_SERVER_URL).
 #
-# By default the snapshot uses DEMO data, so nothing confidential is published.
+# A fallback snapshot (data/report.json) is published too, shown when no server is running.
+# By default it is DEMO data, so nothing confidential is published.
 # To publish real SalesDiary numbers (visible to ANYONE with the URL):
 #   1. Settings -> Secrets and variables -> Actions -> Secrets:
 #        SD_COMPANY_KEY, SD_USERNAME, SD_PASSWORD   (the build signs in, so tokens never go stale)
@@ -12,8 +15,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  schedule:
-    - cron: "*/30 * * * *" # GitHub runs this at best every ~30 min, often later
 
 permissions:
   contents: read
@@ -37,6 +38,7 @@ jobs:
       - name: Build static snapshot
         run: npm run build:static
         env:
+          PAGES_SERVER_URL: ${{ vars.PAGES_SERVER_URL }}
           SNAPSHOT_SOURCE: ${{ vars.PAGES_LIVE_DATA == 'true' && 'live' || 'mock' }}
           SD_COMPANY_KEY: ${{ vars.PAGES_LIVE_DATA == 'true' && secrets.SD_COMPANY_KEY || '' }}
           SD_USERNAME: ${{ vars.PAGES_LIVE_DATA == 'true' && secrets.SD_USERNAME || '' }}

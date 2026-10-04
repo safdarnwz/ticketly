@@ -6,8 +6,9 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js",
-    "demo": "node --watch server.js --demo",
+    "dev": "node --watch server.js --ui",
+    "demo": "node --watch server.js --demo --ui",
+    "api": "node --watch server.js",
     "build:static": "node scripts/build-static.js"
   },
   "engines": {

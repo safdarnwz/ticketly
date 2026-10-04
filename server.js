@@ -249,13 +249,13 @@ async function handleApi(req, res, url) {
       }
       const { token, displayName } = await upstream.login({ ...company, username, password });
       if (session) sessions.destroy(req);
-      const { cookie } = sessions.create(req, {
+      const { session: created, cookie } = sessions.create(req, {
         mode: 'live', company, username, displayName, token,
         // Kept in memory only, to renew the token silently when it expires.
         password: body.remember === false ? null : password,
       });
       console.log(`[login] ${username}@${companyKey} signed in`);
-      return send(req, res, 200, { ok: true }, { 'Set-Cookie': cookie });
+      return send(req, res, 200, { ok: true, session: created.id }, { 'Set-Cookie': cookie });
     } catch (err) {
       console.error(`[login] ${username}@${companyKey} -> ${err.message}`);
       return send(req, res, err.status === 401 ? 401 : err.status || 500, { error: err.message });
@@ -264,8 +264,8 @@ async function handleApi(req, res, url) {
 
   if (p === '/api/auth/demo' && req.method === 'POST') {
     if (session) sessions.destroy(req);
-    const { cookie } = sessions.create(req, { mode: 'demo' });
-    return send(req, res, 200, { ok: true }, { 'Set-Cookie': cookie });
+    const { session: created, cookie } = sessions.create(req, { mode: 'demo' });
+    return send(req, res, 200, { ok: true, session: created.id }, { 'Set-Cookie': cookie });
   }
 
   if (p === '/api/auth/logout' && req.method === 'POST') {
@@ -286,11 +286,11 @@ async function handleApi(req, res, url) {
       return send(req, res, 200, { ok: true });
     }
     if (session) sessions.destroy(req);
-    const { cookie } = sessions.create(req, {
+    const { session: created, cookie } = sessions.create(req, {
       mode: 'live', token, username: info?.userId ? `user ${info.userId}` : 'token', displayName: info?.profile || 'Token user', password: null,
       company: { companyKey: info?.instance || '', instance: info?.instance || '', name: info?.instance || 'SalesDiary', logo: null, apiBase: config.apiBase },
     });
-    return send(req, res, 200, { ok: true }, { 'Set-Cookie': cookie });
+    return send(req, res, 200, { ok: true, session: created.id }, { 'Set-Cookie': cookie });
   }
 
   if (p === '/api/report') {
@@ -328,8 +328,45 @@ function authorized(req) {
   return given.length === expected.length && crypto.timingSafeEqual(given, expected);
 }
 
+// ---------- CORS: the UI on GitHub Pages calls this server from the browser ----------
+
+function applyCors(req, res) {
+  const origin = String(req.headers.origin || '').replace(/\/+$/, '');
+  if (!origin) return false;
+  const local = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  if (!local && !config.corsOrigins.includes(origin) && !config.corsOrigins.includes('*')) return false;
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Expose-Headers', 'ETag, X-Fetched-At');
+  return true;
+}
+
+function landingPage() {
+  const link = config.dashboardUrl.replace(/[&<>"]/g, '');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Shelfwise server</title>
+<style>body{font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;background:#f6f6f3;color:#0b0b0b;display:grid;place-items:center;min-height:100vh;margin:0}
+main{max-width:440px;padding:24px}h1{font-size:20px;margin:0 0 8px}p{color:#52514e;margin:0 0 16px}a{display:inline-block;background:#0b0b0b;color:#fff;padding:9px 14px;border-radius:6px;text-decoration:none}
+@media (prefers-color-scheme:dark){body{background:#0d0d0d;color:#fff}p{color:#c3c2b7}a{background:#fff;color:#0b0b0b}}</style></head>
+<body><main><h1>The Shelfwise server is running.</h1><p>This computer serves the data. The dashboard itself is on GitHub Pages and connects here automatically.</p><a href="${link}">Open the dashboard</a></main></body></html>`;
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
+  const cors = url.pathname.startsWith('/api/') && applyCors(req, res);
+  if (req.method === 'OPTIONS') {
+    if (!cors) {
+      res.writeHead(403);
+      return res.end();
+    }
+    res.writeHead(204, {
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, X-Session, If-None-Match',
+      'Access-Control-Max-Age': '600',
+      // Chrome asks before a public site (github.io) may talk to localhost.
+      ...(req.headers['access-control-request-private-network'] ? { 'Access-Control-Allow-Private-Network': 'true' } : {}),
+    });
+    return res.end();
+  }
   if (url.pathname !== '/api/health' && !authorized(req)) {
     res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Shelfwise", charset="UTF-8"', 'Content-Type': 'text/plain' });
     return res.end('Authentication required');
@@ -337,6 +374,7 @@ const server = http.createServer(async (req, res) => {
   try {
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(req, res, 405, { error: 'Method not allowed' });
+    if (!config.serveUi) return send(req, res, 200, landingPage(), { 'Content-Type': 'text/html; charset=utf-8' });
     serveStatic(req, res, decodeURIComponent(url.pathname));
   } catch (err) {
     console.error(err);
@@ -347,6 +385,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(config.port, config.host, () => {
   const mode = config.dataSource === 'mock' ? 'DEMO data only' : config.requireLogin ? 'users sign in with SalesDiary' : config.token ? `shared token, ${config.apiBase}` : 'DEMO data (no SD_TOKEN set)';
   console.log(`Shelfwise running on http://localhost:${config.port}  ·  ${mode}${config.basicAuth ? '  ·  password protected' : ''}`);
+  console.log(config.serveUi ? `UI also served here: http://localhost:${config.port}` : `API only. Dashboard: ${config.dashboardUrl}  (allowed origins: ${config.corsOrigins.join(', ')})`);
 });
 
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => server.close(() => process.exit(0)));

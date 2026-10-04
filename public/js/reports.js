@@ -32,30 +32,99 @@ function heatTable(rowsData, cols, { metric = 'availPct', fmt = 'pct', rowLabel 
     <div class="heat-scale"><span>${fmt === 'pct' ? '0%' : '0'}</span><span class="ramp">${ramp}</span><span>${fmt === 'pct' ? '100%' : compact(max)}</span>${cols.length > maxCols ? `<span>· first ${maxCols} of ${cols.length} columns</span>` : ''}</div>`;
 }
 
+
+// ---------- written summaries shown under each page title ----------
+
+const b = (v) => `<b>${v}</b>`;
+const pp = (v) => (v == null ? '—' : `${Math.round(v)}%`);
+const plural = (n, one, many = one + 's') => `${num(n)} ${n === 1 ? one : many}`;
+
+function overviewSummary({ rows }) {
+  const t = A.totals(rows);
+  const days = A.sortBy(A.groupBy(rows, 'date'), 'key', 'asc');
+  const last = days[days.length - 1];
+  const prev = days[days.length - 2];
+  let first;
+  if (prev) {
+    const d = last.availPct - prev.availPct;
+    const move = Math.abs(d) < 0.5 ? 'about the same as' : `${Math.abs(d).toFixed(1)} points ${d > 0 ? 'better than' : 'worse than'}`;
+    first = `On ${shortDate(last.key)}, ${b(pp(last.availPct))} of SKU checks found stock on the shelf, ${move} ${shortDate(prev.key)}.`;
+  } else {
+    first = `${b(pp(t.availPct))} of SKU checks found stock on the shelf.`;
+  }
+  return `${first} Reps made ${b(num(t.visits))} visits to ${b(num(t.outlets))} outlets and booked ${b(compact(t.orderQty))} units. ${b(pp(t.strikeRate))} of visits ended with an order.`;
+}
+
+function skuSummary({ rows }) {
+  const prods = A.groupBy(rows, 'product').filter((p) => p.checks >= 3);
+  if (!prods.length) return 'Not enough checks yet to compare SKUs.';
+  const worst = A.sortBy(prods, 'availPct', 'asc')[0];
+  const best = A.sortBy(prods, 'availPct')[0];
+  const under = prods.filter((p) => p.availPct < 50).length;
+  return `${b(esc(worst.key))} is the hardest SKU to find. It was on the shelf in only ${b(pp(worst.availPct))} of checks. ${b(num(under))} of ${num(prods.length)} SKUs are below 50%, while ${esc(best.key)} leads at ${b(pp(best.availPct))}.`;
+}
+
+function outletSummary({ rows }) {
+  const latest = A.latestVisitPerOutlet(rows);
+  const crit = latest.filter((v) => v.availPct < 40).length;
+  const noOrder = A.groupBy(rows, 'retailer_id').filter((o) => o.orderQty === 0).length;
+  return `${b(num(crit))} of ${num(latest.length)} outlets were less than 40% stocked at their last visit, and ${b(plural(noOrder, 'outlet'))} haven't ordered anything in this period.`;
+}
+
+function teamSummary({ rows }) {
+  const t = A.totals(rows);
+  const reps = A.groupBy(rows, 'salesman');
+  const top = A.sortBy(reps, 'orderQty')[0];
+  const bestStrike = A.sortBy(reps.filter((r) => r.visits >= 3), 'strikeRate')[0];
+  const perDay = t.reps && t.days ? t.visits / t.reps / t.days : null;
+  let text = `${b(num(t.reps))} reps logged ${b(num(t.visits))} visits, about ${b(dec(perDay))} per rep per day.`;
+  if (top?.orderQty) text += ` ${esc(top.key)} booked the most, with ${b(num(top.orderQty))} units.`;
+  if (bestStrike) text += ` ${esc(bestStrike.key)} converts the most visits into orders (${b(pp(bestStrike.strikeRate))}).`;
+  return text;
+}
+
+function geoSummary({ rows }) {
+  const regions = A.groupBy(rows, 'region').filter((r) => r.checks >= 10);
+  if (regions.length < 2) return 'Compare regions, clusters, territories and cities on shelf availability and orders.';
+  const best = A.sortBy(regions, 'availPct')[0];
+  const worst = A.sortBy(regions, 'availPct', 'asc')[0];
+  const total = regions.reduce((s, r) => s + r.orderQty, 0) || 1;
+  const topOrders = A.sortBy(regions, 'orderQty')[0];
+  return `${b(esc(best.key))} is the best-stocked region at ${b(pp(best.availPct))}. ${b(esc(worst.key))} trails at ${b(pp(worst.availPct))}. ${esc(topOrders.key)} accounts for ${b(pp((topOrders.orderQty / total) * 100))} of all units ordered.`;
+}
+
+function opportunitySummary({ rows }) {
+  const t = A.totals(rows);
+  const crit = A.latestVisitPerOutlet(rows).filter((v) => v.availPct < 40).length;
+  const idle = rows.filter((r) => Number(r.avail) > 0 && !(Number(r.o_qty) > 0)).length;
+  return `The next actions most likely to lift sales, worked out from the records below. ${b(plural(crit, 'outlet'))} need a restock visit, and ${b(pp(t.available ? (idle / t.available) * 100 : null))} of SKUs that were in stock went unordered.`;
+}
+
 // ============================== Overview ==============================
 
 const overview = {
   title: 'Overview',
   sub: 'Shelf health, field activity and orders at a glance',
+  summary: overviewSummary,
   mount(el) {
     el.innerHTML = `
       <div class="kpis" data-kpis></div>
       <div class="grid g-21">
-        ${card({ title: 'Availability trend', sub: 'Share of SKU checks found on shelf, per day', body: canvas('ovTrend') })}
-        ${card({ title: 'Order quantity by brand', sub: 'Top 5 brands, rest grouped', body: `${canvas('ovBrand', 'short')}<div class="legend" data-legend="brand"></div>` })}
+        ${card({ title: 'Shelf availability, day by day', sub: 'Share of SKU checks that found stock', body: canvas('ovTrend') })}
+        ${card({ title: 'Where the orders went', sub: 'Units ordered by brand', body: `${canvas('ovBrand', 'short')}<div class="legend" data-legend="brand"></div>` })}
       </div>
       <div class="grid g-2">
         ${card({ title: 'Visits per day', body: canvas('ovVisits', 'short') })}
-        ${card({ title: 'Order quantity per day', body: canvas('ovOrders', 'short') })}
+        ${card({ title: 'Units ordered per day', body: canvas('ovOrders', 'short') })}
       </div>
       <div class="grid g-3">
-        ${card({ title: 'Availability by region', sub: 'Click a bar to filter', body: canvas('ovRegion', 'short') })}
+        ${card({ title: 'Availability by region', sub: 'Share of checks in stock', body: canvas('ovRegion', 'short') })}
         ${card({ title: 'Visits by outlet type', body: `${canvas('ovType', 'short')}<div class="legend" data-legend="type"></div>` })}
-        ${card({ title: 'Top SKUs by order quantity', body: canvas('ovTopSku', 'short') })}
+        ${card({ title: 'Best-selling SKUs', sub: 'Units ordered', body: canvas('ovTopSku', 'short') })}
       </div>
       <div class="grid g-12">
-        ${card({ title: 'Latest visits', sub: 'Newest first · updates live', body: '<div class="feed" data-feed></div>', flush: true })}
-        ${card({ title: 'Availability by category', sub: 'Click a bar to filter', body: canvas('ovCat', 'tall') })}
+        ${card({ title: 'Latest visits', sub: 'Newest first', body: '<div class="feed" data-feed></div>', flush: true })}
+        ${card({ title: 'Availability by category', sub: 'Share of checks in stock', body: canvas('ovCat', 'tall') })}
       </div>`;
   },
   update(el, ctx) {
@@ -129,6 +198,7 @@ const overview = {
 const availability = {
   title: 'SKU availability',
   sub: 'Which products are missing from shelves, and where',
+  summary: skuSummary,
   mount(el, ctx) {
     this.rowDim = 'region';
     this.colDim = 'category';
@@ -137,15 +207,15 @@ const availability = {
     el.innerHTML = `
       <div class="kpis" data-kpis></div>
       <div class="grid g-2">
-        ${card({ title: 'Availability by category', sub: 'Click to filter', body: canvas('avCat') })}
-        ${card({ title: 'Availability by brand', sub: 'Click to filter', body: canvas('avBrand') })}
+        ${card({ title: 'Availability by category', sub: 'Share of checks in stock', body: canvas('avCat') })}
+        ${card({ title: 'Availability by brand', sub: 'Share of checks in stock', body: canvas('avBrand') })}
       </div>
-      ${card({ title: 'Availability heatmap', sub: 'Darker = better stocked. Hover a cell for detail.', actions: `<div class="row-gap">${seg('avRow', rowDims.map((k) => ({ key: k, label: lbl(k) })), this.rowDim)}${seg('avCol', [{ key: 'category', label: 'Category' }, { key: 'brand', label: 'Brand' }, { key: 'product', label: 'SKU' }], this.colDim)}</div>`, body: '<div data-heat></div>' })}
+      ${card({ title: 'Where each line is missing', sub: 'Darker cells are better stocked. Hover a cell for the counts.', actions: `<div class="row-gap">${seg('avRow', rowDims.map((k) => ({ key: k, label: lbl(k) })), this.rowDim)}${seg('avCol', [{ key: 'category', label: 'Category' }, { key: 'brand', label: 'Brand' }, { key: 'product', label: 'SKU' }], this.colDim)}</div>`, body: '<div data-heat></div>' })}
       <div class="grid g-2">
-        ${card({ title: 'Lowest availability SKUs', sub: 'Bottom 12 by share of checks in stock', body: canvas('avLow', 'tall') })}
-        ${card({ title: 'Out-of-stock checks by SKU', sub: 'Biggest gaps first · tooltip shows cumulative share', body: canvas('avOos', 'tall') })}
+        ${card({ title: 'Hardest SKUs to find', sub: 'Lowest share of checks in stock', body: canvas('avLow', 'tall') })}
+        ${card({ title: 'Where the empty shelves add up', sub: 'Out-of-stock checks per SKU', body: canvas('avOos', 'tall') })}
       </div>
-      ${card({ title: 'SKU scorecard', sub: 'Every tracked product in the current selection', body: '<div data-table></div>', flush: true })}`;
+      ${card({ title: 'SKU scorecard', sub: 'Least available first', body: '<div data-table></div>', flush: true })}`;
     onSeg(el, 'avRow', (v) => { this.rowDim = v; this.update(el, ctx.current()); });
     onSeg(el, 'avCol', (v) => { this.colDim = v; this.update(el, ctx.current()); });
     bindCellTips(el);
@@ -217,15 +287,16 @@ const BANDS = [[0, 20], [20, 40], [40, 60], [60, 80], [80, 101]];
 const outlets = {
   title: 'Outlets',
   sub: 'Outlet-level shelf health and where to send a rep next',
+  summary: outletSummary,
   mount(el, ctx) {
     el.innerHTML = `
       <div class="kpis" data-kpis></div>
       <div class="grid g-3">
-        ${card({ title: 'Outlets by availability band', sub: 'Based on each outlet’s latest visit', body: canvas('olBand', 'short') })}
+        ${card({ title: 'How stocked are outlets?', sub: 'Outlets by availability at their latest visit', body: canvas('olBand', 'short') })}
         ${card({ title: 'Outlets by type', body: `${canvas('olType', 'short')}<div class="legend" data-legend></div>` })}
-        ${card({ title: 'Availability by outlet class', sub: 'Click to filter', body: canvas('olClass', 'short') })}
+        ${card({ title: 'Availability by outlet class', sub: 'Share of checks in stock', body: canvas('olClass', 'short') })}
       </div>
-      ${card({ title: 'Outlet scorecard', sub: 'Click a row to focus on that outlet', body: '<div data-table></div>', flush: true })}`;
+      ${card({ title: 'Outlet scorecard', sub: 'Worst-stocked first. Select a row to see only that outlet.', body: '<div data-table></div>', flush: true })}`;
     this.table = new DataTable(el.querySelector('[data-table]'), {
       title: 'outlet-scorecard', sort: 'latestPct', dir: 'asc',
       onRowClick: (r) => ctx.search(r.o_code || r.o_name),
@@ -287,12 +358,13 @@ const outlets = {
 const team = {
   title: 'Field team',
   sub: 'Rep productivity, coverage discipline and team comparison',
+  summary: teamSummary,
   mount(el, ctx) {
     el.innerHTML = `
       <div class="kpis" data-kpis></div>
       <div class="grid g-2">
-        ${card({ title: 'Order quantity by rep', sub: 'Top 15 · click to filter', body: canvas('tmOrders', 'tall') })}
-        ${card({ title: 'Visits vs availability', sub: 'Each dot is a rep · top-right is where you want them', body: canvas('tmScatter', 'tall') })}
+        ${card({ title: 'Units ordered by rep', sub: 'Top 15', body: canvas('tmOrders', 'tall') })}
+        ${card({ title: 'Visits vs shelf availability', sub: 'Each dot is one rep', body: canvas('tmScatter', 'tall') })}
       </div>
       ${card({ title: 'Rep leaderboard', body: '<div data-reps></div>', flush: true })}
       <div class="grid g-2">
@@ -368,6 +440,7 @@ const team = {
 const geography = {
   title: 'Geography',
   sub: 'Region, cluster, territory and city comparison',
+  summary: geoSummary,
   mount(el, ctx) {
     const dims = ['region', 'cluster', 'territory', 'state', 'city', 'pteam'].filter((d) => hasField(ctx, d));
     this.dim = dims[0] || 'region';
@@ -375,8 +448,8 @@ const geography = {
     el.innerHTML = `
       <div>${seg('geoDim', dims.map((k) => ({ key: k, label: lbl(k) })), this.dim)}</div>
       <div class="grid g-2">
-        ${card({ title: 'Availability', sub: 'Click a bar to filter', body: canvas('geoAvail', 'tall') })}
-        ${card({ title: 'Order quantity', sub: 'Click a bar to filter', body: canvas('geoOrders', 'tall') })}
+        ${card({ title: 'Availability', sub: 'Share of checks in stock', body: canvas('geoAvail', 'tall') })}
+        ${card({ title: 'Units ordered', sub: 'Top 20', body: canvas('geoOrders', 'tall') })}
       </div>
       <div class="grid g-12">
         ${card({ title: 'Share of visits by region', body: `${canvas('geoShare', 'short')}<div class="legend" data-legend></div>` })}
@@ -422,11 +495,12 @@ const geography = {
 const opportunities = {
   title: 'Opportunities',
   sub: 'Auto-generated actions ranked by business impact',
+  summary: opportunitySummary,
   mount(el, ctx) {
     el.innerHTML = `
       <div class="insights" data-insights></div>
-      ${card({ title: 'Restock list', sub: 'Outlets whose latest visit had the most missing SKUs — send these to the distributor', body: '<div data-gaps></div>', flush: true })}
-      ${card({ title: 'Upsell list', sub: 'SKU on the shelf but nothing ordered on that visit', body: '<div data-upsell></div>', flush: true })}
+      ${card({ title: 'Restock list', sub: 'Outlets with the most missing SKUs at their latest visit', body: '<div data-gaps></div>', flush: true })}
+      ${card({ title: 'Upsell list', sub: 'SKUs that were on the shelf but not ordered on that visit', body: '<div data-upsell></div>', flush: true })}
       <section data-stock></section>`;
     this.gaps = new DataTable(el.querySelector('[data-gaps]'), {
       title: 'restock-list', sort: 'missingCount', rank: true,
@@ -563,7 +637,7 @@ const opportunities = {
 
 const pivotPage = {
   title: 'Pivot builder',
-  sub: 'Slice any metric by any two dimensions',
+  sub: 'Choose two dimensions and a metric to compare. For example, region by category on availability, or rep by date on visits.',
   mount(el, ctx) {
     const dims = A.DIMENSIONS.filter((d) => hasField(ctx, d.key));
     this.row = 'region';
@@ -626,13 +700,13 @@ const LABELS = {
 const DEFAULT_COLS = ['date', 'o_name', 'outlet_type', 'salesman', 'region', 'cluster', 'product', 'category', 'brand', 'avail', 'o_qty', 'sos', 'ms'];
 
 const explorer = {
-  title: 'Data explorer',
-  sub: 'Every raw row from the API, sortable and exportable',
+  title: 'Raw data',
+  sub: 'Every record from SalesDiary for the selected dates, exactly as received. Choose columns, sort, and export to CSV.',
   mount(el, ctx) {
     this.cols = new Set(DEFAULT_COLS.filter((c) => hasField(ctx, c)));
     el.innerHTML = card({
-      title: 'Raw rows',
-      sub: 'Respects every filter above',
+      title: 'Records',
+      sub: 'One row per SKU checked at a visit',
       actions: '<div class="dd" data-colpick><button class="btn btn-sm" type="button">Columns</button></div>',
       body: '<div data-table></div>',
       flush: true,

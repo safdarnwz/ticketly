@@ -47,6 +47,12 @@ module.exports = {
   // Upstream responses are cached this long; every browser polling every 5 s shares one call.
   cacheTtlMs: Number(env.CACHE_TTL_MS || 4000),
   allowTokenUpdate: (env.ALLOW_TOKEN_UPDATE || 'true') === 'true',
+  // The UI lives on GitHub Pages; these origins may call this server from the browser.
+  corsOrigins: (env.CORS_ORIGINS || 'https://safdarnwz.github.io').split(',').map((o) => o.trim().replace(/\/+$/, '')).filter(Boolean),
+  // Where the UI is published (shown when someone opens the server URL directly).
+  dashboardUrl: env.DASHBOARD_URL || 'https://safdarnwz.github.io/ticketly/',
+  // Also serve the UI from this server (handy for local development). Docker runs API-only.
+  serveUi: process.argv.includes('--ui') || (env.SERVE_UI || 'false') === 'true',
   // Set both to require a login (recommended whenever the dashboard is on a public URL).
   basicAuth: env.DASHBOARD_USER && env.DASHBOARD_PASSWORD ? `${env.DASHBOARD_USER}:${env.DASHBOARD_PASSWORD}` : null,
 };

@@ -2,23 +2,32 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Shelfwise: live (uses .env)",
+      "name": "Shelfwise: API + local UI",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/server.js",
+      "args": ["--ui"],
+      "runtimeArgs": ["--watch"],
+      "console": "integratedTerminal",
+      "serverReadyAction": { "pattern": "UI also served here: (https?://\\S+)", "uriFormat": "%s", "action": "openExternally" }
+    },
+    {
+      "name": "Shelfwise: API only (for the GitHub Pages site)",
       "type": "node",
       "request": "launch",
       "program": "${workspaceFolder}/server.js",
       "runtimeArgs": ["--watch"],
-      "console": "integratedTerminal",
-      "serverReadyAction": { "pattern": "running on (https?://\\S+)", "uriFormat": "%s", "action": "openExternally" }
+      "console": "integratedTerminal"
     },
     {
       "name": "Shelfwise: demo data",
       "type": "node",
       "request": "launch",
       "program": "${workspaceFolder}/server.js",
+      "args": ["--demo", "--ui"],
       "runtimeArgs": ["--watch"],
-      "env": { "DATA_SOURCE": "mock" },
       "console": "integratedTerminal",
-      "serverReadyAction": { "pattern": "running on (https?://\\S+)", "uriFormat": "%s", "action": "openExternally" }
+      "serverReadyAction": { "pattern": "UI also served here: (https?://\\S+)", "uriFormat": "%s", "action": "openExternally" }
     }
   ]
 }

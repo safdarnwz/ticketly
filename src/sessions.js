@@ -21,8 +21,15 @@ function isHttps(req) {
   return Boolean(req.socket.encrypted) || String(req.headers['x-forwarded-proto'] || '').startsWith('https');
 }
 
+// The UI on GitHub Pages sends the session id in a header (cross-site cookies are blocked by
+// most browsers); the same-origin UI can use the cookie.
+function sessionId(req) {
+  const header = String(req.headers['x-session'] || '').trim();
+  return header || parseCookies(req)[COOKIE];
+}
+
 function get(req) {
-  const sid = parseCookies(req)[COOKIE];
+  const sid = sessionId(req);
   const s = sid && sessions.get(sid);
   if (!s) return null;
   if (Date.now() - s.lastSeen > config.sessionHours * 3600 * 1000) {
@@ -42,7 +49,7 @@ function create(req, data) {
 }
 
 function destroy(req) {
-  const sid = parseCookies(req)[COOKIE];
+  const sid = sessionId(req);
   if (sid) sessions.delete(sid);
   return `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
 }

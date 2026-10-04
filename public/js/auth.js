@@ -1,14 +1,7 @@
-// Two-step SalesDiary sign-in: company key -> username/password. The server does the actual
-// SalesDiary calls and keeps the token in its session; the browser only gets a cookie.
+// Sign-in screen. Step 0 (only on GitHub Pages): reach the local Shelfwise server.
+// Step 1: company key. Step 2: username + password. The server talks to SalesDiary.
 
 const $ = (id) => document.getElementById(id);
-
-async function post(url, body) {
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error || `Request failed (${res.status})`);
-  return json;
-}
 
 function remember(key, value) {
   try {
@@ -29,9 +22,18 @@ export function logoHtml(company) {
   return initials(company?.name || company?.key);
 }
 
-export function initAuth({ onSignedIn }) {
-  const forms = { company: $('companyForm'), login: $('loginForm'), token: $('tokenForm') };
+const prettyUrl = (u) => String(u || '').replace(/^https?:\/\//, '');
+
+/**
+ * getBackend(): current backend (may be null while offline)
+ * onSignedIn(): called after a successful sign-in / demo choice
+ * onRetry(url): try to reach the server again; resolves true when connected
+ * onSnapshot(): open the published snapshot instead
+ */
+export function initAuth({ getBackend, onSignedIn, onRetry, onSnapshot }) {
+  const forms = { offline: $('offlineForm'), company: $('companyForm'), login: $('loginForm'), token: $('tokenForm') };
   let company = null;
+  let snapshotOk = false;
 
   const error = (msg) => ($('authError').textContent = msg || '');
   const busy = (btn, on, label) => {
@@ -40,13 +42,32 @@ export function initAuth({ onSignedIn }) {
   };
   const showForm = (name) => {
     for (const [k, f] of Object.entries(forms)) f.hidden = k !== name;
+    $('authSteps').hidden = name === 'offline';
     $('stepOne').className = name === 'login' ? 'done' : 'on';
     $('stepTwo').className = name === 'login' ? 'on' : '';
+    $('tokenToggle').hidden = name === 'offline' || getBackend()?.allowTokenUpdate === false;
     $('tokenToggle').textContent = name === 'token' ? 'Use username & password' : 'Use a token instead';
+    $('demoBtn').hidden = name === 'offline' && !snapshotOk;
+    $('demoBtn').textContent = name === 'offline' ? 'View the demo snapshot' : 'Explore with demo data';
+    $('altSep').hidden = $('tokenToggle').hidden || $('demoBtn').hidden;
     error('');
     const first = forms[name].querySelector('input:not([type=checkbox]), textarea');
     setTimeout(() => first?.focus(), 30);
   };
+  const serverLine = (url, ok) => {
+    $('serverLine').hidden = !url;
+    $('serverLabel').textContent = prettyUrl(url);
+    $('serverDot').className = 'dot ' + (ok ? 'ok' : 'err');
+  };
+
+  forms.offline.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    busy($('retryBtn'), true, 'Connecting…');
+    error('');
+    const ok = await onRetry($('serverUrl').value.trim());
+    busy($('retryBtn'), false, 'Retry');
+    if (!ok) error(`Still can't reach ${prettyUrl($('serverUrl').value)}. Check that the container is running (docker ps).`);
+  });
 
   forms.company.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -55,7 +76,7 @@ export function initAuth({ onSignedIn }) {
     busy($('companyBtn'), true, 'Checking…');
     error('');
     try {
-      const c = await post('api/auth/company', { companyKey: key });
+      const c = await getBackend().company(key);
       company = c;
       remember('company', key);
       $('companyName').textContent = c.name || key;
@@ -80,7 +101,7 @@ export function initAuth({ onSignedIn }) {
     error('');
     try {
       const username = $('username').value.trim();
-      await post('api/auth/login', { companyKey: company.companyKey, username, password: $('password').value, remember: $('remember').checked });
+      await getBackend().login({ companyKey: company.companyKey, username, password: $('password').value, remember: $('remember').checked });
       remember('user-' + company.companyKey, username);
       $('password').value = '';
       onSignedIn();
@@ -96,7 +117,7 @@ export function initAuth({ onSignedIn }) {
     e.preventDefault();
     error('');
     try {
-      await post('api/auth/token', { token: $('tokenLogin').value.trim() });
+      await getBackend().loginToken($('tokenLogin').value.trim());
       $('tokenLogin').value = '';
       onSignedIn();
     } catch (err) {
@@ -105,6 +126,11 @@ export function initAuth({ onSignedIn }) {
   });
 
   $('changeCompany').addEventListener('click', () => showForm('company'));
+  $('serverChange').addEventListener('click', () => {
+    $('serverUrl').value = getBackend()?.base || $('serverUrl').value;
+    showForm('offline');
+    $('serverUrl').select();
+  });
   $('pwToggle').addEventListener('click', () => {
     const pw = $('password');
     pw.type = pw.type === 'password' ? 'text' : 'password';
@@ -113,29 +139,39 @@ export function initAuth({ onSignedIn }) {
   $('tokenToggle').addEventListener('click', () => showForm(forms.token.hidden ? 'token' : company ? 'login' : 'company'));
   $('demoBtn').addEventListener('click', async () => {
     try {
-      await post('api/auth/demo');
+      if (!forms.offline.hidden) return onSnapshot();
+      await getBackend().demo();
       onSignedIn();
     } catch (err) {
       error(err.message);
     }
   });
 
+  const open = () => {
+    document.body.classList.add('signed-out');
+    $('auth').hidden = false;
+  };
+
   return {
     show(status, message) {
-      document.body.classList.add('signed-out');
-      $('auth').hidden = false;
-      $('tokenToggle').hidden = status?.allowTokenUpdate === false;
-      const key = remember('company') || status?.defaultCompany || '';
-      $('companyKey').value = key;
+      open();
+      const b = getBackend();
+      serverLine(b?.remote ? b.base : null, true);
+      $('companyKey').value = remember('company') || status?.defaultCompany || '';
       showForm('company');
+      if (message) error(message);
+    },
+    showOffline(url, hasSnapshot, message) {
+      open();
+      snapshotOk = hasSnapshot;
+      serverLine(url, false);
+      $('serverUrl').value = url;
+      showForm('offline');
       if (message) error(message);
     },
     hide() {
       document.body.classList.remove('signed-out');
       $('auth').hidden = true;
-    },
-    async signOut() {
-      await post('api/auth/logout').catch(() => {});
     },
   };
 }
