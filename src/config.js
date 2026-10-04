@@ -28,15 +28,10 @@ module.exports = {
   apiBase: (env.SD_API_BASE || 'https://inx11.salesdiary.in:4071').replace(/\/+$/, ''),
   reportPath: env.SD_REPORT_PATH || '/api/pwa_reports/getStockAvailablityReport',
   token: (env.SD_TOKEN || '').trim(),
-  // Login flow: company key -> instance (sdlogin), then username/password -> token (instance)
-  loginBase: (env.SD_LOGIN_BASE || 'https://sdlogin.salesdiary.in:2001').replace(/\/+$/, ''),
-  companyPath: env.SD_COMPANY_PATH || '/api/sd_companies/findcompanyinstancewithlogo',
-  loginPath: env.SD_LOGIN_PATH || '/api/res_users/instance_pwa_login',
-  pwaVersion: env.SD_PWA_VERSION || '293',
-  defaultCompany: env.SD_COMPANY_KEY || '',
-  // true = everyone signs in with their SalesDiary account; false = SD_TOKEN is shared by all viewers
-  requireLogin: (env.REQUIRE_LOGIN || 'true') === 'true',
-  // Signed-in sessions expire after this much inactivity (hours)
+  // true = each browser pastes its own token in the box at the top of the page;
+  // false = SD_TOKEN is shared by all viewers (no box needed)
+  requireLogin: (env.REQUIRE_TOKEN || env.REQUIRE_LOGIN || 'true') === 'true',
+  // A pasted token's session expires after this much inactivity (hours)
   sessionHours: Number(env.SESSION_HOURS || 12),
   origin: env.SD_ORIGIN || 'https://app.salesdiary.in',
   pageSize: Number(env.SD_PAGE_SIZE || 5000),

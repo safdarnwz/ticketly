@@ -63,100 +63,6 @@ async function postJson(url, body, headers = {}) {
   }
 }
 
-// ---------- response helpers: the login APIs' exact shapes vary, so search them ----------
-
-function walk(node, visit, depth = 0) {
-  if (!node || typeof node !== 'object' || depth > 6) return;
-  for (const [k, v] of Object.entries(node)) {
-    visit(k, v);
-    if (v && typeof v === 'object') walk(v, visit, depth + 1);
-  }
-}
-
-function findValue(node, keys, test = (v) => typeof v === 'string' && v.trim() !== '') {
-  const wanted = keys.map((k) => k.toLowerCase());
-  let found;
-  for (const key of wanted) {
-    walk(node, (k, v) => {
-      if (found === undefined && k.toLowerCase() === key && test(v)) found = v;
-    });
-    if (found !== undefined) return found;
-  }
-  return undefined;
-}
-
-function findJwt(node) {
-  const preferred = findValue(node, ['token', 'access_token', 'accessToken', 'jwt', 'auth_token'], (v) => typeof v === 'string' && JWT_RE.test(v));
-  if (preferred) return preferred;
-  let any;
-  walk(node, (_k, v) => {
-    if (!any && typeof v === 'string' && JWT_RE.test(v)) any = v;
-  });
-  return any;
-}
-
-function messageOf(json) {
-  return findValue(json, ['msg', 'message', 'error', 'err', 'error_message']) || null;
-}
-
-function statusOf(json) {
-  const s = findValue(json, ['status'], (v) => typeof v === 'number' || /^\d+$/.test(String(v)));
-  return s == null ? null : Number(s);
-}
-
-// ---------- step 1: company key -> instance, API url, logo ----------
-
-async function findCompany(companyKey) {
-  const { status, json } = await postJson(config.loginBase + config.companyPath, { companyKey });
-  if (!json) throw new UpstreamError(`Company lookup failed (${status}).`, 502);
-  const st = statusOf(json);
-  if (status >= 400 || (st && st !== 200)) throw new UpstreamError(messageOf(json) || 'Company not found.', 404);
-
-  const isUrl = (v) => typeof v === 'string' && /^https?:\/\//i.test(v);
-  const url = findValue(json, ['url', 'instance_url', 'api_url', 'server_url', 'base_url', 'node_url', 'app_url'], isUrl);
-  const instance = findValue(json, ['instance', 'instance_name', 'ckey', 'company_key', 'key']) || companyKey;
-  const logo = findValue(json, ['logo', 'logo_url', 'company_logo', 'image', 'logo_path'], (v) => typeof v === 'string' && /^(https?:|data:image)/.test(v));
-  const name = findValue(json, ['company_name', 'name', 'display_name', 'title']) || companyKey;
-  if (!url && !json) throw new UpstreamError('Company not found.', 404);
-  return {
-    companyKey,
-    instance,
-    name,
-    logo: logo || null,
-    apiBase: (url || config.apiBase).replace(/\/+$/, ''),
-  };
-}
-
-// ---------- step 2: username + password -> token ----------
-
-async function login({ companyKey, instance, apiBase, username, password }) {
-  const body = {
-    instance,
-    ckey: companyKey,
-    url: apiBase,
-    token: null,
-    login_type: null,
-    user_name: username,
-    password,
-    otp: null,
-    device_name: '',
-    device_info: { ip_address: '0.0.0.0', name: '12345678', browser: '', os: '', device_token: null },
-    pwa_version: config.pwaVersion,
-    access_token: null,
-    sso_name: '',
-    user: null,
-  };
-  const { status, json } = await postJson(apiBase + config.loginPath, body);
-  if (!json) throw new UpstreamError(`Login failed (${status}).`, 502);
-  const token = findJwt(json);
-  if (!token) {
-    const msg = messageOf(json);
-    throw new UpstreamError(msg && !/^success$/i.test(msg) ? msg : 'Wrong username or password.', 401, 'login_failed');
-  }
-  const displayName = findValue(json, ['full_name', 'name', 'user_full_name', 'display_name', 'user_name']) || username;
-  return { token, displayName };
-}
-
 // ---------- report ----------
 
 function buildPayload({ start, end, offsetID, token, apiBase }) {
@@ -241,4 +147,4 @@ async function fetchReport(start, end, { token, apiBase }) {
   return { rows, pages, upstreamTime, total };
 }
 
-module.exports = { findCompany, login, fetchReport, decodeToken, UpstreamError, JWT_RE };
+module.exports = { fetchReport, decodeToken, UpstreamError, JWT_RE };

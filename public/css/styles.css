@@ -418,18 +418,34 @@ table.dt { width: 100%; border-collapse: separate; border-spacing: 0; font-size:
 .tooltip-pop { position: fixed; z-index: 120; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow); border-radius: var(--radius-sm); padding: 7px 10px; font-size: 12px; max-width: 280px; }
 .tooltip-pop b { font-weight: 600; }
 
-/* ---------- sign in ---------- */
+/* ---------- token box (top of the site) ---------- */
+
+.tokenbar { background: #111110; color: #f4f4f1; border-bottom: 1px solid #2c2c2a; }
+.tokenbar-row { display: flex; align-items: center; gap: 12px; min-height: 52px; padding-top: 8px; padding-bottom: 8px; flex-wrap: wrap; }
+.tokenbar-label { font-weight: 600; font-size: 13px; white-space: nowrap; }
+.token-input {
+  flex: 1 1 360px; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px;
+  border-radius: var(--radius-sm); background: #1d1d1b; border: 1px solid #3a3a37; color: #9a9890;
+}
+.token-input:focus-within { border-color: #3987e5; box-shadow: 0 0 0 3px rgba(57, 135, 229, 0.3); }
+.token-input input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: #ffffff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+.token-input input::placeholder { color: #8a8880; font-family: var(--font); font-size: 13px; }
+.token-input .btn-link { color: #c3c2b7; font-size: 12px; }
+.tokenbar .btn-primary { background: #ffffff; color: #0b0b0b; border-color: #ffffff; height: 36px; padding: 0 16px; }
+.tokenbar .btn-primary:hover { background: #e8e8e4; }
+.tokenbar-status { font-size: 12.5px; color: #c3c2b7; display: inline-flex; align-items: center; gap: 7px; flex: 0 1 auto; }
+.tokenbar-status .btn-link { color: #ffffff; text-decoration: underline; text-underline-offset: 2px; padding: 0; }
+.tokenbar.is-error .tokenbar-status { color: #ff9b9b; }
+.tokenbar.is-error .token-input { border-color: #e66767; }
+.ok-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex: none; }
+
+/* ---------- server offline screen ---------- */
 
 body.signed-out .site { display: none; }
 .auth { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 16px; gap: 16px; }
 .auth-card { width: 100%; max-width: 400px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 28px 28px 22px; box-shadow: var(--shadow); }
 .auth-brand { display: flex; align-items: center; gap: 10px; padding: 0 0 22px; }
 .auth-brand .brand-sub { border: 0; padding: 0; display: block; }
-.auth-steps { list-style: none; display: flex; gap: 6px; margin: 0 0 22px; padding: 0; counter-reset: step; }
-.auth-steps li { flex: 1; font-size: 12px; color: var(--ink-3); padding-top: 8px; border-top: 2px solid var(--line); counter-increment: step; }
-.auth-steps li::before { content: counter(step) ". "; }
-.auth-steps li.on { color: var(--ink); border-top-color: var(--ink); font-weight: 550; }
-.auth-steps li.done { color: var(--ink-2); border-top-color: var(--ink-3); }
 .auth-form { display: flex; flex-direction: column; gap: 14px; }
 .auth-form h1 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -0.02em; }
 .auth-lead { margin: -8px 0 4px; color: var(--ink-2); }
@@ -439,20 +455,8 @@ body.signed-out .site { display: none; }
 .auth-form .field textarea { height: auto; padding: 8px 11px; font-family: ui-monospace, monospace; font-size: 12px; }
 .auth-form .field input:focus, .auth-form .field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
 .auth-form .field span { font-size: 12.5px; }
-.pw { position: relative; display: block; }
-.pw input { width: 100%; padding-right: 56px !important; }
-.pw .btn-link { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 12px; }
-.check { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 12.5px; }
-.check input { accent-color: var(--ink); margin: 0; }
-.check small { color: var(--ink-3); }
 .btn-lg { height: 38px; font-size: 14px; }
 .btn[disabled] { opacity: 0.6; cursor: progress; }
-.company-chip { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); }
-.company-logo { width: 36px; height: 36px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); display: grid; place-items: center; overflow: hidden; font-weight: 650; color: var(--ink-2); flex: none; }
-.company-logo img { width: 100%; height: 100%; object-fit: contain; }
-.company-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.company-text b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.company-text small { color: var(--ink-3); font-size: 12px; }
 .auth-error { margin: 12px 0 0; min-height: 0; color: var(--bad-ink); font-size: 12.5px; }
 .auth-error:empty { display: none; }
 .auth-alt { display: flex; gap: 6px; justify-content: center; align-items: center; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--ink-3); font-size: 12.5px; }
@@ -466,11 +470,8 @@ body.signed-out .site { display: none; }
 .auth-note { margin: 0; color: var(--ink-3); font-size: 12px; }
 .auth-note b { color: var(--ink-2); font-weight: 550; }
 .auth-foot { color: var(--ink-3); font-size: 12px; text-align: center; max-width: 400px; margin: 0; }
-.user-line { display: flex; align-items: center; gap: 8px; }
 .avatar { width: 22px; height: 22px; border-radius: 50%; background: var(--surface-2); border: 1px solid var(--line); display: grid; place-items: center; font-size: 10.5px; font-weight: 650; color: var(--ink-2); flex: none; overflow: hidden; }
 .avatar img { width: 100%; height: 100%; object-fit: contain; }
-.advanced summary { cursor: pointer; color: var(--ink-2); font-weight: 500; margin-bottom: 10px; }
-.advanced[open] { display: flex; flex-direction: column; gap: 10px; }
 
 /* ---------- responsive ---------- */
 
@@ -481,6 +482,8 @@ body.signed-out .site { display: none; }
 }
 @media (max-width: 980px) {
   .wrap { padding: 0 16px; }
+  .tokenbar-label { display: none; }
+  .tokenbar-status { flex-basis: 100%; }
   .header-row { flex-wrap: wrap; height: auto; gap: 0 12px; padding-top: 10px; }
   .logo { flex: 1; }
   .site-nav { order: 3; flex-basis: 100%; height: 44px; margin: 0 -8px; }

@@ -94,8 +94,6 @@ function serverBackend(base) {
       if (!res.ok) throw fail('Server unreachable', { code: 'offline' });
       return res.json();
     },
-    company: (companyKey) => post('api/auth/company', { companyKey }),
-    login: (body) => post('api/auth/login', body),
     loginToken: (token) => post('api/auth/token', { token }),
     demo: () => post('api/auth/demo'),
     async logout() {
