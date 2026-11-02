@@ -13,7 +13,9 @@ FIX = ROOT / "tests" / "fixtures"
 if not (FIX / "sample_response.json").exists():
     import subprocess
     subprocess.run([sys.executable, str(FIX / "make_sample.py")], check=True)
-ROWS = json.loads((FIX / "sample_response.json").read_text())["results"]["data"]["sales"]
+ALL = json.loads((FIX / "sample_response.json").read_text())["results"]["data"]["sales"]
+ROWS = [r for r in ALL if "2026-10-01" <= str(r["order_date"]) <= "2026-10-31" or not str(r["order_date"]).startswith("2026-09")]
+PREV = [r for r in ALL if str(r["order_date"]).startswith("2026-09") and r not in ROWS]
 
 from app import fetcher as fm  # noqa: E402
 from app import config  # noqa: E402
@@ -175,15 +177,57 @@ def test_master_target_and_unmapped(pipeline):
     assert "NOSALE1" in set(pipeline["stores_no_sale"]["cust_code"])
 
 
-def test_excel_and_json(pipeline, tmp_path):
+@pytest.fixture(scope="module")
+def act(pipeline):
+    from app import spark_clean, actions
+    prev = spark_clean.clean(PREV, "2026-09-01", "2026-09-30")
+    return actions.build(pipeline["clean"], prev["clean"], "2026-10-01", "2026-10-31", None, pipeline.get("target_kae")), prev
+
+
+def test_previous_period_dates():
+    from app.actions import previous_period
+    assert previous_period("2026-11-01", "2026-11-18") == ("2026-10-01", "2026-10-18")
+    assert previous_period("2026-10-01", "2026-10-31") == ("2026-09-01", "2026-09-30")     # 31 -> 30
+    assert previous_period("2026-03-01", "2026-03-31") == ("2026-02-01", "2026-02-28")
+    assert previous_period("2026-01-05", "2026-01-20") == ("2025-12-05", "2025-12-20")
+
+
+def test_actions_find_the_planted_problems(act):
+    a, _ = act
+    p = a["promoters"].set_index("emp_code")
+    assert p.loc["GL1800019", "status"].startswith("Stopped")                       # sold in Sep, nothing in Oct
+    assert {"GL1800003", "GL1800004"} <= set(a["no_sale"]["emp_code"])               # stopped after 26-Oct
+    assert {"GL1800003", "GL1800004"} <= set(a["not_punched"]["emp_code"])
+    assert "GL1800019" in set(a["drops"]["emp_code"])
+    assert (a["suspicious"]["type"] == "Quantity spike").any()
+    assert a["sku_gaps"]["cust_code"].is_unique                                     # one row per outlet, no double opportunity
+    west = a["kae_scorecard"].set_index("kae").loc["KAE West"]
+    assert west["change"] < 0 and west["rag"] in ("Red", "Amber")
+    areas = {x["area"] for x in a["actions"]}
+    assert {"Sale vs LMTD", "Punching", "Inactive promoters", "Promoter decline"} <= areas
+    for x in a["actions"]:                                                          # every bullet names something concrete
+        assert any(ch.isdigit() for ch in x["text"])
+
+
+def test_action_totals_tie_to_raw(act, pipeline):
     from app import report
-    meta = dict(start="2026-10-01", end="2026-10-31", generated="now", rows=len(ROWS), fetch={"Pages": 3}, master=True)
-    p = tmp_path / "r.xlsx"; report.write_excel(pipeline, meta, p)
+    a, prev = act
+    checks = report.action_checks(a, pipeline, prev)
+    assert all(c["result"] == "OK" for c in checks), checks
+
+
+def test_excel_and_json(pipeline, act, tmp_path):
+    from app import report
+    a, prev = act
+    meta = dict(start="2026-10-01", end="2026-10-31", lmtd_start="2026-09-01", lmtd_end="2026-09-30", generated="now",
+                rows=len(ROWS), fetch={"Pages": 3}, master=True)
+    pipeline["checks"] = pipeline["checks"] + report.action_checks(a, pipeline, prev)
+    p = tmp_path / "r.xlsx"; report.write_excel(pipeline, a, meta, p)
     import openpyxl
     wb = openpyxl.load_workbook(p)
-    for name in ("Dashboard", "Control Checks", "KAE Summary", "Supervisor Summary", "Promoters", "Outlets", "Clean Data",
-                 "Target vs Achievement", "Data Quality", "Order Gaps"):
-        assert name in wb.sheetnames
-    js = report.dashboard_json(pipeline, meta)
-    json.dumps(js)   # must be serialisable (no NaN / numpy types)
-    assert js["kpi"]["sales"] > 0 and js["insights"]
+    for name in ("Action Center", "Control Checks", "KAE Scorecard", "Supervisor Scorecard", "Not Punched", "No Sale 3+ Days",
+                 "Promoter Decline", "Outlet Decline", "Outlet SKU Gaps", "Entries To Verify", "Clean Data"):
+        assert name in wb.sheetnames, name
+    js = report.dashboard_json(pipeline, a, meta)
+    json.dumps(js)
+    assert js["actions"] and js["totals"]["lmtd"] > 0

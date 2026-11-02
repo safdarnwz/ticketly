@@ -30,17 +30,28 @@ In Chrome: log in to app.salesdiary.in → F12 → **Network** → open any repo
 request → **Headers** → copy the `authorization` value. A token lasts about 16 hours. The page shows its expiry
 time as soon as you paste it (decoded in the browser, nothing is sent anywhere).
 
-## What you get
+## What you get – Sales Action Center
 
-**Dashboard (browser):** KPI tiles, insights, daily trend, brand mix, accounts, top teams, plus sortable and searchable tables:
-KAE/Team, Supervisor, Promoters, Outlets, Brands/SKUs/Accounts/States, Target vs Achievement (when a master is uploaded),
-Data quality, Order gaps and Control checks.
+Open the report and the first screen tells you **who to call and what to fix today**. Every point names the person,
+the outlet and the rupee impact:
 
-**Excel:** Dashboard, Control Checks (live formulas), KAE Summary, Supervisor Summary, Target vs Achievement, Stores
-without sale, Promoters, Outlets, Brands, SKUs, Daily Trend (+ chart), Daily x Brand, Account Summary, Account x Brand,
-State Summary, Data Quality, Order Gaps, Clean Data.
+| Action | What it finds |
+|---|---|
+| **Sale vs LMTD** | This period vs the same days last month, and which KAE / supervisor caused the change (₹) |
+| **Not punched** | Promoters who sold in the period but punched nothing on the last day, with supervisor and usual daily sale |
+| **No sale 3+ days** | Promoters inactive for N days (attendance / stock / replacement issue) |
+| **Never punched** | Roster promoters (master upload) with zero sale punched |
+| **Decline** | Promoters and outlets down 20%+ vs LMTD, incl. those that stopped completely; worst first |
+| **SKU gaps** | Outlets not selling focus SKUs (sold in 40%+ of similar outlets) + ₹ opportunity per outlet |
+| **Verify** | Quantity spikes, same SKU twice in one order, one promoter at several outlets on one day, below-MRP sale |
+| **Scorecards** | KAE and supervisor: sale, LMTD, growth, target/ach (master), punched today, punch %, ₹/promoter-day, gaps, RAG |
 
-**History:** every run is kept in `./data/runs/` and can be opened again from the **History** tab.
+* **Filters** (Channel → KAE → Supervisor) recalculate every tile, list and action point for that team.
+* **Copy for WhatsApp** on every list, plus CSV.
+* **Excel** has the same views: Action Center, Control Checks, KAE / Supervisor Scorecard, Not Punched, No Sale 3+ Days,
+  Never Punched, Promoter / Outlet Decline, Outlet SKU Gaps, Focus SKUs, Entries To Verify, All Promoters / Outlets, Brand,
+  Brand Mix Index, Daily Trend, Data Quality, Order Gaps and Clean Data.
+* LMTD is fetched automatically (same days last month) when "Compare with LMTD" is ticked. Thresholds are set in `.env`.
 
 ## Optional master (exact accounts + targets)
 Upload the *Attendance & Sale* workbook (any sheet whose header has `SD Store ID` and `Target`) or a CSV with

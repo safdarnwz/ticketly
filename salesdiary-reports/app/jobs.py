@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import config, master as master_mod, report, spark_clean
+from . import actions, config, master as master_mod, report, spark_clean
 from .fetcher import Fetcher, FetchError
 
 JOBS: dict[str, dict] = {}
@@ -37,50 +37,75 @@ def create(start: str, end: str, source: str) -> str:
     return job_id
 
 
-def run(job_id: str, token: str | None, rows: list | None, master_blob: tuple | None):
-    """token -> live API pull; rows -> offline JSON upload. master_blob = (bytes, filename) or None."""
+def run(job_id: str, token: str | None, rows: list | None, master_blob: tuple | None,
+        compare: bool = True, prev_rows: list | None = None):
+    """token -> live API pull; rows -> offline JSON upload. master_blob = (bytes, filename) or None.
+    compare -> also pull the same days of last month (LMTD) for growth / drop analysis."""
     with _run_lock:
         j = JOBS[job_id]
         d = _job_dir(job_id)
         try:
-            fetch_meta = {}
+            fetch_meta, warnings = {}, []
+            p_start, p_end = actions.previous_period(j["start"], j["end"])
             if rows is None:
                 _set(job_id, stage="fetch", message="Connecting to SalesDiary…")
                 raw_dir = d / "raw"
                 if config.KEEP_RAW_JSON: raw_dir.mkdir(exist_ok=True)
 
-                def sink(i, page):
-                    if config.KEEP_RAW_JSON:
-                        (raw_dir / f"page_{i:05d}.json").write_text(json.dumps(page, ensure_ascii=False))
+                def sink_for(tag):
+                    def sink(i, page):
+                        if config.KEEP_RAW_JSON:
+                            (raw_dir / f"{tag}_page_{i:05d}.json").write_text(json.dumps(page, ensure_ascii=False))
+                    return sink
 
-                def prog(p):
-                    _set(job_id, pages=p["pages"], rows=p["rows"], message=f"Fetched {p['pages']} pages, {p['rows']:,} rows")
+                def prog_for(label):
+                    def prog(p):
+                        _set(job_id, pages=p["pages"], rows=p["rows"], message=f"{label}: {p['pages']} pages, {p['rows']:,} rows")
+                    return prog
 
-                res = Fetcher(token, j["start"], j["end"], progress=prog, raw_sink=sink).run()
-                token = None  # drop the token as soon as fetching is done
+                res = Fetcher(token, j["start"], j["end"], progress=prog_for("Current period"), raw_sink=sink_for("cur")).run()
                 rows = res.rows
-                fetch_meta = {"Pages requested": res.pages, "Offset mode": res.offset_mode, "Rows received": res.raw_rows,
-                              "Repeated pages ignored": res.overlap_dropped, "Rows used": len(rows)}
+                fetch_meta = {"Current period": f"{j['start']} to {j['end']}", "Pages requested": res.pages, "Offset mode": res.offset_mode,
+                              "Rows received": res.raw_rows, "Repeated pages ignored": res.overlap_dropped, "Rows used": len(rows)}
+                if compare:
+                    try:
+                        _set(job_id, message=f"Fetching LMTD {p_start} to {p_end}…")
+                        pres = Fetcher(token, p_start, p_end, progress=prog_for("LMTD"), raw_sink=sink_for("lmtd")).run()
+                        prev_rows = pres.rows
+                        fetch_meta.update({"LMTD period": f"{p_start} to {p_end}", "LMTD rows": len(prev_rows)})
+                    except FetchError as e:
+                        warnings.append(f"LMTD could not be fetched ({e}); report shows current period only.")
+                token = None  # drop the token as soon as fetching is done
             else:
                 fetch_meta = {"Source": "uploaded JSON", "Rows used": len(rows)}
+                if prev_rows:
+                    fetch_meta.update({"LMTD period": f"{p_start} to {p_end}", "LMTD rows": len(prev_rows)})
             _set(job_id, rows=len(rows), stage="clean", message=f"Cleaning {len(rows):,} rows with PySpark…")
 
-            master_store, notes = None, []
+            master_store, master_pos, notes = None, None, []
             if master_blob:
-                pos, notes = master_mod.read_master(*master_blob)
-                master_store = master_mod.store_level(pos)
+                master_pos, notes = master_mod.read_master(*master_blob)
+                master_store = master_mod.store_level(master_pos)
             res = spark_clean.clean(rows, j["start"], j["end"], master_store)
-            _set(job_id, stage="report", message="Building dashboard and Excel…")
+            prev_clean = None
+            if prev_rows:
+                _set(job_id, message=f"Cleaning LMTD ({len(prev_rows):,} rows)…")
+                prev_clean = spark_clean.clean(prev_rows, p_start, p_end, master_store)
+            _set(job_id, stage="report", message="Building action dashboard and Excel…")
             res = report.enrich(res, j["start"], j["end"])
-            meta = dict(start=j["start"], end=j["end"], generated=dt.datetime.now().strftime("%d-%b-%Y %H:%M"), rows=len(rows),
-                        fetch=fetch_meta, master_notes=notes, master=bool(master_blob), job_id=job_id)
-            (d / "dashboard.json").write_text(json.dumps(report.dashboard_json(res, meta), default=str))
-            xlsx = d / f"SalesDiary_Tertiary_{j['start']}_to_{j['end']}.xlsx"
-            report.write_excel(res, meta, xlsx)
+            act = actions.build(res["clean"], prev_clean["clean"] if prev_clean else None, j["start"], j["end"],
+                                master_pos, res.get("target_kae"))
+            res["checks"] += report.action_checks(act, res, prev_clean)
+            meta = dict(start=j["start"], end=j["end"], lmtd_start=p_start if prev_clean else None, lmtd_end=p_end if prev_clean else None,
+                        generated=dt.datetime.now().strftime("%d-%b-%Y %H:%M"), rows=len(rows), fetch=fetch_meta,
+                        master_notes=notes, master=bool(master_blob), job_id=job_id, warnings=warnings)
+            (d / "dashboard.json").write_text(json.dumps(report.dashboard_json(res, act, meta), default=str))
+            xlsx = d / f"SalesDiary_Actions_{j['start']}_to_{j['end']}.xlsx"
+            report.write_excel(res, act, meta, xlsx)
             res["clean"].to_csv(d / "clean_data.csv", index=False)
             ok = all(c["result"] == "OK" for c in res["checks"])
-            _set(job_id, stage="done", message="Ready" + ("" if ok else " – some control checks need review"), excel=xlsx.name,
-                 checks_ok=ok, finished=dt.datetime.now().isoformat(timespec="seconds"))
+            _set(job_id, stage="done", message="Ready" + ("" if ok else " – some control checks need review") + ("" if not warnings else " (LMTD missing)"),
+                 excel=xlsx.name, checks_ok=ok, finished=dt.datetime.now().isoformat(timespec="seconds"))
         except FetchError as e:
             _set(job_id, stage="error", error=str(e), message=str(e))
         except Exception as e:  # noqa: BLE001

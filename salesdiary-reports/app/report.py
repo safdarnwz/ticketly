@@ -9,6 +9,8 @@ import math
 import numpy as np
 import pandas as pd
 from openpyxl import Workbook
+
+from . import actions as actions_mod
 from openpyxl.chart import BarChart, LineChart, Reference
 from openpyxl.formatting.rule import CellIsRule, ColorScaleRule, DataBarRule, FormulaRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -158,7 +160,7 @@ def checks(r: dict) -> list:
 
 
 # ------------------------------------------------------------------ dashboard JSON
-def _records(df: pd.DataFrame, limit=None) -> list:
+def _records(df, limit=None) -> list:
     if df is None or not len(df):
         return []
     d = df.head(limit) if limit else df
@@ -168,6 +170,7 @@ def _records(df: pd.DataFrame, limit=None) -> list:
         clean = {}
         for k, v in rec.items():
             if isinstance(v, (pd.Timestamp, dt.date, dt.datetime)): v = v.isoformat()[:10]
+            elif isinstance(v, (np.bool_, bool)): v = bool(v)
             elif isinstance(v, (np.integer,)): v = int(v)
             elif isinstance(v, (np.floating, float)): v = None if math.isnan(v) else round(float(v), 4)
             elif v is pd.NaT: v = None
@@ -176,14 +179,30 @@ def _records(df: pd.DataFrame, limit=None) -> list:
     return out
 
 
-def dashboard_json(r: dict, meta: dict) -> dict:
-    k = {kk: (v.isoformat() if hasattr(v, "isoformat") else (float(v) if isinstance(v, (np.floating, np.integer)) else v)) for kk, v in r["kpi"].items()}
-    return dict(meta=meta, kpi=k, runrate=r["runrate"], insights=r["insights"], checks=r["checks"],
-                daily=_records(r["daily"]), brand=_records(r["brand"]), account=_records(r["account"]), channel=_records(r["channel"]),
-                kae=_records(r["kae"]), supervisor=_records(r["supervisor"]), promoter=_records(r["promoter"]),
-                outlet=_records(r["outlet"]), sku=_records(r["sku"]), state=_records(r["state"]), quality=_records(r["quality"]),
-                order_gaps=_records(r["order_gaps"], 500), target_kae=_records(r.get("target_kae")),
-                stores_no_sale=_records(r.get("stores_no_sale"), 500))
+def action_checks(a: dict, r: dict, prev: dict | None) -> list:
+    tot = round(float(r["clean"]["total"].sum()), 2)
+    res = [("Promoter list sale = clean data", tot, round(float(a["promoters"]["sale"].sum()), 2)),
+           ("KAE scorecard sale = clean data", tot, round(float(a["kae_scorecard"]["sale"].sum()), 2)),
+           ("Supervisor scorecard sale = clean data", tot, round(float(a["supervisor_scorecard"]["sale"].sum()), 2)),
+           ("Outlet list sale = clean data", tot, round(float(a["outlets"]["sale"].sum()), 2)),
+           ("Brand table sale = clean data", tot, round(float(a["brand"]["sale"].sum()), 2))]
+    if prev is not None:
+        pt = round(float(prev["clean"]["total"].sum()), 2)
+        res += [("LMTD: KAE scorecard = LMTD clean data", pt, round(float(a["kae_scorecard"]["lmtd"].sum()), 2)),
+                ("LMTD: promoter list = LMTD clean data", pt, round(float(a["promoters"]["lmtd"].sum()), 2)),
+                ("LMTD: outlet list = LMTD clean data", pt, round(float(a["outlets"]["lmtd"].sum()), 2))]
+    return [dict(check=c, expected=e, actual=v, result="OK" if abs(float(e) - float(v)) < 0.5 else "CHECK") for c, e, v in res]
+
+
+def dashboard_json(r: dict, a: dict, meta: dict) -> dict:
+    return dict(meta=meta, totals=a["totals"], has_prev=a["has_prev"], runrate=r["runrate"], actions=a["actions"], checks=r["checks"],
+                kae=_records(a["kae_scorecard"]), supervisor=_records(a["supervisor_scorecard"]), promoters=_records(a["promoters"]),
+                not_punched=_records(a["not_punched"]), no_sale=_records(a["no_sale"]), drops=_records(a["drops"]),
+                never_punched=_records(a["never_punched"]), outlets=_records(a["outlets"]), outlet_drops=_records(a["outlet_drops"]),
+                focus_skus=_records(a["focus_skus"]), sku_gaps=_records(a["sku_gaps"]), suspicious=_records(a["suspicious"]),
+                brand=_records(a["brand"]), brand_index=_records(a["brand_index"]), daily=_records(a["daily"]),
+                quality=_records(r["quality"]), order_gaps=_records(r["order_gaps"], 500),
+                sku=_records(r["sku"]), account=_records(r["account"]))
 
 
 # ------------------------------------------------------------------ Excel
@@ -240,113 +259,168 @@ def _write_table(ws, df: pd.DataFrame, r0: int, c0: int = 1, total_row=True, sum
 SUMS = {"sales", "qty", "orders", "lines", "promoter_days", "target", "achievement", "amount", "gap_vs_plan"}
 
 
-def write_excel(r: dict, meta: dict, path):
+
+FMT.update({"sale": "#,##0", "lmtd": "#,##0", "change": "#,##0;[Red]-#,##0", "growth": "0.0%;[Red]-0.0%", "rs_per_active_day": "#,##0",
+            "rs_per_promoter_day": "#,##0", "punch_discipline": "0%", "punch_pct": "0%", "opportunity": "#,##0", "gap_opportunity": "#,##0",
+            "median_sale_per_outlet": "#,##0", "penetration": "0%", "sale_last_day": "#,##0", "last7": "#,##0", "prev7": "#,##0",
+            "change7": "#,##0;[Red]-#,##0", "cum_sale": "#,##0", "cum_lmtd": "#,##0"})
+NICE = {"emp_code": "Emp code", "emp_name": "Promoter", "kae": "KAE", "supervisor": "Supervisor", "channel": "Channel", "main_outlet": "Main outlet",
+        "outlet_code": "Outlet code", "sale": "Sale ₹", "lmtd": "LMTD ₹", "change": "Change ₹", "growth": "Growth %", "active_days": "Active days",
+        "last_sale": "Last sale", "days_since_last_sale": "Days since sale", "sale_last_day": "Sale on last day", "punch_pct": "Punch %",
+        "rs_per_active_day": "₹ / active day", "status": "Status", "cust_code": "Outlet code", "cust_name": "Outlet", "account": "Account",
+        "promoter": "Promoter", "missing_count": "Focus SKUs missing", "focus_skus": "Focus SKUs", "opportunity": "Opportunity ₹",
+        "missing_skus": "Missing SKUs", "prd_name": "SKU", "brand": "Brand", "outlets_selling": "Outlets selling", "outlets_missing": "Outlets missing",
+        "penetration": "Penetration", "median_sale_per_outlet": "Median ₹ / outlet", "type": "Check", "detail": "Detail", "amount": "Amount ₹",
+        "punched_last_day": "Punched last day", "not_punched": "Not punched", "dropping_promoters": "Dropping promoters", "suspicious": "To verify",
+        "sku_gaps": "SKU gaps", "gap_opportunity": "Gap opportunity ₹", "punch_discipline": "Punch discipline", "rs_per_promoter_day": "₹ / promoter-day",
+        "share": "Share", "rag": "RAG", "rag_basis": "RAG basis", "rank": "Rank", "promoters": "Promoters", "outlets": "Outlets",
+        "promoter_days": "Promoter-days", "target": "Target ₹", "ach_pct": "Ach %", "date": "Date", "order_ref": "Order", "basis": "Basis"}
+LABEL.update(NICE)
+
+
+def _rag_fmt(ws, col_letter, first, last):
+    for v, c in (("Green", "C6EFCE"), ("Amber", "FFE699"), ("Red", "F8CBAD")):
+        ws.conditional_formatting.add(f"{col_letter}{first}:{col_letter}{last}", CellIsRule(operator="equal", formula=[f'"{v}"'], fill=PatternFill("solid", fgColor=c)))
+
+
+def write_excel(r: dict, a: dict, meta: dict, path):
     wb = Workbook()
-    ws = wb.active; ws.title = "Dashboard"; ws.sheet_view.showGridLines = False
-    ws["A1"] = "SalesDiary – Tertiary Sales Dashboard"; ws["A1"].font = F(bold=True, size=18, color=NAVY)
-    ws["A2"] = f"Period {meta['start']} to {meta['end']}   |   generated {meta['generated']}   |   source rows {meta['rows']:,}"
-    ws["A2"].font = F(size=10, color="595959")
-    k = r["kpi"]
-    tiles = [("SALE (₹)", k["sales"], "#,##0"), ("ORDERS", k["orders"], "#,##0"), ("LINES", k["lines"], "#,##0"), ("QTY", k["qty"], "#,##0"),
-             ("PROMOTERS", k["promoters"], "#,##0"), ("OUTLETS", k["outlets"], "#,##0"), ("SKUs", k["skus"], "#,##0"),
-             ("AVG ORDER (₹)", (k["sales"] or 0) / max(k["orders"] or 1, 1), "#,##0")]
-    if r["runrate"]["projected"]:
-        tiles.append(("PROJECTED MONTH (₹)", r["runrate"]["projected"], "#,##0"))
+    t = a["totals"]
+    ws = wb.active; ws.title = "Action Center"; ws.sheet_view.showGridLines = False
+    ws["A1"] = "Sales Action Center"; ws["A1"].font = F(bold=True, size=18, color=NAVY)
+    sub = f"{meta['start']} to {meta['end']} (data till {t['last_day']})"
+    if meta.get("lmtd_start"): sub += f"   |   LMTD {meta['lmtd_start']} to {meta['lmtd_end']}"
+    ws["A2"] = sub + f"   |   generated {meta['generated']}"; ws["A2"].font = F(size=10, color="595959")
+    g = (t["sale"] / t["lmtd"] - 1) if t.get("lmtd") else None
+    tiles = [("SALE ₹", t["sale"], "#,##0"), ("LMTD ₹", t["lmtd"] or 0, "#,##0"), ("GROWTH", g if g is not None else 0, "0.0%;[Red]-0.0%"),
+             ("PROMOTERS ACTIVE", t["promoters"], "#,##0"), (f"PUNCHED {dt.date.fromisoformat(t['last_day']):%d-%b}", t["punched_last_day"], "#,##0"),
+             ("NOT PUNCHED", len(a["not_punched"]), "#,##0"), (f"NO SALE 3+ DAYS", len(a["no_sale"]), "#,##0"),
+             ("SKU GAP ₹", float(a["sku_gaps"]["opportunity"].sum()) if len(a["sku_gaps"]) else 0, "#,##0"),
+             ("ENTRIES TO VERIFY", len(a["suspicious"]), "#,##0"), ("OUTLETS BILLED", t["outlets"], "#,##0")]
     for n, (lab, v, fmt) in enumerate(tiles):
         c0 = 1 + (n % 5) * 3; r0 = 4 + (n // 5) * 4
         ws.merge_cells(start_row=r0, start_column=c0, end_row=r0, end_column=c0 + 1)
         ws.merge_cells(start_row=r0 + 1, start_column=c0, end_row=r0 + 2, end_column=c0 + 1)
-        a = ws.cell(r0, c0, lab); a.font = F(bold=True, size=9, color="FFFFFF"); a.fill = PatternFill("solid", fgColor=TEAL if n == 0 else NAVY)
-        a.alignment = Alignment(horizontal="center")
-        b = ws.cell(r0 + 1, c0, float(v or 0)); b.number_format = fmt; b.font = F(bold=True, size=18, color=NAVY)
-        b.alignment = Alignment(horizontal="center", vertical="center")
+        x = ws.cell(r0, c0, lab); x.font = F(bold=True, size=9, color="FFFFFF"); x.fill = PatternFill("solid", fgColor=TEAL if n < 3 else NAVY)
+        x.alignment = Alignment(horizontal="center")
+        y = ws.cell(r0 + 1, c0, float(v or 0)); y.number_format = fmt; y.font = F(bold=True, size=18, color=NAVY)
+        y.alignment = Alignment(horizontal="center", vertical="center")
         for rr in range(r0, r0 + 3):
             for cc in range(c0, c0 + 2): ws.cell(rr, cc).border = BOX
     row = 13
-    ws.cell(row, 1, "Insights").font = F(bold=True, size=13, color=TEAL)
-    for i, t in enumerate(r["insights"], row + 1):
-        ws.cell(i, 1, f"• {t}").font = F(); ws.merge_cells(start_row=i, start_column=1, end_row=i, end_column=15)
-        ws.cell(i, 1).alignment = Alignment(wrap_text=True, vertical="top"); ws.row_dimensions[i].height = 28
+    ws.cell(row, 1, "What to do today").font = F(bold=True, size=13, color=TEAL)
+    colors = {"red": "F8CBAD", "amber": "FFE699", "green": "C6EFCE"}
+    for i, act in enumerate(a["actions"], row + 1):
+        c = ws.cell(i, 1, act["area"]); c.font = F(bold=True); c.fill = PatternFill("solid", fgColor=colors.get(act["level"], "DDEBF7")); c.border = BOX
+        c.alignment = Alignment(vertical="top", wrap_text=True)
+        ws.merge_cells(start_row=i, start_column=1, end_row=i, end_column=2)
+        d = ws.cell(i, 3, act["text"]); d.font = F(); d.alignment = Alignment(wrap_text=True, vertical="top"); d.border = BOX
+        ws.merge_cells(start_row=i, start_column=3, end_row=i, end_column=15); ws.row_dimensions[i].height = 44
     for c in range(1, 16): ws.column_dimensions[L(c)].width = 11
 
-    def sheet(name, df, sums=SUMS, cf_share=True, freeze="B2"):
+    def sheet(name, df, cols, sums=("sale", "lmtd", "change", "opportunity", "amount", "gap_opportunity", "target"), rag=False, note=None):
         s = wb.create_sheet(name); s.sheet_view.showGridLines = False
+        r0 = 1
+        if note:
+            s.cell(1, 1, note).font = F(italic=True, color="595959"); r0 = 3
         if df is None or not len(df):
-            s["A1"] = "No data"; return s, None
-        r0, last = _write_table(s, df, 1, sum_cols=[c for c in df.columns if c in sums])
-        s.freeze_panes = freeze; s.auto_filter.ref = f"A1:{L(len(df.columns))}{r0 + len(df)}"
-        cols = list(df.columns)
-        if "sales" in cols:
-            col = L(cols.index("sales") + 1)
-            s.conditional_formatting.add(f"{col}2:{col}{len(df)+1}", DataBarRule(start_type="num", start_value=0, end_type="max", color="5B9BD5"))
-        return s, (r0, last)
+            s.cell(r0, 1, "Nothing to show – good."); return s
+        cols = [c for c in cols if c in df.columns]
+        h, last = _write_table(s, df[cols], r0, sum_cols=[c for c in cols if c in sums])
+        s.freeze_panes = s.cell(h + 1, 3); s.auto_filter.ref = f"A{h}:{L(len(cols))}{h + len(df)}"
+        if rag and "rag" in cols:
+            _rag_fmt(s, L(cols.index("rag") + 1), h + 1, h + len(df))
+        if "growth" in cols:
+            gl = L(cols.index("growth") + 1)
+            s.conditional_formatting.add(f"{gl}{h+1}:{gl}{h+len(df)}", CellIsRule(operator="lessThan", formula=["0"], font=Font(color="C00000", bold=True)))
+        return s
 
-    kae_cols = ["rank", "kae", "channel", "sales", "share", "orders", "lines", "qty", "promoters", "outlets", "promoter_days",
-                "avg_active_days", "sales_per_promoter", "sales_per_promoter_day", "aov", "lines_per_order"]
-    s_kae, _ = sheet("KAE Summary", r["kae"][kae_cols] if len(r["kae"]) else r["kae"])
-    s_sup, _ = sheet("Supervisor Summary", r["supervisor"][["rank", "supervisor"] + kae_cols[1:]] if len(r["supervisor"]) else r["supervisor"])
-    if "target_kae" in r:
-        sheet("Target vs Achievement", r["target_kae"])
-        sheet("Stores without sale", r.get("stores_no_sale"))
-    pcols = ["emp_code", "emp_name", "supervisor", "kae", "channel", "role", "status", "sales", "orders", "lines", "qty", "active_days",
-             "avg_per_active_day", "outlets", "outlet_codes", "first_sale", "last_sale", "days_since_last_sale", "name_variants"]
-    s_p, _ = sheet("Promoters", r["promoter"][[c for c in pcols if c in r["promoter"].columns]])
-    ocols = ["cust_code", "cust_name", "account", "account_source", "channel", "state", "district", "kae", "status", "sales", "orders",
-             "qty", "skus", "promoters", "days_with_sale", "last_sale", "days_since_last_sale"]
-    sheet("Outlets", r["outlet"][[c for c in ocols if c in r["outlet"].columns]])
-    sheet("Brands", r["brand"][["brand", "sales", "share", "orders", "lines", "qty", "promoters", "outlets", "aov"]] if len(r["brand"]) else r["brand"])
-    sheet("SKUs", r["sku"][["prd_code", "prd_name", "brand", "categ", "mrp", "sales", "share", "qty", "orders", "outlets", "promoters"]] if len(r["sku"]) else r["sku"])
-    s_d, pos = sheet("Daily Trend", r["daily"][["order_date", "weekday", "sales", "cum_sales", "orders", "lines", "qty", "promoters", "outlets"]] if len(r["daily"]) else r["daily"])
-    if pos and len(r["daily"]) > 1:
-        ch = LineChart(); ch.title = "Daily sale"; ch.height = 8; ch.width = 22; ch.y_axis.number_format = "#,##0"
-        ch.add_data(Reference(s_d, min_col=3, min_row=1, max_row=len(r["daily"]) + 1), titles_from_data=True)
-        ch.set_categories(Reference(s_d, min_col=1, min_row=2, max_row=len(r["daily"]) + 1)); ch.legend = None
-        s_d.add_chart(ch, "L2")
-    sheet("Daily x Brand", r["daily_brand"], sums=set(r["daily_brand"].columns) - {"order_date"})
-    sheet("Account Summary", r["account"][["account", "channel", "sales", "share", "orders", "lines", "qty", "promoters", "outlets", "aov"]] if len(r["account"]) else r["account"])
-    sheet("Account x Brand", r["account_brand"], sums=set(r["account_brand"].columns) - {"account"})
-    sheet("State Summary", r["state"])
-    sheet("Data Quality", r["quality"], sums={"lines", "amount"})
-    sheet("Order Gaps", r["order_gaps"], sums={"gap"})
-    s_c, cpos = sheet("Clean Data", r["clean"], sums={"total", "qty", "mrp_value"}, freeze="C2")
+    sc_cols = ["rank", "kae", "channel", "rag", "sale", "lmtd", "change", "growth", "target", "ach_pct", "share", "promoters", "punched_last_day",
+               "not_punched", f"no_sale_{actions_mod.NO_SALE_DAYS}d", "dropping_promoters", "punch_discipline", "rs_per_promoter_day", "outlets", "sku_gaps",
+               "gap_opportunity", "suspicious", "rag_basis"]
+    sheet("KAE Scorecard", a["kae_scorecard"], sc_cols, rag=True)
+    sheet("Supervisor Scorecard", a["supervisor_scorecard"], ["rank", "supervisor", "kae"] + sc_cols[2:], rag=True)
+    pcols = ["emp_code", "emp_name", "kae", "supervisor", "channel", "main_outlet", "outlet_code", "status", "sale", "lmtd", "change", "growth",
+             "sale_last_day", "active_days", "punch_pct", "last_sale", "days_since_last_sale", "rs_per_active_day", "outlets"]
+    sheet("Not Punched", a["not_punched"], pcols, note=f"Promoters with sale in the period but nothing on {t['last_day']} – call their supervisor.")
+    sheet("No Sale 3+ Days", a["no_sale"], pcols, note="No sale for 3 or more days – check attendance, stock or replacement.")
+    if len(a["never_punched"]):
+        sheet("Never Punched", a["never_punched"], ["emp_code", "emp_name", "kae", "supervisor", "cust_code", "account", "status"],
+              note="Active promoters in the roster with no sale punched in this period.")
+    sheet("Promoter Decline", a["drops"], pcols + ["last7", "prev7", "change7", "basis"], note="Promoters down 20%+ (vs LMTD, or last 7 vs previous 7 days). Worst first.")
+    sheet("Outlet Decline", a["outlet_drops"], ["cust_code", "cust_name", "account", "kae", "supervisor", "promoter", "sale", "lmtd", "change", "growth", "days_since_last_sale"],
+          note="Outlets down 20%+ vs LMTD (incl. outlets with no sale this period). Worst first.")
+    sheet("Outlet SKU Gaps", a["sku_gaps"], ["cust_code", "cust_name", "account", "kae", "supervisor", "promoter", "channel", "missing_count", "focus_skus",
+                                             "opportunity", "missing_skus", "sale"],
+          note="Focus SKUs = sold in 40%+ of outlets of the same channel. Opportunity = what a typical outlet sells of each missing SKU.")
+    sheet("Focus SKUs", a["focus_skus"], ["channel", "prd_name", "brand", "outlets_selling", "outlets_missing", "penetration", "median_sale_per_outlet", "opportunity"])
+    sheet("Entries To Verify", a["suspicious"], ["type", "date", "emp_code", "emp_name", "kae", "supervisor", "cust_name", "detail", "amount", "order_ref"],
+          note="Quantity spikes, same SKU twice in one order, one promoter at several outlets on one day, below-MRP sale.")
+    sheet("All Promoters", a["promoters"], pcols)
+    sheet("All Outlets", a["outlets"], ["cust_code", "cust_name", "account", "channel", "kae", "supervisor", "promoter", "sale", "lmtd", "change", "growth",
+                                        "orders", "skus", "days_with_sale", "last_sale", "days_since_last_sale"])
+    sheet("Brand", a["brand"], ["brand", "sale", "lmtd", "change", "growth", "share"])
+    bi = wb.create_sheet("Brand Mix Index"); bi.sheet_view.showGridLines = False
+    bi["A1"] = "Brand share in each KAE ÷ company brand share (1.00 = same as company, below 0.60 = under-selling)"; bi["A1"].font = F(italic=True, color="595959")
+    if len(a["brand_index"]):
+        h, last = _write_table(bi, a["brand_index"], 3, total_row=False)
+        rng = f"B{h+1}:{L(len(a['brand_index'].columns))}{last}"
+        bi.conditional_formatting.add(rng, ColorScaleRule(start_type="num", start_value=0.3, start_color="F8696B", mid_type="num", mid_value=1, mid_color="FFFFFF", end_type="num", end_value=1.7, end_color="63BE7B"))
+    dsh = sheet("Daily Trend", a["daily"], ["date", "sale", "lmtd", "cum_sale", "cum_lmtd", "promoters", "outlets"])
+    if len(a["daily"]) > 1:
+        ch = LineChart(); ch.title = "Cumulative sale vs LMTD" if a["has_prev"] else "Daily sale"; ch.height = 8; ch.width = 22
+        cols = ["date", "sale", "lmtd", "cum_sale", "cum_lmtd", "promoters", "outlets"]; cols = [c for c in cols if c in a["daily"].columns]
+        series = ["cum_sale", "cum_lmtd"] if a["has_prev"] else ["sale"]
+        for sname in series:
+            ci = cols.index(sname) + 1
+            ch.add_data(Reference(dsh, min_col=ci, min_row=1, max_row=len(a["daily"]) + 1), titles_from_data=True)
+        ch.set_categories(Reference(dsh, min_col=1, min_row=2, max_row=len(a["daily"]) + 1)); ch.y_axis.number_format = "#,##0"
+        dsh.add_chart(ch, "J2")
+    sheet("Data Quality", r["quality"], ["issue", "lines", "orders", "amount"], sums=())
+    sheet("Order Gaps", r["order_gaps"], list(r["order_gaps"].columns) if len(r["order_gaps"]) else [], sums=("gap",))
+    s_clean = sheet("Clean Data", r["clean"], list(r["clean"].columns), sums=("total", "qty"))
 
-    # Control checks: formulas compare every sheet total with the Clean Data total
+    # Control checks with live formulas back to Clean Data
     s = wb.create_sheet("Control Checks", 1); s.sheet_view.showGridLines = False
-    s["A1"] = "Control Checks – every total must tie back to Clean Data"; s["A1"].font = F(bold=True, size=14, color=NAVY)
-    hdr = ["Check", "Expected", "Actual", "Difference", "Result"]
-    for j, h in enumerate(hdr, 1):
+    s["A1"] = "Control Checks – every total ties back to Clean Data"; s["A1"].font = F(bold=True, size=14, color=NAVY)
+    for j, h in enumerate(["Check", "Expected", "Actual", "Difference", "Result"], 1):
         c = s.cell(3, j, h); c.font = F(bold=True, color="FFFFFF"); c.fill = HF; c.border = BOX
-    n_clean = len(r["clean"]); tcol = L(list(r["clean"].columns).index("total") + 1)
-    clean_total = f"SUM('Clean Data'!{tcol}2:{tcol}{n_clean + 1})"
-    lines = [("Rows from API = rows in Clean Data", r["counts"]["raw"], f"=COUNTA('Clean Data'!B2:B{n_clean + 1})")]
-    for name, df in (("KAE Summary", r["kae"]), ("Supervisor Summary", r["supervisor"]), ("Promoters", r["promoter"]), ("Outlets", r["outlet"]),
-                     ("Brands", r["brand"]), ("SKUs", r["sku"]), ("Daily Trend", r["daily"]), ("Account Summary", r["account"])):
-        if not len(df): continue
-        cols = {"KAE Summary": kae_cols, "Supervisor Summary": ["rank", "supervisor"] + kae_cols[1:], "Promoters": [c for c in pcols if c in df.columns],
-                "Outlets": [c for c in ocols if c in df.columns], "Brands": ["brand", "sales"], "SKUs": ["prd_code", "prd_name", "brand", "categ", "mrp", "sales"],
-                "Daily Trend": ["order_date", "weekday", "sales"], "Account Summary": ["account", "channel", "sales"]}[name]
-        col = L(cols.index("sales") + 1)
-        lines.append((f"{name} sale = Clean Data sale", f"={clean_total}", f"=SUM('{name}'!{col}2:{col}{len(df) + 1})"))
-    if "target_kae" in r:
-        tk = r["target_kae"]; col = L(list(tk.columns).index("achievement") + 1)
-        lines.append(("Target vs Achievement = Clean Data sale", f"={clean_total}", f"=SUM('Target vs Achievement'!{col}2:{col}{len(tk) + 1})"))
-    for i, (c, e, a) in enumerate(lines, 4):
-        s.cell(i, 1, c).font = F(bold=True); s.cell(i, 2, e); s.cell(i, 3, a); s.cell(i, 4, f"=C{i}-B{i}")
+    n = len(r["clean"]); tcol = L(list(r["clean"].columns).index("total") + 1)
+    ct = f"SUM('Clean Data'!{tcol}2:{tcol}{n + 1})"
+    lines = [("Rows from API = rows in Clean Data", r["counts"]["raw"], f"=COUNTA('Clean Data'!B2:B{n + 1})")]
+    for name, df in (("KAE Scorecard", a["kae_scorecard"]), ("Supervisor Scorecard", a["supervisor_scorecard"]), ("All Promoters", a["promoters"]),
+                     ("All Outlets", a["outlets"]), ("Brand", a["brand"])):
+        cols_ = {"KAE Scorecard": [c for c in sc_cols if c in df.columns], "Supervisor Scorecard": [c for c in ["rank", "supervisor", "kae"] + sc_cols[2:] if c in df.columns],
+                 "All Promoters": [c for c in pcols if c in df.columns],
+                 "All Outlets": [c for c in ["cust_code", "cust_name", "account", "channel", "kae", "supervisor", "promoter", "sale"] if c in df.columns],
+                 "Brand": ["brand", "sale"]}[name]
+        col = L(cols_.index("sale") + 1)
+        lines.append((f"{name} sale = Clean Data sale", f"={ct}", f"=SUM('{name}'!{col}2:{col}{len(df) + 1})"))
+    for i, (c, e, v) in enumerate(lines, 4):
+        s.cell(i, 1, c).font = F(bold=True); s.cell(i, 2, e); s.cell(i, 3, v); s.cell(i, 4, f"=C{i}-B{i}")
         s.cell(i, 5, f'=IF(ABS(D{i})<0.5,"OK","CHECK")')
         for j in range(1, 6):
             s.cell(i, j).border = BOX
             if j in (2, 3, 4): s.cell(i, j).number_format = "#,##0"; s.cell(i, j).font = F()
     last = 3 + len(lines)
+    off = last + 1
+    for i, chk in enumerate([c for c in r["checks"] if c["check"].startswith("LMTD")], off):
+        s.cell(i, 1, chk["check"]).font = F(bold=True); s.cell(i, 2, chk["expected"]); s.cell(i, 3, chk["actual"])
+        s.cell(i, 4, f"=C{i}-B{i}"); s.cell(i, 5, f'=IF(ABS(D{i})<0.5,"OK","CHECK")')
+        for j in range(1, 6):
+            s.cell(i, j).border = BOX
+            if j in (2, 3, 4): s.cell(i, j).number_format = "#,##0"
+        last = i
     s.conditional_formatting.add(f"E4:E{last}", CellIsRule(operator="equal", formula=['"OK"'], fill=PatternFill("solid", fgColor="C6EFCE"), font=Font(bold=True, color="006100")))
     s.conditional_formatting.add(f"E4:E{last}", CellIsRule(operator="equal", formula=['"CHECK"'], fill=PatternFill("solid", fgColor="FFC7CE"), font=Font(bold=True, color="9C0006")))
     s.cell(last + 2, 1, "All checks").font = F(bold=True, size=12)
-    s.cell(last + 2, 2, f'=IF(COUNTIF(E4:E{last},"OK")={len(lines)},"ALL OK","REVIEW")').font = F(bold=True, size=12)
+    s.cell(last + 2, 2, f'=IF(COUNTIF(E4:E{last},"OK")={last - 3},"ALL OK","REVIEW")').font = F(bold=True, size=12)
     s.cell(last + 4, 1, "Fetch details").font = F(bold=True, size=12, color=TEAL)
     for i, (kk, vv) in enumerate(meta.get("fetch", {}).items(), last + 5):
         s.cell(i, 1, kk).font = F(); s.cell(i, 2, str(vv)).font = F()
     s.column_dimensions["A"].width = 46
     for c in "BCDE": s.column_dimensions[c].width = 16
-
     for sh in wb.worksheets:
-        sh.sheet_properties.tabColor = {"Dashboard": TEAL, "Control Checks": "00B050", "Data Quality": "C00000", "Order Gaps": "C00000"}.get(sh.title, NAVY)
+        sh.sheet_properties.tabColor = {"Action Center": TEAL, "Control Checks": "00B050"}.get(sh.title, "C00000" if sh.title in (
+            "Not Punched", "No Sale 3+ Days", "Never Punched", "Promoter Decline", "Outlet Decline", "Entries To Verify") else NAVY)
     wb.save(path)

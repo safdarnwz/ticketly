@@ -64,21 +64,19 @@ async def _master(master: UploadFile | None, save: bool):
 
 @app.post("/api/jobs")
 async def start_job(token: str = Form(...), start_date: str = Form(...), end_date: str = Form(...),
-                    master: UploadFile | None = File(None), save_master: bool = Form(False)):
+                    master: UploadFile | None = File(None), save_master: bool = Form(False), compare: bool = Form(True)):
     _check_dates(start_date, end_date)
     blob = await _master(master, save_master)
     job_id = jobs.create(start_date, end_date, "api")
-    threading.Thread(target=jobs.run, args=(job_id, token, None, blob), daemon=True).start()
+    threading.Thread(target=jobs.run, args=(job_id, token, None, blob, compare), daemon=True).start()
     return {"job_id": job_id}
 
 
-@app.post("/api/jobs/upload")
-async def upload_job(files: list[UploadFile] = File(...), start_date: str = Form(...), end_date: str = Form(...),
-                     master: UploadFile | None = File(None), save_master: bool = Form(False)):
-    """Offline mode: build the same dashboard from saved JSON response(s)."""
-    _check_dates(start_date, end_date)
+async def _read_pages(files) -> list:
     rows, seen_pages = [], set()
-    for f in files:
+    for f in files or []:
+        if not f or not f.filename:
+            continue
         try:
             body = json.loads(await f.read())
         except ValueError:
@@ -89,11 +87,22 @@ async def upload_job(files: list[UploadFile] = File(...), start_date: str = Form
         if sig in seen_pages:       # the same page uploaded twice is skipped; identical rows inside data are kept
             continue
         seen_pages.add(sig); rows.extend(page)
+    return rows
+
+
+@app.post("/api/jobs/upload")
+async def upload_job(files: list[UploadFile] = File(...), start_date: str = Form(...), end_date: str = Form(...),
+                     master: UploadFile | None = File(None), save_master: bool = Form(False),
+                     prev_files: list[UploadFile] | None = File(None)):
+    """Offline mode: build the same dashboard from saved JSON response(s); optional LMTD JSON for comparison."""
+    _check_dates(start_date, end_date)
+    rows = await _read_pages(files)
     if not rows:
         raise HTTPException(400, "No sales rows found in the uploaded file(s)")
+    prev_rows = await _read_pages(prev_files) if prev_files else None
     blob = await _master(master, save_master)
     job_id = jobs.create(start_date, end_date, "upload")
-    threading.Thread(target=jobs.run, args=(job_id, None, rows, blob), daemon=True).start()
+    threading.Thread(target=jobs.run, args=(job_id, None, rows, blob, False, prev_rows or None), daemon=True).start()
     return {"job_id": job_id}
 
 
