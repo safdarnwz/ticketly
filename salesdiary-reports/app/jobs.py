@@ -60,13 +60,13 @@ def run(job_id: str, token: str | None, rows: list | None, master_blob: tuple | 
 
                 def prog_for(label):
                     def prog(p):
-                        _set(job_id, pages=p["pages"], rows=p["rows"], message=f"{label}: {p['pages']} pages, {p['rows']:,} rows")
+                        _set(job_id, pages=p["pages"], rows=p["rows"], message=f"{label}: {p['rows']:,} rows" + (f" ({p['note']})" if p.get("note") else ""))
                     return prog
 
                 res = Fetcher(token, j["start"], j["end"], progress=prog_for("Current period"), raw_sink=sink_for("cur")).run()
                 rows = res.rows
-                fetch_meta = {"Current period": f"{j['start']} to {j['end']}", "Pages requested": res.pages, "Offset mode": res.offset_mode,
-                              "Rows received": res.raw_rows, "Repeated pages ignored": res.overlap_dropped, "Rows used": len(rows)}
+                fetch_meta = {"Current period": f"{j['start']} to {j['end']}", "API calls": res.pages, "Fetch method": res.offset_mode,
+                              "Rows received": res.raw_rows, "Rows of other days skipped (day-by-day)": res.overlap_dropped, "Rows used": len(rows)}
                 if compare:
                     try:
                         _set(job_id, message=f"Fetching LMTD {p_start} to {p_end}…")

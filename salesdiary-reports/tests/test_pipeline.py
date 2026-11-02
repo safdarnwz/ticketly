@@ -34,54 +34,64 @@ class FakeResp:
 
 
 class FakeSession:
-    """Simulates the SalesDiary API with row- or page-based offsets."""
-    def __init__(self, rows, page_size=37, mode="row", overlap=0, fail=None, repeat_last=False):
-        self.rows, self.ps, self.mode, self.overlap, self.fail, self.repeat_last, self.calls = rows, page_size, mode, overlap, fail, repeat_last, []
+    """Behaves like the live SalesDiary API: 'offset' is the time-zone (330) and the whole range comes back in one
+    response. cap = optional server row limit to simulate truncation."""
+    def __init__(self, rows, cap=None, fail=None):
+        self.rows, self.cap, self.fail, self.calls = rows, cap, fail, []
 
     def post(self, url, headers=None, data=None, timeout=None, verify=None):
         body = json.loads(data)
         assert headers["authorization"] == body["access_token"] == TOKEN
         assert headers["Accept"].endswith("*/*")
-        off = body["offset"]; self.calls.append(off)
+        assert body["offset"] == 330                      # time-zone minutes, exactly like the web app
+        self.calls.append((body["start_date"], body["end_date"]))
         if self.fail: return self.fail
-        start = off if self.mode == "row" else off * self.ps
-        start = max(0, start - self.overlap) if off > 1 else start
-        page = self.rows[start:start + self.ps]
-        if not page and self.repeat_last:
-            page = self.rows[-self.ps:]
-        return FakeResp(body={"results": {"status": 200, "msg": "success", "data": {"sales": page}}})
+        out = [r for r in self.rows if body["start_date"] <= str(r["order_date"])[:10] <= body["end_date"]]
+        if self.cap: out = out[:self.cap]
+        return FakeResp(body={"results": {"status": 200, "msg": "success", "data": {"sales": out}}})
 
 
 @pytest.fixture(autouse=True)
 def fast(monkeypatch):
     monkeypatch.setattr(config, "MAX_RETRIES", 1)
+    monkeypatch.setattr(config, "FETCH_MODE", "auto")
     monkeypatch.setattr(fm.time, "sleep", lambda s: None)
 
 
-@pytest.mark.parametrize("mode", ["row", "page"])
-def test_fetch_all_rows_both_offset_modes(mode):
-    s = FakeSession(ROWS, mode=mode)
+IN_OCT = [r for r in ROWS if "2026-10-01" <= str(r["order_date"])[:10] <= "2026-10-31"]
+
+
+def test_single_call_returns_whole_range():
+    s = FakeSession(ROWS)
     res = fm.Fetcher(TOKEN, "2026-10-01", "2026-10-31", session=s).run()
-    assert res.offset_mode == mode
-    assert len(res.rows) == len(ROWS)
+    assert len(s.calls) == 1 and len(res.rows) == len(IN_OCT)
+
+
+def test_capped_response_is_refetched_day_by_day():
+    s = FakeSession(ROWS, cap=1000)                       # server silently stops at 1000 rows for the month
+    res = fm.Fetcher(TOKEN, "2026-10-01", "2026-10-31", session=s).run()
+    assert len(res.rows) == len(IN_OCT) > 1000
+    assert "day by day" in res.offset_mode and len(s.calls) == 1 + 31
+
+
+def test_daily_mode_and_cap_on_a_single_day(monkeypatch):
+    monkeypatch.setattr(config, "FETCH_MODE", "daily")
+    res = fm.Fetcher(TOKEN, "2026-10-01", "2026-10-31", session=FakeSession(ROWS)).run()
+    assert len(res.rows) == len(IN_OCT)
+    one_day = [dict(ROWS[0], order_date="2026-10-05") for _ in range(500)]
+    with pytest.raises(fm.FetchError, match="server limit"):
+        fm.Fetcher(TOKEN, "2026-10-05", "2026-10-05", session=FakeSession(one_day)).run()
 
 
 def test_identical_rows_are_kept_not_deduplicated():
-    """Same SKU punched twice in one order is real sale; it must survive pagination (also across a page boundary)."""
-    dup = dict(ROWS[0])
-    data = ROWS[:36] + [dup, dict(dup)] + ROWS[36:]      # duplicate pair straddles the 37-row page boundary
-    for mode in ("row", "page"):
-        res = fm.Fetcher(TOKEN, "2026-10-01", "2026-10-31", session=FakeSession(data, mode=mode)).run()
+    """Same SKU punched twice in one order is real sale; it must survive (single call and day by day)."""
+    dup = dict(IN_OCT[0])
+    data = IN_OCT + [dict(dup), dict(dup)]
+    for mode in ("single", "daily"):
+        config.FETCH_MODE = mode
+        res = fm.Fetcher(TOKEN, "2026-10-01", "2026-10-31", session=FakeSession(data)).run()
         assert len(res.rows) == len(data), mode
-        assert sum(float(str(r["total"]).replace(",", "")) for r in res.rows) == pytest.approx(
-            sum(float(str(r["total"]).replace(",", "")) for r in data))
-
-
-def test_server_repeating_last_page_does_not_loop_forever():
-    s = FakeSession(ROWS, mode="page", repeat_last=True)
-    res = fm.Fetcher(TOKEN, "2026-10-01", "2026-10-31", session=s).run()
-    assert len(res.rows) == len(ROWS)
-    assert len(s.calls) < 100
+    config.FETCH_MODE = "auto"
 
 
 def test_expired_token_message():
@@ -113,17 +123,8 @@ def test_short_token_rejected():
         fm.Fetcher("abc", "2026-10-01", "2026-10-31")
 
 
-def test_api_ignoring_offset_is_an_error_not_silent_truncation():
-    class Same(FakeSession):
-        def post(self, url, headers=None, data=None, timeout=None, verify=None):
-            return FakeResp(body={"results": {"status": 200, "data": {"sales": self.rows[:37]}}})
-    with pytest.raises(fm.FetchError, match="ignores"):
-        fm.Fetcher(TOKEN, "2026-10-01", "2026-10-31", session=Same(ROWS)).run()
-
-
 def test_empty_range():
-    s = FakeSession([], mode="row")
-    res = fm.Fetcher(TOKEN, "2026-10-01", "2026-10-31", session=s).run()
+    res = fm.Fetcher(TOKEN, "2030-01-01", "2030-01-31", session=FakeSession(ROWS)).run()
     assert res.rows == []
 
 

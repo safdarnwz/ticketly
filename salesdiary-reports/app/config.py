@@ -10,10 +10,10 @@ USER_AGENT = os.getenv(
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
 )
 REQUEST_TIMEOUT = int(os.getenv("SD_TIMEOUT_SECONDS", "120"))
-MAX_PAGES = int(os.getenv("SD_MAX_PAGES", "5000"))
+TZ_OFFSET = int(os.getenv("SD_TZ_OFFSET", "330"))          # body "offset" = browser time-zone minutes (IST = 330)
+FETCH_MODE = os.getenv("SD_FETCH_MODE", "auto")            # auto | single | daily
+SUSPECT_CAPS = {int(x) for x in os.getenv("SD_SUSPECT_CAPS", "1000,2000,5000,10000,20000,50000").split(",") if x.strip()}
 MAX_RETRIES = int(os.getenv("SD_MAX_RETRIES", "4"))
-# auto = detect whether "offset" is a row offset or a page number; or force "row" / "page"
-OFFSET_MODE = os.getenv("SD_OFFSET_MODE", "auto")
 VERIFY_TLS = os.getenv("SD_VERIFY_TLS", "true").lower() != "false"
 
 DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))

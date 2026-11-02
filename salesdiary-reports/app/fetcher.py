@@ -1,12 +1,17 @@
 """Pull every row of the SalesDiary tertiary sales report for a date range.
 
+How the API behaves (found on the live system)
+- "offset" in the request body is the browser's time-zone offset in minutes (330 = IST, +5:30), NOT a page number.
+  The API returns the whole date range in one response; sending offset 0/1 just returns the same rows.
+- So the fetcher sends offset=330 (SD_TZ_OFFSET) like the web app, and reads the whole range in one call.
+
 Edge cases handled
-- "offset" may be a row offset or a page number: detected automatically (or forced with SD_OFFSET_MODE).
-- Repeated pages: a page identical to an earlier page stops the loop (server looping). Individual rows are never
-  de-duplicated, because identical lines can be genuine sale; they are flagged later instead.
-- A server that ignores "offset" raises an error instead of silently returning only the first page.
-- Expired / wrong token (401/403 or status != 200 in the body), HTML error pages, timeouts and 5xx are reported
-  with a clear message; transient errors are retried with exponential backoff.
+- Possible server-side row cap: if one response returns a "round" number of rows (e.g. 500, 1000, 5000) the range is
+  re-fetched day by day and the per-day results are used (each day's rows must belong to that day). SD_FETCH_MODE=daily
+  always fetches day by day; single never does.
+- Rows are never de-duplicated (identical lines can be genuine sale); they are flagged later instead.
+- Expired / wrong token (401/403 or a token message in the body), HTML error pages, timeouts, 5xx and 429 give clear
+  messages; transient errors are retried with backoff.
 - The token is only held in memory for the duration of the fetch. It is never logged or written to disk.
 """
 from __future__ import annotations
@@ -29,14 +34,15 @@ class FetchError(Exception):
 class FetchResult:
     rows: list
     pages: int
-    offset_mode: str
+    offset_mode: str           # how the data was fetched (kept name for compatibility)
     raw_rows: int              # rows received incl. overlap duplicates
-    overlap_dropped: int       # pages ignored because they exactly repeated an earlier page
+    overlap_dropped: int       # day-by-day mode: rows skipped because their date belongs to another day's call
     page_sizes: list = field(default_factory=list)
 
 
-def build_payload(token: str, start: str, end: str, offset: int) -> dict:
-    """Body exactly as the SalesDiary web app sends it; only dates, token and offset change."""
+def build_payload(token: str, start: str, end: str, offset: int | None = None) -> dict:
+    """Body exactly as the SalesDiary web app sends it; only dates and token change. offset = time-zone minutes."""
+    offset = config.TZ_OFFSET if offset is None else offset
     return {
         "start_date": start, "end_date": end, "period_id": 0, "access_token": token,
         "url": config.API_BASE, "offset": offset, "offsetID": 0, "flag": True, "type": "",
@@ -91,12 +97,13 @@ class Fetcher:
         self.raw_sink = raw_sink or (lambda i, rows: None)
         self.url = config.API_BASE + config.TERTIARY_PATH
 
-    def _post(self, offset: int) -> list:
+    def _post(self, start: str | None = None, end: str | None = None) -> list:
+        start, end = start or self.start, end or self.end
         last = None
         for attempt in range(config.MAX_RETRIES + 1):
             try:
                 r = self.session.post(self.url, headers=headers(self.token),
-                                      data=json.dumps(build_payload(self.token, self.start, self.end, offset)),
+                                      data=json.dumps(build_payload(self.token, start, end)),
                                       timeout=config.REQUEST_TIMEOUT, verify=config.VERIFY_TLS)
             except requests.RequestException as e:
                 last = f"network error: {e.__class__.__name__}"
@@ -119,58 +126,48 @@ class Fetcher:
                     return extract_rows(body)
             if attempt < config.MAX_RETRIES:
                 time.sleep(min(2 ** (attempt + 1), 30))
-        raise FetchError(f"Gave up after {config.MAX_RETRIES + 1} attempts at offset {offset}: {last}")
+        raise FetchError(f"Gave up after {config.MAX_RETRIES + 1} attempts for {start} to {end}: {last}")
+
+    @staticmethod
+    def looks_capped(n: int) -> bool:
+        """A response that stops at a round number of rows may have been cut by the server."""
+        return n >= 500 and (n % 500 == 0 or n in config.SUSPECT_CAPS)
+
+    def _daily(self) -> tuple[list, list, int]:
+        import datetime as _dt
+        s, e = _dt.date.fromisoformat(self.start), _dt.date.fromisoformat(self.end)
+        rows, sizes, outside = [], [], 0
+        d, i, n_days = s, 0, (e - s).days + 1
+        while d <= e:
+            day = d.isoformat()
+            page = self._post(day, day)
+            self.raw_sink(i, page); sizes.append(len(page))
+            if self.looks_capped(len(page)):
+                raise FetchError(f"{day}: the API returned exactly {len(page)} rows for a single day, which looks like a server "
+                                 "limit. The report would be incomplete – ask SalesDiary about the row limit.")
+            for r in page:
+                od = str(r.get("order_date") or "")[:10]
+                if od and od != day:
+                    outside += 1          # belongs to another day; it is fetched with that day
+                    continue
+                rows.append(r)
+            i += 1; d += _dt.timedelta(days=1)
+            self.progress({"stage": "fetch", "pages": i, "rows": len(rows), "note": f"day {i}/{n_days}"})
+        return rows, sizes, outside
 
     def run(self) -> FetchResult:
-        """Rows are NEVER de-duplicated here: two identical lines can be genuine (same SKU punched twice) and dropping
-        them would lose sale. Row offsets advance by exactly the rows received, so pages cannot overlap; a page that is
-        an exact repeat of an earlier page means the server is looping, and fetching stops there."""
-        rows, sizes, page_sigs = [], [], set()
-        repeated = 0
-
-        def page_sig(page):
-            return hash(tuple(signature(r) for r in page))
-
-        first = self._post(0)
-        self.raw_sink(0, first); sizes.append(len(first)); rows.extend(first); page_sigs.add(page_sig(first))
+        mode = config.FETCH_MODE
+        if mode == "daily":
+            rows, sizes, outside = self._daily()
+            return FetchResult(rows, len(sizes), "day by day", sum(sizes), outside, sizes)
+        rows = self._post()
+        self.raw_sink(0, rows)
         self.progress({"stage": "fetch", "pages": 1, "rows": len(rows)})
-        if not first:
-            return FetchResult([], 1, "n/a", 0, 0, sizes)
-
-        mode = config.OFFSET_MODE
-        if mode == "auto":
-            probe = self._post(1)
-            if not probe:
-                return FetchResult(rows, 1, "single page", len(rows), 0, sizes)
-            if [signature(x) for x in probe] == [signature(x) for x in first]:
-                raise FetchError("The API returned the same page for offset 0 and 1, i.e. it ignores 'offset'. Only "
-                                 f"{len(first)} rows could be read, so the report would be incomplete. Set SD_OFFSET_MODE "
-                                 "or check the request.")
-            if len(first) > 1 and signature(probe[0]) == signature(first[1]):
-                mode = "row"          # offset=1 skipped exactly one row -> row offset
-            else:
-                mode = "page"         # offset=1 returned a different block -> page number
-                self.raw_sink(1, probe); sizes.append(len(probe)); rows.extend(probe); page_sigs.add(page_sig(probe))
-                if len(probe) < len(first):   # second page already short -> it was the last page
-                    return FetchResult(rows, 2, mode, len(rows), 0, sizes)
-
-        pages = len(sizes)
-        offset = len(rows) if mode == "row" else pages
-        while pages < config.MAX_PAGES:
-            page = self._post(offset)
-            pages += 1
-            self.raw_sink(pages - 1, page); sizes.append(len(page))
-            if not page:
-                break
-            sig = page_sig(page)
-            if sig in page_sigs:      # exact repeat of an earlier page -> server is looping; stop
-                repeated += 1
-                break
-            page_sigs.add(sig); rows.extend(page)
-            self.progress({"stage": "fetch", "pages": pages, "rows": len(rows)})
-            if len(page) < len(first):   # a short page is the last page; asking again could return repeated rows
-                break
-            offset = offset + len(page) if mode == "row" else offset + 1
-        else:
-            raise FetchError(f"Stopped after {config.MAX_PAGES} pages – raise SD_MAX_PAGES if this range is really that big.")
-        return FetchResult(rows, pages, mode, sum(sizes), repeated, sizes)
+        if mode == "auto" and self.looks_capped(len(rows)) and self.start != self.end:
+            self.progress({"stage": "fetch", "pages": 1, "rows": len(rows), "note": f"{len(rows)} rows looks like a limit – re-fetching day by day"})
+            drows, sizes, outside = self._daily()
+            if len(drows) < len(rows):
+                raise FetchError(f"Day-by-day fetch returned fewer rows ({len(drows)}) than the single call ({len(rows)}); "
+                                 "cannot be sure the data is complete.")
+            return FetchResult(drows, len(sizes) + 1, f"day by day (single call stopped at {len(rows)} rows)", sum(sizes), outside, sizes)
+        return FetchResult(rows, 1, "single call (offset = time-zone 330)", len(rows), 0, [len(rows)])

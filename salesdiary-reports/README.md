@@ -63,9 +63,8 @@ are marked `prefix rule`, and ambiguous prefixes (MTWE, MTCA) are flagged for re
 
 | Risk | How it is handled |
 |---|---|
-| Pagination: `offset` may be a row offset or a page number | Detected automatically (`SD_OFFSET_MODE=auto`), or force `row` / `page` |
-| API ignores `offset` and returns page 1 every time | Stops with an error instead of a silently partial report |
-| Server repeats a page or loops | An exact repeat of a page stops the loop; a short page is treated as the last page |
+| API "offset" is the time-zone (330 = IST), not a page | Sent as 330 like the web app; the whole range comes in one call |
+| Server silently caps rows (response stops at 500 / 1000 / 5000…) | Range re-fetched day by day automatically; a cap on a single day stops with an error |
 | Identical lines (same SKU punched twice) | **Never dropped**. Kept and flagged "Possible duplicate line" |
 | Lines of an order missing / extra | Sum of lines vs `order_config_json.order.total`, listed in **Order Gaps** |
 | Numbers as text (`"1,234"`), text dates, blanks, `"NA"`, trailing spaces | Cast / trimmed in Spark; invalid values flagged |
@@ -76,7 +75,7 @@ are marked `prefix rule`, and ambiguous prefixes (MTWE, MTCA) are flagged for re
 | Every table must add up | Control Checks: rows and ₹ of every table vs Clean Data (web page + live Excel formulas) |
 
 ## Configuration (`.env`)
-See `.env.example`: API base/path, timeout, retries, max pages, offset mode, max range (default 92 days), Spark memory.
+See `.env.example`: API base/path, timeout, retries, time-zone offset, fetch mode, max range (default 92 days), Spark memory.
 
 ## Security
 * The token is sent only to this server, used for the fetch and then dropped. It is not logged and not written to disk,
