@@ -1,0 +1,13 @@
+services:
+  salesdiary-reports:
+    build: .
+    image: salesdiary-reports:latest
+    container_name: salesdiary-reports
+    ports:
+      - "${PORT:-8080}:8080"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/data          # runs (raw JSON, Excel, dashboard JSON) and the saved master
+    init: true
+    restart: unless-stopped

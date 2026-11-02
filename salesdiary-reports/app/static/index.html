@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SalesDiary Reports</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/vendor/chart.umd.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">SalesDiary <span>Reports</span></div>
+  <nav><button class="link" data-view="run">New report</button><button class="link" data-view="history">History</button></nav>
+</header>
+
+<main>
+  <!-- RUN FORM -->
+  <section id="view-run" class="card form-card">
+    <div class="tabs small">
+      <button class="tab active" data-mode="api">Live (token)</button>
+      <button class="tab" data-mode="upload">From JSON file</button>
+    </div>
+    <form id="run-form" autocomplete="off">
+      <div class="mode mode-api">
+        <label>SalesDiary token <small>(the <code>authorization</code> value – used once for this report, never saved)</small></label>
+        <div class="token-row">
+          <textarea id="token" rows="3" spellcheck="false" placeholder="eyJhbGciOi…"></textarea>
+          <button type="button" class="ghost" id="toggle-token">Show</button>
+        </div>
+        <div id="token-info" class="hint"></div>
+      </div>
+      <div class="mode mode-upload hidden">
+        <label>Saved API response(s) <small>(.json – one or many pages)</small></label>
+        <input type="file" id="json-files" accept=".json,application/json" multiple>
+      </div>
+      <div class="grid2">
+        <div><label>Start date</label><input type="date" id="start" required></div>
+        <div><label>End date</label><input type="date" id="end" required></div>
+      </div>
+      <div class="quick">
+        <button type="button" class="chip" data-range="mtd">Month to date</button>
+        <button type="button" class="chip" data-range="yesterday">Yesterday</button>
+        <button type="button" class="chip" data-range="last7">Last 7 days</button>
+        <button type="button" class="chip" data-range="lastmonth">Last month</button>
+      </div>
+      <details>
+        <summary>Optional: roster / target master</summary>
+        <p class="hint">Upload the Attendance &amp; Sale workbook (or a CSV with cust_code, account, kae, supervisor, target) to get exact Account
+          mapping and Target vs Achievement. <span id="master-saved"></span></p>
+        <input type="file" id="master" accept=".xlsx,.xlsm,.csv">
+        <label class="inline"><input type="checkbox" id="save-master"> Remember this master for next time</label>
+        <button type="button" class="ghost tiny hidden" id="forget-master">Forget saved master</button>
+      </details>
+      <button type="submit" class="primary" id="go">Fetch &amp; build dashboard</button>
+      <div id="form-error" class="error hidden"></div>
+    </form>
+    <div id="progress" class="hidden">
+      <div class="bar"><div id="bar-fill"></div></div>
+      <div id="progress-text">Starting…</div>
+    </div>
+  </section>
+
+  <!-- HISTORY -->
+  <section id="view-history" class="card hidden">
+    <h2>Recent reports</h2>
+    <table class="data"><thead><tr><th>Run</th><th>Period</th><th>Source</th><th>Rows</th><th>Status</th><th></th></tr></thead>
+      <tbody id="history-body"></tbody></table>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section id="view-dash" class="hidden">
+    <div class="dash-head">
+      <div>
+        <h1 id="dash-title">Tertiary Sales Dashboard</h1>
+        <div id="dash-sub" class="sub"></div>
+      </div>
+      <div class="actions">
+        <span id="checks-badge" class="badge"></span>
+        <a class="primary btn" id="dl-excel">Download Excel</a>
+        <a class="ghost btn" id="dl-csv">Clean data (CSV)</a>
+      </div>
+    </div>
+    <div id="kpis" class="kpis"></div>
+    <div class="tabs" id="dash-tabs">
+      <button class="tab active" data-tab="overview">Overview</button>
+      <button class="tab" data-tab="kae">KAE / Team</button>
+      <button class="tab" data-tab="supervisor">Supervisor</button>
+      <button class="tab" data-tab="promoter">Promoters</button>
+      <button class="tab" data-tab="outlet">Outlets</button>
+      <button class="tab" data-tab="sku">Brands &amp; SKUs</button>
+      <button class="tab hidden" data-tab="target" id="tab-target">Target vs Ach.</button>
+      <button class="tab" data-tab="quality">Data quality</button>
+      <button class="tab" data-tab="checks">Control checks</button>
+    </div>
+    <div class="tabpane" id="pane-overview">
+      <div class="card"><h3>Insights</h3><ul id="insights" class="insights"></ul></div>
+      <div class="charts">
+        <div class="card chart-card wide"><h3>Daily sale</h3><canvas id="c-daily"></canvas></div>
+        <div class="card chart-card"><h3>Brand mix</h3><canvas id="c-brand"></canvas></div>
+        <div class="card chart-card"><h3>Account</h3><canvas id="c-account"></canvas></div>
+        <div class="card chart-card wide"><h3>Top teams (KAE)</h3><canvas id="c-kae"></canvas></div>
+      </div>
+    </div>
+    <div class="tabpane hidden" id="pane-kae"></div>
+    <div class="tabpane hidden" id="pane-supervisor"></div>
+    <div class="tabpane hidden" id="pane-promoter"></div>
+    <div class="tabpane hidden" id="pane-outlet"></div>
+    <div class="tabpane hidden" id="pane-sku"></div>
+    <div class="tabpane hidden" id="pane-target"></div>
+    <div class="tabpane hidden" id="pane-quality"></div>
+    <div class="tabpane hidden" id="pane-checks"></div>
+  </section>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>
