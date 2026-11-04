@@ -1,8 +1,9 @@
-import { Body, Controller, Get, HttpCode, Ip, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Ip, Param, ParseUUIDPipe, Post, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import { AuthService } from '../auth/auth.service';
 import { CustomerPrincipal } from '../auth/auth.types';
 import { CurrentUser, CustomerAuthGuard } from '../auth/guards';
-import { AcceptKfsDto, AssessmentDto, BankAccountDto, EsignCompleteDto, KycDto, RequestOtpDto, StartApplicationDto, VerifyOtpDto } from './dto';
+import { AcceptKfsDto, AssessmentDto, BankAccountDto, KycStartDto, RequestOtpDto, StartApplicationDto, VerifyOtpDto } from './dto';
 import { InstantLoanService } from './instant-loan.service';
 
 @Controller('auth')
@@ -35,9 +36,16 @@ export class InstantLoanController {
     return this.svc.status(id, u);
   }
 
-  @Post(':id/kyc') @HttpCode(200)
-  kyc(@CurrentUser() u: CustomerPrincipal, @Param('id', ParseUUIDPipe) id: string, @Body() dto: KycDto) {
-    return this.svc.kyc(id, u, dto);
+  /** Starts DigiLocker eKYC (Digio). Returns the ids the Digio Web SDK needs. */
+  @Post(':id/kyc/start') @HttpCode(200)
+  kycStart(@CurrentUser() u: CustomerPrincipal, @Param('id', ParseUUIDPipe) id: string, @Body() _dto: KycStartDto) {
+    return this.svc.kycStart(id, u);
+  }
+
+  /** Called when the Digio SDK returns; the server reads the verified result from Digio. */
+  @Post(':id/kyc/complete') @HttpCode(200)
+  kycComplete(@CurrentUser() u: CustomerPrincipal, @Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.kycComplete(id, u);
   }
 
   @Post(':id/bank-account') @HttpCode(200)
@@ -66,7 +74,15 @@ export class InstantLoanController {
   }
 
   @Post(':id/esign/complete') @HttpCode(200)
-  esignDone(@CurrentUser() u: CustomerPrincipal, @Param('id', ParseUUIDPipe) id: string, @Body() dto: EsignCompleteDto) {
-    return this.svc.esignComplete(id, u, dto.otp);
+  esignDone(@CurrentUser() u: CustomerPrincipal, @Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.esignComplete(id, u);
+  }
+
+  @Get(':id/agreement.pdf')
+  async agreement(@CurrentUser() u: CustomerPrincipal, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+    const d = await this.svc.agreementPdf(id, u);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="loan-agreement-${id}.pdf"`);
+    res.send(d.content);
   }
 }

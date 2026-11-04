@@ -19,6 +19,10 @@ import { IntegrationsModule } from './integrations/integrations.module';
 import { JobsService } from './jobs.service';
 import { PricingService } from './pricing/pricing.service';
 import { StaffService } from './staff/staff.service';
+import { SandboxController } from './integrations/sandbox/sandbox.controller';
+import { LoansController } from './repayment/loans.controller';
+import { NotifierService } from './repayment/notifier.service';
+import { RepaymentService } from './repayment/repayment.service';
 
 @Module({
   imports: [
@@ -33,7 +37,7 @@ import { StaffService } from './staff/staff.service';
     AuditModule,
     IntegrationsModule,
   ],
-  controllers: [CustomerAuthController, InstantLoanController, StaffAuthController, AdminController, PayoutWebhookController],
-  providers: [AuthService, StaffService, PricingService, InstantLoanService, JourneyRecorder, DisbursementService, MetricsService, JobsService],
+  controllers: [CustomerAuthController, InstantLoanController, LoansController, StaffAuthController, AdminController, PayoutWebhookController, SandboxController],
+  providers: [AuthService, StaffService, PricingService, InstantLoanService, JourneyRecorder, DisbursementService, MetricsService, JobsService, RepaymentService, NotifierService],
 })
 export class AppModule {}

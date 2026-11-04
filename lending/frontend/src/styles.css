@@ -78,3 +78,12 @@ button.link { width: auto; padding: 0; background: none; color: var(--brand); fo
 .save-row .field { margin: 0; flex: 0 1 220px; }
 .save-row button { width: auto; padding: 11px 20px; }
 footer a { color: var(--brand); }
+
+/* DigiLocker / eSign / repayment */
+.sandbox-box { border: 1px dashed var(--warn); border-radius: 10px; padding: 14px; margin-top: 10px; }
+.sandbox-box .sandbox { border: 0; padding: 0; margin-bottom: 10px; }
+.due { background: var(--hl); border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+.due .amount { font-size: 30px; font-weight: 700; margin: 4px 0; }
+.due.overdue { background: color-mix(in srgb, var(--bad) 10%, transparent); }
+.due.paid { background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.pay-box { margin-top: 16px; }

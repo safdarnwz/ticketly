@@ -8,5 +8,8 @@ import { LoanApplication } from './instant-loan/loan-application.entity';
 import { Loan } from './instant-loan/loan.entity';
 import { PricingPlan } from './pricing/pricing-plan.entity';
 import { StaffUser } from './staff/staff-user.entity';
+import { LoanDocument } from './instant-loan/loan-document.entity';
+import { Notification } from './repayment/notification.entity';
+import { Repayment } from './repayment/repayment.entity';
 
-export const ENTITIES = [AuditLog, OtpChallenge, BankAccount, Customer, Disbursement, JourneyEvent, LoanApplication, Loan, PricingPlan, StaffUser];
+export const ENTITIES = [AuditLog, OtpChallenge, BankAccount, Customer, Disbursement, JourneyEvent, LoanApplication, Loan, PricingPlan, StaffUser, LoanDocument, Notification, Repayment];

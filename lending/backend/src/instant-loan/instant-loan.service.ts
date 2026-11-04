@@ -5,6 +5,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, MoreThan, Not } from 'typeorm';
 import { AuditService } from '../audit/audit.service';
 import { CustomerPrincipal, StaffPrincipal } from '../auth/auth.types';
+import { createHash } from 'crypto';
 import { decryptPii, encryptPii, hmacHash } from '../common/crypto';
 import { rupeesToPaise } from '../common/money';
 import { APP_CONFIG, AppConfig } from '../config/configuration';
@@ -13,20 +14,23 @@ import { Customer } from '../customers/customer.entity';
 import { Disbursement } from '../disbursement/disbursement.entity';
 import { DisbursementService } from '../disbursement/disbursement.service';
 import {
-  BANK_VERIFICATION, BankVerificationProvider, CKYC, CkycProvider, CREDIT_BUREAU, CreditBureauProvider, ESIGN, EsignProvider, PAN_KYC, PanKycProvider,
+  BANK_VERIFICATION, BankVerificationProvider, CREDIT_BUREAU, CreditBureauProvider, EKYC, EkycProvider, ESIGN, EsignProvider,
 } from '../integrations/ports';
 import { freezeOffer } from '../pricing/offer';
 import { PricingPlan } from '../pricing/pricing-plan.entity';
 import { PricingService } from '../pricing/pricing.service';
-import { AcceptKfsDto, AssessmentDto, BankAccountDto, KycDto, ReviewDto } from './dto';
+import { buildAgreementPdf } from './agreement.pdf';
+import { AcceptKfsDto, AssessmentDto, BankAccountDto, ReviewDto } from './dto';
 import { ApplicationStatus as S, canTransition, JourneyStep, STEP_TARGETS } from './journey';
 import { JourneyEvent, StepOutcome } from './journey-event.entity';
 import { JourneyRecorder } from './journey.recorder';
 import { buildKfs, kfsHash, KeyFactStatement } from './kfs';
 import { LoanApplication } from './loan-application.entity';
+import { LoanDocument } from './loan-document.entity';
 import { Loan, LoanStatus } from './loan.entity';
 import { assessRisk, DEFAULT_RISK_POLICY, nameSimilarity } from './risk.engine';
 
+const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 const OPEN_STATUSES = [S.STARTED, S.KYC_VERIFIED, S.BANK_VERIFIED, S.MANUAL_REVIEW, S.APPROVED, S.KFS_ACCEPTED, S.ESIGN_PENDING, S.DISBURSING];
 
 @Injectable()
@@ -34,8 +38,7 @@ export class InstantLoanService {
   constructor(
     @InjectDataSource() private readonly ds: DataSource,
     @Inject(APP_CONFIG) private readonly cfg: AppConfig,
-    @Inject(PAN_KYC) private readonly panKyc: PanKycProvider,
-    @Inject(CKYC) private readonly ckyc: CkycProvider,
+    @Inject(EKYC) private readonly ekyc: EkycProvider,
     @Inject(CREDIT_BUREAU) private readonly bureau: CreditBureauProvider,
     @Inject(BANK_VERIFICATION) private readonly bank: BankVerificationProvider,
     @Inject(ESIGN) private readonly esign: EsignProvider,
@@ -113,37 +116,96 @@ export class InstantLoanService {
     });
   }
 
-  // ---------- 00:30 KYC ----------
+  // ---------- 00:30 KYC: Digio DigiLocker (Aadhaar + PAN) ----------
 
-  async kyc(id: string, user: CustomerPrincipal, dto: KycDto) {
+  private sdkSession(requestId: string, accessTokenId: string | null, mobile: string, provider: 'sandbox' | 'digio') {
+    return {
+      provider,
+      requestId,
+      accessTokenId,
+      identifier: mobile,
+      sdk: provider === 'digio' ? { url: this.cfg.digio.sdkUrl, environment: this.cfg.digio.env } : null,
+    };
+  }
+
+  /** Creates the eKYC request. The customer then completes DigiLocker in Digio's Web SDK. */
+  async kycStart(id: string, user: CustomerPrincipal) {
     return this.withApp(id, user, [S.STARTED], async (m, app) => {
-      const t = Date.now();
-      const consentRef = `kyc-consent:${app.id}:${t}`;
-      // PAN check and CKYC download run in parallel to save time.
-      const [pan, ck] = await Promise.all([this.panKyc.verifyPan(dto.pan, dto.fullName, dto.dateOfBirth), this.ckyc.searchAndDownload(dto.pan, dto.dateOfBirth, consentRef)]);
-      const nameScore = pan.nameOnPan ? nameSimilarity(dto.fullName, pan.nameOnPan) : 0;
-      const ok = pan.valid && nameScore >= 0.9;
-      await this.journey.record(m, app, JourneyStep.KYC, ok ? StepOutcome.PASSED : StepOutcome.FAILED, t, { providerRef: pan.ref, detail: { panStatus: pan.panStatus, ckycFound: ck.found, nameScore } });
-      if (!ok) {
-        app.decisionReasons = [pan.valid ? 'KYC_NAME_MISMATCH' : 'KYC_PAN_INVALID'];
-        await this.move(m, app, S.REJECTED, this.customerActor(user));
-        return { status: app.status, reasons: app.decisionReasons };
+      // Re-use a recent request (page refresh, SDK closed) instead of opening a new one.
+      if (app.kycRequestId && app.kycStartedAt && Date.now() - app.kycStartedAt.getTime() < 30 * 60_000)
+        return { status: app.status, kyc: this.sdkSession(app.kycRequestId, app.kycAccessTokenId, user.mobile, this.cfg.ekycProvider) };
+      const s = await this.ekyc.start({ mobile: user.mobile, referenceId: app.id });
+      Object.assign(app, { kycRequestId: s.requestId, kycAccessTokenId: s.accessTokenId, kycStartedAt: new Date() });
+      await m.getRepository(LoanApplication).save(app);
+      await this.audit.record({ actorType: 'CUSTOMER', actorId: user.sub, action: 'kyc.started', entityType: 'loan_application', entityId: app.id, data: { provider: this.cfg.ekycProvider, requestId: s.requestId, consent: true } }, m);
+      return { status: app.status, kyc: this.sdkSession(s.requestId, s.accessTokenId, user.mobile, this.cfg.ekycProvider) };
+    });
+  }
+
+  /** Customer came back from the SDK: read the verified result from the provider. */
+  async kycComplete(id: string, user: CustomerPrincipal) {
+    const app = await this.ds.getRepository(LoanApplication).findOneBy({ id });
+    if (!app || app.customerId !== user.sub) throw new NotFoundException('Application not found');
+    return this.finalizeKyc(app.id);
+  }
+
+  /** Shared by the SDK callback and the Digio webhook. Idempotent; never trusts webhook data. */
+  async finalizeKyc(appId: string): Promise<{ status: S; kyc?: 'PENDING'; reasons?: string[]; retry?: boolean; message?: string }> {
+    return this.ds.transaction(async (m) => {
+      const app = await m.getRepository(LoanApplication).findOne({ where: { id: appId }, lock: { mode: 'pessimistic_write' } });
+      if (!app) throw new NotFoundException('Application not found');
+      if (app.status !== S.STARTED || !app.kycRequestId) return { status: app.status };
+      const r = await this.ekyc.result(app.kycRequestId);
+      if (r.state === 'PENDING') return { status: app.status, kyc: 'PENDING' as const };
+      const t = app.kycStartedAt!.getTime();
+      const nameScore = r.name && r.nameOnPan ? nameSimilarity(r.name, r.nameOnPan) : null;
+      const detail = { state: r.state, panFound: !!r.pan, nameScore };
+      const system = { type: 'SYSTEM' as const, id: null };
+
+      // Expired, or approved but PAN / name / DOB could not be read: let the customer try again.
+      const unreadable = r.state === 'APPROVED' && (!r.pan || !PAN_RE.test(r.pan) || !r.name || !r.dob);
+      if (r.state === 'EXPIRED' || unreadable) {
+        await this.journey.record(m, app, JourneyStep.KYC, StepOutcome.FAILED, t, { providerRef: r.ref, detail: { ...detail, retry: true } });
+        Object.assign(app, { kycRequestId: null, kycAccessTokenId: null, kycStartedAt: null });
+        await m.getRepository(LoanApplication).save(app);
+        if (unreadable) await this.audit.record({ actorType: 'SYSTEM', action: 'kyc.details_unreadable', entityType: 'loan_application', entityId: app.id, data: { ref: r.ref } }, m);
+        return {
+          status: app.status, retry: true,
+          message: unreadable ? 'We could not read your PAN or Aadhaar details from DigiLocker. Make sure your PAN is in DigiLocker and try again.' : 'Verification expired. Please try again.',
+        };
       }
+      const reasons = r.state === 'REJECTED' ? ['KYC_REJECTED'] : nameScore !== null && nameScore < DEFAULT_RISK_POLICY.minNameMatch ? ['KYC_NAME_MISMATCH'] : [];
+      await this.journey.record(m, app, JourneyStep.KYC, reasons.length ? StepOutcome.FAILED : StepOutcome.PASSED, t, { providerRef: r.ref, detail });
+      if (reasons.length) {
+        app.decisionReasons = reasons;
+        await this.move(m, app, S.REJECTED, system, { kycRef: r.ref });
+        return { status: app.status, reasons };
+      }
+      const pan = r.pan!;
       const customers = m.getRepository(Customer);
-      const c = await customers.findOneByOrFail({ id: user.sub });
+      const c = await customers.findOneByOrFail({ id: app.customerId });
       Object.assign(c, {
-        fullName: pan.nameOnPan,
-        panHash: hmacHash(dto.pan, this.cfg.piiHashPepper),
-        panEnc: encryptPii(dto.pan, this.cfg.piiEncryptionKey),
-        panMasked: `${dto.pan.slice(0, 2)}XXXXX${dto.pan.slice(7)}`,
-        dateOfBirth: dto.dateOfBirth,
-        ckycNumber: ck.ckycNumber,
+        fullName: r.name!.toUpperCase(),
+        panHash: hmacHash(pan, this.cfg.piiHashPepper),
+        panEnc: encryptPii(pan, this.cfg.piiEncryptionKey),
+        panMasked: `${pan.slice(0, 2)}XXXXX${pan.slice(7)}`,
+        dateOfBirth: r.dob,
+        aadhaarLast4: r.aadhaarLast4,
+        kycRef: r.ref,
         kycVerifiedAt: new Date(),
       });
       await customers.save(c);
-      await this.move(m, app, S.KYC_VERIFIED, this.customerActor(user), { consentRef });
-      return { status: app.status, name: c.fullName };
+      await this.move(m, app, S.KYC_VERIFIED, system, { kycRef: r.ref, provider: this.cfg.ekycProvider });
+      return { status: app.status };
     });
+  }
+
+  findByKycRequest(requestId: string) {
+    return this.ds.getRepository(LoanApplication).findOne({ where: { kycRequestId: requestId } });
+  }
+
+  findByEsignRequest(requestId: string) {
+    return this.ds.getRepository(LoanApplication).findOne({ where: { esignRequestId: requestId } });
   }
 
   // ---------- 01:30 Bank account verification ----------
@@ -259,29 +321,63 @@ export class InstantLoanService {
     });
   }
 
+  /** Builds the agreement PDF and sends it to Digio for Aadhaar eSign. */
   async esignInitiate(id: string, user: CustomerPrincipal) {
     return this.withApp(id, user, [S.KFS_ACCEPTED, S.ESIGN_PENDING], async (m, app) => {
       this.ensureOfferValid(app);
-      if (app.status === S.ESIGN_PENDING && app.esignRequestId) return { status: app.status, requestId: app.esignRequestId, signingUrl: null };
+      if (app.status === S.ESIGN_PENDING && app.esignRequestId)
+        return { status: app.status, esign: this.sdkSession(app.esignRequestId, app.esignAccessTokenId, user.mobile, this.cfg.esignProvider) };
       const c = await m.getRepository(Customer).findOneByOrFail({ id: user.sub });
-      const r = await this.esign.initiate({ documentHash: app.kfsHash!, signerName: c.fullName!, mobile: c.mobile });
-      app.esignRequestId = r.requestId;
-      await this.move(m, app, S.ESIGN_PENDING, this.customerActor(user), { requestId: r.requestId });
-      return { status: app.status, requestId: r.requestId, signingUrl: r.signingUrl, ...(this.cfg.integrationsMode === 'sandbox' && { sandboxOtp: '123456' }) };
+      const pdf = await buildAgreementPdf(await this.buildKfsFor(m, app));
+      const sha256 = createHash('sha256').update(pdf).digest('hex');
+      const docs = m.getRepository(LoanDocument);
+      await docs.save(docs.create({ applicationId: app.id, kind: 'AGREEMENT_FOR_ESIGN', sha256, content: pdf }));
+      const r = await this.esign.initiate({ pdfBase64: pdf.toString('base64'), fileName: `loan-agreement-${app.id}.pdf`, signerName: c.fullName!, mobile: c.mobile, referenceId: app.id });
+      Object.assign(app, { esignRequestId: r.requestId, esignAccessTokenId: r.accessTokenId, agreementSha256: sha256 });
+      if (app.status === S.KFS_ACCEPTED) await this.move(m, app, S.ESIGN_PENDING, this.customerActor(user), { requestId: r.requestId, agreementSha256: sha256 });
+      else await m.getRepository(LoanApplication).save(app);
+      return { status: app.status, esign: this.sdkSession(r.requestId, r.accessTokenId, user.mobile, this.cfg.esignProvider) };
     });
   }
 
-  /** Signing triggers the payout immediately: this is where the 5-minute promise is kept. */
-  async esignComplete(id: string, user: CustomerPrincipal, otp: string) {
-    const loanId = await this.withApp(id, user, [S.ESIGN_PENDING], async (m, app) => {
-      this.ensureOfferValid(app);
-      const t = app.kfsAcceptedAt!.getTime();
-      const r = await this.esign.complete(app.esignRequestId!, otp);
-      if (!r.signed) throw new UnprocessableEntityException('E-sign failed. Check the OTP and try again.');
+  async agreementPdf(id: string, user: CustomerPrincipal) {
+    const app = await this.ds.getRepository(LoanApplication).findOneBy({ id });
+    if (!app || app.customerId !== user.sub || !app.agreementSha256) throw new NotFoundException();
+    return this.ds.getRepository(LoanDocument).findOneByOrFail({ applicationId: id, sha256: app.agreementSha256 });
+  }
+
+  async esignComplete(id: string, user: CustomerPrincipal) {
+    const app = await this.ds.getRepository(LoanApplication).findOneBy({ id });
+    if (!app || app.customerId !== user.sub) throw new NotFoundException('Application not found');
+    await this.finalizeEsign(id);
+    return this.status(id, user);
+  }
+
+  /**
+   * Shared by the SDK callback and the Digio webhook. Confirms the signature with Digio, creates
+   * the loan and starts the payout at once: this is where the 5-minute promise is kept.
+   */
+  async finalizeEsign(appId: string) {
+    const loanId = await this.ds.transaction(async (m) => {
+      const app = await m.getRepository(LoanApplication).findOne({ where: { id: appId }, lock: { mode: 'pessimistic_write' } });
+      if (!app || app.status !== S.ESIGN_PENDING || !app.esignRequestId) return null;
+      if (!app.offerExpiresAt || app.offerExpiresAt < new Date()) {
+        await this.move(m, app, S.EXPIRED, { type: 'SYSTEM', id: null }, { reason: 'offer expired before signing' });
+        return null;
+      }
+      const st = await this.esign.status(app.esignRequestId);
+      if (!st.signed) {
+        if (st.failed) {
+          // Signing failed or expired at the provider: allow a fresh e-sign request.
+          Object.assign(app, { esignRequestId: null, esignAccessTokenId: null });
+          await m.getRepository(LoanApplication).save(app);
+        }
+        return null;
+      }
       await this.pricing.consume(m, app.pricingPlanId!);
-      app.signedAgreementRef = r.signedDocumentRef;
+      app.signedAgreementRef = app.esignRequestId;
       app.esignedAt = new Date();
-      await this.journey.record(m, app, JourneyStep.KFS_ESIGN, StepOutcome.PASSED, t, { providerRef: app.esignRequestId });
+      await this.journey.record(m, app, JourneyStep.KFS_ESIGN, StepOutcome.PASSED, app.kfsAcceptedAt!.getTime(), { providerRef: app.esignRequestId });
       const o = app.offer!;
       const loans = m.getRepository(Loan);
       const loan = await loans.save(
@@ -297,13 +393,15 @@ export class InstantLoanService {
           totalRepayablePaise: o.totalRepayablePaise,
           aprBps: o.aprBps,
           tenureDays: o.tenureDays,
+          penalType: o.penalType,
+          penalValue: o.penalValue,
         }),
       );
-      await this.move(m, app, S.DISBURSING, this.customerActor(user), { loanId: loan.id, agreement: r.signedDocumentRef });
+      await this.move(m, app, S.DISBURSING, { type: 'SYSTEM', id: null }, { loanId: loan.id, agreement: app.esignRequestId, agreementSha256: app.agreementSha256 });
       return loan.id;
     });
-    await this.disbursal.startForLoan(loanId);
-    return this.status(id, user);
+    if (loanId) await this.disbursal.startForLoan(loanId);
+    return loanId;
   }
 
   // ---------- status / timeline ----------

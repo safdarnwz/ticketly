@@ -16,11 +16,11 @@ Clock t = 0 tab shuru hota hai jab customer OTP maangta hai. Har step ka ek "com
 | Start | Step | Kya hota hai | Complete by |
 |---|---|---|---|
 | 00:00 | Mobile OTP Login | Mobile number se OTP login | 00:30 |
-| 00:30 | KYC Verification | PAN verify aur CKYC download, dono parallel mein | 01:30 |
+| 00:30 | KYC Verification | Digio ke through DigiLocker eKYC: Aadhaar aur PAN customer ke DigiLocker se | 01:30 |
 | 01:30 | Bank Account Verification | Penny drop: account exist karta hai, active hai, aur naam KYC se match karta hai | 02:30 |
 | 02:30 | Credit & Risk Assessment | Credit bureau, income, repayment capacity, fraud aur velocity checks | 03:30 |
 | 03:30 | Loan Approval | Automated underwriting. Borderline case manual review mein jata hai | 04:00 |
-| 04:00 | KFS & E-Sign | Customer APR, charges aur due date padhkar accept karta hai, phir Aadhaar OTP se e-sign | 05:00 |
+| 04:00 | KFS & E-Sign | Customer APR, charges aur due date padhkar accept karta hai, phir Digio Aadhaar eSign se agreement PDF sign | 05:00 |
 | 05:00 | Digital Disbursement | E-sign hote hi IMPS payout seedha customer ke verified account mein | 05:00 |
 
 ### Jab 5 minute mein nahi hoga (aur yeh theek hai)
@@ -35,16 +35,17 @@ Clock t = 0 tab shuru hota hai jab customer OTP maangta hai. Har step ka ek "com
 
 | Integration | Purpose | Code mein port |
 |---|---|---|
-| PAN/KYC API | Customer verification | `PanKycProvider` |
-| CKYC / permitted KYC provider | KYC compliance | `CkycProvider` |
+| **Digio DigiKYC** (DigiLocker Aadhaar + PAN) | Customer verification aur KYC compliance | `EkycProvider` (live: `DigioEkyc`) |
 | Credit Bureau API | Credit history | `CreditBureauProvider` |
 | Bank Verification API | Account ownership | `BankVerificationProvider` |
 | Penny Drop / Account Validation | Beneficiary verification, jahan appropriate ho | `BankVerificationProvider` |
-| eSign / Digital Signature | Loan agreement | `EsignProvider` |
+| **Digio Aadhaar eSign** | Loan agreement | `EsignProvider` (live: `DigioEsign`) |
 | UPI / IMPS / NEFT payout API | Instant digital disbursement | `PayoutProvider` |
 | Payment Reconciliation API | Transaction confirmation | `ReconciliationProvider` |
+| Payment gateway (UPI / net banking / debit card) | Customer repayment, **eNACH nahi** | `PaymentGatewayProvider` |
+| SMS (DLT templates) | Reminders aur receipts | `NotificationProvider` |
 
-Har integration ek interface (port) hai (`backend/src/integrations/ports.ts`). Development ke liye sandbox simulator bana hai. Vendor contract sign hone ke baad har port ka live adapter likhna hai.
+Har integration ek interface (port) hai (`backend/src/integrations/ports.ts`). Development ke liye sandbox simulator bana hai. **Digio ke live adapters bane hue hain** (`EKYC_PROVIDER=digio`, `ESIGN_PROVIDER=digio`). Credit bureau, penny drop, payout, payment gateway aur SMS ke live adapters vendor final hone ke baad likhne hain.
 
 ---
 
@@ -143,5 +144,60 @@ Owner panel (`/#owner`) se Owner yeh sab jab chahe set aur badal sakta hai:
 - Har badlaav audit log mein jata hai: kisne, kab, purana value aur naya value.
 
 **Badlaav kab lagta hai:** turant, lekin sirf naye offers par. Jo offer customer ko KFS mein dikh chuka hai ya sign ho chuka hai, uski terms freeze rehti hain. KFS mein na diya gaya charge baad mein nahi lagaya ja sakta, isliye system yeh rule khud enforce karta hai.
+
+---
+
+## 9. eKYC aur e-sign: Digio
+
+**KYC (DigiLocker via Digio DigiKYC):**
+1. Customer consent deta hai, aur server Digio par KYC request banata hai (`/client/kyc/v2/request/with_template`, DigiStudio template jaise `DIGILOCKER_AADHAAR_PAN`).
+2. Website par Digio Web SDK khulta hai. Customer Aadhaar OTP se DigiLocker mein login karke Aadhaar aur PAN share karta hai.
+3. SDK band hone par, ya Digio webhook aane par, server Digio se result padhta hai (`/client/kyc/v2/{id}/response`). Isse naam, DOB, PAN aur Aadhaar ke last 4 digit milte hain.
+4. Aadhaar aur PAN ka naam match hona chahiye. PAN hi credit bureau check ke liye use hota hai.
+
+Aadhaar number poora kabhi store nahi hota, sirf last 4 digit. PAN encrypted rehta hai.
+
+**E-sign (Digio Aadhaar eSign):** KFS accept hote hi system loan agreement + KFS ka PDF banata hai. Uska SHA-256 hash store hota hai aur PDF Digio ko jata hai (`/v2/client/document/uploadpdf`, `sign_type: aadhaar`). Customer Aadhaar OTP se sign karta hai. Sign confirm hote hi (SDK callback ya webhook se) payout turant start ho jata hai.
+
+**Webhook:** `POST /api/webhooks/digio`. Header `X-Digio-Checksum` = raw body ka HMAC-SHA256. Payload se sirf ID li jati hai; asli status hamesha Digio API se dobara padha jata hai.
+
+**Digio se kya chahiye:**
+- Sandbox aur production ke client ID / secret.
+- DigiStudio mein DigiLocker Aadhaar + PAN wala template.
+- Webhook URL aur uska secret.
+- eSign ke liye Aadhaar eSign enable karwana.
+
+**Testing note:** DigiLocker result ka JSON template par depend karta hai. Code poore response mein naam, DOB aur PAN dhoondhta hai. Agar kuch na mile to KYC pass nahi hota (fail-closed), aur customer ko dobara try karne ko kaha jata hai. Live jaane se pehle Digio sandbox ka asli response dekh kar mapping confirm karein.
+
+**Compliance note:** DigiLocker se aaye documents RBI KYC Master Direction mein officially valid documents maane jate hain. Aadhaar OTP-based e-KYC ki alag limits hoti hain. Kaun sa method kis limit ke saath apply hota hai, yeh compliance officer se confirm karwa lein. CKYC registry mein KYC record upload karna bhi zaroori hai (abhi nahi bana).
+
+---
+
+## 10. Repayment (eNACH nahi)
+
+Payday loan 30 din ka ek hi bullet payment hai. Is product mein eNACH mandate theek nahi baithta: mandate banane mein samay lagta hai, usse 5-minute journey slow hoti hai, aur auto-debit fail hone par bounce charges aur shikayatein aati hain. Isliye **customer khud pay karta hai**:
+
+| Tareeka | Kaise |
+|---|---|
+| UPI | Payment page ya UPI app (intent / QR) |
+| Net banking | Payment gateway page |
+| Debit card | Payment gateway page |
+
+Paisa seedha lender ke bank account mein jata hai (RBI Digital Lending Directions).
+
+**Kitna dena hai (system khud calculate karta hai):**
+- **Due date se pehle:** principal + sirf jitne din use kiye utne din ka interest (kam se kam 1 din). Prepayment charge nahi.
+- **Cooling-off period mein:** isi tarah, bina penalty ke exit.
+- **Due date par:** principal + poore tenure ka interest.
+- **Due date ke baad:** iske upar penal charge, Owner ke set kiye rate se, sirf unpaid amount par. Yeh interest mein nahi judta aur compound nahi hota.
+- **Part payment** allowed hai (minimum ₹100). Pura bakaya chukate hi loan apne aap CLOSED ho jata hai.
+
+**Confirmation:** gateway ka signed webhook (`POST /api/webhooks/payment`), har 5 second poller, aur customer ka refresh. Teeno ek hi idempotent code chalate hain, isliye ek payment sirf ek baar count hota hai. Har payment par receipt number aur SMS milta hai.
+
+**Reminders (auto-debit nahi hai, isliye yahi collection ka main tool hai):** due date se 3 din pehle, 1 din pehle, due date par, aur 1, 3 aur 7 din overdue hone par SMS jata hai. SMS sirf subah 9 se shaam 7 baje (IST) ke beech jata hai, aur har reminder ek hi baar. Har SMS mein payment link hota hai.
+
+**Collections:** overdue loans ki list (naam, mobile, kitne din overdue, bakaya) Collection Agent, Operations aur Finance ko dikhti hai. Recovery sirf lawful tareeke se hogi.
+
+**Payment gateway chunna hai:** abhi sandbox simulator hai. Jo bhi gateway chunein (UPI aur payment links support hone chahiye), uska adapter `PaymentGatewayProvider` port par likhna hai.
 
 *Yeh document legal opinion nahi hai. Launch se pehle RBI CoR, Digital Lending Directions, KFS format aur saare integrations qualified NBFC professionals se verify karwayein.*

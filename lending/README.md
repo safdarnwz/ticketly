@@ -1,7 +1,8 @@
 # Instant Lending Platform
 
 Digital short-term loan platform with a **5-minute instant disbursement** journey:
-OTP login → KYC → bank verification → credit & risk → approval → KFS & e-sign → IMPS payout.
+OTP login → DigiLocker eKYC (Digio) → bank verification → credit & risk → approval → KFS & Aadhaar eSign (Digio) → IMPS payout,
+then self-service repayment by UPI / net banking / debit card (no eNACH).
 
 | Part | Stack |
 |---|---|
@@ -38,15 +39,17 @@ to change pricing or create offers.
 | Input | Result |
 |---|---|
 | OTP | Shown on screen in sandbox |
+| DigiLocker (sandbox) | Type the PAN / name / DOB DigiLocker would return |
 | PAN digits 0001–5999 (e.g. `ABCDE1234F`) | Bureau 760, auto-approved |
 | PAN digits 6000–6999 | Bureau 680, manual review |
 | PAN digits 7000–7999 / 8000–8999 | Low score / write-off, rejected |
 | PAN digits 9000–9999 | New to credit, manual review |
-| PAN ending `Z` | PAN invalid |
+| PAN ending `Z` | eKYC rejected |
 | Account ending `0000` / `1111` | Not found / not in your name |
 | Account ending `2222` | IMPS fails, NEFT fallback succeeds |
 | Account ending `3333` | Account closed, loan cancelled |
-| e-sign OTP | `123456` |
+| Aadhaar eSign OTP (sandbox) | `123456` |
+| Repayment (sandbox) | Sandbox payment page: UPI, net banking, debit card or failure |
 
 ## Tests
 
@@ -61,14 +64,16 @@ cd lending/backend && TEST_DATABASE_URL=postgres://lending:lending@localhost:543
 The e2e suite drives the whole journey against a real PostgreSQL database (it drops and recreates
 the schema of the test database). It covers IMPS→NEFT fallback, the closed-account cancel path,
 name mismatch, rejection, manual review, KFS hash checks, webhook signatures, owner-only pricing,
-personal and campaign offers, frozen terms after plan edits,
+personal and campaign offers, frozen terms after plan edits, DigiLocker eKYC and Digio webhooks,
+agreement PDF e-sign, UPI repayment with part payment and closure, overdue penal accrual, reminders,
 role conflicts, the append-only audit log and the SLA metrics.
 
 ## API (prefix `/api`)
 
 Customer: `POST auth/otp/request`, `POST auth/otp/verify`, `POST applications`, `GET applications/:id`,
-`POST applications/:id/kyc`, `…/bank-account`, `…/assessment`, `GET …/kfs`, `POST …/kfs/accept`,
-`POST …/esign/initiate`, `POST …/esign/complete`.
+`POST applications/:id/kyc/start`, `POST …/kyc/complete`, `…/bank-account`, `…/assessment`, `GET …/kfs`, `POST …/kfs/accept`,
+`POST …/esign/initiate`, `POST …/esign/complete`, `GET …/agreement.pdf`,
+`GET loans`, `GET loans/:id`, `POST loans/:id/payments`, `POST loans/:id/payments/:paymentId/refresh`.
 
 Staff (password + TOTP): `POST staff/login`, `GET admin/roles`, `admin/staff`,
 `GET admin/pricing-plans`, `GET admin/pricing-plans/preview?mobile=&amount=`,
@@ -76,7 +81,20 @@ Staff (password + TOTP): `POST staff/login`, `GET admin/roles`, `admin/staff`,
 `admin/applications/review-queue`, `POST admin/applications/:id/review`,
 `admin/disbursements`, `POST admin/reconciliation/run`, `GET admin/metrics/instant-disbursal`, `GET admin/audit`.
 
-Provider callback: `POST webhooks/payout` (header `x-signature` = HMAC-SHA256 of the raw body).
+Provider callbacks (all signature-checked, status always re-read from the provider):
+`POST webhooks/payout` and `POST webhooks/payment` (header `x-signature`), `POST webhooks/digio` (header `X-Digio-Checksum`).
+All are HMAC-SHA256 of the raw body.
+
+Sandbox stand-ins for provider pages (only with `INTEGRATIONS_MODE=sandbox`): `POST sandbox/ekyc/:id/complete`,
+`POST sandbox/esign/:id/sign`, `POST sandbox/payments/:orderId/pay`, `GET sandbox/sms`.
+
+## Digio
+
+Set `EKYC_PROVIDER=digio` and/or `ESIGN_PROVIDER=digio` with `DIGIO_ENV`, `DIGIO_CLIENT_ID`, `DIGIO_CLIENT_SECRET`,
+`DIGIO_KYC_TEMPLATE` (DigiStudio template, DigiLocker Aadhaar + PAN) and `DIGIO_WEBHOOK_SECRET`. Point the Digio webhook at
+`https://<api-host>/api/webhooks/digio`. The website loads Digio's Web SDK (`/sdk/v11/digio.js`) for both flows.
+Check the DigiLocker field mapping (`extractIdentity` in `backend/src/integrations/digio/digio.adapters.ts`) against your Digio
+sandbox response before going live; it fails closed if PAN, name or DOB are missing.
 
 ## Before going live
 
@@ -84,4 +102,5 @@ Provider callback: `POST webhooks/payout` (header `x-signature` = HMAC-SHA256 of
 - Real secrets in a secrets manager (`JWT_SECRET`, `PII_ENCRYPTION_KEY`, `PII_HASH_PEPPER`, `PAYOUT_WEBHOOK_SECRET`). The app refuses to start in live mode without them.
 - DLT-registered SMS template for OTPs, rate limiting at the edge, VAPT and a security audit.
 - Owner-set pricing within the board-approved interest-rate policy, legal review of the KFS and loan agreement text.
-- Not built yet: repayment collection (UPI / eNACH), overdue tracking, bureau reporting, RBI returns, and admin screens other than the Owner pricing panel.
+- Pick a payment gateway (UPI + payment links) and an SMS provider with DLT templates, and write their adapters.
+- Not built yet: CKYC upload, credit bureau reporting, RBI returns, and admin screens other than the Owner pricing panel.

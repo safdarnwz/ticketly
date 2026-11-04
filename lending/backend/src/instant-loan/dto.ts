@@ -14,11 +14,14 @@ export class VerifyOtpDto {
 export class StartApplicationDto {
   @IsOptional() @IsString() @MaxLength(128) deviceId?: string;
 }
-export class KycDto {
+export class KycStartDto {
+  @Equals(true, { message: 'KYC consent is required' }) consentKyc: boolean;
+}
+/** Sandbox only: what DigiLocker would have returned. */
+export class SandboxKycDto {
   @Matches(/^[A-Z]{5}[0-9]{4}[A-Z]$/, { message: 'PAN format: ABCDE1234F' }) pan: string;
   @IsString() @Length(3, 200) fullName: string;
   @IsISO8601({ strict: true }) dateOfBirth: string;
-  @Equals(true, { message: 'KYC consent is required' }) consentKyc: boolean;
 }
 export class BankAccountDto {
   @Matches(/^\d{9,18}$/, { message: 'Account number must be 9–18 digits' }) accountNumber: string;
@@ -35,8 +38,16 @@ export class AcceptKfsDto {
   @Matches(/^[a-f0-9]{64}$/) kfsHash: string;
   @Equals(true, { message: 'You must confirm you have read the KFS' }) consentKfs: boolean;
 }
-export class EsignCompleteDto {
+export class SandboxEsignDto {
   @Matches(/^\d{6}$/) otp: string;
+}
+export class SandboxPayDto {
+  @IsIn(['PAID', 'FAILED']) outcome: 'PAID' | 'FAILED';
+  @IsOptional() @IsIn(['UPI', 'NETBANKING', 'DEBIT_CARD']) method?: string;
+}
+export class RepayDto {
+  /** Rupees. Omit to pay the full outstanding amount. */
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(1) amount?: number;
 }
 export class ReviewDto {
   @IsIn(['APPROVE', 'REJECT']) decision: 'APPROVE' | 'REJECT';

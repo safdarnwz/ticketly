@@ -28,6 +28,14 @@ export class Customer extends Uuid7Entity {
   @Column({ type: 'varchar', length: 40, nullable: true })
   ckycNumber: string | null;
 
+  /** Last 4 digits of Aadhaar only. The full number is never stored. */
+  @Column({ type: 'varchar', length: 4, nullable: true })
+  aadhaarLast4: string | null;
+
+  /** eKYC provider request id (Digio KID…), kept as KYC evidence. */
+  @Column({ type: 'varchar', length: 128, nullable: true })
+  kycRef: string | null;
+
   @Column({ type: 'timestamptz', nullable: true })
   kycVerifiedAt: Date | null;
 }

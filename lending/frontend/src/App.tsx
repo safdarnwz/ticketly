@@ -1,9 +1,11 @@
 import { FormEvent, ReactNode, useCallback, useEffect, useState } from 'react';
 import { api, deviceId, inr, mmss } from './api';
 import { OwnerPanel } from './OwnerPanel';
+import { LoanView } from './Repay';
+import { EsignStep, KycStep } from './Verify';
 import type { AppStatus } from './types';
 
-type Screen = 'mobile' | 'otp' | 'kyc' | 'bank' | 'assess' | 'kfs' | 'esign' | 'disbursing' | 'done' | 'review' | 'rejected' | 'failed' | 'expired';
+type Screen = 'mobile' | 'otp' | 'loan' | 'kyc' | 'bank' | 'assess' | 'kfs' | 'esign' | 'disbursing' | 'done' | 'review' | 'rejected' | 'failed' | 'expired';
 
 const screenFor = (s: string): Screen =>
   (({
@@ -12,6 +14,7 @@ const screenFor = (s: string): Screen =>
   }) as Record<string, Screen>)[s] ?? 'kyc';
 
 const REASON_TEXT: Record<string, string> = {
+  KYC_REJECTED: 'DigiLocker KYC could not be completed.',
   KYC_PAN_INVALID: 'PAN could not be verified.',
   KYC_NAME_MISMATCH: 'Name does not match PAN records.',
   BUREAU_SCORE_LOW: 'Credit score is below our minimum.',
@@ -39,6 +42,7 @@ function CustomerJourney() {
   const [mobile, setMobile] = useState('');
   const [challenge, setChallenge] = useState<{ id: string; sandboxOtp?: string } | null>(null);
   const [appId, setAppId] = useState<string | null>(null);
+  const [loanId, setLoanId] = useState<string | null>(null);
   const [st, setSt] = useState<AppStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +97,7 @@ function CustomerJourney() {
         <div className="tagline">Money in your bank account in about 5 minutes*</div>
       </header>
 
-      {st && (
+      {st && screen !== 'loan' && (
         <div className={`timer ${elapsed > target ? 'late' : ''}`}>
           <span className="clock">{mmss(stopped ? st.elapsedMs : elapsed)}</span>
           <span className="of">/ {mmss(target)} target</span>
@@ -121,21 +125,27 @@ function CustomerJourney() {
               onSubmit={(otp) => run(async () => {
                 const v = await api('/auth/otp/verify', { body: { mobile, challengeId: challenge.id, otp } });
                 setToken(v.accessToken);
+                // A customer with an open loan (or coming from an SMS link) goes to repayment.
+                const loans = await api<{ id: string; status: string }[]>('/loans', { token: v.accessToken });
+                const linked = location.hash.startsWith('#loan/') ? location.hash.slice(6) : null;
+                const open = loans.find((l) => l.id === linked) ?? loans.find((l) => l.status === 'ACTIVE' || l.status === 'OVERDUE');
+                if (open) {
+                  setLoanId(open.id);
+                  setScreen('loan');
+                  return;
+                }
                 const a = await api('/applications', { token: v.accessToken, body: { deviceId: deviceId() } });
                 setAppId(a.id);
                 await refresh(a.id, v.accessToken);
               })} />
           )}
 
-          {screen === 'kyc' && <KycForm busy={busy} onSubmit={(b) => step('kyc', b)} />}
+          {screen === 'loan' && loanId && token && <LoanView loanId={loanId} token={token} />}
+          {screen === 'kyc' && appId && token && <KycStep appId={appId} token={token} onChange={() => refresh()} />}
           {screen === 'bank' && <BankForm busy={busy} onSubmit={(b) => step('bank-account', b)} />}
           {screen === 'assess' && <AssessForm busy={busy} onSubmit={(b) => step('assessment', b)} />}
           {screen === 'kfs' && appId && <KfsView appId={appId} token={token!} busy={busy} onAccept={(hash) => step('kfs/accept', { kfsHash: hash, consentKfs: true })} />}
-          {screen === 'esign' && st && (
-            <EsignForm busy={busy} pending={st.status === 'ESIGN_PENDING'}
-              onStart={() => step('esign/initiate', {})}
-              onSign={(otp) => step('esign/complete', { otp })} />
-          )}
+          {screen === 'esign' && appId && token && <EsignStep appId={appId} token={token} onChange={() => refresh()} />}
 
           {screen === 'disbursing' && (
             <div className="center">
@@ -156,6 +166,8 @@ function CustomerJourney() {
                 <dt>Due date</dt><dd>{st.loan.dueDate}</dd>
                 <dt>Cooling-off ends</dt><dd>{st.loan.coolingOffEndsOn} (exit without penalty until then)</dd>
               </dl>
+              <p className="muted">No auto-debit is set up. Repay by UPI, net banking or card any time; early repayment costs less.</p>
+              <button onClick={() => { setLoanId(st.loan!.id); setScreen('loan'); }}>View loan & repay</button>
             </div>
           )}
 
@@ -165,7 +177,7 @@ function CustomerJourney() {
           {screen === 'expired' && <Message title="This application expired" text="Please log in again to start a new one." />}
         </div>
 
-        {st && <Timeline st={st} />}
+        {st && screen !== 'loan' && <Timeline st={st} />}
       </main>
 
       <footer>
@@ -218,20 +230,6 @@ function OtpForm({ hint, busy, onSubmit }: { hint?: string; busy: boolean; onSub
     <Form title="Enter OTP" cta="Verify & continue" busy={busy} onSubmit={() => onSubmit(otp)}>
       <Field label="6-digit OTP sent by SMS"><input inputMode="numeric" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} required autoFocus /></Field>
       {hint && <p className="sandbox">Sandbox OTP: <b>{hint}</b></p>}
-    </Form>
-  );
-}
-
-function KycForm({ busy, onSubmit }: { busy: boolean; onSubmit: (b: unknown) => void }) {
-  const [f, setF] = useState({ pan: '', fullName: '', dateOfBirth: '', consentKyc: false });
-  return (
-    <Form title="Verify your identity" cta="Verify KYC" busy={busy} onSubmit={() => onSubmit(f)}>
-      <Field label="PAN"><input value={f.pan} maxLength={10} onChange={(e) => setF({ ...f, pan: e.target.value.toUpperCase() })} placeholder="ABCDE1234F" required autoFocus /></Field>
-      <Field label="Full name as on PAN"><input value={f.fullName} onChange={(e) => setF({ ...f, fullName: e.target.value })} required /></Field>
-      <Field label="Date of birth"><input type="date" value={f.dateOfBirth} onChange={(e) => setF({ ...f, dateOfBirth: e.target.value })} required /></Field>
-      <label className="check"><input type="checkbox" checked={f.consentKyc} onChange={(e) => setF({ ...f, consentKyc: e.target.checked })} required />
-        I agree to the lender verifying my PAN and fetching my KYC records from CKYC for this loan.</label>
-      <p className="sandbox">Sandbox: PAN digits 0001–5999 approve, 6xxx manual review, 7xxx/8xxx reject. Last letter Z = invalid.</p>
     </Form>
   );
 }
@@ -302,23 +300,5 @@ function KfsView({ appId, token, busy, onAccept }: { appId: string; token: strin
         I have read and understood the Key Fact Statement, including the APR and all charges.</label>
       <button disabled={!ok || busy} onClick={() => onAccept(data.kfsHash)}>Accept & continue to e-sign</button>
     </div>
-  );
-}
-
-function EsignForm({ busy, pending, onStart, onSign }: { busy: boolean; pending: boolean; onStart: () => void; onSign: (otp: string) => void }) {
-  const [otp, setOtp] = useState('');
-  if (!pending)
-    return (
-      <div>
-        <h2>Sign your loan agreement</h2>
-        <p>You will sign with an Aadhaar OTP. The money is sent the moment you sign.</p>
-        <button disabled={busy} onClick={onStart}>Start e-sign</button>
-      </div>
-    );
-  return (
-    <Form title="Enter e-sign OTP" cta="Sign & get money" busy={busy} onSubmit={() => onSign(otp)}>
-      <Field label="OTP"><input inputMode="numeric" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} required autoFocus /></Field>
-      <p className="sandbox">Sandbox e-sign OTP: <b>123456</b></p>
-    </Form>
   );
 }

@@ -21,6 +21,17 @@ export class LoanApplication extends Uuid7Entity {
   @Column({ type: 'uuid', nullable: true })
   bankAccountId: string | null;
 
+  /** eKYC request at the provider (Digio KID…). */
+  @Index()
+  @Column({ type: 'varchar', length: 128, nullable: true })
+  kycRequestId: string | null;
+
+  @Column({ type: 'varchar', length: 128, nullable: true })
+  kycAccessTokenId: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  kycStartedAt: Date | null;
+
   @Column({ type: 'bigint', nullable: true, transformer: paiseTransformer })
   requestedPrincipalPaise: number | null;
 
@@ -53,8 +64,16 @@ export class LoanApplication extends Uuid7Entity {
   @Column({ type: 'timestamptz', nullable: true })
   kfsAcceptedAt: Date | null;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
+  @Index()
+  @Column({ type: 'varchar', length: 128, nullable: true })
   esignRequestId: string | null;
+
+  @Column({ type: 'varchar', length: 128, nullable: true })
+  esignAccessTokenId: string | null;
+
+  /** SHA-256 of the agreement PDF sent for e-sign. */
+  @Column({ type: 'char', length: 64, nullable: true })
+  agreementSha256: string | null;
 
   @Column({ type: 'varchar', length: 200, nullable: true })
   signedAgreementRef: string | null;

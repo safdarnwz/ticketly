@@ -1,14 +1,15 @@
 import { createHash, randomUUID } from 'crypto';
 import {
-  BankVerificationProvider, BankVerificationResult, BureauReport, CkycProvider, CkycResult, CreditBureauProvider,
-  EsignCompleteResult, EsignInitResult, EsignProvider, PanKycProvider, PanVerificationResult, PayoutProvider,
-  PayoutResult, ReconciliationEntry, ReconciliationProvider,
+  BankVerificationProvider, BankVerificationResult, BureauReport, CreditBureauProvider, EkycProvider, EkycResult, EkycSession,
+  EsignInitResult, EsignProvider, EsignStatus, NotificationProvider, PaymentGatewayProvider, PaymentOrder, PaymentStatus,
+  PayoutProvider, PayoutResult, ReconciliationEntry, ReconciliationProvider,
 } from '../ports';
 
 /**
  * Deterministic simulators. NO real KYC, bureau pull, e-sign or money movement happens.
- * Test data rules (see README):
- *   PAN last letter 'Z'                 → PAN invalid
+ * Test data rules (see README). In sandbox the tester types the PAN / name / DOB that DigiLocker
+ * would have returned:
+ *   PAN last letter 'Z'                 → eKYC rejected
  *   PAN digits 0001–5999               → bureau score 760 (auto approve)
  *   PAN digits 6000–6999               → bureau score 680 (manual review)
  *   PAN digits 7000–7999               → bureau score 600 (reject)
@@ -19,6 +20,7 @@ import {
  *   Account ending 2222                → IMPS fails (bank offline), NEFT fallback succeeds
  *   Account ending 3333                → payout fails, account closed (no retry)
  *   e-sign OTP                         → 123456
+ *   Payments                           → paid from the sandbox payment page
  */
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const ref = (p: string) => `${p}_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
@@ -31,21 +33,26 @@ export class SandboxLatency {
   }
 }
 
-export class SandboxPanKyc implements PanKycProvider {
+/** Simulates Digio DigiKYC. `simulate()` plays the part of the customer finishing DigiLocker. */
+export class SandboxEkyc implements EkycProvider {
+  private readonly requests = new Map<string, EkycResult>();
   constructor(private readonly l: SandboxLatency) {}
-  async verifyPan(pan: string, name: string): Promise<PanVerificationResult> {
+  async start(input: { mobile: string }): Promise<EkycSession> {
     await this.l.wait();
-    const ok = !pan.endsWith('Z');
-    return { valid: ok, panStatus: ok ? 'VALID' : 'INVALID', nameOnPan: ok ? name.toUpperCase() : null, aadhaarSeeded: ok, ref: ref('pan') };
+    const id = ref('KID');
+    this.requests.set(id, { state: 'PENDING', name: null, dob: null, pan: null, nameOnPan: null, aadhaarLast4: null, ref: id });
+    return { requestId: id, accessTokenId: ref('GWT'), customerIdentifier: input.mobile };
   }
-}
-
-export class SandboxCkyc implements CkycProvider {
-  constructor(private readonly l: SandboxLatency) {}
-  async searchAndDownload(pan: string, dob: string): Promise<CkycResult> {
+  simulate(requestId: string, d: { pan: string; fullName: string; dateOfBirth: string }) {
+    const r = this.requests.get(requestId);
+    if (!r || r.state !== 'PENDING') return false;
+    if (d.pan.endsWith('Z')) this.requests.set(requestId, { ...r, state: 'REJECTED' });
+    else this.requests.set(requestId, { ...r, state: 'APPROVED', name: d.fullName.toUpperCase(), nameOnPan: d.fullName.toUpperCase(), dob: d.dateOfBirth, pan: d.pan, aadhaarLast4: String(panDigits(d.pan)).padStart(4, '0') });
+    return true;
+  }
+  async result(requestId: string): Promise<EkycResult> {
     await this.l.wait();
-    const n = createHash('sha256').update(pan).digest('hex').replace(/\D/g, '').slice(0, 14).padEnd(14, '0');
-    return { found: true, ckycNumber: n, fullName: null, dob, ref: ref('ckyc') };
+    return this.requests.get(requestId) ?? { state: 'EXPIRED', name: null, dob: null, pan: null, nameOnPan: null, aadhaarLast4: null, ref: requestId };
   }
 }
 
@@ -73,21 +80,70 @@ export class SandboxBankVerification implements BankVerificationProvider {
   }
 }
 
+/** Simulates Digio Aadhaar eSign. `simulate()` is the customer entering the Aadhaar OTP. */
 export class SandboxEsign implements EsignProvider {
-  private readonly requests = new Map<string, { hash: string; name: string }>();
+  private readonly requests = new Map<string, { name: string; signed: boolean }>();
   constructor(private readonly l: SandboxLatency) {}
-  async initiate(input: { documentHash: string; signerName: string }): Promise<EsignInitResult> {
+  async initiate(input: { signerName: string }): Promise<EsignInitResult> {
     await this.l.wait();
-    const id = ref('esign');
-    this.requests.set(id, { hash: input.documentHash, name: input.signerName });
-    return { requestId: id, signingUrl: null };
+    const id = ref('DID');
+    this.requests.set(id, { name: input.signerName, signed: false });
+    return { requestId: id, accessTokenId: ref('GWT') };
   }
-  async complete(requestId: string, otp: string): Promise<EsignCompleteResult> {
+  simulate(requestId: string, otp: string) {
+    const r = this.requests.get(requestId);
+    if (!r || otp !== '123456') return false;
+    r.signed = true;
+    return true;
+  }
+  async status(requestId: string): Promise<EsignStatus> {
     await this.l.wait();
     const r = this.requests.get(requestId);
-    if (!r || otp !== '123456') return { signed: false, signedDocumentRef: null, signerName: null };
-    this.requests.delete(requestId);
-    return { signed: true, signedDocumentRef: `signed/${requestId}/${r.hash.slice(0, 12)}.pdf`, signerName: r.name };
+    return { signed: !!r?.signed, failed: !r, signerName: r?.name ?? null };
+  }
+}
+
+/** Simulates a payment gateway (UPI / net banking / card). `simulate()` is the customer paying. */
+export class SandboxPayments implements PaymentGatewayProvider {
+  private readonly orders = new Map<string, PaymentStatus & { reference: string; amountPaise: number }>();
+  private readonly byRef = new Map<string, string>();
+  constructor(private readonly l: SandboxLatency, private readonly webUrl: string) {}
+  async createOrder(input: { reference: string; amountPaise: number }): Promise<PaymentOrder> {
+    const existing = this.byRef.get(input.reference);
+    const id = existing ?? ref('order');
+    if (!existing) {
+      await this.l.wait();
+      this.orders.set(id, { orderId: id, reference: input.reference, amountPaise: input.amountPaise, state: 'PENDING', paidPaise: 0, method: null, utr: null, paidAt: null });
+      this.byRef.set(input.reference, id);
+    }
+    return { orderId: id, paymentUrl: `${this.webUrl}/#sandbox-pay/${id}`, upiIntentUrl: `upi://pay?pa=lender@sandbox&am=${(input.amountPaise / 100).toFixed(2)}&tr=${id}` };
+  }
+  simulate(orderId: string, outcome: 'PAID' | 'FAILED', method = 'UPI') {
+    const o = this.orders.get(orderId);
+    if (!o || o.state !== 'PENDING') return null;
+    Object.assign(o, outcome === 'PAID'
+      ? { state: 'PAID', paidPaise: o.amountPaise, method, utr: String(Math.floor(1e11 + Math.random() * 9e11)), paidAt: new Date().toISOString() }
+      : { state: 'FAILED', method });
+    return { orderId, amountPaise: o.amountPaise };
+  }
+  order(orderId: string) {
+    return this.orders.get(orderId) ?? null;
+  }
+  async status(orderId: string): Promise<PaymentStatus> {
+    const o = this.orders.get(orderId);
+    if (!o) return { orderId, state: 'EXPIRED', paidPaise: 0, method: null, utr: null, paidAt: null };
+    const { reference: _r, amountPaise: _a, ...st } = o;
+    return { ...st };
+  }
+}
+
+/** Sandbox SMS: keeps sent messages in memory so tests and the demo can show them. */
+export class SandboxSms implements NotificationProvider {
+  readonly sent: { mobile: string; templateKey: string; vars: Record<string, string>; at: string }[] = [];
+  async sms(mobile: string, templateKey: string, vars: Record<string, string>) {
+    this.sent.push({ mobile, templateKey, vars, at: new Date().toISOString() });
+    if (this.sent.length > 500) this.sent.shift();
+    return { ref: ref('sms') };
   }
 }
 

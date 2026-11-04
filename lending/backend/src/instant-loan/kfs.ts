@@ -29,6 +29,8 @@ export interface KeyFactStatement {
   effectiveAnnualCostPercent: string;
   penalCharges: string;
   coolingOff: string;
+  repayment: string;
+  prepayment: string;
   recovery: string;
   lendingServiceProvider: string;
   grievanceRedressal: string;
@@ -104,7 +106,9 @@ export function buildKfs(input: {
     aprPercent: pct(o.aprBps),
     effectiveAnnualCostPercent: pct(o.effectiveAnnualBps),
     penalCharges: penalText(o),
-    coolingOff: `You may exit within ${o.coolingOffDays} days of disbursal by repaying the principal and proportionate APR, with no penalty.`,
+    coolingOff: `You may exit within ${o.coolingOffDays} days of disbursal by repaying the principal and interest for the days used, with no penalty.`,
+    repayment: 'You repay yourself by UPI, net banking or debit card from your loan dashboard or the link in our SMS. No auto-debit (eNACH/NACH) mandate is taken. Money goes directly to the lender’s bank account.',
+    prepayment: 'You can repay early at any time with no prepayment charge. Interest is charged only for the days you used the money (minimum 1 day).',
     recovery: 'Reminders only by SMS, email or calls between 8 AM and 7 PM. No threats, no contact with your phone contacts.',
     lendingServiceProvider: 'None. The lender deals with you directly.',
     grievanceRedressal: `${input.grievanceOfficer}. If not resolved in 30 days you may complain on the RBI Complaint Management System (cms.rbi.org.in).`,

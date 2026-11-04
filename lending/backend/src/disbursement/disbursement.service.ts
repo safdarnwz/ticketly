@@ -12,6 +12,9 @@ import { JourneyRecorder } from '../instant-loan/journey.recorder';
 import { LoanApplication } from '../instant-loan/loan-application.entity';
 import { Loan, LoanStatus } from '../instant-loan/loan.entity';
 import { PAYOUT, PayoutProvider, PayoutResult, RECONCILIATION, ReconciliationProvider } from '../integrations/ports';
+import { formatInr } from '../common/money';
+import { addDays, istDate } from '../repayment/loan.math';
+import { NotifierService } from '../repayment/notifier.service';
 import { Disbursement, DisbursementStatus, PayoutRail } from './disbursement.entity';
 
 /** Per-transaction rail limits (paise). Loans here are ₹10k–₹30k, so IMPS is the primary rail. */
@@ -39,6 +42,7 @@ export class DisbursementService {
     @Inject(APP_CONFIG) private readonly cfg: AppConfig,
     private readonly audit: AuditService,
     private readonly journey: JourneyRecorder,
+    private readonly notifier: NotifierService,
   ) {}
 
   /** Creates attempt 1 for a signed loan and sends it to the payout provider. */
@@ -93,6 +97,7 @@ export class DisbursementService {
   /** Applies a provider result. Row-locked and idempotent, so webhook + poller can race safely. */
   async apply(disbursementId: string, result: PayoutResult) {
     let fallback: Disbursement | null = null;
+    let credited: Loan | null = null;
     await this.ds.transaction(async (m) => {
       const r = m.getRepository(Disbursement);
       const d = await r.findOne({ where: { id: disbursementId }, lock: { mode: 'pessimistic_write' } });
@@ -112,6 +117,7 @@ export class DisbursementService {
         d.utr = result.utr;
         await r.save(d);
         await this.onCredited(m, loan, app, d);
+        credited = loan;
         return;
       }
       d.status = DisbursementStatus.FAILED;
@@ -131,12 +137,22 @@ export class DisbursementService {
       await this.journey.record(m, app, JourneyStep.DISBURSAL, StepOutcome.FAILED, app.esignedAt!.getTime(), { providerRef: result.providerRef, detail: { code: result.failureCode } });
     });
     if (fallback) await this.send(fallback);
+    if (credited) await this.smsCredited(credited);
+  }
+
+  private async smsCredited(loan: Loan) {
+    const c = await this.ds.getRepository(Customer).findOneByOrFail({ id: loan.customerId });
+    await this.notifier.once({
+      loanId: loan.id, customerId: c.id, mobile: c.mobile, kind: 'DISBURSED', templateKey: 'LOAN_DISBURSED',
+      vars: { amount: formatInr(loan.netDisbursalPaise), repay: formatInr(loan.totalRepayablePaise), dueDate: loan.dueDate!, link: `${this.cfg.publicWebUrl}/#loan/${loan.id}` },
+    });
   }
 
   private async onCredited(m: EntityManager, loan: Loan, app: LoanApplication, d: Disbursement) {
     const at = d.confirmedAt!;
-    const day = (n: number) => new Date(at.getTime() + n * 86_400_000).toISOString().slice(0, 10);
-    Object.assign(loan, { status: LoanStatus.ACTIVE, disbursedAt: at, dueDate: day(loan.tenureDays), coolingOffEndsOn: day(app.offer?.coolingOffDays ?? 3) });
+    // Dates follow the Indian calendar: due = credit date (IST) + tenure.
+    const on = istDate(at);
+    Object.assign(loan, { status: LoanStatus.ACTIVE, disbursedAt: at, dueDate: addDays(on, loan.tenureDays), coolingOffEndsOn: addDays(on, app.offer?.coolingOffDays ?? 3) });
     await m.getRepository(Loan).save(loan);
     const elapsed = at.getTime() - app.journeyStartedAt.getTime();
     Object.assign(app, { status: ApplicationStatus.DISBURSED, completedAt: at, totalElapsedMs: elapsed, withinTarget: elapsed <= this.cfg.journeyTargetSeconds * 1000 });

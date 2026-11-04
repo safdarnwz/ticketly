@@ -4,28 +4,29 @@
  * signed vendor contract and selected with INTEGRATIONS_MODE=live.
  */
 
-// PAN / KYC API — customer verification
-export interface PanVerificationResult {
-  valid: boolean;
+// eKYC (Digio DigiKYC: DigiLocker Aadhaar + PAN) — customer verification
+// Asynchronous: we create a request, the customer completes it in the provider's SDK,
+// then we read the verified result from the provider (webhook or SDK callback).
+export type EkycState = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
+export interface EkycSession {
+  requestId: string;
+  /** One-time token for the provider's Web SDK. */
+  accessTokenId: string | null;
+  customerIdentifier: string;
+}
+export interface EkycResult {
+  state: EkycState;
+  /** Name and DOB as on Aadhaar. */
+  name: string | null;
+  dob: string | null; // YYYY-MM-DD
+  pan: string | null;
   nameOnPan: string | null;
-  panStatus: 'VALID' | 'INVALID' | 'NOT_FOUND';
-  aadhaarSeeded: boolean;
+  aadhaarLast4: string | null;
   ref: string;
 }
-export interface PanKycProvider {
-  verifyPan(pan: string, name: string, dob: string): Promise<PanVerificationResult>;
-}
-
-// CKYC / permitted KYC provider — KYC compliance
-export interface CkycResult {
-  found: boolean;
-  ckycNumber: string | null;
-  fullName: string | null;
-  dob: string | null;
-  ref: string;
-}
-export interface CkycProvider {
-  searchAndDownload(pan: string, dob: string, consentRef: string): Promise<CkycResult>;
+export interface EkycProvider {
+  start(input: { mobile: string; referenceId: string }): Promise<EkycSession>;
+  result(requestId: string): Promise<EkycResult>;
 }
 
 // Credit Bureau API — credit history
@@ -54,20 +55,19 @@ export interface BankVerificationProvider {
   validateAccount(accountNumber: string, ifsc: string, expectedName: string): Promise<BankVerificationResult>;
 }
 
-// eSign / digital signature — loan agreement
+// eSign (Digio Aadhaar eSign) — loan agreement
 export interface EsignInitResult {
   requestId: string;
-  /** Hosted signing page (Aadhaar eSign). Sandbox completes with an OTP instead. */
-  signingUrl: string | null;
+  accessTokenId: string | null;
 }
-export interface EsignCompleteResult {
+export interface EsignStatus {
   signed: boolean;
-  signedDocumentRef: string | null;
+  failed: boolean;
   signerName: string | null;
 }
 export interface EsignProvider {
-  initiate(input: { documentHash: string; signerName: string; mobile: string }): Promise<EsignInitResult>;
-  complete(requestId: string, otp: string): Promise<EsignCompleteResult>;
+  initiate(input: { pdfBase64: string; fileName: string; signerName: string; mobile: string; referenceId: string }): Promise<EsignInitResult>;
+  status(requestId: string): Promise<EsignStatus>;
 }
 
 // UPI / IMPS / NEFT payout API — instant digital disbursement
@@ -105,8 +105,35 @@ export interface ReconciliationProvider {
   settledPayouts(sinceIso: string): Promise<ReconciliationEntry[]>;
 }
 
-export const PAN_KYC = Symbol('PAN_KYC');
-export const CKYC = Symbol('CKYC');
+// Repayment payment gateway — UPI (intent / QR), net banking, debit card. No eNACH mandate.
+export type PaymentState = 'PENDING' | 'PAID' | 'FAILED' | 'EXPIRED';
+export interface PaymentOrder {
+  orderId: string;
+  paymentUrl: string;
+  upiIntentUrl: string | null;
+}
+export interface PaymentStatus {
+  orderId: string;
+  state: PaymentState;
+  paidPaise: number;
+  method: string | null;
+  utr: string | null;
+  paidAt: string | null;
+}
+export interface PaymentGatewayProvider {
+  /** Must be idempotent on `reference`. Money settles to the lender's own account. */
+  createOrder(input: { reference: string; amountPaise: number; mobile: string; name: string; description: string; expiresInMinutes: number }): Promise<PaymentOrder>;
+  status(orderId: string): Promise<PaymentStatus>;
+}
+
+// SMS (DLT-registered templates) — reminders and receipts
+export interface NotificationProvider {
+  sms(mobile: string, templateKey: string, vars: Record<string, string>): Promise<{ ref: string }>;
+}
+
+export const EKYC = Symbol('EKYC');
+export const PAYMENT_GATEWAY = Symbol('PAYMENT_GATEWAY');
+export const NOTIFY = Symbol('NOTIFY');
 export const CREDIT_BUREAU = Symbol('CREDIT_BUREAU');
 export const BANK_VERIFICATION = Symbol('BANK_VERIFICATION');
 export const ESIGN = Symbol('ESIGN');

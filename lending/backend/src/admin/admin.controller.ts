@@ -9,6 +9,7 @@ import { InstantLoanService } from '../instant-loan/instant-loan.service';
 import { toPlanInput, toPlanPatch } from '../pricing/plan.mapper';
 import { PricingService } from '../pricing/pricing.service';
 import { StaffService } from '../staff/staff.service';
+import { RepaymentService } from '../repayment/repayment.service';
 import { MetricsService } from './metrics.service';
 
 @Controller('staff')
@@ -30,7 +31,19 @@ export class AdminController {
     private readonly disbursal: DisbursementService,
     private readonly metrics: MetricsService,
     private readonly audit: AuditService,
+    private readonly repayments: RepaymentService,
   ) {}
+
+  @Get('collections/overdue') @RequirePermissions(Permission.COLLECTIONS_VIEW)
+  overdue() {
+    return this.repayments.overdueList();
+  }
+
+  /** Runs today's penal accrual and reminders now (they also run automatically). */
+  @Post('collections/run-daily') @HttpCode(200) @RequirePermissions(Permission.RECONCILE)
+  async runDaily() {
+    return { overdueUpdated: await this.repayments.accrueOverdue(), remindersSent: await this.repayments.sendReminders() };
+  }
 
   @Get('roles')
   roles() {
