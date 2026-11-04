@@ -1,10 +1,12 @@
 /**
  * Roles of the platform. One customer role plus eleven staff roles for the admin panel.
- * Staff permissions follow least privilege and maker-checker: no single role can both
- * create and activate pricing, or approve and disburse its own loan.
+ * Staff permissions follow least privilege. Pricing and offers are controlled by the OWNER only;
+ * every change is audited and needs a fresh authenticator code.
  */
 export enum Role {
   CUSTOMER = 'CUSTOMER',
+  /** Company owner. The ONLY role that can create or change pricing plans and offers. */
+  OWNER = 'OWNER',
   SUPER_ADMIN = 'SUPER_ADMIN',
   COMPLIANCE_OFFICER = 'COMPLIANCE_OFFICER',
   CREDIT_RISK_MANAGER = 'CREDIT_RISK_MANAGER',
@@ -20,8 +22,7 @@ export enum Role {
 
 export enum Permission {
   STAFF_MANAGE = 'staff.manage',
-  PRICING_DRAFT = 'pricing.draft',
-  PRICING_ACTIVATE = 'pricing.activate',
+  PRICING_MANAGE = 'pricing.manage',
   PRICING_VIEW = 'pricing.view',
   APPLICATION_VIEW = 'application.view',
   APPLICATION_REVIEW = 'application.review',
@@ -35,9 +36,10 @@ export enum Permission {
 const P = Permission;
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   [Role.CUSTOMER]: [],
+  [Role.OWNER]: [P.PRICING_MANAGE, P.PRICING_VIEW, P.APPLICATION_VIEW, P.DISBURSAL_VIEW, P.METRICS_VIEW, P.AUDIT_VIEW],
   [Role.SUPER_ADMIN]: [P.STAFF_MANAGE, P.METRICS_VIEW, P.AUDIT_VIEW],
-  [Role.COMPLIANCE_OFFICER]: [P.PRICING_ACTIVATE, P.PRICING_VIEW, P.APPLICATION_VIEW, P.METRICS_VIEW, P.AUDIT_VIEW],
-  [Role.CREDIT_RISK_MANAGER]: [P.PRICING_DRAFT, P.PRICING_VIEW, P.APPLICATION_VIEW, P.METRICS_VIEW],
+  [Role.COMPLIANCE_OFFICER]: [P.PRICING_VIEW, P.APPLICATION_VIEW, P.METRICS_VIEW, P.AUDIT_VIEW],
+  [Role.CREDIT_RISK_MANAGER]: [P.PRICING_VIEW, P.APPLICATION_VIEW, P.METRICS_VIEW],
   [Role.CREDIT_ANALYST]: [P.APPLICATION_VIEW, P.APPLICATION_REVIEW],
   [Role.OPERATIONS_MANAGER]: [P.APPLICATION_VIEW, P.DISBURSAL_VIEW, P.DISBURSAL_RETRY, P.METRICS_VIEW],
   [Role.KYC_VERIFIER]: [P.APPLICATION_VIEW],
@@ -59,7 +61,7 @@ export function permissionsFor(roles: Role[]): Set<Permission> {
  * by the same person, so maker-checker survives even with very few staff.
  */
 export const CONFLICTING_ROLE_PAIRS: [Role, Role][] = [
-  [Role.CREDIT_RISK_MANAGER, Role.COMPLIANCE_OFFICER], // drafts pricing vs activates pricing
+  [Role.OWNER, Role.AUDITOR], // sets prices vs audits them
   [Role.COLLECTION_AGENT, Role.GRIEVANCE_OFFICER], // collects vs hears complaints about collection
   [Role.SUPER_ADMIN, Role.AUDITOR], // manages users vs audits them
   [Role.CREDIT_ANALYST, Role.AUDITOR],
@@ -73,7 +75,7 @@ export function findRoleConflicts(roles: Role[]): [Role, Role][] {
 
 /** Suggested setup for a 5-person company. Used by the seed script and the docs. */
 export const FIVE_PERSON_TEAM: { title: string; roles: Role[] }[] = [
-  { title: 'Founder / Director', roles: [Role.SUPER_ADMIN, Role.CREDIT_RISK_MANAGER] },
+  { title: 'Founder / Owner', roles: [Role.OWNER, Role.SUPER_ADMIN, Role.CREDIT_RISK_MANAGER] },
   { title: 'Compliance & Grievance Head', roles: [Role.COMPLIANCE_OFFICER, Role.GRIEVANCE_OFFICER] },
   { title: 'Finance & Accounts', roles: [Role.FINANCE_MANAGER] },
   { title: 'Credit & Operations', roles: [Role.CREDIT_ANALYST, Role.OPERATIONS_MANAGER, Role.KYC_VERIFIER] },

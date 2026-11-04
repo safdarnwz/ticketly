@@ -135,9 +135,8 @@ export class DisbursementService {
 
   private async onCredited(m: EntityManager, loan: Loan, app: LoanApplication, d: Disbursement) {
     const at = d.confirmedAt!;
-    const policy = await m.query(`SELECT "coolingOffDays" FROM pricing_policies WHERE id = $1`, [loan.pricingPolicyId]);
     const day = (n: number) => new Date(at.getTime() + n * 86_400_000).toISOString().slice(0, 10);
-    Object.assign(loan, { status: LoanStatus.ACTIVE, disbursedAt: at, dueDate: day(loan.tenureDays), coolingOffEndsOn: day(policy[0]?.coolingOffDays ?? 3) });
+    Object.assign(loan, { status: LoanStatus.ACTIVE, disbursedAt: at, dueDate: day(loan.tenureDays), coolingOffEndsOn: day(app.offer?.coolingOffDays ?? 3) });
     await m.getRepository(Loan).save(loan);
     const elapsed = at.getTime() - app.journeyStartedAt.getTime();
     Object.assign(app, { status: ApplicationStatus.DISBURSED, completedAt: at, totalElapsedMs: elapsed, withinTarget: elapsed <= this.cfg.journeyTargetSeconds * 1000 });

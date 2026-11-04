@@ -1,6 +1,6 @@
 import { assessRisk, nameSimilarity, RiskInput } from './risk.engine';
 
-const terms = { annualInterestBps: 1800, processingFeeBps: 100, gstOnFeeBps: 1800, tenureDays: 30 };
+const terms = { interestUnit: 'PER_ANNUM' as const, interestRatePercent: 18, feeType: 'PERCENT' as const, feeValue: 1, gstPercent: 18, tenureDays: 30 };
 const limits = { minPrincipalPaise: 1_000_000, maxPrincipalPaise: 3_000_000 };
 const base: RiskInput = {
   ageYears: 30,

@@ -20,7 +20,7 @@ export class Loan extends Uuid7Entity {
   customerId: string;
 
   @Column('uuid')
-  pricingPolicyId: string;
+  pricingPlanId: string;
 
   @Column({ type: 'bigint', transformer: paiseTransformer })
   principalPaise: number;

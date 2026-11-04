@@ -1,7 +1,7 @@
 import { Column, Entity, Index } from 'typeorm';
 import { paiseTransformer } from '../common/money';
 import { Uuid7Entity } from '../common/uuid7.entity';
-import type { LoanOffer } from '../pricing/pricing.calc';
+import type { FrozenOffer } from '../pricing/offer';
 import { ApplicationStatus } from './journey';
 
 @Entity('loan_applications')
@@ -37,11 +37,11 @@ export class LoanApplication extends Uuid7Entity {
   decisionReasons: string[];
 
   @Column({ type: 'uuid', nullable: true })
-  pricingPolicyId: string | null;
+  pricingPlanId: string | null;
 
   /** Frozen offer (what the KFS shows). */
   @Column({ type: 'jsonb', nullable: true })
-  offer: LoanOffer | null;
+  offer: FrozenOffer | null;
 
   @Column({ type: 'timestamptz', nullable: true })
   offerExpiresAt: Date | null;

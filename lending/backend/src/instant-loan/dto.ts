@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
-import { Equals, IsArray, IsEmail, IsEnum, IsIn, IsInt, IsISO8601, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { PartialType } from '@nestjs/mapped-types';
+import { Equals, IsArray, IsBoolean, IsEmail, IsEnum, IsIn, IsInt, IsISO8601, IsNumber, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { Role } from '../common/roles';
 
 export class RequestOtpDto {
@@ -54,18 +55,28 @@ export class CreateStaffDto {
   @IsString() @MinLength(12) password: string;
   @IsArray() @IsEnum(Role, { each: true }) roles: Role[];
 }
-export class PolicyDraftDto {
-  @IsString() @Length(3, 120) name: string;
-  @IsInt() @Min(0) @Max(100_000) annualInterestBps: number;
-  @IsInt() @Min(0) @Max(5000) processingFeeBps: number;
-  @IsInt() @Min(0) @Max(5000) gstOnFeeBps: number;
+/** Owner's pricing plan form. Amounts in rupees; rates in percent. */
+export class PlanDto {
+  @IsString() @Length(2, 120) name: string;
+  @IsIn(['ALL', 'CUSTOMER']) scope: 'ALL' | 'CUSTOMER';
+  @IsOptional() @Matches(/^[6-9]\d{9}$/, { message: 'customerMobile must be a 10-digit mobile number' }) customerMobile?: string | null;
+  @IsOptional() @IsString() @MaxLength(120) customerLabel?: string | null;
+  @IsOptional() @IsInt() @Min(-1000) @Max(1000) priority?: number;
+  @IsOptional() @IsBoolean() active?: boolean;
+  @IsOptional() @IsISO8601() validFrom?: string | null;
+  @IsOptional() @IsISO8601() validUntil?: string | null;
+  @IsOptional() @IsInt() @Min(1) maxUses?: number | null;
+  @IsIn(['PER_DAY', 'PER_ANNUM']) interestUnit: 'PER_DAY' | 'PER_ANNUM';
+  @IsNumber({ maxDecimalPlaces: 6 }) @Min(0) @Max(1000) interestRatePercent: number;
+  @IsIn(['PERCENT', 'FLAT']) feeType: 'PERCENT' | 'FLAT';
+  @IsNumber({ maxDecimalPlaces: 4 }) @Min(0) @Max(10_00_000) feeValue: number;
+  @IsNumber({ maxDecimalPlaces: 3 }) @Min(0) @Max(100) gstPercent: number;
   @IsInt() @Min(1) @Max(365) tenureDays: number;
-  @IsInt() @Min(100) minPrincipalPaise: number;
-  @IsInt() @Min(100) maxPrincipalPaise: number;
-  @IsInt() @Min(1) aprCapBps: number;
-  @IsInt() @Min(1) @Max(30) coolingOffDays: number;
-  @IsString() @Length(5, 2000) penalChargesText: string;
+  @IsInt() @Min(1) @Max(1_00_00_000) minAmount: number;
+  @IsInt() @Min(1) @Max(1_00_00_000) maxAmount: number;
+  @IsOptional() @IsIn(['NONE', 'PERCENT_PER_DAY', 'FLAT_PER_DAY']) penalType?: 'NONE' | 'PERCENT_PER_DAY' | 'FLAT_PER_DAY';
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 4 }) @Min(0) penalValue?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(30) coolingOffDays?: number;
+  @IsOptional() @IsNumber({ maxDecimalPlaces: 3 }) @Min(0) aprCapPercent?: number | null;
 }
-export class ActivatePolicyDto {
-  @IsString() @Length(3, 200) boardApprovalRef: string;
-}
+export class UpdatePlanDto extends PartialType(PlanDto) {}

@@ -15,8 +15,8 @@ import { DisbursementService } from '../disbursement/disbursement.service';
 import {
   BANK_VERIFICATION, BankVerificationProvider, CKYC, CkycProvider, CREDIT_BUREAU, CreditBureauProvider, ESIGN, EsignProvider, PAN_KYC, PanKycProvider,
 } from '../integrations/ports';
-import { computeOffer } from '../pricing/pricing.calc';
-import { PricingPolicy } from '../pricing/pricing-policy.entity';
+import { freezeOffer } from '../pricing/offer';
+import { PricingPlan } from '../pricing/pricing-plan.entity';
 import { PricingService } from '../pricing/pricing.service';
 import { AcceptKfsDto, AssessmentDto, BankAccountDto, KycDto, ReviewDto } from './dto';
 import { ApplicationStatus as S, canTransition, JourneyStep, STEP_TARGETS } from './journey';
@@ -71,19 +71,19 @@ export class InstantLoanService {
     if (!app.offerExpiresAt || app.offerExpiresAt < new Date()) throw new GoneException('This offer has expired. Please start a new application.');
   }
 
-  private async makeOffer(m: EntityManager, app: LoanApplication, principalPaise: number, policy: PricingPolicy) {
-    const offer = computeOffer(policy, principalPaise);
-    if (offer.aprBps > policy.aprCapBps) throw new UnprocessableEntityException('Offer exceeds the board-approved APR cap');
+  private async makeOffer(m: EntityManager, app: LoanApplication, principalPaise: number, plan: PricingPlan) {
+    const offer = freezeOffer(plan, principalPaise);
+    if (plan.aprCapPercent != null && offer.aprBps / 100 > plan.aprCapPercent) throw new UnprocessableEntityException('Offer is above the owner-set APR cap');
     app.offer = offer;
-    app.pricingPolicyId = policy.id;
+    app.pricingPlanId = plan.id;
     app.offerExpiresAt = new Date(Date.now() + this.cfg.offerValidityMinutes * 60_000);
-    app.kfsHash = kfsHash(await this.buildKfsFor(m, app, policy));
+    app.kfsHash = kfsHash(await this.buildKfsFor(m, app));
   }
 
-  private async buildKfsFor(m: EntityManager, app: LoanApplication, policy?: PricingPolicy): Promise<KeyFactStatement> {
+  /** Built only from the frozen offer, never from the live plan. */
+  private async buildKfsFor(m: EntityManager, app: LoanApplication): Promise<KeyFactStatement> {
     const customer = await m.getRepository(Customer).findOneByOrFail({ id: app.customerId });
     const acct = await m.getRepository(BankAccount).findOneByOrFail({ id: app.bankAccountId! });
-    const p = policy ?? (await m.getRepository(PricingPolicy).findOneByOrFail({ id: app.pricingPolicyId! }));
     return buildKfs({
       applicationId: app.id,
       lender: this.cfg.lenderName,
@@ -93,7 +93,6 @@ export class InstantLoanService {
       borrower: { name: customer.fullName!, mobile: customer.mobile, panMasked: customer.panMasked! },
       bank: { last4: acct.accountLast4, ifsc: acct.ifsc },
       offer: app.offer!,
-      policy: p,
     });
   }
 
@@ -103,7 +102,7 @@ export class InstantLoanService {
     const repo = this.ds.getRepository(LoanApplication);
     const open = await repo.findOne({ where: { customerId: user.sub, status: In(OPEN_STATUSES) }, order: { createdAt: 'DESC' } });
     if (open) return this.status(open.id, user);
-    await this.pricing.active(); // fail fast if lending is paused
+    await this.pricing.resolve(user.mobile); // fail fast if lending is paused
     return this.ds.transaction(async (m) => {
       const r = m.getRepository(LoanApplication);
       // t = 0 is when the customer asked for the OTP, so the login step itself is timed.
@@ -176,11 +175,11 @@ export class InstantLoanService {
   async assess(id: string, user: CustomerPrincipal, dto: AssessmentDto) {
     return this.withApp(id, user, [S.BANK_VERIFIED], async (m, app) => {
       const t = Date.now();
-      const policy = await this.pricing.active();
-      const requested = rupeesToPaise(dto.requestedAmount);
-      if (requested < policy.minPrincipalPaise || requested > policy.maxPrincipalPaise)
-        throw new BadRequestException(`Loan amount must be between ₹${policy.minPrincipalPaise / 100} and ₹${policy.maxPrincipalPaise / 100}`);
       const c = await m.getRepository(Customer).findOneByOrFail({ id: user.sub });
+      const plan = await this.pricing.resolve(c.mobile, new Date(), m);
+      const requested = rupeesToPaise(dto.requestedAmount);
+      if (requested < plan.minPrincipalPaise || requested > plan.maxPrincipalPaise)
+        throw new BadRequestException(`Loan amount must be between ₹${plan.minPrincipalPaise / 100} and ₹${plan.maxPrincipalPaise / 100}`);
       const acct = await m.getRepository(BankAccount).findOneByOrFail({ id: app.bankAccountId! });
       const consentRef = `bureau-consent:${app.id}:${t}`;
       const since = new Date(Date.now() - 86_400_000);
@@ -212,8 +211,8 @@ export class InstantLoanService {
           panUsedByOtherCustomer: dupPan,
           openApplicationsForCustomer: otherOpen + activeLoans,
         },
-        policy,
-        policy,
+        plan,
+        plan,
       );
       Object.assign(app, {
         requestedPrincipalPaise: requested,
@@ -233,8 +232,8 @@ export class InstantLoanService {
         return { status: app.status, reasons: risk.reasons, message: 'Your application needs a quick review by our credit team. We will notify you by SMS.' };
       }
       const ta = Date.now();
-      await this.makeOffer(m, app, risk.approvedPrincipalPaise, policy);
-      await this.move(m, app, S.APPROVED, { type: 'SYSTEM', id: null }, { principal: risk.approvedPrincipalPaise, policyId: policy.id });
+      await this.makeOffer(m, app, risk.approvedPrincipalPaise, plan);
+      await this.move(m, app, S.APPROVED, { type: 'SYSTEM', id: null }, { principal: risk.approvedPrincipalPaise, planId: plan.id });
       await this.journey.record(m, app, JourneyStep.APPROVAL, StepOutcome.PASSED, ta, { detail: { approvedPaise: risk.approvedPrincipalPaise, aprBps: app.offer!.aprBps } });
       return { status: app.status, offer: app.offer, offerExpiresAt: app.offerExpiresAt, reasons: risk.reasons };
     });
@@ -279,6 +278,7 @@ export class InstantLoanService {
       const t = app.kfsAcceptedAt!.getTime();
       const r = await this.esign.complete(app.esignRequestId!, otp);
       if (!r.signed) throw new UnprocessableEntityException('E-sign failed. Check the OTP and try again.');
+      await this.pricing.consume(m, app.pricingPlanId!);
       app.signedAgreementRef = r.signedDocumentRef;
       app.esignedAt = new Date();
       await this.journey.record(m, app, JourneyStep.KFS_ESIGN, StepOutcome.PASSED, t, { providerRef: app.esignRequestId });
@@ -288,7 +288,7 @@ export class InstantLoanService {
         loans.create({
           applicationId: app.id,
           customerId: app.customerId,
-          pricingPolicyId: app.pricingPolicyId!,
+          pricingPlanId: app.pricingPlanId!,
           principalPaise: o.principalPaise,
           processingFeePaise: o.processingFeePaise,
           gstOnFeePaise: o.gstOnFeePaise,
@@ -352,12 +352,13 @@ export class InstantLoanService {
         await this.move(m, app, S.REJECTED, actor, { note: dto.note });
         return { status: app.status };
       }
-      const policy = await this.pricing.active();
+      const customer = await m.getRepository(Customer).findOneByOrFail({ id: app.customerId });
+      const plan = await this.pricing.resolve(customer.mobile, new Date(), m);
       const amount = dto.approvedAmount ? rupeesToPaise(dto.approvedAmount) : app.requestedPrincipalPaise!;
-      if (amount > app.requestedPrincipalPaise! || amount < policy.minPrincipalPaise || amount > policy.maxPrincipalPaise)
-        throw new BadRequestException('Approved amount must be within policy limits and not above the requested amount');
+      if (amount > app.requestedPrincipalPaise! || amount < plan.minPrincipalPaise || amount > plan.maxPrincipalPaise)
+        throw new BadRequestException('Approved amount must be within the plan limits and not above the requested amount');
       const t = Date.now();
-      await this.makeOffer(m, app, amount, policy);
+      await this.makeOffer(m, app, amount, plan);
       await this.move(m, app, S.APPROVED, actor, { note: dto.note, principal: amount });
       await this.journey.record(m, app, JourneyStep.APPROVAL, StepOutcome.PASSED, t, { detail: { manual: true, reviewer: staff.sub } });
       return { status: app.status, offer: app.offer };

@@ -4,14 +4,13 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
 import { FIVE_PERSON_TEAM } from './common/roles';
-import { PolicyStatus, PricingPolicy } from './pricing/pricing-policy.entity';
+import { PricingPlan } from './pricing/pricing-plan.entity';
 import { StaffUser } from './staff/staff-user.entity';
 import { StaffService } from './staff/staff.service';
 
 /**
- * Dev/sandbox seed: the suggested 5-person team and one ACTIVE pricing policy.
- * The pricing numbers are placeholders for testing only. The real numbers must come from the
- * board-approved interest-rate policy.
+ * Dev/sandbox seed: the suggested 5-person team and one default pricing plan.
+ * The pricing numbers are placeholders; the owner sets real ones in the Owner panel.
  */
 async function seed() {
   process.env.DISABLE_JOBS = 'true';
@@ -25,20 +24,18 @@ async function seed() {
       console.log(`  ${r.email.padEnd(22)} ${m.title.padEnd(30)} roles=${m.roles.join(',')}  totp=${r.totpSecret}`);
     }
   }
-  const policies = ds.getRepository(PricingPolicy);
-  if (!(await policies.count({ where: { status: PolicyStatus.ACTIVE } }))) {
-    const founder = await ds.getRepository(StaffUser).findOneByOrFail({ email: 'staff1@example.com' });
-    const compliance = await ds.getRepository(StaffUser).findOneByOrFail({ email: 'staff2@example.com' });
-    await policies.save(
-      policies.create({
-        name: 'SANDBOX placeholder – 18% p.a., 1% fee, 30 days',
-        annualInterestBps: 1800, processingFeeBps: 100, gstOnFeeBps: 1800, tenureDays: 30,
-        minPrincipalPaise: 10_000_00, maxPrincipalPaise: 30_000_00, aprCapBps: 3600, coolingOffDays: 3,
-        penalChargesText: 'Penal charge of 2% per month on the overdue amount only, after the due date. No compounding, no capitalisation.',
-        status: PolicyStatus.ACTIVE, createdBy: founder.id, activatedBy: compliance.id, boardApprovalRef: 'SANDBOX-NOT-BOARD-APPROVED', activatedAt: new Date(),
+  const plans = ds.getRepository(PricingPlan);
+  if (!(await plans.count())) {
+    const owner = await ds.getRepository(StaffUser).findOneByOrFail({ email: 'staff1@example.com' });
+    await plans.save(
+      plans.create({
+        name: 'Default plan for all customers (SANDBOX placeholder)',
+        scope: 'ALL', interestUnit: 'PER_ANNUM', interestRatePercent: 18, feeType: 'PERCENT', feeValue: 1, gstPercent: 18, tenureDays: 30,
+        minPrincipalPaise: 10_000_00, maxPrincipalPaise: 30_000_00, penalType: 'PERCENT_PER_DAY', penalValue: 0.1, coolingOffDays: 3,
+        aprCapPercent: null, createdBy: owner.id,
       }),
     );
-    console.log('\nActive pricing policy created (sandbox placeholder).');
+    console.log('\nDefault pricing plan created. The owner (staff1) can change it any time from the Owner panel.');
   }
   await app.close();
 }

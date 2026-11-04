@@ -64,8 +64,8 @@ Har integration ek interface (port) hai (`backend/src/integrations/ports.ts`). D
 - KFS accept kiye bina e-sign nahi, aur e-sign ke bina disbursal nahi (state machine).
 - Customer ne jo KFS dekha uska SHA-256 hash store hota hai. Hash match na ho to accept nahi hota.
 - Offer 15 minute mein expire ho jata hai. Purana offer kabhi sign nahi ho sakta.
-- APR board ke APR cap se upar ho to offer banta hi nahi.
-- Pricing maker-checker: Risk Manager draft banata hai aur Compliance Officer board approval reference ke saath activate karta hai. Dono alag insaan hone chahiye.
+- Agar Owner ne APR cap set kiya hai, to us cap se upar ka offer banta hi nahi.
+- Pricing aur offers sirf OWNER badal sakta hai (Section 8 dekhein). Har badlaav ka purana aur naya value audit log mein jata hai.
 - KFS mein processing fee ke saath GST, APR, penal charges, cooling-off period, recovery practices, LSP details aur grievance officer sab dikhte hain.
 - PAN aur account number encrypted (AES-256-GCM) store hote hain. Sirf masked value dikhayi jati hai.
 - Ek customer ka ek hi open loan ho sakta hai (database unique index bhi).
@@ -91,14 +91,14 @@ Har integration ek interface (port) hai (`backend/src/integrations/ports.ts`). D
 
 | Employee | System roles | Kaam |
 |---|---|---|
-| 1. Founder / Director | SUPER_ADMIN + CREDIT_RISK_MANAGER | Strategy, staff accounts, credit aur pricing policy ka draft |
-| 2. Compliance & Grievance Head | COMPLIANCE_OFFICER + GRIEVANCE_OFFICER | Pricing activate karna, RBI returns, complaints, PMLA Principal Officer |
+| 1. Founder / Owner | OWNER + SUPER_ADMIN + CREDIT_RISK_MANAGER | Strategy, staff accounts, credit policy, aur saari pricing aur offers (sirf Owner) |
+| 2. Compliance & Grievance Head | COMPLIANCE_OFFICER + GRIEVANCE_OFFICER | Pricing dekhna (badal nahi sakta), RBI returns, complaints, PMLA Principal Officer |
 | 3. Finance & Accounts | FINANCE_MANAGER | Reconciliation, books, GST |
 | 4. Credit & Operations | CREDIT_ANALYST + OPERATIONS_MANAGER + KYC_VERIFIER | Manual review, KYC exceptions, payout issues |
 | 5. Support & Collections | CUSTOMER_SUPPORT + COLLECTION_AGENT | Customer queries, lawful reminders |
 | External CA firm | AUDITOR (read-only) | Audit |
 
-System yeh combinations block karta hai: Risk + Compliance, Collection + Grievance, aur Auditor ke saath Super Admin, Credit Analyst ya Finance. Har staff login par password ke saath authenticator (TOTP) MFA lagta hai.
+System yeh combinations block karta hai: Owner + Auditor, Collection + Grievance, aur Auditor ke saath Super Admin, Credit Analyst ya Finance. OWNER role sirf doosra Owner hi de sakta hai. Har staff login par password ke saath authenticator (TOTP) MFA lagta hai.
 
 Technology development, hosting aur call-center overflow outsource kiye ja sakte hain, RBI outsourcing guidelines aur company oversight ke saath.
 
@@ -106,8 +106,42 @@ Technology development, hosting aur call-center overflow outsource kiye ja sakte
 
 ## 7. Pricing note
 
-Code mein sandbox ke liye placeholder pricing (18% p.a., 1% fee + GST, 30 din) aur 36% APR cap seed hai. Yeh sirf testing ke liye hai.
+Seed mein sirf ek placeholder plan hai (18% per year, 1% fee + GST, 30 din). Owner ise jab chahe badal sakta hai.
 
-Business plan ka original proposal (1% per day + 10% upfront fee) ka APR lagbhag **540%** banta hai. Unit test mein yeh calculation verify ki gayi hai. Is pricing par instant loan dena regulatory, reputational aur default risk teeno badhata hai. Final rate aur APR cap Board-approved interest-rate policy aur regulatory lawyer ki review ke baad hi set karein.
+Business plan ka original proposal (1% per day + 10% upfront fee) ka APR lagbhag **540%** banta hai. System yeh rate set karne deta hai (APR cap khali chhodne par), aur KFS mein APR saaf dikhata hai. Lekin itni mehngi pricing regulatory, reputational aur default risk badhati hai. Interest rate aur charges Board-approved interest-rate policy ke andar hone chahiye. Owner jo bhi rate set kare, wo us policy ke range mein ho, aur regulatory lawyer ne review kiya ho.
+
+---
+
+## 8. Fully custom pricing aur offers (sirf Owner)
+
+Owner panel (`/#owner`) se Owner yeh sab jab chahe set aur badal sakta hai:
+
+| Setting | Options |
+|---|---|
+| Interest | **% per day** (jaise 0.05% per day) ya **% per year** (jaise 18%) |
+| Processing fee | **% of loan** ya **flat ₹** (jaise ₹99) |
+| GST on fee | Koi bhi % |
+| Tenure | 1–365 din |
+| Loan amount | Min aur max ₹ |
+| Penal charge (due date ke baad) | None, % per day of overdue amount, ya flat ₹ per day |
+| Cooling-off | Din |
+| APR cap | Optional. Set kiya to usse upar ka offer nahi banega |
+| Validity | Kab se, kab tak (festival ya campaign offer ke liye) |
+| Max loans | Is offer par kitne loan (jaise personal offer sirf 1 baar) |
+| Priority | Ek saath kai offer chal rahe hon to zyada priority wala jeetega |
+| On / off | Turant band ya chalu |
+
+**Do tarah ke offer:**
+- **Offer for all customers:** default plan, ya ek time-limited campaign (jaise "Festival offer: zero fee" agle 7 din).
+- **Offer for one customer:** mobile number par personal rate (jaise "Special rate for you"). Customer ke register hone se pehle bhi banaya ja sakta hai.
+
+**Kaunsa offer lagega:** customer ka valid personal offer sabse pehle, warna sabke liye valid offer. Ek se zyada hon to zyada priority wala, phir naya wala. Owner panel mein "Check what a customer will be offered" se mobile aur amount daal kar dekh sakte hain.
+
+**Suraksha:**
+- Sirf OWNER role pricing badal sakta hai. Baaki roles sirf dekh sakte hain, ya bilkul nahi.
+- Har save par authenticator app ka fresh code maanga jata hai, chahe Owner already logged in ho.
+- Har badlaav audit log mein jata hai: kisne, kab, purana value aur naya value.
+
+**Badlaav kab lagta hai:** turant, lekin sirf naye offers par. Jo offer customer ko KFS mein dikh chuka hai ya sign ho chuka hai, uski terms freeze rehti hain. KFS mein na diya gaya charge baad mein nahi lagaya ja sakta, isliye system yeh rule khud enforce karta hai.
 
 *Yeh document legal opinion nahi hai. Launch se pehle RBI CoR, Digital Lending Directions, KFS format aur saare integrations qualified NBFC professionals se verify karwayein.*

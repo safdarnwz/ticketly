@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -25,8 +25,10 @@ export class StaffService {
       throw new BadRequestException(`These roles cannot be held by one person (maker-checker): ${conflicts.map((c) => c.join(' + ')).join('; ')}`);
   }
 
-  async create(input: { email: string; name: string; title: string; password: string; roles: Role[] }, actorId: string | null) {
+  /** actor = null only for the seed script. Only an OWNER can make another OWNER. */
+  async create(input: { email: string; name: string; title: string; password: string; roles: Role[] }, actorId: string | null, actorRoles: Role[] = []) {
     StaffService.validateRoles(input.roles);
+    if (actorId && input.roles.includes(Role.OWNER) && !actorRoles.includes(Role.OWNER)) throw new ForbiddenException('Only an owner can give the OWNER role');
     if (input.password.length < 12) throw new BadRequestException('Password must be at least 12 characters');
     if (await this.repo.exist({ where: { email: input.email.toLowerCase() } })) throw new ConflictException('Email already registered');
     const totpSecret = newTotpSecret();
@@ -45,6 +47,12 @@ export class StaffService {
     await this.audit.record({ actorType: 'STAFF', actorId: u.id, action: 'staff.login', entityType: 'staff_user', entityId: u.id });
     const p: StaffPrincipal = { typ: 'staff', sub: u.id, roles: u.roles };
     return { accessToken: await this.jwt.signAsync(p, { expiresIn: '8h' }), roles: u.roles, name: u.name };
+  }
+
+  /** Fresh authenticator code required for every pricing change (step-up check). */
+  async verifyStepUp(staffId: string, code: string | undefined) {
+    const u = await this.repo.findOne({ where: { id: staffId, active: true } });
+    if (!u || !code || !verifyTotp(u.totpSecret, code)) throw new UnauthorizedException('Enter the current code from your authenticator app to change pricing');
   }
 
   list() {

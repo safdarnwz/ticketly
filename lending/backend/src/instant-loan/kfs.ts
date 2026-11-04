@@ -1,12 +1,12 @@
 import { createHash } from 'crypto';
 import { formatInr } from '../common/money';
-import type { LoanOffer } from '../pricing/pricing.calc';
-import type { PricingPolicy } from '../pricing/pricing-policy.entity';
+import type { FrozenOffer } from '../pricing/offer';
 
 export interface KeyFactStatement {
   version: 'KFS-1';
   applicationId: string;
   lender: string;
+  offerName: string | null;
   generatedAt: string;
   validUntil: string;
   borrower: { name: string; mobile: string; panMasked: string };
@@ -22,7 +22,7 @@ export interface KeyFactStatement {
   };
   charges: { item: string; amount: string; deductedUpfront: boolean }[];
   netDisbursal: string;
-  interest: { annualRatePercent: string; type: string; amount: string };
+  interest: { rate: string; perDayPercent: string; perAnnumPercent: string; type: string; amount: string };
   totalAmountPayable: string;
   totalCostOfCredit: string;
   aprPercent: string;
@@ -33,7 +33,7 @@ export interface KeyFactStatement {
   lendingServiceProvider: string;
   grievanceRedressal: string;
   notes: string[];
-  raw: LoanOffer;
+  raw: FrozenOffer;
 }
 
 /** Deterministic JSON (sorted keys) so the hash the borrower accepts can be verified later. */
@@ -47,6 +47,13 @@ export function stableStringify(v: unknown): string {
 export const kfsHash = (k: KeyFactStatement) => createHash('sha256').update(stableStringify(k)).digest('hex');
 
 const pct = (bps: number) => (bps / 100).toFixed(2);
+const trim = (n: number, dp = 6) => String(Number(n.toFixed(dp)));
+
+export function penalText(o: Pick<FrozenOffer, 'penalType' | 'penalValue'>): string {
+  if (o.penalType === 'NONE' || !o.penalValue) return 'No penal charges.';
+  const v = o.penalType === 'PERCENT_PER_DAY' ? `${trim(o.penalValue, 4)}% per day of the overdue amount` : `${formatInr(Math.round(o.penalValue * 100))} per day`;
+  return `${v}, only after the due date, on the overdue amount only. Not added to interest, no compounding.`;
+}
 const addDays = (d: Date, n: number) => new Date(d.getTime() + n * 86_400_000).toISOString().slice(0, 10);
 
 export function buildKfs(input: {
@@ -57,14 +64,14 @@ export function buildKfs(input: {
   validUntil: Date;
   borrower: { name: string; mobile: string; panMasked: string };
   bank: { last4: string; ifsc: string };
-  offer: LoanOffer;
-  policy: PricingPolicy;
+  offer: FrozenOffer;
 }): KeyFactStatement {
-  const { offer: o, policy: p } = input;
+  const o = input.offer;
   return {
     version: 'KFS-1',
     applicationId: input.applicationId,
     lender: input.lender,
+    offerName: o.customerLabel,
     generatedAt: input.generatedAt.toISOString(),
     validUntil: input.validUntil.toISOString(),
     borrower: { ...input.borrower, mobile: `XXXXXX${input.borrower.mobile.slice(-4)}` },
@@ -79,17 +86,25 @@ export function buildKfs(input: {
       dueDateRule: `${o.tenureDays} days from the date the money is credited to your account`,
     },
     charges: [
-      { item: `Processing fee (${pct(p.processingFeeBps)}% of loan)`, amount: formatInr(o.processingFeePaise), deductedUpfront: true },
-      { item: `GST on processing fee (${pct(p.gstOnFeeBps)}%)`, amount: formatInr(o.gstOnFeePaise), deductedUpfront: true },
+      { item: o.feeType === 'PERCENT' ? `Processing fee (${trim(o.feeValue, 4)}% of loan)` : 'Processing fee (flat)', amount: formatInr(o.processingFeePaise), deductedUpfront: true },
+      { item: `GST on processing fee (${trim(o.gstPercent, 3)}%)`, amount: formatInr(o.gstOnFeePaise), deductedUpfront: true },
     ],
     netDisbursal: formatInr(o.netDisbursalPaise),
-    interest: { annualRatePercent: pct(o.annualInterestBps), type: 'Fixed, simple interest, actual/365', amount: formatInr(o.interestPaise) },
+    interest: {
+      rate: o.interestUnit === 'PER_DAY'
+        ? `${trim(o.interestRatePercent)}% per day (${trim(o.annualInterestPercent, 2)}% per year)`
+        : `${trim(o.interestRatePercent)}% per year (${trim(o.dailyInterestPercent, 4)}% per day)`,
+      perDayPercent: trim(o.dailyInterestPercent),
+      perAnnumPercent: trim(o.annualInterestPercent, 4),
+      type: 'Fixed, simple interest on the loan amount',
+      amount: formatInr(o.interestPaise),
+    },
     totalAmountPayable: formatInr(o.totalRepayablePaise),
     totalCostOfCredit: formatInr(o.totalCostPaise),
     aprPercent: pct(o.aprBps),
     effectiveAnnualCostPercent: pct(o.effectiveAnnualBps),
-    penalCharges: p.penalChargesText,
-    coolingOff: `You may exit within ${p.coolingOffDays} days of disbursal by repaying the principal and proportionate APR, with no penalty.`,
+    penalCharges: penalText(o),
+    coolingOff: `You may exit within ${o.coolingOffDays} days of disbursal by repaying the principal and proportionate APR, with no penalty.`,
     recovery: 'Reminders only by SMS, email or calls between 8 AM and 7 PM. No threats, no contact with your phone contacts.',
     lendingServiceProvider: 'None. The lender deals with you directly.',
     grievanceRedressal: `${input.grievanceOfficer}. If not resolved in 30 days you may complain on the RBI Complaint Management System (cms.rbi.org.in).`,

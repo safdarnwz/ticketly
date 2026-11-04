@@ -23,7 +23,13 @@ let ds: DataSource;
 let http: ReturnType<typeof request>;
 let mobileSeq = 9000000000;
 
-const staff: Record<string, { token: string; id: string }> = {};
+const staff: Record<string, { token: string; id: string; secret: string }> = {};
+const owner = () => ({ Authorization: `Bearer ${staff.founder.token}`, 'x-totp': totp(staff.founder.secret) });
+const DEFAULT_PLAN = {
+  name: 'Default', scope: 'ALL', interestUnit: 'PER_ANNUM', interestRatePercent: 18, feeType: 'PERCENT', feeValue: 1, gstPercent: 18,
+  tenureDays: 30, minAmount: 10000, maxAmount: 30000, penalType: 'PERCENT_PER_DAY', penalValue: 0.1, coolingOffDays: 3, aprCapPercent: 36,
+};
+let defaultPlanId: string;
 
 async function login(mobile: string) {
   const r = await http.post('/api/auth/otp/request').send({ mobile }).expect(200);
@@ -32,8 +38,8 @@ async function login(mobile: string) {
 }
 
 /** Runs the customer journey up to (and including) the risk assessment. */
-async function toAssessment(opts: { pan: string; account: string; amount?: number; income?: number }) {
-  const token = await login(String(mobileSeq++));
+async function toAssessment(opts: { pan: string; account: string; amount?: number; income?: number; mobile?: string }) {
+  const token = await login(opts.mobile ?? String(mobileSeq++));
   const auth = { Authorization: `Bearer ${token}`, 'X-Forwarded-For': `10.0.${Math.floor(mobileSeq / 250) % 250}.${mobileSeq % 250}` };
   const a = await http.post('/api/applications').set(auth).send({ deviceId: `dev-${mobileSeq}` }).expect(201);
   const id = a.body.id;
@@ -81,22 +87,19 @@ beforeAll(async () => {
   const mk = async (key: string, roles: Role[]) => {
     const r = await svc.create({ email: `${key}@t.in`, name: key, title: key, password: 'Password-123456', roles }, null);
     const l = await http.post('/api/staff/login').send({ email: `${key}@t.in`, password: 'Password-123456', totp: totp(r.totpSecret) }).expect(200);
-    staff[key] = { token: l.body.accessToken, id: r.id };
+    staff[key] = { token: l.body.accessToken, id: r.id, secret: r.totpSecret };
   };
-  await mk('founder', [Role.SUPER_ADMIN, Role.CREDIT_RISK_MANAGER]);
+  await mk('founder', [Role.OWNER, Role.SUPER_ADMIN, Role.CREDIT_RISK_MANAGER]);
   await mk('compliance', [Role.COMPLIANCE_OFFICER, Role.GRIEVANCE_OFFICER]);
   await mk('creditops', [Role.CREDIT_ANALYST, Role.OPERATIONS_MANAGER, Role.KYC_VERIFIER]);
   await mk('finance', [Role.FINANCE_MANAGER]);
   await mk('support', [Role.CUSTOMER_SUPPORT, Role.COLLECTION_AGENT]);
 
-  const policy = {
-    name: '18% / 1% / 30d', annualInterestBps: 1800, processingFeeBps: 100, gstOnFeeBps: 1800, tenureDays: 30,
-    minPrincipalPaise: 1_000_000, maxPrincipalPaise: 3_000_000, aprCapBps: 3600, coolingOffDays: 3, penalChargesText: '2% per month on overdue amount only',
-  };
-  const d = await http.post('/api/admin/pricing-policies').set('Authorization', `Bearer ${staff.founder.token}`).send(policy).expect(201);
-  // Maker cannot also be checker (the founder lacks the permission anyway); compliance activates.
-  await http.post(`/api/admin/pricing-policies/${d.body.id}/activate`).set('Authorization', `Bearer ${staff.founder.token}`).send({ boardApprovalRef: 'BR-1' }).expect(403);
-  await http.post(`/api/admin/pricing-policies/${d.body.id}/activate`).set('Authorization', `Bearer ${staff.compliance.token}`).send({ boardApprovalRef: 'BR-2026-11-01' }).expect(200);
+  // Only the owner can set prices, and only with a fresh authenticator code.
+  await http.post('/api/admin/pricing-plans').set('Authorization', `Bearer ${staff.compliance.token}`).send(DEFAULT_PLAN).expect(403);
+  await http.post('/api/admin/pricing-plans').set('Authorization', `Bearer ${staff.founder.token}`).send(DEFAULT_PLAN).expect(401);
+  const d = await http.post('/api/admin/pricing-plans').set(owner()).send(DEFAULT_PLAN).expect(201);
+  defaultPlanId = d.body.id;
 });
 
 afterAll(async () => {
@@ -191,10 +194,82 @@ describe('5-minute instant disbursement journey', () => {
     const r = await http
       .post('/api/admin/staff')
       .set('Authorization', `Bearer ${staff.founder.token}`)
-      .send({ email: 'x@t.in', name: 'Xy', title: 'Xy', password: 'Password-123456', roles: ['CREDIT_RISK_MANAGER', 'COMPLIANCE_OFFICER'] })
+      .send({ email: 'x@t.in', name: 'Xy', title: 'Xy', password: 'Password-123456', roles: ['OWNER', 'AUDITOR'] })
       .expect(400);
     expect(r.body.message).toMatch(/maker-checker/);
     await expect(ds.query(`DELETE FROM audit_logs`)).rejects.toThrow(/append-only/);
+  });
+
+  it('gives a specific customer their personal offer (per-day interest, flat fee, one use)', async () => {
+    const mobile = '8800000001';
+    const plan = await http.post('/api/admin/pricing-plans').set(owner()).send({
+      ...DEFAULT_PLAN, name: 'VIP', scope: 'CUSTOMER', customerMobile: mobile, customerLabel: 'Special rate for you',
+      interestUnit: 'PER_DAY', interestRatePercent: 0.04, feeType: 'FLAT', feeValue: 99, maxUses: 1,
+    }).expect(201);
+    const pre = await http.get(`/api/admin/pricing-plans/preview?mobile=${mobile}&amount=20000`).set('Authorization', `Bearer ${staff.compliance.token}`).expect(200);
+    expect(pre.body.plan.id).toBe(plan.body.id);
+
+    const { id, auth, res } = await toAssessment({ pan: 'ABCDE1357F', account: '50100055550001', mobile });
+    expect(res.body.offer.planId).toBe(plan.body.id);
+    expect(res.body.offer.processingFeePaise).toBe(9_900);
+    expect(res.body.offer.interestPaise).toBe(24_000); // 0.04% × 30 days × ₹20,000
+    const { kfs } = await signAndDisburse(id, auth);
+    expect(kfs.offerName).toBe('Special rate for you');
+    expect(kfs.interest.rate).toMatch(/^0.04% per day/);
+    expect((await settle(id, auth)).status).toBe('DISBURSED');
+
+    // Used once → the customer falls back to the plan for everyone.
+    const after = await http.get(`/api/admin/pricing-plans/preview?mobile=${mobile}&amount=20000`).set(owner()).expect(200);
+    expect(after.body.plan.id).toBe(defaultPlanId);
+  });
+
+  it('runs a time-limited offer for all customers and switches it off', async () => {
+    const until = new Date(Date.now() + 3_600_000).toISOString();
+    const promo = await http.post('/api/admin/pricing-plans').set(owner()).send({
+      ...DEFAULT_PLAN, name: 'Festival', customerLabel: 'Festival offer: zero fee', feeValue: 0, priority: 10, validUntil: until,
+    }).expect(201);
+    const { res } = await toAssessment({ pan: 'ABCDE1468F', account: '50100055550002' });
+    expect(res.body.offer.planId).toBe(promo.body.id);
+    expect(res.body.offer.processingFeePaise).toBe(0);
+
+    await http.patch(`/api/admin/pricing-plans/${promo.body.id}`).set(owner()).send({ active: false }).expect(200);
+    const pre = await http.get('/api/admin/pricing-plans/preview?mobile=9999999999&amount=20000').set(owner()).expect(200);
+    expect(pre.body.plan.id).toBe(defaultPlanId);
+  });
+
+  it('applies owner changes to new offers only; an offer already shown keeps its KFS', async () => {
+    const { id, auth, res } = await toAssessment({ pan: 'ABCDE1579F', account: '50100055550003' });
+    const before = await http.get(`/api/applications/${id}/kfs`).set(auth).expect(200);
+    await http.patch(`/api/admin/pricing-plans/${defaultPlanId}`).set(owner()).send({ interestRatePercent: 20 }).expect(200);
+    const again = await http.get(`/api/applications/${id}/kfs`).set(auth).expect(200);
+    expect(again.body.kfsHash).toBe(before.body.kfsHash);
+    await signAndDisburse(id, auth);
+    const s = await settle(id, auth);
+    expect(s.loan.totalRepayablePaise).toBe(res.body.offer.totalRepayablePaise);
+
+    const fresh = await http.get('/api/admin/pricing-plans/preview?mobile=9999999999&amount=20000').set(owner()).expect(200);
+    expect(fresh.body.offer.annualInterestPercent).toBe(20);
+    const audit = await http.get(`/api/admin/audit?entityType=pricing_plan&entityId=${defaultPlanId}`).set(owner()).expect(200);
+    expect(audit.body[0].data).toMatchObject({ before: { interestRatePercent: 18 }, after: { interestRatePercent: 20 } });
+    await http.patch(`/api/admin/pricing-plans/${defaultPlanId}`).set(owner()).send({ interestRatePercent: 18 }).expect(200);
+  });
+
+  it('validates plans: APR cap, customer mobile, fees larger than the loan', async () => {
+    const r = await http.post('/api/admin/pricing-plans').set(owner()).send({ ...DEFAULT_PLAN, interestUnit: 'PER_DAY', interestRatePercent: 1 }).expect(400);
+    expect(r.body.message).toMatch(/APR cap/);
+    await http.post('/api/admin/pricing-plans').set(owner()).send({ ...DEFAULT_PLAN, scope: 'CUSTOMER' }).expect(400);
+    await http.post('/api/admin/pricing-plans').set(owner()).send({ ...DEFAULT_PLAN, feeType: 'FLAT', feeValue: 15000, aprCapPercent: null }).expect(400);
+    // Without a cap the owner may set any rate, e.g. 1% per day.
+    const ok = await http.post('/api/admin/pricing-plans').set(owner()).send({ ...DEFAULT_PLAN, name: 'Uncapped', active: false, interestUnit: 'PER_DAY', interestRatePercent: 1, aprCapPercent: null }).expect(201);
+    expect(ok.body.interestRatePercent).toBe(1);
+  });
+
+  it('lets only an owner create another owner', async () => {
+    const svc = app.get(StaffService);
+    const r = await svc.create({ email: 'admin2@t.in', name: 'Admin', title: 'Admin', password: 'Password-123456', roles: [Role.SUPER_ADMIN] }, null);
+    const l = await http.post('/api/staff/login').send({ email: 'admin2@t.in', password: 'Password-123456', totp: totp(r.totpSecret) }).expect(200);
+    await http.post('/api/admin/staff').set('Authorization', `Bearer ${l.body.accessToken}`)
+      .send({ email: 'o2@t.in', name: 'Owner Two', title: 'Owner', password: 'Password-123456', roles: ['OWNER'] }).expect(403);
   });
 
   it('reports the SLA: share within 5 minutes and per-step timings', async () => {

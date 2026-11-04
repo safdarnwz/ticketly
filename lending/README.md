@@ -6,7 +6,7 @@ OTP login → KYC → bank verification → credit & risk → approval → KFS &
 | Part | Stack |
 |---|---|
 | `backend/` | NestJS 11, TypeORM 0.3, PostgreSQL 16, UUIDv7 primary keys |
-| `frontend/` | React 19 + Vite (customer journey with a live 5:00 timer) |
+| `frontend/` | React 19 + Vite: customer journey with a live 5:00 timer, and the Owner pricing panel at `/#owner` |
 | `docs/INSTANT_DISBURSAL.md` | Business plan addendum: journey, integrations, compliance, 5-person team |
 
 > All external integrations run as **sandbox simulators** by default. No real KYC, bureau pull,
@@ -29,7 +29,9 @@ cd lending/frontend && npm install && npm run dev
 ```
 
 Open http://localhost:5173. Migrations run automatically on start. `npm run seed` creates the
-5 staff accounts (it prints their TOTP secrets) and a sandbox pricing policy.
+5 staff accounts (it prints their TOTP secrets) and a default pricing plan. Log in as `staff1@example.com`
+(the owner; password `ChangeMe-123456`, code from the printed TOTP secret) at http://localhost:5173/#owner
+to change pricing or create offers.
 
 ### Sandbox test data
 
@@ -58,7 +60,8 @@ cd lending/backend && TEST_DATABASE_URL=postgres://lending:lending@localhost:543
 
 The e2e suite drives the whole journey against a real PostgreSQL database (it drops and recreates
 the schema of the test database). It covers IMPS→NEFT fallback, the closed-account cancel path,
-name mismatch, rejection, manual review, KFS hash checks, webhook signatures, maker-checker,
+name mismatch, rejection, manual review, KFS hash checks, webhook signatures, owner-only pricing,
+personal and campaign offers, frozen terms after plan edits,
 role conflicts, the append-only audit log and the SLA metrics.
 
 ## API (prefix `/api`)
@@ -67,8 +70,10 @@ Customer: `POST auth/otp/request`, `POST auth/otp/verify`, `POST applications`, 
 `POST applications/:id/kyc`, `…/bank-account`, `…/assessment`, `GET …/kfs`, `POST …/kfs/accept`,
 `POST …/esign/initiate`, `POST …/esign/complete`.
 
-Staff (password + TOTP): `POST staff/login`, `GET admin/roles`, `admin/staff`, `admin/pricing-policies`
-(draft / activate), `admin/applications/review-queue`, `POST admin/applications/:id/review`,
+Staff (password + TOTP): `POST staff/login`, `GET admin/roles`, `admin/staff`,
+`GET admin/pricing-plans`, `GET admin/pricing-plans/preview?mobile=&amount=`,
+`POST admin/pricing-plans` and `PATCH admin/pricing-plans/:id` (OWNER only, header `x-totp` with a fresh code),
+`admin/applications/review-queue`, `POST admin/applications/:id/review`,
 `admin/disbursements`, `POST admin/reconciliation/run`, `GET admin/metrics/instant-disbursal`, `GET admin/audit`.
 
 Provider callback: `POST webhooks/payout` (header `x-signature` = HMAC-SHA256 of the raw body).
@@ -78,5 +83,5 @@ Provider callback: `POST webhooks/payout` (header `x-signature` = HMAC-SHA256 of
 - Live adapters for each port, signed vendor contracts, and RBI outsourcing oversight.
 - Real secrets in a secrets manager (`JWT_SECRET`, `PII_ENCRYPTION_KEY`, `PII_HASH_PEPPER`, `PAYOUT_WEBHOOK_SECRET`). The app refuses to start in live mode without them.
 - DLT-registered SMS template for OTPs, rate limiting at the edge, VAPT and a security audit.
-- Board-approved pricing and APR cap, legal review of the KFS and loan agreement text.
-- Not built yet: repayment collection (UPI / eNACH), overdue tracking, bureau reporting, RBI returns, admin panel UI.
+- Owner-set pricing within the board-approved interest-rate policy, legal review of the KFS and loan agreement text.
+- Not built yet: repayment collection (UPI / eNACH), overdue tracking, bureau reporting, RBI returns, and admin screens other than the Owner pricing panel.

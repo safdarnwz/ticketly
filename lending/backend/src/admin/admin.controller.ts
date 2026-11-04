@@ -1,11 +1,12 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { StaffPrincipal } from '../auth/auth.types';
 import { CurrentUser, RequirePermissions, StaffAuthGuard } from '../auth/guards';
 import { FIVE_PERSON_TEAM, Permission, ROLE_PERMISSIONS } from '../common/roles';
 import { DisbursementService } from '../disbursement/disbursement.service';
-import { ActivatePolicyDto, CreateStaffDto, PolicyDraftDto, ReviewDto, StaffLoginDto } from '../instant-loan/dto';
+import { CreateStaffDto, PlanDto, ReviewDto, StaffLoginDto, UpdatePlanDto } from '../instant-loan/dto';
 import { InstantLoanService } from '../instant-loan/instant-loan.service';
+import { toPlanInput, toPlanPatch } from '../pricing/plan.mapper';
 import { PricingService } from '../pricing/pricing.service';
 import { StaffService } from '../staff/staff.service';
 import { MetricsService } from './metrics.service';
@@ -43,22 +44,37 @@ export class AdminController {
 
   @Post('staff') @RequirePermissions(Permission.STAFF_MANAGE)
   createStaff(@CurrentUser() u: StaffPrincipal, @Body() dto: CreateStaffDto) {
-    return this.staff.create(dto, u.sub);
+    return this.staff.create(dto, u.sub, u.roles);
   }
 
-  @Get('pricing-policies') @RequirePermissions(Permission.PRICING_VIEW)
-  policies() {
-    return this.pricing.list();
+  // ---- Pricing plans & offers: OWNER only, fresh authenticator code on every change ----
+
+  @Get('pricing-plans') @RequirePermissions(Permission.PRICING_VIEW)
+  plans(@Query('scope') scope?: string, @Query('mobile') mobile?: string) {
+    return this.pricing.list({ scope, mobile });
   }
 
-  @Post('pricing-policies') @RequirePermissions(Permission.PRICING_DRAFT)
-  draft(@CurrentUser() u: StaffPrincipal, @Body() dto: PolicyDraftDto) {
-    return this.pricing.draft(dto, u.sub);
+  @Get('pricing-plans/preview') @RequirePermissions(Permission.PRICING_VIEW)
+  preview(@Query('mobile') mobile: string, @Query('amount') amount: string) {
+    if (!/^[6-9]\d{9}$/.test(mobile ?? '') || !(Number(amount) > 0)) throw new BadRequestException('mobile and amount are required');
+    return this.pricing.preview(mobile, Math.round(Number(amount) * 100));
   }
 
-  @Post('pricing-policies/:id/activate') @HttpCode(200) @RequirePermissions(Permission.PRICING_ACTIVATE)
-  activate(@CurrentUser() u: StaffPrincipal, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ActivatePolicyDto) {
-    return this.pricing.activate(id, dto.boardApprovalRef, u.sub);
+  @Get('pricing-plans/:id') @RequirePermissions(Permission.PRICING_VIEW)
+  plan(@Param('id', ParseUUIDPipe) id: string) {
+    return this.pricing.get(id);
+  }
+
+  @Post('pricing-plans') @RequirePermissions(Permission.PRICING_MANAGE)
+  async createPlan(@CurrentUser() u: StaffPrincipal, @Headers('x-totp') code: string | undefined, @Body() dto: PlanDto) {
+    await this.staff.verifyStepUp(u.sub, code);
+    return this.pricing.create(toPlanInput(dto), u.sub);
+  }
+
+  @Patch('pricing-plans/:id') @RequirePermissions(Permission.PRICING_MANAGE)
+  async updatePlan(@CurrentUser() u: StaffPrincipal, @Headers('x-totp') code: string | undefined, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdatePlanDto) {
+    await this.staff.verifyStepUp(u.sub, code);
+    return this.pricing.update(id, toPlanPatch(dto), u.sub);
   }
 
   @Get('applications/review-queue') @RequirePermissions(Permission.APPLICATION_REVIEW)

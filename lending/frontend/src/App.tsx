@@ -1,5 +1,6 @@
 import { FormEvent, ReactNode, useCallback, useEffect, useState } from 'react';
 import { api, deviceId, inr, mmss } from './api';
+import { OwnerPanel } from './OwnerPanel';
 import type { AppStatus } from './types';
 
 type Screen = 'mobile' | 'otp' | 'kyc' | 'bank' | 'assess' | 'kfs' | 'esign' | 'disbursing' | 'done' | 'review' | 'rejected' | 'failed' | 'expired';
@@ -23,6 +24,16 @@ const REASON_TEXT: Record<string, string> = {
 };
 
 export function App() {
+  const [route, setRoute] = useState(location.hash);
+  useEffect(() => {
+    const f = () => setRoute(location.hash);
+    addEventListener('hashchange', f);
+    return () => removeEventListener('hashchange', f);
+  }, []);
+  return route === '#owner' ? <OwnerPanel /> : <CustomerJourney />;
+}
+
+function CustomerJourney() {
   const [screen, setScreen] = useState<Screen>('mobile');
   const [token, setToken] = useState<string | null>(null);
   const [mobile, setMobile] = useState('');
@@ -160,6 +171,7 @@ export function App() {
       <footer>
         *Target time, not a guarantee. KYC, credit bureau, bank verification, e-sign or banking network delays can make it longer.
         The lender sends money directly to your verified account. No hidden charges: everything is in the Key Fact Statement.
+        <br /><a href="#owner">Owner login</a>
       </footer>
     </div>
   );
@@ -269,11 +281,12 @@ function KfsView({ appId, token, busy, onAccept }: { appId: string; token: strin
       <p className="muted">Read this before you sign. Offer valid until {new Date(k.validUntil).toLocaleTimeString()}.</p>
       <table className="kfs">
         <tbody>
+          {k.offerName && <tr className="hl"><th>Your offer</th><td>{k.offerName}</td></tr>}
           <tr><th>Lender</th><td>{k.lender}</td></tr>
           <tr><th>Loan amount</th><td>{k.loan.sanctionedAmount}</td></tr>
           {k.charges.map((c: any) => <tr key={c.item}><th>{c.item}</th><td>{c.amount} (deducted upfront)</td></tr>)}
           <tr className="hl"><th>You receive</th><td>{k.netDisbursal} in account XXXX{k.disbursalAccount.last4}</td></tr>
-          <tr><th>Interest ({k.interest.annualRatePercent}% p.a., {k.interest.type})</th><td>{k.interest.amount}</td></tr>
+          <tr><th>Interest: {k.interest.rate}</th><td>{k.interest.amount}</td></tr>
           <tr className="hl"><th>Total you repay</th><td>{k.totalAmountPayable} in one payment</td></tr>
           <tr><th>When</th><td>{k.loan.dueDateRule} (about {k.loan.estimatedDueDateIfDisbursedToday})</td></tr>
           <tr><th>Total cost of credit</th><td>{k.totalCostOfCredit}</td></tr>
