@@ -1,0 +1,56 @@
+:root {
+  --bg: #f6f7fb; --card: #ffffff; --text: #1b1f2a; --muted: #5d6475; --line: #e3e6ee;
+  --brand: #1f5eff; --brand-ink: #ffffff; --ok: #0f8a4b; --warn: #b26b00; --bad: #c0362c; --hl: #eef3ff;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: var(--text); background: var(--bg);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f1115; --card: #181b22; --text: #e8eaf0; --muted: #9aa1b2; --line: #2a2f3a; --brand: #5b8cff; --hl: #1d2433; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); }
+.page { max-width: 980px; margin: 0 auto; padding: 16px; }
+header { margin: 8px 0 16px; }
+.brand { font-size: 22px; font-weight: 700; }
+.tagline { color: var(--muted); }
+.timer { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: baseline; margin-bottom: 16px; }
+.timer .clock { font: 700 34px ui-monospace, monospace; }
+.timer .of { color: var(--muted); }
+.timer .bar { grid-column: 1 / -1; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.timer .bar div { height: 100%; background: var(--ok); transition: width 0.25s linear; }
+.timer.late .bar div { background: var(--warn); }
+main { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; }
+@media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+h2 { margin: 0 0 14px; font-size: 20px; }
+h3 { margin: 0 0 10px; font-size: 15px; }
+.field { display: block; margin-bottom: 14px; }
+.field span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+input:not([type=checkbox]):not([type=range]), select { width: 100%; padding: 11px 12px; font-size: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); }
+input[type=range] { width: 100%; }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; margin: 10px 0 14px; }
+button { width: 100%; padding: 13px; font-size: 16px; font-weight: 600; border: 0; border-radius: 8px; background: var(--brand); color: var(--brand-ink); cursor: pointer; }
+button:disabled { opacity: 0.55; cursor: default; }
+.error { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); padding: 10px 12px; border-radius: 8px; margin-bottom: 14px; }
+.muted { color: var(--muted); font-size: 14px; }
+.sandbox { font-size: 12px; color: var(--warn); border: 1px dashed var(--warn); border-radius: 6px; padding: 6px 8px; }
+.center { text-align: center; padding: 10px 0; }
+.big { font-size: 18px; font-weight: 600; color: var(--ok); }
+.tick { font-size: 44px; color: var(--ok); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; text-align: left; margin-top: 16px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+.kfs { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 8px; }
+.kfs th, .kfs td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.kfs th { width: 45%; font-weight: 500; color: var(--muted); }
+.kfs tr.hl { background: var(--hl); font-weight: 600; }
+.timeline ol { list-style: none; padding: 0; margin: 0; }
+.timeline li { display: grid; grid-template-columns: 46px 1fr auto; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.timeline .t { font-family: ui-monospace, monospace; color: var(--muted); }
+.timeline .d { color: var(--muted); font-size: 12px; }
+.timeline li.passed .l::before { content: '✓ '; color: var(--ok); }
+.timeline li.failed .l::before { content: '✕ '; color: var(--bad); }
+.timeline li.referred .l::before { content: '• '; color: var(--warn); }
+.timeline li.todo { color: var(--muted); }
+.spinner { width: 36px; height: 36px; margin: 10px auto; border: 4px solid var(--line); border-top-color: var(--brand); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+footer { color: var(--muted); font-size: 12px; margin: 24px 0; }
